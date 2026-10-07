@@ -20,3 +20,13 @@ Quality:
   JSON schema (M3).
 * Pidgin "send me the code wey dem send you" → translation "send them the code they sent to me": lexicon needs a
   "code … sent" credential pattern (M1 fix).
+
+## S2 — Semantic search calibration (7 Oct 2026)
+
+`BAAI/bge-small-en-v1.5` via fastembed (ONNX, CPU, 384-dim, ~5–6 ms/query, ~130 MB). Probed the core + demo-bank
+packs with paraphrases (no shared words) and off-topic questions:
+
+* Off-topic best similarity: 0.50–0.55 · relevant paraphrases: 0.63–0.86 → `DENSE_MIN = 0.62`.
+* Pidgin "my money no reach the person but they debited me" → failed-transfer (0.76), no keyword overlap.
+* Two misses were content gaps (loan-app shaming, SIM-swap "network stopped") → keywords added to the core pack.
+* FAISS not needed: packs are hundreds–thousands of entries; brute-force numpy dot product is < 1 ms and exact.

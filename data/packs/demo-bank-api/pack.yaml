@@ -1,0 +1,19 @@
+# SAMPLE partner pack served over HTTP (disabled by default). Run the reference server to try it:
+#   DEMO_BANK_TOKEN=dev-token python scripts/mock_partner_api.py
+# then enable this pack (include it in the deployment's pack list) with the same DEMO_BANK_TOKEN.
+id: demo-bank-api
+name: Demo Bank API (sample)
+owner: Fictional example partner, not a real bank
+kind: partner
+priority: 50
+sample: true
+enabled: false
+description: Same content as demo-bank, synced from the partner's API instead of files.
+source:
+  type: http
+  base_url: http://127.0.0.1:8900
+  mode: sync
+  timeout_s: 1.5
+  refresh_s: 3600
+  auth:
+    env: DEMO_BANK_TOKEN

@@ -1,0 +1,292 @@
+# Core entries. Rules for authors:
+#  * one idea per fact, short sentences, no jargon (N-ATLAS restates them in the user's language)
+#  * never promise an outcome ("you will get your money back"); never say something is "safe"
+#  * every red flag in kudiguard.domain.Flag must have at least one entry (enforced by tests)
+
+# --- red flags ---------------------------------------------------------------------------------------
+- id: flag-asks-credentials
+  title: Never share your OTP, PIN, password or BVN
+  flags: [asks_credentials]
+  facts:
+    - Your bank will never ask for your OTP, PIN, password or card details by call, SMS, WhatsApp or social media.
+    - Anyone who asks for these is trying to steal your money.
+    - An OTP is like the key to your account. Whoever has it can move your money.
+  actions:
+    - Do not share the code. End the call or chat.
+    - If you already shared it, call your bank immediately using the number on the back of your card and ask them to block your account.
+    - Change your PIN and password.
+  keywords: [otp, pin, password, bvn, code, verification code]
+
+- id: flag-remote-access
+  title: Never install apps a stranger asks you to install
+  flags: [remote_access]
+  facts:
+    - Apps like AnyDesk or TeamViewer let another person see and control your phone.
+    - Scammers use them to watch you type your PIN and to open your bank app.
+  actions:
+    - Do not install the app. If you installed it, uninstall it now.
+    - Call your bank using the number on the back of your card and tell them what happened.
+  keywords: [anydesk, teamviewer, screen share, install app]
+
+- id: flag-guaranteed-returns
+  title: Guaranteed high returns are a warning sign
+  flags: [guaranteed_returns]
+  facts:
+    - Real investments can lose money. Nobody can guarantee high profits.
+    - Schemes that promise to double your money are usually Ponzi schemes. Early members are paid with new members' money until it collapses.
+    - Investment companies in Nigeria must be registered with the Securities and Exchange Commission (SEC).
+  actions:
+    - Do not pay. Check if the company is registered on the SEC Nigeria website.
+    - Be careful when friends or family invite you. Scammers use people you trust.
+  keywords: [investment, ponzi, double money, crypto, forex, returns, profit]
+
+- id: flag-wrong-transfer
+  title: "\"I sent money to you by mistake\""
+  flags: [wrong_transfer]
+  facts:
+    - A common trick is to claim money was sent to you by mistake and ask you to send it back.
+    - Sometimes no money was sent at all and the alert is fake. Sometimes the money is stolen and you get in trouble.
+  actions:
+    - Do not send any money back yourself.
+    - Check your balance in your bank app or by USSD, not from an SMS.
+    - Tell the person to contact their own bank to reverse it, and inform your bank.
+  keywords: [wrong transfer, mistake, reverse, refund, sent by mistake]
+
+- id: flag-account-threat
+  title: "\"Your account, BVN or SIM will be blocked\""
+  flags: [account_threat]
+  facts:
+    - Scammers frighten people by saying their account, BVN, NIN or SIM will be blocked.
+    - They then ask for codes or payment to "fix" it.
+    - Banks and telecom companies do not fix accounts through strangers on the phone.
+  actions:
+    - Do not reply or click any link.
+    - Contact your bank or network provider yourself, using their official number.
+  keywords: [blocked, suspended, deactivated, restricted, frozen, barred]
+
+- id: flag-upfront-fee
+  title: Paying a fee to receive money, a loan or a job
+  flags: [upfront_fee]
+  facts:
+    - If you must pay first to receive a prize, loan, grant or job, it is usually a scam.
+    - Fake fees include "processing", "registration", "clearance" and "activation" fees.
+    - Government grants and real employers do not ask for fees through personal accounts.
+  actions:
+    - Do not pay. Ask for the company's official details and check them yourself.
+  keywords: [processing fee, registration fee, activation, grant, job offer, recruitment, loan fee]
+
+- id: flag-prize-lottery
+  title: "\"Congratulations, you have won\""
+  flags: [prize_lottery]
+  facts:
+    - You cannot win a promo or lottery you did not enter.
+    - Fake promos use names of banks, telecom companies and the government.
+  actions:
+    - Do not pay any fee and do not share codes to "claim" a prize.
+    - Check the promo on the company's official website or by calling their official number.
+  keywords: [won, winner, promo, prize, lottery, giveaway, selected]
+
+- id: flag-fake-payment
+  title: Fake credit alerts
+  flags: [fake_payment]
+  facts:
+    - Scammers send fake SMS alerts that look like bank credit alerts.
+    - An SMS is not proof of payment. Only your bank balance is proof.
+  actions:
+    - Check your balance in your bank app or by USSD before you release goods or give change.
+    - Do not trust screenshots of transfers.
+  keywords: [credit alert, alert, payment proof, screenshot, release goods]
+
+- id: flag-money-request
+  title: Strangers or new "friends" asking for money
+  flags: [money_request]
+  facts:
+    - Romance and "stuck at the airport" stories are common ways to ask for money.
+    - Scammers also hack a friend's WhatsApp and ask their contacts for urgent help.
+  actions:
+    - Call the person on their usual number before you send anything.
+    - Never send money to someone you have only met online.
+  keywords: [romance, airport, customs, borrow, lend, help me]
+
+- id: flag-suspicious-link
+  title: Links in unexpected messages
+  flags: [suspicious_link]
+  facts:
+    - Fake links copy bank, NIMC or government pages to steal your details.
+    - Short links and strange website names hide where they really go.
+  actions:
+    - Do not click. Type the official website yourself or use the official app.
+    - Never download apps from links. Use the Play Store or App Store.
+  keywords: [link, website, url, apk, download, click]
+
+- id: flag-impersonation
+  title: People pretending to be your bank or the government
+  flags: [impersonation]
+  facts:
+    - Scammers pretend to be bank staff, customer care, CBN, EFCC or police.
+    - Fake "customer care" accounts on Twitter/X, Facebook and Telegram are common.
+  actions:
+    - End the conversation and contact the organisation yourself using its official number or website.
+  keywords: [customer care, bank staff, cbn, efcc, police, support]
+
+- id: flag-urgency
+  title: Pressure to act fast
+  flags: [urgency]
+  facts:
+    - Scammers rush you so you do not have time to think or ask someone.
+    - Real banks give you time to visit a branch or call them back.
+  actions:
+    - Slow down. Talk to someone you trust before you act.
+  keywords: [urgent, now, immediately, hours, deadline]
+
+- id: flag-secrecy
+  title: "\"Don't tell anyone\""
+  flags: [secrecy]
+  facts:
+    - Asking you to keep a money matter secret is a warning sign.
+    - Scammers do not want your family or bank to warn you.
+  actions:
+    - Tell someone you trust before you send money.
+  keywords: [secret, don't tell, confidential]
+
+# --- everyday money literacy ---------------------------------------------------------------------------
+- id: bvn-basics
+  title: What a BVN is
+  facts:
+    - A BVN (Bank Verification Number) is an 11-digit number that links all your bank accounts to you.
+    - You get a BVN by registering at a bank branch with your fingerprints and photo.
+    - You can check your BVN by dialling *565*0# from the phone number you registered with.
+    - Your BVN alone cannot move money, but never give it to strangers.
+  keywords: [bvn, bank verification number, register, check bvn]
+
+- id: nin-basics
+  title: What a NIN is
+  facts:
+    - A NIN (National Identification Number) is your national identity number from NIMC.
+    - You can check your NIN by dialling *346# from the phone number linked to it.
+    - NIMC does not ask you to "update" your NIN through links sent by SMS or WhatsApp.
+  keywords: [nin, nimc, national identity, identification]
+
+- id: saving-basics
+  title: How to start saving
+  facts:
+    - Pay yourself first. Move a fixed amount into savings as soon as you receive money.
+    - Even small amounts add up over time.
+    - Keep savings in a separate account so you are not tempted to spend it.
+    - Keep some savings for emergencies before you invest.
+  keywords: [save, savings, saving money, emergency fund, ajo, esusu]
+
+- id: budgeting
+  title: Making a simple budget
+  facts:
+    - Write down what you earn and what you spend each month.
+    - Separate needs (food, rent, transport, school fees) from wants.
+    - Decide how much to save before you spend on wants.
+  keywords: [budget, spending, expenses, plan money, salary]
+
+- id: loan-apps
+  title: Borrowing from loan apps
+  facts:
+    - Before you borrow, find out the total amount you must repay, not only the interest rate.
+    - Short loans with daily or weekly charges can become very expensive.
+    - Digital lenders in Nigeria must be approved by the FCCPC. Check its list of approved lenders.
+    - Lenders are not allowed to shame you or message your contacts.
+  actions:
+    - Report harassment by a loan app to the FCCPC.
+  keywords: [loan, loan app, borrow, interest, repayment, debt, harassment, shaming, calling my contacts, calling my family]
+
+- id: failed-transfer
+  title: When a transfer fails but you were debited
+  facts:
+    - Most failed transfers are reversed automatically.
+    - Keep the transaction reference or receipt.
+  actions:
+    - If the money does not come back, contact your bank through its official channels with the reference.
+    - If your bank does not resolve it, you can escalate to the CBN Consumer Protection Department.
+  keywords: [failed transfer, debited, reversal, pending, transaction, refund]
+
+- id: pos-safety
+  title: Using POS agents without losing your card or PIN
+  facts:
+    - Cover your hand when you type your PIN.
+    - Make sure your card is returned to you, and check that it is your own card.
+    - Keep the receipt and check your balance afterwards.
+  keywords: [pos, agent, withdraw cash, card, atm]
+
+- id: protect-account
+  title: Protecting your bank account
+  facts:
+    - Use a PIN that is not your birthday or 1234.
+    - Do not let anyone else use your phone to open your bank app.
+    - Turn on alerts so you see every transaction.
+    - Many banks have a USSD code to block your account quickly in an emergency. Find your bank's code on its official website.
+  keywords: [security, protect account, hacked, password, block account]
+
+- id: report-fraud
+  title: How to report fraud
+  facts:
+    - Report to your bank first, as fast as possible. Speed matters.
+    - You can also report financial crimes to the EFCC.
+    - Report SIM swap or telecom fraud to your network provider and the NCC.
+  actions:
+    - Write down dates, amounts, phone numbers and account numbers used by the scammer.
+  keywords: [report, complaint, fraud, scammed, efcc, police, recover money]
+
+- id: sent-to-wrong-account
+  title: You sent money to the wrong account
+  facts:
+    - Your bank cannot take money back from another account without that account owner's consent or a legal process.
+    - Acting fast gives the best chance, before the money is withdrawn.
+  actions:
+    - Contact your bank immediately through its official channels with the amount, date, reference and the account you sent to.
+    - Ask your bank to contact the receiving bank for a recall.
+    - Be careful of strangers who call promising to help you recover it for a fee.
+  keywords: [wrong account, wrong number, sent by mistake, recall, reverse transfer, mistaken transfer]
+
+- id: recovery-scam
+  title: People who promise to recover money you lost to a scam
+  flags: [upfront_fee]
+  facts:
+    - After a scam, fake "recovery agents", hackers or lawyers often contact victims and ask for a fee to get the money back.
+    - This is a second scam. Real recovery goes through your bank and law enforcement, not paid strangers.
+  actions:
+    - Do not pay anyone who promises to recover your money. Report to your bank and the EFCC instead.
+  keywords: [recover money, recovery agent, hacker, get my money back, fund recovery]
+
+- id: lost-phone
+  title: You lost your phone or it was stolen
+  facts:
+    - Anyone with your phone may try to use your SIM to receive bank codes or reset your banking app.
+  actions:
+    - Call your bank immediately using another phone and ask them to block mobile and USSD banking on your account.
+    - Ask your network provider to block the SIM, then get a replacement SIM with your number.
+    - Change your banking passwords and PINs once you have access again.
+  keywords: [lost phone, stolen phone, phone stolen, missing phone, snatched phone]
+
+- id: unauthorised-debit
+  title: Money left your account and you did not do it
+  facts:
+    - A debit you did not make can mean your card, PIN, app or SIM has been compromised.
+  actions:
+    - Call your bank immediately to block your account and cards, and report the transaction.
+    - Write down the date, amount and reference of every debit you did not make.
+    - If your bank does not resolve it, you can escalate to the CBN Consumer Protection Department.
+  keywords: [unauthorised debit, unknown debit, money missing, debit alert, did not authorise, hacked account]
+
+- id: mobile-money
+  title: Mobile money and agent wallets
+  facts:
+    - Wallets from mobile money operators and payment service banks work like bank accounts on your phone.
+    - Use only official apps from the Play Store or App Store, and keep your wallet PIN secret like a bank PIN.
+    - Agents should give you a receipt or confirmation for every deposit or withdrawal.
+  actions:
+    - For problems, contact the provider through the support channels inside its official app.
+  keywords: [wallet, mobile money, agent, opay, palmpay, moniepoint, momo, psb]
+
+- id: account-tiers
+  title: Account tiers and limits
+  facts:
+    - Nigerian accounts have tiers. Lower tiers need fewer documents but have lower limits on deposits, transfers and balances.
+    - You can upgrade by providing your BVN or NIN and other documents your bank asks for.
+    - Your bank or wallet app shows your current tier and its limits.
+  keywords: [tier, tier 1, tier 3, account limit, upgrade account, kyc, maximum balance]

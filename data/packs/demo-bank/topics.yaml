@@ -1,0 +1,8 @@
+- id: demo-never-ask
+  title: Demo Bank will never ask for your OTP or PIN
+  flags: [asks_credentials, impersonation]
+  facts:
+    - Demo Bank staff will never ask for your OTP, PIN, password or card details.
+    - Demo Bank only contacts you from its official channels listed in the app.
+  actions:
+    - Block your account instantly with the emergency USSD code, then call the fraud desk.

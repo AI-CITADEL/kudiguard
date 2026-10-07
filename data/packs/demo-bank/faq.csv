@@ -1,0 +1,8 @@
+id,question,answer,keywords
+transfer-limit,What is my daily transfer limit?,"Demo Bank's daily limit is N200,000 on USSD and N5,000,000 on the app for fully verified accounts. You can change it in the app under Settings.",limit;transfer limit;daily limit;ussd
+failed-transfer,My transfer failed but I was debited. What should I do?,Most failed transfers reverse within 24 hours. If not, open the app and tap Help then Dispute a transaction with your reference.,failed transfer;debited;reversal;dispute
+block-card,How do I block my card?,Open the app and tap Cards then Freeze card or dial the emergency USSD code. You can unfreeze it later in the app.,block card;lost card;freeze;stolen
+open-account,How do I open an account?,Download the Demo Bank app from the Play Store or App Store and register with your BVN or NIN. It takes about 5 minutes.,open account;register;new account
+reset-pin,How do I reset my transaction PIN?,In the app go to Settings then Security then Reset PIN. You will confirm with your BVN and a code sent to your registered phone.,reset pin;forgot pin;change pin
+loan,Does Demo Bank give loans?,Yes. Salary earners can get a Quick Loan in the app. The total repayment amount is shown before you accept. There are no upfront fees.,loan;borrow;quick loan
+alerts,How do I turn on SMS alerts?,Alerts are on by default. Check Settings then Notifications in the app.,alerts;sms;notifications

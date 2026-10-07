@@ -153,3 +153,22 @@ retention 90 days; `DELETE` wipes a user's rows. Secrets only in `.env`.
 | Yoruba quality (human eval 2.69) | Labelled beta; templates dominate; short free text |
 
 Cut: Twilio, vLLM, BM25, Docker for GPU path, strict mypy, TTS (pre-recorded prompt clips instead; MMS-TTS stretch).
+
+## 9. Backlog (post-submission)
+
+| Item | Why | Notes |
+|---|---|---|
+| `kudiguard import-docs` with **LangExtract** (Apache-2.0) | Faster partner onboarding: turn PDFs / web pages / T&Cs into draft `faq.csv` + `topics.yaml` with source grounding | Offline only, human review before publish; measure extraction quality with N-ATLAS first |
+| Graph RAG (e.g. LightRAG) as an extra `KnowledgeSource` | Only if a partner brings large unstructured document sets needing multi-hop answers | Not on the hot path: adds an LLM call per query |
+| Content backlog from retrieval benchmark | Red-flag scam entries sometimes outrank literacy topics on general questions | Track via `data/eval/retrieval.yaml` misses |
+| **MCP server** wrapping `/v1/check` + `/v1/ask` | Lets AI agents / developer tools call KudiGuard; distribution & visibility | Thin wrapper (~1 day); revenue comes from the REST API + white-label WhatsApp |
+| Scam-intelligence dashboard / feed | Per-partner anonymised scam trends; cross-institution feed is the long-term moat | Needs consented, aggregated data only (NDPA) |
+
+### Commercial model (backlog — post-submission)
+
+| Lever | Role | Backlog items |
+|---|---|---|
+| **REST API + white-label WhatsApp assistant** | Revenue engine: per-check / per-conversation pricing and monthly plans with SLA | Usage metering & billing, per-key quotas, SLA monitoring, tenant branding (name, number, tone) |
+| **Partner knowledge plug-in** (files or partner API) | Lock-in: the partner's FAQ, fraud desk and custom lexicon live in our platform | Enterprise plan packaging, partner admin UI for packs, per-partner lexicon overrides, onboarding via LangExtract import |
+| **Anonymised scam-trends dashboard** | Long-term moat: per-partner trends; cross-institution intelligence feed | Consent + aggregation pipeline (NDPA), partner dashboard, paid intelligence feed/API |
+| **MCP server** | Cheap extra distribution channel for AI agents and developer tools | Thin wrapper over `/v1/check` and `/v1/ask` (~1 day) |

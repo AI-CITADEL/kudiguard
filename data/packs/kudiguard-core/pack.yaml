@@ -1,0 +1,11 @@
+id: kudiguard-core
+name: KudiGuard Core
+owner: KudiGuard
+kind: core
+priority: 10
+content_language: en
+description: >
+  Scam red-flag guidance (one entry per red flag), everyday money literacy and official reporting channels.
+  Facts are short and plain so N-ATLAS can restate them in Hausa, Yoruba, Igbo or English.
+source:
+  type: files

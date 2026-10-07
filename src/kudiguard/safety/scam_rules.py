@@ -7,12 +7,12 @@ thresholds. LLM-extracted flags are merged in via ``extra_flags`` but can never 
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
 from kudiguard.domain import Flag, ScamAssessment, Verdict
+from kudiguard.text import fold, normalize
 
 # Policy. 3 = decisive on its own, 2 = strong, 1 = amplifier (only matters in combination or on request).
 WEIGHTS: Mapping[Flag, int] = MappingProxyType(
@@ -36,27 +36,7 @@ SCAM_THRESHOLD = 3
 CAUTION_THRESHOLD = 2
 
 _FLAG_ORDER = {flag: i for i, flag in enumerate(Flag)}
-# Letters NFKD leaves intact (Hausa hooked letters) and typographic quotes.
-_FOLD = str.maketrans({"ɓ": "b", "ɗ": "d", "ƙ": "k", "ƴ": "y", "’": "'", "‘": "'", "ʼ": "'"})  # noqa: RUF001 - curly quotes are intentional
-# Spelled-out acronyms: o.t.p / b-v-n (2+ separators) and o t p (3+ single letters). Note: "u.s.a." -> "usa."
-_SPELLED_PUNCT = re.compile(r"\b(?:[^\W\d_][.\-]){2,}[^\W\d_]\b")
-_SPELLED_SPACE = re.compile(r"\b(?:[^\W\d_] ){2,}[^\W\d_]\b")
-_SPACES = re.compile(r"\s+")
-
 Patterns = tuple[re.Pattern[str], ...]
-
-
-def fold(text: str) -> str:
-    """Lower-case and strip accents/tone marks (the canonical form lexicon terms are written in)."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().translate(_FOLD)
-
-
-def normalize(text: str) -> str:
-    """``fold`` + join spelled-out acronyms + collapse whitespace."""
-    text = _SPACES.sub(" ", fold(text)).strip()
-    text = _SPELLED_PUNCT.sub(lambda m: re.sub(r"[.\-]", "", m.group()), text)
-    return _SPELLED_SPACE.sub(lambda m: m.group().replace(" ", ""), text)
 
 
 def _compile(term: str) -> re.Pattern[str]:

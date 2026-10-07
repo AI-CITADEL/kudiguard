@@ -1,0 +1,13 @@
+# SAMPLE partner pack. "Demo Bank" is fictional: every number and address below is a placeholder.
+# Copy this folder to onboard a real partner: replace the files with the partner's own FAQ export and contacts.
+id: demo-bank
+name: Demo Bank (sample)
+owner: Fictional example partner, not a real bank
+kind: partner
+priority: 50
+content_language: en
+sample: true
+enabled: false  # fictional: never load by default (build_sources also refuses samples)
+description: Shows how a bank plugs in its own FAQ, safety messages and fraud desk contacts.
+source:
+  type: files

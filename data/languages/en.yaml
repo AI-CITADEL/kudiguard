@@ -26,6 +26,7 @@ lexicon:
       - '(?:share|sharing) (?:your |my )?screen'
       - 'screen ?shar\w*'
       - 'remote access'
+      - 'download\W+(?:\w+\W+){0,3}?app\W+(?:\w+\W+){0,6}?(?:fix|help|access|control|check|unblock)\w*\W+(?:\w+\W+){0,2}?(?:your|ur|my) (?:account|phone|app|bank)'
     guaranteed_returns:
       - 'double (?:your|ur|my) money'
       - 'guaranteed (?:return|profit|income|interest)s?'

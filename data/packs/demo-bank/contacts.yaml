@@ -1,0 +1,22 @@
+- label: Demo Bank fraud desk (24/7)
+  kind: phone
+  value: 0000 000 0000
+  flags: [asks_credentials, remote_access, account_threat, impersonation, wrong_transfer, fake_payment, suspicious_link]
+  verified: true
+  note: Fictional placeholder (sample)
+- label: Demo Bank emergency account block
+  kind: ussd
+  value: "*000*911#"
+  flags: [asks_credentials, remote_access]
+  verified: true
+  note: Fictional placeholder (sample)
+- label: Demo Bank help on WhatsApp
+  kind: whatsapp
+  value: "+000 000 000 0000"
+  verified: true
+  note: Fictional placeholder (sample)
+- label: Demo Bank website
+  kind: web
+  value: https://demo-bank.example
+  verified: true
+  note: Reserved example domain

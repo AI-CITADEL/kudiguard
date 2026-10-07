@@ -1,0 +1,7 @@
+id,question,answer,keywords
+faq-otp-what,What is an OTP?,An OTP (one-time password) is a short code your bank sends to confirm a transaction. It is only for you. Never share it with anyone.,otp;code;one-time password
+faq-bank-calls,Will my bank ever call me for my PIN?,No. Your bank will never ask for your PIN or OTP or password by phone or message.,bank call;pin;customer care
+faq-ussd-safe,How do I use USSD banking carefully?,USSD banking is convenient. Keep your USSD PIN secret and lock your phone so others cannot use it.,ussd;mobile banking
+faq-sim-swap,What is SIM swap fraud?,A scammer gets a new SIM with your number to receive your bank codes. If your network suddenly stops working contact your network provider and your bank at once.,sim swap;no network;sim;network stopped;cannot make calls;no signal suddenly
+faq-recover,Can I get my money back after a scam?,Sometimes if you act fast. Report to your bank immediately so they can try to stop the money. There is no guarantee so prevention is best.,recover;money back;scammed
+faq-interest,What does interest mean?,Interest is the extra money you pay when you borrow or the extra money you earn when you save. Always compare the total cost.,interest;rate;borrow

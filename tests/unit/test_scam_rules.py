@@ -4,7 +4,8 @@ import pytest
 
 from kudiguard.domain import Flag, Verdict
 from kudiguard.languages import LanguageRegistry
-from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess, normalize
+from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess
+from kudiguard.text import normalize
 
 
 @pytest.fixture(scope="module")
@@ -162,6 +163,7 @@ def test_flags_unique_and_ordered_by_weight(en: Lexicon) -> None:
         "I sent N20,000 to your account by mistake, please reverse it to this number",
         "Customer care here, kindly tell me your ATM card PIN so we can fix your account",
         "Download AnyDesk so our bank officer can fix your app",
+        "They told me to download an app so they can help me fix my account",
         "Someone called and asked me for the OTP on my phone",
         "Click this link https://bit.ly/x urgently to update your details",
         # Pidgin and review-found misses
