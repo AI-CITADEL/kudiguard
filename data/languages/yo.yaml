@@ -1,0 +1,19 @@
+# Yoruba (beta: N-ATLAS human-eval average 2.69/5). Accents are stripped before matching.
+# Native terms below are a starter set and MUST be reviewed by a native speaker before launch.
+code: yo
+name: Yoruba
+native_name: Yorùbá
+order: 2
+status: beta
+asr_model: NCAIR1/Yoruba-ASR
+review:
+  lexicon: pending-native-review
+
+lexicon:
+  flags:
+    urgency:
+      - 'kiakia'
+  check_intent:
+    - 'jibiti'
+    - 'ojoro'
+    - 'ayederu'

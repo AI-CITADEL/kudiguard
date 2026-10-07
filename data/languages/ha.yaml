@@ -1,0 +1,24 @@
+# Hausa. Loanwords (OTP, BVN, PIN, link…) are covered by the English pivot lexicon, which always applies.
+# Native terms below are a starter set and MUST be reviewed by a native speaker before launch.
+code: ha
+name: Hausa
+native_name: Hausa
+order: 1
+status: stable
+asr_model: NCAIR1/Hausa-ASR
+review:
+  lexicon: pending-native-review
+
+lexicon:
+  flags:
+    asks_credentials:
+      - 'lambar sirri'
+    account_threat:
+      - '(?:an )?toshe'
+    urgency:
+      - 'gaggawa'
+      - 'yanzu yanzu'
+  check_intent:
+    - '(?:dan )?damfara'
+    - 'zamba'
+    - 'yaudara'

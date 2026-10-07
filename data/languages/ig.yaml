@@ -1,0 +1,18 @@
+# Igbo (beta). Accents are stripped before matching.
+# Native terms below are a starter set and MUST be reviewed by a native speaker before launch.
+code: ig
+name: Igbo
+native_name: Igbo
+order: 3
+status: beta
+asr_model: NCAIR1/Igbo-ASR
+review:
+  lexicon: pending-native-review
+
+lexicon:
+  flags:
+    urgency:
+      - 'ngwa ngwa'
+  check_intent:
+    - 'wayo'
+    - 'aghugho'

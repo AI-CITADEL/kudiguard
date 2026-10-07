@@ -1,0 +1,110 @@
+# English — also the pivot language: every message is translated to English, so this lexicon always applies.
+# Terms are Python regular expressions matched against normalised text (lower-case, accents stripped,
+# "o.t.p" / "o t p" -> "otp", curly quotes -> ') with word boundaries added automatically.
+# Terms must be lower-case ASCII-folded and must not match the empty string (enforced at load time).
+#
+# Gap idiom: (?:(?!my\b|our\b)\w+\W+){0,6}? = "up to 6 words, never crossing 'my'/'our'", so a user asking
+# about *their own* PIN ("should I give my PIN to anyone?") is not read as someone *requesting* it.
+code: en
+name: English
+native_name: English
+order: 4
+status: stable
+asr_model: NCAIR1/NigerianAccentedEnglish
+
+lexicon:
+  flags:
+    asks_credentials:
+      - '(?:send|give|share|tell|provide|confirm|read|forward|drop|call out|reply(?: with)?|dm|text|whatsapp|submit)\W+(?:(?!my\b|our\b)\w+\W+){0,6}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin|(?:account|bank|atm|card) details|expiry date|(?:\d+[- ]?digits? )?code\W+(?:wey|that|which|we|dem|they|sent|you received))'
+      - '(?:what is|whats) (?:your|ur) (?:otp|pin|cvv|password|bvn|nin|card number)'
+      - 'ask(?:ed|ing|s)?\W+(?:\w+\W+){0,4}?for\W+(?:\w+\W+){0,3}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin)'
+      - '(?:otp|pin|cvv|password|verification code)\W+(?:\w+\W+){0,6}?(?:send|give|share|tell|forward)\W+(?:it|them|to me)'
+    remote_access:
+      - 'anydesk'
+      - 'teamviewer'
+      - 'quick ?support'
+      - '(?:share|sharing) (?:your |my )?screen'
+      - 'screen ?shar\w*'
+      - 'remote access'
+    guaranteed_returns:
+      - 'double (?:your|ur|my) money'
+      - 'guaranteed (?:return|profit|income|interest)s?'
+      - '\d+ ?% (?:daily|weekly|monthly|per day|per week|per month|every (?:day|week|month))'
+      - '(?:daily|weekly) (?:profit|returns?|roi|income)'
+      - '(?:invest|put|pay|send|deposit)\W+(?:\w+\W+){0,3}?(?:and|to) (?:get|earn|receive|make)\W+[^\w\s]?\d[\w.,]*\W+(?:\w+\W+){0,3}?(?:in|within|every|daily|weekly|monthly|back|guaranteed)'
+    wrong_transfer:
+      - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:your|ur) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
+      - '(?:mistakenly|wrongly) (?:sent|transferred|credited|paid)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:you|your)'
+      - '(?:please|kindly|pls|plz)\W+(?:\w+\W+){0,2}?(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|the transfer|my money)'
+    account_threat:
+      - '(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|line|whatsapp)\W+(?:\w+\W+){0,4}?(?:blocked|suspended|deactivated|restricted|frozen|barred|disabled|banned|closed|don block|go block)'
+      - '(?:block|suspend|deactivat|restrict|freez|bar|ban)\w*\W+(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|whatsapp)'
+    upfront_fee:
+      - '(?:processing|registration|clearance|release|activation|unlocking|verification|handling|insurance|approval) (?:fee|charge)s?'
+      - 'pay\W+(?:\w+\W+){0,6}?(?:to|before|so that)\W+(?:you\W+|i\W+)?(?:can\W+)?(?:receive|claim|collect|release|withdraw|unlock|activate|approve|process|disburse|secure|get (?:the|your) (?:money|loan|prize|job))'
+      - 'pay\W+(?:\w+\W+){0,4}?(?:registration|form|medical|delivery|customs|clearance)'
+      - 'for (?:the )?(?:customs|clearance)'
+    prize_lottery:
+      - '(?:you|u) (?:have |just )?won'
+      - 'winner'
+      - 'prize'
+      - 'lottery'
+      - 'lucky (?:draw|winner|number)'
+      - 'giveaway'
+      - '(?:have|has) been selected'
+    fake_payment:
+      - 'credit alert'
+      - 'check (?:your|ur) (?:alert|account|phone|sms)'
+      - '(?:send|release|deliver) (?:the )?(?:goods|items?|products?)'
+    money_request:
+      - 'stuck (?:at|in) (?:the )?(?:airport|customs|border|hospital)'
+      - '(?:send|lend) me\W+(?:some )?(?:money|[^\w\s]?\d)'
+    suspicious_link:
+      - 'https?://\S+'
+      - 'www\.\S+'
+      - 'bit\.ly'
+      - 'tinyurl'
+      - '\w+\.apk'
+      - '(?<![.])(?![\w.-]*\.(?:gov|edu)\.ng)(?:[\w-]+\.)+(?:com\.ng|ng|xyz|top|online|site|info|live|click|link|vip|shop)(?:/\S*)?'
+      - '(?:click|via|through|visit|open|use) (?:on )?(?:this|the) link'
+      - 'download (?:this|the) app'
+    impersonation:
+      - 'customer (?:care|service|support)'
+      - 'bank (?:staff|official|manager|agent|officer)'
+      - '(?:gt ?bank|gtco|access|zenith|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic)\w* ?(?:support|care|help|team)'
+      - 'on (?:twitter|x|telegram|facebook|instagram)'
+      - 'cbn'
+      - 'central bank'
+      - 'efcc'
+      - 'police'
+      - 'ncc'
+      - 'from (?:your|the) bank'
+    urgency:
+      - 'urgent(?:ly)?'
+      - 'immediately'
+      - 'right now'
+      - 'as soon as possible'
+      - 'asap'
+      - '(?:in|within) \d+ ?(?:hours?|hrs?|minutes?|mins?)'
+      - 'today only'
+      - 'last chance'
+      - 'act (?:fast|now)'
+      - 'expires? (?:today|soon)'
+    secrecy:
+      - "(?:don'?t|do not) (?:tell|inform) (?:anyone|anybody|your (?:bank|family|wife|husband))"
+      - 'keep (?:it|this) (?:secret|confidential|between us)'
+  check_intent:
+    - 'scam\w*'
+    - 'fraud\w*'
+    - 'fake'
+    - 'legit\w*'
+    - 'genuine'
+    - 'is (?:this|it|that) (?:real|true|safe|correct)'
+    - 'na (?:real|true|lie|scam|wayo)'
+    - 'can i trust'
+    - 'should i (?:trust|pay|send|believe|click)'
+    - '419'
+    - 'yahoo ?boys?'
+    - 'wayo'
+    - 'ojoro'
+    - 'suspicious'

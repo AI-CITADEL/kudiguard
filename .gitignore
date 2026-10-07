@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.db
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+models/
+exports/
+tools/
