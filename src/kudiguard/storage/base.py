@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from kudiguard.domain import Interaction, LanguageCode
+from kudiguard.domain import Interaction, LanguageCode, Outcome
 
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
@@ -58,6 +58,10 @@ class Store(Protocol):
         ...
 
     async def get_interaction(self, interaction_id: int) -> Interaction | None: ...
+
+    async def set_outcome(self, interaction_id: int, outcome: Outcome, error: str | None = None) -> None:
+        """Correct a logged turn's outcome (e.g. the answer could not be delivered). ``error`` is redacted."""
+        ...
 
     async def add_feedback(self, user_hash: str, interaction_id: int, helpful: bool) -> None:
         """Record 👍/👎 for one of the user's own interactions (latest vote wins)."""

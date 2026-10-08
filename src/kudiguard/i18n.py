@@ -48,6 +48,12 @@ class Msg(StrEnum):
     ERROR_RETRY = "error_retry"
     STOPPED = "stopped"
     DELETED = "deleted"
+    FALLBACK_SCAM = "fallback_scam"
+    FALLBACK_ANSWER = "fallback_answer"
+    FALLBACK_STEPS = "fallback_steps"
+    WARN_FAMILY_FALLBACK = "warn_family_fallback"
+    AT_CAPACITY = "at_capacity"
+    BUSY = "busy"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

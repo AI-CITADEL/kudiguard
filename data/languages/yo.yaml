@@ -12,8 +12,8 @@ review:
   strings: pending-native-review
 
 commands:
-  stop: [dúró]
-  delete: [pa rẹ́, pa á rẹ́]
+  stop: [ẹ dá a dúró, má fi ránṣẹ́ mọ́]  # not bare "dúró": it also means "wait"
+  delete: [pa àwọn ìfiránṣẹ́ mi rẹ́]
   language: [èdè, yí èdè padà]
   greetings: [báwo, báwo ni, ẹ n lẹ́, ẹ kú àárọ̀, ẹ kú ọ̀sán, ẹ kú ìrọ̀lẹ́, ẹ kú alẹ́, ẹ ṣé, ẹ ṣeun, o ṣé, o ṣeun,
     ẹ ṣé gan, pẹ̀lẹ́, ó dáa]
@@ -29,6 +29,17 @@ lexicon:
   flags:
     urgency:
       - 'kiakia'
+    asks_credentials:
+      - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
+      - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
+    account_threat:
+      - '(?:akaunti|account)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo|o) (?:di|dina|pa)'
+    guaranteed_returns:
+      - 'ilopo (?:meji|meta)'
+    upfront_fee:
+      - 'san\W+(?:\w+\W+){0,4}?ki (?:o|e|a) (?:to|too) (?:gba|ri)'
+    secrecy:
+      - '(?:ma|e ma) (?:se )?so fun enikeni'
   check_intent:
     - 'jibiti'
     - 'ojoro'
@@ -74,3 +85,12 @@ strings:
   error_retry: 😔 Ẹ má bínú, nǹkan kan ṣẹlẹ̀ ní ẹ̀gbẹ́ mi. Ẹ jọ̀ọ́ ẹ tún gbìyànjú láìpẹ́.
   stopped: Ẹ kò ní gba ọ̀rọ̀ láti ọ̀dọ̀ KudiGuard mọ́. Ẹ fi ọ̀rọ̀ èyíkéyìí ránṣẹ́ láti tún bẹ̀rẹ̀.
   deleted: 🗑️ A ti pa àwọn ọ̀rọ̀ yín rẹ́.
+  fallback_scam: "Ẹ má ṣe fi owó ránṣẹ́, ẹ má sì fún ẹnikẹ́ni ní kóòdù, PIN tàbí ọ̀rọ̀ aṣínà yín. Ẹ dá ìbáṣepọ̀ dúró, kí ẹ sì pe báǹkì yín ní nọ́ńbà tó wà lórí káàdì yín."
+  fallback_answer: "Mi ò lè pèsè ìdáhùn kíkún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́, tàbí kí ẹ béèrè lọ́wọ́ báǹkì yín tààrà."
+  fallback_steps: |-
+    1. Ẹ má ṣe fún ẹnikẹ́ni ní kóòdù (OTP), PIN tàbí ọ̀rọ̀ aṣínà yín.
+    2. Ẹ má ṣe fi owó ránṣẹ́ tàbí ṣí ìjápọ̀ (link) láti ọ̀dọ̀ ẹni yìí.
+    3. Ẹ pe báǹkì yín ní nọ́ńbà tó wà lórí káàdì yín kí ẹ sì fi ẹjọ́ sùn.
+  warn_family_fallback: "⚠️ Ìkìlọ̀ nípa jìbìtì: ẹnìkan lè kàn sí yín pé òun wá láti báǹkì tàbí ilé-iṣẹ́ ìjọba, tàbí kí ó ṣèlérí owó fún yín. Ẹ má ṣe fún ẹnikẹ́ni ní OTP, PIN tàbí BVN yín, ẹ má sì san owó kankan kí ẹ tó gba owó. Ẹ kọ́kọ́ bá báǹkì yín sọ̀rọ̀."
+  at_capacity: "😔 KudiGuard ti kún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ọjọ́ díẹ̀."
+  busy: "⏳ Ọ̀pọ̀ ènìyàn ló ń béèrè báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ìṣẹ́jú kan."

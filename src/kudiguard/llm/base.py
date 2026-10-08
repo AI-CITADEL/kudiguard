@@ -21,7 +21,19 @@ class Purpose(StrEnum):
     TRANSLATE = "translate"
     COMPOSE = "compose"
     WARN = "warn"
+    STEPS = "steps"
     GENERAL = "general"
+
+
+# Per-purpose total budget (seconds, incl. queueing and retries) when a request sets no ``timeout_s``.
+DEFAULT_TIMEOUTS: Mapping[Purpose, float] = {
+    Purpose.ANALYSE: 10.0,
+    Purpose.TRANSLATE: 10.0,
+    Purpose.COMPOSE: 20.0,
+    Purpose.WARN: 10.0,
+    Purpose.STEPS: 10.0,
+    Purpose.GENERAL: 30.0,
+}
 
 
 @dataclass(frozen=True, slots=True)

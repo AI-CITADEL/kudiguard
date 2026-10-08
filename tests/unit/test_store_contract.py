@@ -207,3 +207,12 @@ async def test_closed_store_refuses_use(store: Store) -> None:
         await store.get_user("u1")
     with pytest.raises(StoreClosedError):
         await store.claim_message("whatsapp", "m1")
+
+
+async def test_set_outcome_marks_undelivered_answers(store: Store) -> None:
+    interaction_id = await store.add_interaction(turn(message_id="a"))
+    await store.set_outcome(interaction_id, Outcome.ERROR, "undelivered: call 08031234567")
+    stored = await store.get_interaction(interaction_id)
+    assert stored is not None and stored.outcome is Outcome.ERROR
+    assert stored.error is not None and "08031234567" not in stored.error
+    await store.set_outcome(999, Outcome.ERROR)  # unknown id: no-op

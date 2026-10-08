@@ -6,10 +6,11 @@ import dataclasses
 from datetime import datetime
 from typing import Any
 
-from kudiguard.domain import Interaction
+from kudiguard.domain import Interaction, Outcome
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
 from kudiguard.storage.export import export_row, protect
+from kudiguard.text import redact
 
 
 class MemoryStore:
@@ -57,6 +58,14 @@ class MemoryStore:
         self._ensure_open()
         found = self._interactions.get(interaction_id)
         return dataclasses.replace(found) if found else None
+
+    async def set_outcome(self, interaction_id: int, outcome: Outcome, error: str | None = None) -> None:
+        self._ensure_open()
+        found = self._interactions.get(interaction_id)
+        if found is not None:
+            self._interactions[interaction_id] = dataclasses.replace(
+                found, outcome=outcome, error=redact(error) if error else found.error
+            )
 
     async def add_feedback(self, user_hash: str, interaction_id: int, helpful: bool) -> None:
         self._ensure_open()

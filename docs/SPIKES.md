@@ -131,23 +131,46 @@ multilingual Whisper vocabulary with no Igbo token. NCAIR does not pin a languag
 detects the language (+~1.2 s). Our config forces `ha`/`yo` (faster) and leaves Igbo on auto. **To decide with data:**
 A/B forced vs auto on the recorded clips (`eval_asr.py`, toggle `asr_whisper_language` to null) before submission.
 
-## S6 — Official NCAIR1 ASR accuracy on public clips (8 Oct 2026)
+## S6 — Official NCAIR1 ASR accuracy on public clips (8 Oct 2026, corrected after data review)
 
 Clips: Google FLEURS dev (CC-BY-4.0), native speakers reading Wikipedia-style sentences, re-encoded to WhatsApp-style
-Opus 16 kHz / 24 kbps (`scripts/fetch_eval_audio.py`, attribution in `data/eval/asr/SOURCES.md`). CTranslate2 int8 on CPU.
+Opus 16 kHz / 24 kbps (`scripts/fetch_eval_audio.py`, attribution in `data/eval/asr/SOURCES.md`). CTranslate2 int8 on
+CPU. **Pooled** over clips (total edits / total reference words); rejected clips count as 100% errors; per-clip
+outputs in `data/eval/asr/results/int8.jsonl`. "WER" folds all diacritics (tone marks and under-dots); "WER+d" keeps them.
 
-| Lang | n | WER | WER incl. tone marks | CER | p50 latency (forced) | p50 latency (auto) |
+| Lang | clips | rejected | WER | WER+d | CER | p50 latency |
 |---|---|---|---|---|---|---|
-| ha | 20 | 29.8% | 29.8% | 9.5% | 2.2 s | 3.8 s |
-| yo | 10 | 32.0% | 63.3% | 7.9% | 2.1 s | 4.2 s |
-| ig | 9 (+1 rejected) | 44.4% | 47.8% | 22.4% | 3.6 s | 4.5 s |
-| en | 1 (TTS) | 0% | 0% | 0% | 2.1 s | 3.5 s |
+| ha | 20 (18 distinct sentences) | 0 | 28.2% | 28.2% | 9.0% | 2.7 s |
+| yo | 10 | 0 | 32.7% | 64.0% | 8.4% | 2.6 s |
+| ig | 10 | 1 | 45.5% | 48.9% | 25.9% | 3.8 s |
 
-* **Forced vs auto language: identical accuracy, forced 1.4–2 s faster** → keep `asr_whisper_language: ha/yo`.
-  Igbo has no Whisper token, so it always auto-detects (hence slower). Backlog: test forcing a neighbouring token.
-* Read encyclopedic sentences (named entities, numbers) are harder than everyday speech; FLEURS may also overlap NCAIR1
-  training data. Treat as indicative only. Low CER (8–10% ha/yo) means most errors are word splits/spelling, which the
-  downstream LLM tolerates; Yoruba tone marks are often dropped (WER 63% counting tones) — the analyse step folds them.
-* One Igbo clip (peak −50 dBFS, near-silent) is rejected as `no_speech` by design → user is asked to resend.
-* Still required: real WhatsApp voice notes from testers about money/scams (`source: whatsapp`), ≥20 ha + ≥20 en.
-* Pending: `--compare` (int8 vs float32) on these clips.
+* Forced vs auto language (ha, yo; first run, mean-of-clips): WER unchanged on these clips (ha 29.8 vs 29.8, yo 32.0 vs
+  32.0), forced 1.6–2.1 s faster → keep forced. Small n: indicative, not proof. Igbo has no Whisper token (always auto).
+* Yoruba WER+d is inflated by noisy FLEURS references (e.g. "sih", "gbeh", missing tone marks), not only ASR errors.
+* The rejected Igbo clip is quiet real speech (loudest frame −56 dBFS vs the −55 dB floor). Backlog: gain-normalise
+  before the silence check and re-measure (risk: Whisper hallucination on noise).
+* FLEURS is read encyclopedic speech and may overlap NCAIR1 training data: indicative only. The English model is not
+  measured here (one synthetic TTS clip only).
+* Still required: real WhatsApp voice notes about money/scams from testers (`source: whatsapp`), ≥20 ha + ≥20 en;
+  `--compare` (int8 vs float32).
+
+## S7 — Blind evaluation of scam detection and retrieval (8 Oct 2026)
+
+Frozen sets written by an independent author with no access to rules, prompts or pack content
+(`data/eval/scenarios.yaml`, `data/eval/retrieval_blind.yaml`). Never tune on them; ha/yo/ig wording pending native review.
+
+**Scam detection** (`scripts/eval_scenarios.py`; flagged = likely_scam or caution; 40 messages, 5 scam + 5 legit per language):
+
+| Mode | Precision | Recall | False-positive rate | ha recall | yo recall | ig recall | en recall |
+|---|---|---|---|---|---|---|---|
+| Rules only (model down: safety floor) | 87% | 65% | 10% | 40% | 40% | 80% | 100% |
+| Full engine (N-ATLAS analyse + rules) | 86% | **95%** | 15% | 100% | 80% | 100% | 100% |
+
+Full-engine latency p50 5.4 s, p95 7.2 s (text). Errors: genuine bank OTP SMS → caution (en s02, ig s32), Igbo
+"failed transfer, debited" question → likely_scam (s35), Yoruba investment-tripling scam missed (s30).
+Known limitation: genuine OTP-delivery SMS ("your OTP is …, do not share") is flagged "be careful". Fix belongs in the
+lexicon with *separate* dev examples, then re-measure here once (recorded as a post-fix run).
+
+**Retrieval, blind** (24 English queries): production path (rules flags + hybrid search) **67% top-1 / 96% top-3**
+(BM25 only: 67% / 79%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
+top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tuned on them).

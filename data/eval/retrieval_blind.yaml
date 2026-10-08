@@ -1,0 +1,25 @@
+# Blind retrieval set: written 2026-10-08 by an independent author without access to pack content. FROZEN: never tune content on it.
+- {q: "someone called say na my bank, dem want make i read out the code wey just enter my phone", want: [faq-bank-calls, flag-asks-credentials]}
+- {q: "guy told me to download one app so he can fix my account from his own side", want: [flag-remote-access]}
+- {q: "my cousin say if i put 100k inside his forex thing i go collect 300k every month, no loss at all", want: [flag-guaranteed-returns]}
+- {q: "a woman texted that she paid 20k into my acct by error and i should send it back to her", want: [flag-wrong-transfer]}
+- {q: "sms says my line will be disconnected today if i dont update my details, is it real", want: [flag-account-threat]}
+- {q: "they said I got the job but I must pay for uniform and medicals before resumption", want: [flag-upfront-fee]}
+- {q: "i got text that i won 2 million naira in a raffle i never even entered", want: [flag-prize-lottery]}
+- {q: "buyer showed me screenshot of transfer but nothing has entered my account, should i release the goods", want: [flag-fake-payment]}
+- {q: "man i met on facebook last month now dey ask me to send money for his hospital bill", want: [flag-money-request]}
+- {q: "is it ok to tap a link that unknown number sent me on whatsapp", want: [flag-suspicious-link]}
+- {q: "somebody claiming to be from CBN called to verify my details", want: [flag-impersonation, faq-bank-calls]}
+- {q: "where can i report the scammer that took my money", want: [report-fraud]}
+- {q: "he told me make i no tell my husband about the investment until e pay", want: [flag-secrecy]}
+- {q: "what is this 11 digit number the bank keeps asking me for", want: [bvn-basics]}
+- {q: "how i fit start to keep small small money aside every week", want: [saving-basics]}
+- {q: "the POS agent wants to collect my card and type my pin himself, is that fine", want: [pos-safety]}
+- {q: "those quick loan apps wey dey call your contacts, are they safe to borrow from", want: [loan-apps]}
+- {q: "I did transfer, it failed but they still removed the money from my account", want: [failed-transfer]}
+- {q: "I typed wrong account number and the money went to a stranger, what do i do", want: [sent-to-wrong-account]}
+- {q: "after I lost money to fake investment, a hacker on instagram says he can get it back if i pay him", want: [recovery-scam, faq-recover]}
+- {q: "my phone was snatched yesterday and my bank app is on it", want: [lost-phone]}
+- {q: "I saw a debit of 45k this morning that I know nothing about", want: [unauthorised-debit]}
+- {q: "why my account cannot receive more than 50k at once", want: [account-tiers]}
+- {q: "my network suddenly went off and i cant make calls, then i started getting debit alerts", want: [faq-sim-swap, unauthorised-debit]}

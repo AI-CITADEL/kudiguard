@@ -81,3 +81,22 @@ def render_warning(messages: Messages, language: LanguageCode, warning: str) -> 
     footer = f"_{messages.text(language, Msg.WARN_FAMILY_FOOTER)}_"
     budget = WHATSAPP_MAX_CHARS - len(intro) - len(footer) - 4
     return "\n\n".join((intro, _fit(warning.strip(), budget), footer))
+
+
+def render_steps(messages: Messages, language: LanguageCode, steps: str) -> str:
+    """The "What should I do?" follow-up."""
+    header = messages.text(language, Msg.WHAT_TO_DO)
+    disclaimer = messages.text(language, Msg.DISCLAIMER)
+    budget = WHATSAPP_MAX_CHARS - len(header) - len(disclaimer) - 4
+    return "\n\n".join((f"{header}\n{_fit(steps.strip(), budget)}", disclaimer))
+
+
+def render_report(messages: Messages, language: LanguageCode, contacts: Sequence[Contact]) -> str:
+    """The "Where to report" follow-up: verified contacts only, inserted verbatim."""
+    lines = [contact_line(c, language) for c in contacts if c.verified]
+    return "\n".join([messages.text(language, Msg.WHERE_TO_REPORT), *lines])
+
+
+def plain_text(text: str) -> str:
+    """Channel-neutral copy of a rendered reply (REST API, IVR, SMS): WhatsApp markup removed, emoji kept."""
+    return text.translate(_FORMATTING)

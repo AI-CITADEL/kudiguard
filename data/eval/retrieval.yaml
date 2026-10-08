@@ -24,7 +24,7 @@
 - {q: "How do I protect my bank account from hackers?", want: [protect-account]}
 - {q: "Is USSD banking safe?", want: [faq-ussd-safe]}
 - {q: "Will my bank call me to ask for my PIN?", want: [faq-bank-calls, flag-asks-credentials]}
-# --- held-out paraphrases: written after content was frozen, deliberately avoiding entry keywords ---
+# --- dev set 1: paraphrases written after content was frozen (partly tuned on since); see blind.yaml for held-out ---
 - {q: "they took money from my account but my brother never received it", want: [failed-transfer]}
 - {q: "i want to put small small money away for my children's school fees", want: [saving-basics, budgeting]}
 - {q: "a man at the market collected my atm and gave me another one", want: [pos-safety]}
@@ -33,7 +33,7 @@
 - {q: "what number do i dial to see my identity number", want: [nin-basics, bvn-basics]}
 - {q: "i was cheated online, who can help me", want: [report-fraud, faq-recover]}
 - {q: "how much extra will i pay if i collect credit", want: [faq-interest, loan-apps]}
-# --- held-out set 2: written by the independent M2 reviewer (not seen while authoring content) ---
+# --- dev set 2: written by the M2 reviewer; content was later tuned on it, so it is NOT held out (data review) ---
 - {q: "abeg how i fit check my bvn for phone", want: [bvn-basics]}
 - {q: "someone sent me alert of 50k but my balance did not increase", want: [flag-fake-payment]}
 - {q: "the loan app added my contacts and is sending them messages that i am a thief", want: [loan-apps]}

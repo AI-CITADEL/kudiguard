@@ -22,6 +22,7 @@ from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
 from kudiguard.storage.export import export_row, protect
+from kudiguard.text import redact
 
 T = TypeVar("T")
 _TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -199,6 +200,14 @@ class SQLiteStore:
             lambda db: db.execute("SELECT * FROM interactions WHERE id = ?", (interaction_id,)).fetchone()
         )
         return _interaction(row) if row else None
+
+    async def set_outcome(self, interaction_id: int, outcome: Outcome, error: str | None = None) -> None:
+        await self._run(
+            lambda db: db.execute(
+                "UPDATE interactions SET outcome = ?, error = COALESCE(?, error) WHERE id = ?",
+                (outcome.value, redact(error) if error else None, interaction_id),
+            )
+        )
 
     async def add_feedback(self, user_hash: str, interaction_id: int, helpful: bool) -> None:
         await self._run(

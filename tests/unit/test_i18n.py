@@ -108,3 +108,9 @@ def test_consent_states_retention_and_controls(registry: LanguageRegistry, code:
     welcome = registry.get(code).strings[Msg.WELCOME]
     assert "90" in welcome and "*DELETE*" in welcome and "*STOP*" in welcome
     assert "Powered by N-ATLAS · Awarri" in welcome
+
+
+def test_numbered_fixed_steps_keep_their_line_breaks(registry: LanguageRegistry) -> None:
+    # A multi-line double-quoted YAML scalar folds line breaks into spaces: steps must stay one per line.
+    for lang in registry.enabled:
+        assert lang.strings["fallback_steps"].count("\n") == 2, lang.code

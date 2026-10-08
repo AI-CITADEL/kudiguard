@@ -17,16 +17,18 @@ from kudiguard.knowledge.models import Query
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = yaml.safe_load((ROOT / "data" / "eval" / "retrieval.yaml").read_text(encoding="utf-8"))
+# Written blind by an independent author (no access to pack content) and frozen: never tune content on it.
+BLIND = yaml.safe_load((ROOT / "data" / "eval" / "retrieval_blind.yaml").read_text(encoding="utf-8"))
 
 
-async def evaluate(embedder: Embedder | None) -> tuple[float, float, float]:
+async def evaluate(embedder: Embedder | None, cases: list[dict] = CASES) -> tuple[float, float, float]:  # type: ignore[type-arg]
     from kudiguard.knowledge.service import KnowledgeBase, Limits
 
     core = FilePackSource.load(ROOT / "data" / "packs" / "kudiguard-core", embedder=embedder)
     kb = KnowledgeBase([core], embedder=embedder, limits=Limits(flag_entries=0, hits=3))
     top1 = top3 = 0
     timings = []
-    for case in CASES:
+    for case in cases:
         start = time.perf_counter()
         hits = [s.entry.id for s in (await kb.search(Query(text=case["q"], limit=3))).entries]
         timings.append(time.perf_counter() - start)
@@ -34,7 +36,7 @@ async def evaluate(embedder: Embedder | None) -> tuple[float, float, float]:
         top3 += any(h in case["want"] for h in hits)
         if not (hits and hits[0] in case["want"]):
             print(f"  miss: {case['q']!r} -> {hits} (want {case['want']})")
-    n = len(CASES)
+    n = len(cases)
     return top1 / n, top3 / n, median(timings) * 1000
 
 
@@ -57,7 +59,7 @@ async def test_hybrid_accuracy_and_latency() -> None:
     assert p50_ms < 30
 
 
-async def evaluate_pipeline(embedder: Embedder | None) -> tuple[float, float]:
+async def evaluate_pipeline(embedder: Embedder | None, cases: list[dict] = CASES) -> tuple[float, float]:  # type: ignore[type-arg]
     """As production runs it: deterministic rules flag the message, then the knowledge base answers."""
     from kudiguard.knowledge.service import KnowledgeBase
     from kudiguard.languages import LanguageRegistry
@@ -69,12 +71,12 @@ async def evaluate_pipeline(embedder: Embedder | None) -> tuple[float, float]:
         embedder=embedder,
     )
     top1 = top3 = 0
-    for case in CASES:
+    for case in cases:
         flags = assess([case["q"]], lexicon).flags
         ids = [s.entry.id for s in (await kb.search(Query(text=case["q"], flags=flags))).entries]
         top1 += bool(ids) and ids[0] in case["want"]
         top3 += any(i in case["want"] for i in ids[:3])
-    return top1 / len(CASES), top3 / len(CASES)
+    return top1 / len(cases), top3 / len(cases)
 
 
 async def test_pipeline_accuracy_bm25() -> None:
@@ -92,3 +94,22 @@ async def test_pipeline_accuracy_hybrid() -> None:
     print(f"\nPipeline (rules + hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.85
     assert top3 >= 0.92
+
+
+async def test_blind_set_pipeline_bm25() -> None:
+    """Frozen blind set (independent author): measured 67% top-1 / 79% top-3 on 2026-10-08. Guard, never tune."""
+    top1, top3 = await evaluate_pipeline(None, BLIND)
+    print(f"\nBlind pipeline (BM25): top1={top1:.0%} top3={top3:.0%}")
+    assert top1 >= 0.6
+    assert top3 >= 0.75
+
+
+@pytest.mark.live
+async def test_blind_set_pipeline_hybrid() -> None:
+    """Measured 67% top-1 / 96% top-3 on 2026-10-08 (compose is grounded on the top 3)."""
+    from kudiguard.knowledge.embeddings import FastEmbedder
+
+    top1, top3 = await evaluate_pipeline(FastEmbedder(cache_dir=ROOT / "models" / "fastembed"), BLIND)
+    print(f"\nBlind pipeline (hybrid): top1={top1:.0%} top3={top3:.0%}")
+    assert top1 >= 0.6
+    assert top3 >= 0.9

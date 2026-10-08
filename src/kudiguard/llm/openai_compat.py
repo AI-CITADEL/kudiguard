@@ -19,17 +19,10 @@ from typing import Any
 
 import httpx
 
-from kudiguard.llm.base import ChatRequest, Completion, LLMError, Purpose
+from kudiguard.llm.base import DEFAULT_TIMEOUTS, ChatRequest, Completion, LLMError, Purpose
 
 RETRYABLE_STATUS = frozenset({502, 503})  # 503 = llama.cpp still loading the model
 MAX_ERROR_CHARS = 200  # provider errors can echo user input (PII): keep them short
-DEFAULT_TIMEOUTS: Mapping[Purpose, float] = {
-    Purpose.ANALYSE: 10.0,
-    Purpose.TRANSLATE: 10.0,
-    Purpose.COMPOSE: 20.0,
-    Purpose.WARN: 10.0,
-    Purpose.GENERAL: 30.0,
-}
 MIN_ATTEMPT_S = 1.0  # do not start a retry with less budget than this
 
 

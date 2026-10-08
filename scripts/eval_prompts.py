@@ -24,19 +24,17 @@ import httpx
 import yaml
 
 from kudiguard.domain import Verdict
+from kudiguard.engine import Engine
 from kudiguard.knowledge.models import Query
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import PIVOT, LanguageRegistry
+from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.prompts import (
     Intent,
-    analyse_request,
     clean_reply,
-    clean_translation,
     compose_request,
-    parse_analysis,
-    translate_request,
 )
-from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
+from kudiguard.safety.decision import decide, is_content_free
 from kudiguard.safety.output_guard import OutputGuard
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +67,7 @@ class Context:
     kb: KnowledgeBase
     registry: LanguageRegistry
     guard: OutputGuard
+    engine: Engine
     timings: dict[str, list[float]]
 
 
@@ -93,15 +92,13 @@ async def run_case(ctx: Context, case: dict[str, str], *, verbose: bool) -> list
     tag = f"[{lang}] {text[:48]}"
     problems: list[str] = []
 
-    content, _ = await chat(ctx, analyse_request(text, name).payload(), "analyse")
-    analysis = parse_analysis(content, original=text, source_language=lang)
-    if analysis is None:
-        return [f"{tag}: analyse unusable"]
-    fallback = None
-    if analysis.untranslated and lang != PIVOT:
-        problems.append(f"{tag}: untranslated ({analysis.english[:30]!r}) -> fallback")
-        fallback = clean_translation((await chat(ctx, translate_request(text, name).payload()))[0])
-    analysis = resolve_analysis(analysis, text, lang, fallback_translation=fallback)
+    started = time.perf_counter()
+    analysis, _, model_down = await ctx.engine.analyse(text, lang)  # the production analyse/translate policy
+    ctx.timings["analyse"].append(time.perf_counter() - started)
+    if model_down:
+        return [f"{tag}: analyse failed (model unavailable)"]
+    if lang != PIVOT and not analysis.english:
+        problems.append(f"{tag}: no usable translation (rules on the original only)")
     if analysis.intent != case["expect"]:
         problems.append(f"{tag}: intent {analysis.intent} (expected {case['expect']})")
 
@@ -159,12 +156,16 @@ async def main(url: str, runs: int) -> None:
     cases = yaml.safe_load((ROOT / "data" / "eval" / "prompts.yaml").read_text(encoding="utf-8"))
     problems: list[str] = []
     async with httpx.AsyncClient(timeout=120) as client:
+        kb = knowledge_base_from_packs(ROOT / "data" / "packs", client=client)
         ctx = Context(
             client=client,
             url=url,
-            kb=knowledge_base_from_packs(ROOT / "data" / "packs", client=client),
+            kb=kb,
             registry=registry,
             guard=OutputGuard(registry),
+            engine=Engine(
+                registry=registry, llm=OpenAICompatLLM(url.split("/v1/")[0], client=client), knowledge=kb
+            ),
             timings={"analyse": [], "compose": []},
         )
         for run in range(runs):

@@ -15,6 +15,7 @@ LanguageCode = str
 class MessageKind(StrEnum):
     TEXT = "text"
     AUDIO = "audio"
+    BUTTON = "button"  # a tap on one of our reply buttons or list options (``button_id`` is our own id)
     UNSUPPORTED = "unsupported"
 
 
@@ -27,6 +28,7 @@ class InboundMessage:
     text: str | None = None
     audio: bytes | None = None
     audio_mime: str | None = None
+    button_id: str | None = None
 
 
 class Flag(StrEnum):

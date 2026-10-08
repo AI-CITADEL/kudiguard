@@ -275,3 +275,32 @@ def test_asking_about_secrecy_is_not_a_red_flag(en: Lexicon) -> None:
 )
 def test_secrecy_rule_needs_someone_asking(en: Lexicon, text: str, flagged: bool) -> None:
     assert (Flag.SECRECY in assess([text], en).flags) is flagged
+
+
+@pytest.mark.parametrize(
+    ("lang", "text", "flagged"),
+    [
+        # data review false positives (8 Oct 2026)
+        ("en", "what is the prize of rice today", False),
+        ("ha", "an toshe hanyar zuwa kasuwa", False),
+        ("ha", "dole sai na biya kudin makaranta", False),
+        ("yo", "mo fe ra iresi", False),
+        # native starter terms (pending native review)
+        ("en", "Congratulations you won a cash prize, claim your prize now", True),
+        ("ha", "za a toshe asusunka yau", True),
+        ("ha", "ya ce sai ka biya kudin rajista kafin a baka bashin", True),
+        ("ha", "ya ce in turo masa lambar da aka aiko min", True),
+        ("ha", "kada ka fada wa kowa", True),
+        ("ha", "zai ninka kudinka ninki biyu", True),
+        ("yo", "won ni ki n fi koodu ti won fi ranse si mi ranse", True),
+        ("yo", "e ma se so fun enikeni", True),
+        ("yo", "won ni akaunti mi maa di", True),
+        ("ig", "o gwara m ka m zitere ya koodu ahu", True),
+        ("ig", "agwala onye obula", True),
+        ("ig", "a ga emechi akauntu gi", True),
+    ],
+)
+def test_native_terms_and_review_false_positives(
+    registry: LanguageRegistry, lang: str, text: str, flagged: bool
+) -> None:
+    assert bool(assess([text], registry.lexicon_for(lang)).flags) is flagged

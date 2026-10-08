@@ -1,7 +1,9 @@
 """Speech-recognition accuracy metrics.
 
-``tone_sensitive=False`` folds tone marks/diacritics (useful for Hausa/English); Yoruba tones change meaning, so
-report both views for Yoruba and Igbo.
+``tone_sensitive=False`` folds *all* diacritics (tone marks and under-dots: ẹ→e, ọ→o, ṣ→s, ụ→u), useful for
+Hausa/English; Yoruba and Igbo diacritics change meaning, so report both views for them. For a data set, pool the
+counts (``word_errors``/``char_errors``: total edits / total reference length) rather than averaging per-clip rates,
+which over-weights short clips.
 """
 
 from __future__ import annotations
@@ -40,3 +42,17 @@ def character_error_rate(reference: str, hypothesis: str, *, tone_sensitive: boo
     ref = _normalise(reference, tone_sensitive=tone_sensitive)
     hyp = _normalise(hypothesis, tone_sensitive=tone_sensitive)
     return _edit_distance(list(ref), list(hyp)) / max(len(ref), 1)
+
+
+def word_errors(reference: str, hypothesis: str, *, tone_sensitive: bool = False) -> tuple[int, int]:
+    """(edits, reference words), for pooling over a data set."""
+    ref = _normalise(reference, tone_sensitive=tone_sensitive).split()
+    hyp = _normalise(hypothesis, tone_sensitive=tone_sensitive).split()
+    return _edit_distance(ref, hyp), len(ref)
+
+
+def char_errors(reference: str, hypothesis: str, *, tone_sensitive: bool = False) -> tuple[int, int]:
+    """(edits, reference characters), for pooling over a data set."""
+    ref = _normalise(reference, tone_sensitive=tone_sensitive)
+    hyp = _normalise(hypothesis, tone_sensitive=tone_sensitive)
+    return _edit_distance(list(ref), list(hyp)), len(ref)

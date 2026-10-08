@@ -1,0 +1,40 @@
+{"id": "s01", "lang": "en", "label": "legit", "verdict": "not_a_check", "flags": [], "english": "Acct:20******91 Amt:NGN3,000.00 DR Desc:MOB TRF TO EMEKA O/NIP Avail Bal:NGN18,442.10 Date:07-10-2026 14:22"}
+{"id": "s02", "lang": "en", "label": "legit", "verdict": "caution", "flags": ["impersonation", "urgency"], "english": "Your OTP for NIP transfer of NGN50,000 is 551208. Expires in 10 mins. Do not share this code with anyone, including bank staff."}
+{"id": "s03", "lang": "en", "label": "legit", "verdict": "not_a_check", "flags": [], "english": "Abeg Tunde, I'm short this week, fit lend me 5k? I go return am when salary drop on 28th"}
+{"id": "s04", "lang": "en", "label": "legit", "verdict": "not_a_check", "flags": [], "english": "how do I check my BVN myself? I forgot it and the new bank is asking"}
+{"id": "s05", "lang": "en", "label": "legit", "verdict": "not_a_check", "flags": [], "english": "POS man charged me 200 naira for 5k withdrawal, is that normal?"}
+{"id": "s06", "lang": "en", "label": "scam", "verdict": "likely_scam", "flags": ["account_threat", "suspicious_link", "urgency"], "english": "Dear Customer, your account has been restricted due to incomplete BVN update. Click https://gtb-verify-update.com to reactivate within 24hrs or it will be permanently blocked."}
+{"id": "s07", "lang": "en", "label": "scam", "verdict": "likely_scam", "flags": ["wrong_transfer"], "english": "Hello sorry I mistakenly sent 30k to your account, pls kindly refund it to my sister account 0123456789 Access bank, she is in hospital. God bless you"}
+{"id": "s08", "lang": "en", "label": "scam", "verdict": "caution", "flags": ["upfront_fee"], "english": "Congrats! You have been approved for FG Survival Fund grant of N250,000. Pay N10,500 processing fee to claim before Friday or your slot will be given to another person."}
+{"id": "s09", "lang": "en", "label": "scam", "verdict": "likely_scam", "flags": ["asks_credentials"], "english": "This is UBA head office, we are upgrading your ATM card. Send your card number, expiry date and PIN so the new card can be activated today"}
+{"id": "s10", "lang": "en", "label": "scam", "verdict": "caution", "flags": ["suspicious_link"], "english": "Your loan of N150,000 is ready. To receive disbursement pls download QuickKash.apk from http://quickkash-ng.top and allow all permissions"}
+{"id": "s11", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s12", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s13", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s14", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s15", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s16", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s17", "lang": "ha", "label": "scam", "verdict": "caution", "flags": ["upfront_fee"], "english": ""}
+{"id": "s18", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s19", "lang": "ha", "label": "scam", "verdict": "likely_scam", "flags": ["suspicious_link", "impersonation"], "english": ""}
+{"id": "s20", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s21", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s22", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s23", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s24", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s25", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s26", "lang": "yo", "label": "scam", "verdict": "caution", "flags": ["suspicious_link"], "english": ""}
+{"id": "s27", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s28", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s29", "lang": "yo", "label": "scam", "verdict": "likely_scam", "flags": ["remote_access", "impersonation"], "english": ""}
+{"id": "s30", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s31", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s32", "lang": "ig", "label": "legit", "verdict": "caution", "flags": ["urgency"], "english": ""}
+{"id": "s33", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s34", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s35", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s36", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["urgency"], "english": ""}
+{"id": "s37", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["upfront_fee"], "english": ""}
+{"id": "s38", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["impersonation"], "english": ""}
+{"id": "s39", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["impersonation"], "english": ""}
+{"id": "s40", "lang": "ig", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}

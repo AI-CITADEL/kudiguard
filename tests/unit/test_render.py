@@ -124,3 +124,12 @@ def test_transcript_markup_cannot_restyle_reply(messages: Messages) -> None:
         messages, "en", verdict=Verdict.CAUTION, body="Careful.", transcript="*bold* _it_ ~x~ `code`"
     )
     assert "“bold it x code”" in text
+
+
+def test_plain_text_strips_whatsapp_markup() -> None:
+    from kudiguard.render import plain_text
+
+    assert (
+        plain_text("🔴 *This looks like a SCAM*\n_Guidance only._")
+        == "🔴 This looks like a SCAM\nGuidance only."
+    )

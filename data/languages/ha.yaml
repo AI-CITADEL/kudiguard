@@ -12,8 +12,8 @@ review:
   strings: pending-native-review
 
 commands:
-  stop: [tsaya, daina]
-  delete: [goge, goge bayanai na]
+  stop: [daina aiko min, daina turo min sako]  # not "tsaya": it means "wait"
+  delete: [goge bayanai na, goge sakonni na]
   language: [harshe, canja harshe]
   greetings: [sannu, sannu da zuwa, ina kwana, ina wuni, barka, barka da safe, barka da rana, barka da yamma,
     salam, assalamu alaikum, na gode, nagode, mun gode, to, madalla]
@@ -30,16 +30,23 @@ lexicon:
   flags:
     asks_credentials:
       - 'lambar sirri'
+      - '(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masa|mata|musu|mana|shi|ita|su)\W+(?:\w+\W+){0,2}?(?:lamba\w*|code|kod|otp|pin)'
     prize_lottery:
       - '(?:kun|ka|kin|na|an|ya|ta|sun) ci (?:kyauta\w*|gasa\w*|lambar yabo)'
     upfront_fee:
       - 'kudin (?:rajista|rijista|sarrafawa|aiki|kwastam)'
-      - '(?:sai|dole|tukuna)\W+(?:\w+\W+){0,2}?(?:na|ku|ka|ki|in|mu) biya'
+      - '(?:sai|dole|tukuna)\W+(?:\w+\W+){0,2}?(?:ku|ka|ki|kun) biya\W+(?:\w+\W+){0,4}?(?:kafin|domin|don|sannan)'
     account_threat:
-      - '(?:an )?toshe'
+      - 'toshe\W+(?:\w+\W+){0,2}?(?:asusu\w*|account\w*|kati\w*|layi\w*|bvn|sim)'
+      - '(?:asusu\w*|account\w*|bvn|layi\w*)\W+(?:\w+\W+){0,3}?(?:za a |an |sun |zasu |za su )toshe'
     urgency:
       - 'gaggawa'
       - 'yanzu yanzu'
+    guaranteed_returns:
+      - 'ninki (?:biyu|uku)'
+      - 'riba (?:tabbatacciya|ta tabbata|babu asara)'
+    secrecy:
+      - '(?:kada|kar) (?:ka|ki|ku) (?:fada|gaya|sanar)\W+(?:\w+\W+){0,1}?kowa'
   check_intent:
     - '(?:dan )?damfara'
     - 'zamba'
@@ -85,3 +92,12 @@ strings:
   error_retry: 😔 Yi haƙuri, an sami matsala a ɓangarena. Don Allah ku sake gwadawa nan ba da daɗewa ba.
   stopped: Ba za ku ƙara samun saƙonni daga KudiGuard ba. Ku aika kowane saƙo don sake farawa.
   deleted: 🗑️ An share saƙonninku.
+  fallback_scam: "Kada ku tura kuɗi, kuma kada ku bayar da wata lamba, PIN ko kalmar sirri. Ku daina hulɗa da su, ku kira bankinku ta lambar da ke jikin katinku."
+  fallback_answer: "Ban iya shirya cikakkiyar amsa yanzu ba. Don Allah ku sake gwadawa nan ba da jimawa ba, ko ku tambayi bankinku kai tsaye."
+  fallback_steps: |-
+    1. Kada ku bayar da wata lamba (OTP), PIN ko kalmar sirri.
+    2. Kada ku tura kuɗi ko ku buɗe hanyar haɗi (link) daga wannan mutumin.
+    3. Ku kira bankinku ta lambar da ke jikin katinku ku kai rahoto.
+  warn_family_fallback: "⚠️ Gargaɗi kan damfara: wani zai iya tuntuɓarku yana cewa daga banki ko hukumar gwamnati yake, ko yana alƙawarin kuɗi. Kada ku taɓa bayar da OTP, PIN ko BVN ɗinku, kuma kada ku biya kuɗi don karɓar kuɗi. Ku tabbatar da bankinku tukuna."
+  at_capacity: "😔 KudiGuard ta cika yanzu. Don Allah ku sake gwadawa bayan 'yan kwanaki."
+  busy: "⏳ Mutane da yawa suna tambaya yanzu. Don Allah ku sake gwadawa bayan minti ɗaya."

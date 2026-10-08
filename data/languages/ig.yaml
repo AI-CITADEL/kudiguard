@@ -13,7 +13,7 @@ review:
 
 commands:
   stop: [kwụsị]
-  delete: [hichapụ, hichapụ ozi m]
+  delete: [hichapụ ozi m, hichapụ data m]
   language: [asụsụ, gbanwee asụsụ]
   greetings: [ndewo, kedu, kedụ, ụtụtụ ọma, ehihie ọma, mgbede ọma, daalụ, daalụ nke ukwuu, nnọọ, ọ dị mma]
 
@@ -28,6 +28,17 @@ lexicon:
   flags:
     urgency:
       - 'ngwa ngwa'
+    asks_credentials:
+      - '(?:zitere|zite|ziga|nye)\W+(?:ya|ha|anyi|m|mu)\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin|okwuntughe)'
+    account_threat:
+      - '(?:akauntu|account)\W+(?:\w+\W+){0,4}?(?:emechi|akpochi|mechie|kpochie)'
+      - '(?:emechi|akpochi|mechie|kpochie)\W+(?:\w+\W+){0,1}?(?:akauntu|account)'
+    guaranteed_returns:
+      - 'okpukpu (?:abuo|ato)'
+    upfront_fee:
+      - 'kwu\w*\W+(?:\w+\W+){0,4}?(?:tupu|ka i nweta|ka i nata)'
+    secrecy:
+      - 'agwala onye (?:obula|o bula)'
   check_intent:
     - 'wayo'
     - 'aghugho'
@@ -72,3 +83,12 @@ strings:
   error_retry: 😔 Ndo, nsogbu dapụtara n'akụkụ m. Biko nwaa ọzọ n'oge na-adịghị anya.
   stopped: Ị gaghị enwetakwa ozi site na KudiGuard. Zite ozi ọ bụla iji malite ọzọ.
   deleted: 🗑️ Ehichapụla ozi gị.
+  fallback_scam: "Ezitela ego, enyekwala onye ọ bụla koodu, PIN ma ọ bụ okwuntughe gị. Kwụsị ịkpakọrịta ha, kpọọ ụlọ akụ gị na nọmba e dere na kaadị gị."
+  fallback_answer: "Enweghị m ike ịkwadebe azịza zuru ezu ugbu a. Biko nwaa ọzọ n'oge na-adịghị anya, ma ọ bụ jụọ ụlọ akụ gị ozugbo."
+  fallback_steps: |-
+    1. Enyela onye ọ bụla koodu (OTP), PIN ma ọ bụ okwuntughe gị.
+    2. Ezitela ego ma ọ bụ mepee njikọ (link) sitere n'aka onye a.
+    3. Kpọọ ụlọ akụ gị na nọmba e dere na kaadị gị ma kọọrọ ha ya.
+  warn_family_fallback: "⚠️ Ịdọ aka ná ntị maka aghụghọ: mmadụ nwere ike ịkpọtụrụ unu na-ekwu na o si n'ụlọ akụ ma ọ bụ ụlọ ọrụ gọọmentị, ma ọ bụ na-ekwe nkwa ego. Unu enyela onye ọ bụla OTP, PIN ma ọ bụ BVN unu, unu akwụkwala ego ka unu nata ego. Buru ụzọ jụọ ụlọ akụ unu."
+  at_capacity: "😔 KudiGuard juputara ugbu a. Biko nwaa ọzọ mgbe ụbọchị ole na ole gachara."
+  busy: "⏳ Ọtụtụ mmadụ na-ajụ ajụjụ ugbu a. Biko nwaa ọzọ mgbe otu nkeji gachara."

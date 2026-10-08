@@ -80,7 +80,9 @@ lexicon:
     prize_lottery:
       - '(?:you|u|i) (?:have |just )?won'
       - 'winner'
-      - 'prize'
+      - '(?:won|win|claim|collect|redeem)\W+(?:\w+\W+){0,3}?prize'
+      - '(?:cash|star|grand) prize'
+      - 'prize (?:money|draw|winner)'
       - 'lottery'
       - 'lucky (?:draw|winner|number)'
       - 'giveaway'
@@ -189,3 +191,12 @@ strings:
   error_retry: "😔 Sorry, something went wrong on my side. Please try again in a moment."
   stopped: "You will not get messages from KudiGuard anymore. Send any message to start again."
   deleted: "🗑️ Your messages have been deleted."
+  fallback_scam: "Do not send money and do not share any code, PIN or password. Stop all contact and call your bank on the number printed on your card."
+  fallback_answer: "I could not prepare a full answer right now. Please try again in a moment, or ask your bank directly."
+  fallback_steps: |-
+    1. Do not share any code, PIN or password.
+    2. Do not send money or open links from this person.
+    3. Call your bank on the number printed on your card and report it.
+  warn_family_fallback: "⚠️ Scam alert: someone may contact you pretending to be from a bank or a government agency, or promising money. Never share your OTP, PIN or BVN, and never pay a fee to receive money. Check with your bank first."
+  at_capacity: "😔 KudiGuard is full right now. Please try again in a few days."
+  busy: "⏳ Many people are asking right now. Please try again in a minute."

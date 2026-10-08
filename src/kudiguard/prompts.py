@@ -31,6 +31,7 @@ ANALYSE_MAX_TOKENS = 400
 TRANSLATE_MAX_TOKENS = 300
 COMPOSE_MAX_TOKENS = 250  # raising it only moves tail latency (review M3: 350 -> max 8.6 s)
 WARN_MAX_TOKENS = 120
+STEPS_MAX_TOKENS = 200
 COMPOSE_STOP = ("\n4.", "\n4)")  # stop at a 4th step: removed all truncations in review M3 (variant S)
 MAX_ENTRIES = 3  # more facts made N-ATLAS list everything and run out of tokens (eval E1)
 MAX_FACTS = 8
@@ -106,6 +107,9 @@ Write in the language you are asked for, in simple everyday words:
 - Then up to 3 numbered steps, one short line each.
 Base everything on the facts and actions given. If they do not cover the question, say so briefly and suggest asking their bank.
 Do not call anything safe or guaranteed. Do not add links, phone numbers, greetings or a sign-off."""
+
+_STEPS_SYSTEM = """Rewrite the safety steps in {language} as a numbered list of at most 3 short steps (1., 2., 3.).
+Keep bank, app and agency names exactly. Do not add new advice, links, phone numbers, greetings or a sign-off."""
 
 _WARN_SYSTEM = """Write a short warning in {language} that a person can forward to family and friends on WhatsApp.
 Use 2 or 3 short sentences with simple words. Describe the trick and the one rule that protects them (for example: never share your OTP).
@@ -379,6 +383,13 @@ def compose_request(
         purpose=Purpose.COMPOSE,
         stop=COMPOSE_STOP,
     )
+
+
+def steps_request(*, language_name: str, actions: Sequence[str]) -> ChatRequest:
+    """The "What should I do?" follow-up: the knowledge base's English actions restated in the user's language."""
+    bullets = "\n".join(f"- {_data(a)}" for a in actions[:MAX_STEPS])
+    system = _STEPS_SYSTEM.format(language=language_name)
+    return _chat(Purpose.STEPS, system, f"<actions>\n{bullets}\n</actions>", STEPS_MAX_TOKENS)
 
 
 def warn_family_request(*, language_name: str, english: str, flags: Sequence[Flag]) -> ChatRequest:

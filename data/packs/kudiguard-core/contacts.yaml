@@ -1,12 +1,12 @@
 # Official reporting channels. `verified: true` only after the value was checked against the organisation's own
 # website; the source and date are in `note`. Unverified contacts are never shown to users (render.py).
+# Label translations (label_i18n): DRAFT, pending native-speaker review. Numbers and links are never translated.
 - label: Your own bank
   kind: note
   value: Call the number printed on the back of your bank card or listed on the bank's official website
   pinned: true
   verified: true
   note: Always-correct instruction rather than a specific number
-  # Translations: DRAFT, pending native-speaker review.
   label_i18n:
     ha: Bankinku
     yo: Báǹkì yín
@@ -22,13 +22,32 @@
   flags: [asks_credentials, guaranteed_returns, upfront_fee, prize_lottery, wrong_transfer, money_request, impersonation, remote_access, fake_payment]
   verified: true
   note: Verified 2026-10-07 on efcc.gov.ng
+  label_i18n:
+    ha: EFCC (kai rahoton laifukan kuɗi)
+    yo: EFCC (ẹ fi ẹ̀sùn ìwà ọ̀daràn owó sùn)
+    ig: EFCC (kọọ mpụ gbasara ego)
 
 - label: EFCC Eagle Eye app (anonymous reporting)
   kind: app
-  value: Eagle Eye, on the Play Store or App Store
+  value: Eagle Eye (Play Store / App Store)
   flags: [asks_credentials, guaranteed_returns, upfront_fee, prize_lottery, money_request, impersonation]
   verified: true
   note: Verified 2026-10-07 on efcc.gov.ng/records/eagle-eye-app
+  label_i18n:
+    ha: Manhajar EFCC Eagle Eye (rahoto ba tare da suna ba)
+    yo: Ìṣàfilọ́lẹ̀ EFCC Eagle Eye (ìfisùn láìdárúkọ)
+    ig: Ngwa EFCC Eagle Eye (kọọ n'ekpugheghị aha)
+
+- label: Police cybercrime centre (NPF-NCCC online report)
+  kind: web
+  value: https://nccc.npf.gov.ng/ereport
+  flags: [asks_credentials, remote_access, suspicious_link, impersonation, money_request, fake_payment, wrong_transfer]
+  verified: true
+  note: Verified 2026-10-08 on nccc.npf.gov.ng (official NPF-NCCC e-report portal; replaces incb.npf.gov.ng)
+  label_i18n:
+    ha: Cibiyar yaƙi da laifukan intanet ta 'yan sanda (NPF-NCCC)
+    yo: Ẹ̀ka ọlọ́pàá fún ìwà ọ̀daràn orí íntánẹ́ẹ̀tì (NPF-NCCC)
+    ig: Ngalaba ndị uwe ojii maka mpụ ịntanetị (NPF-NCCC)
 
 - label: SEC Nigeria (check if an investment company is registered)
   kind: web
@@ -36,6 +55,10 @@
   flags: [guaranteed_returns]
   verified: true
   note: Verified 2026-10-07 on sec.gov.ng ("Registered Capital Market Operators" search)
+  label_i18n:
+    ha: SEC Nigeria (ku duba ko kamfanin zuba jari yana da rajista)
+    yo: SEC Nigeria (ẹ ṣàyẹ̀wò bóyá ilé-iṣẹ́ ìdókòwò ti forúkọsílẹ̀)
+    ig: SEC Nigeria (lee ma ụlọ ọrụ itinye ego ọ debara aha)
 
 - label: FCCPC complaints (loan apps, unfair treatment; after first contacting the business)
   kind: web
@@ -43,6 +66,21 @@
   flags: [upfront_fee]
   verified: true
   note: Verified 2026-10-07 on fccpc.gov.ng ("File a Complaint")
+  label_i18n:
+    ha: Korafi ga FCCPC (manhajar bashi, rashin adalci; bayan kun tuntuɓi kamfanin)
+    yo: Ẹ̀sùn sí FCCPC (ìṣàfilọ́lẹ̀ awin, ìwà àìtọ́; lẹ́yìn tí ẹ ti bá ilé-iṣẹ́ náà sọ̀rọ̀)
+    ig: Mkpesa FCCPC (ngwa mgbazinye ego, omume ezighi ezi; mgbe unu kpọtụrụ ụlọ ọrụ ahụ)
+
+- label: FCCPC phone
+  kind: phone
+  value: 0805 600 2020
+  flags: [upfront_fee]
+  verified: true
+  note: Verified 2026-10-08 on fccpc.gov.ng (Contact Us; also 0805 600 3030, contact@fccpc.gov.ng)
+  label_i18n:
+    ha: Wayar FCCPC
+    yo: Fóònù FCCPC
+    ig: Ekwentị FCCPC
 
 - label: NCC 622 (after first complaining to your network and getting a ticket number)
   kind: phone
@@ -50,9 +88,17 @@
   flags: [account_threat, impersonation, asks_credentials]
   verified: true
   note: Verified 2026-10-07 on ncc.gov.ng; second-level escalation line, toll-free
+  label_i18n:
+    ha: NCC 622 (bayan kun kai ƙara ga kamfanin layinku kuma kun sami lambar tikiti)
+    yo: NCC 622 (lẹ́yìn tí ẹ ti fi ẹ̀sùn sùn sí ilé-iṣẹ́ nẹ́tíwọ̀ọ̀kì yín tí ẹ sì gba nọ́mbà tíkẹ́ẹ̀tì)
+    ig: NCC 622 (mgbe unu buru ụzọ mee mkpesa n'ụlọ ọrụ netwọk unu ma nweta nọmba tiketi)
 
 - label: CBN Consumer Protection (if your bank does not resolve a complaint)
   kind: email
   value: cpd@cbn.gov.ng
   verified: true
   note: Verified 2026-10-07 on cbn.gov.ng (Complaints Management)
+  label_i18n:
+    ha: Sashen Kare Masu Amfani na CBN (idan bankinku bai warware korafi ba)
+    yo: Ẹ̀ka Ààbò Oníbàárà CBN (tí báǹkì yín kò bá yanjú ẹ̀sùn)
+    ig: Ngalaba Nchekwa Ndị ahịa CBN (ọ bụrụ na ụlọ akụ unu edozighị mkpesa)

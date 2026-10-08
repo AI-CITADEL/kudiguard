@@ -207,6 +207,22 @@ The M7 pipeline keeps this open: channels are adapters; the core never assumes W
   follow-up (or pre-translated actions) rather than sending English.
 * Redact `analysis.english` before logging; pass `native_name` to `language_set`.
 
+### Data review (8 Oct 2026): status
+Done: pooled WER + per-clip logs + rejected-as-errors (S6), dev sets relabelled, blind retrieval + 40-item blind
+scam set (S7), lexicon false positives fixed, starter native terms (ha/yo/ig), polite register, NPF-NCCC + FCCPC phone
+contacts, localised contact labels. Open (human): native-speaker review of all ha/yo/ig strings, lexicons, commands and
+the blind set wording; ≥20 ha + ≥20 en real WhatsApp voice notes; genuine-OTP-SMS false alarm (fix with separate dev
+examples, re-measure once). Open (engineering, backlog): int8 vs float32 `--compare`, gain-normalise quiet notes before
+the silence check, de-duplicate FLEURS sentences, multilingual retrieval eval through the translation step,
+Yoruba diacritic restoration for the "I heard" echo, speaker diarization (call centre).
+
+### Multi-speaker audio and on-device (backlog)
+* Forwarded recordings with several voices already work for checks (one transcript; red flags found regardless of
+  speaker). Speaker diarization (who said what) only for the call-centre agent (caller vs agent), +1–3 s.
+* On-device "KudiGuard Lite"/bank SDK: scam rules + packs run offline (pure config/Python); a small multimodal model
+  (e.g. MiniCPM-o, Qwen2.5-Omni) only if it handles ha/yo/ig well — measure first. Not for NAIC: judges score N-ATLAS
+  integration, and most target phones lack the RAM.
+
 ### Trusted-site search (backlog)
 Open-web search is out of scope for V1 (scam/SEO pages could be repeated as facts; prompt injection from page text;
 +1–3 s latency; paid API; queries leave the system). Planned instead: a `KnowledgeSource` that searches **only an
