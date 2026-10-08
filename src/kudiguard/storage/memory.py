@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 
@@ -80,10 +81,16 @@ class MemoryStore:
             1 for i in self._interactions.values() if i.user_hash == user_hash and i.created_at >= cutoff
         )
 
-    async def count_active_users_since(self, since: datetime) -> int:
+    async def count_active_users_since(self, since: datetime, channels: Collection[str] | None = None) -> int:
         self._ensure_open()
         cutoff = aware(since)
-        return len({i.user_hash for i in self._interactions.values() if i.created_at >= cutoff})
+        return len(
+            {
+                i.user_hash
+                for i in self._interactions.values()
+                if i.created_at >= cutoff and (channels is None or i.channel in channels)
+            }
+        )
 
     async def delete_user(self, user_hash: str) -> int:
         self._ensure_open()

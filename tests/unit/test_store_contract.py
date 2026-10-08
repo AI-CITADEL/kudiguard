@@ -226,3 +226,17 @@ async def test_retention_purge_forgets_old_message_claims(store: Store) -> None:
         await store.purge_before(utcnow() + timedelta(minutes=1)) == 1
     )  # the claim itself counts as removed
     assert await store.claim_message("whatsapp", "wamid.1")  # nothing about the old message id remains
+
+
+async def test_count_active_users_by_channel(store: Store) -> None:
+    for n, (channel, user) in enumerate(
+        (("whatsapp", "u1"), ("web", "w1"), ("web", "w2"), ("whatsapp", "u1"))
+    ):
+        item = turn(user=user, message_id=f"c{n}")
+        item.channel = channel
+        await store.add_interaction(item)
+    since = utcnow() - timedelta(days=30)
+    assert await store.count_active_users_since(since) == 3
+    assert await store.count_active_users_since(since, channels={"whatsapp"}) == 1
+    assert await store.count_active_users_since(since, channels={"web", "whatsapp"}) == 3
+    assert await store.count_active_users_since(since, channels=()) == 0

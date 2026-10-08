@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KudiGuard</title>
+<meta name="description" content="Check a suspicious message or call in Hausa, Yoruba, Igbo or English. Powered by N-ATLAS.">
+<style>
+  :root {
+    --bg: #f6f7f5; --card: #ffffff; --ink: #1b1f1d; --muted: #5d6662; --line: #dfe3e0;
+    --accent: #0b7a53; --accent-ink: #ffffff; --danger: #c62828; --warn: #8a4f00; --ok: #2e7d32;
+    --danger-bg: #fdecea; --warn-bg: #fff4e0; --ok-bg: #e9f5ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111413; --card: #1a1f1d; --ink: #e8ece9; --muted: #a2aca7; --line: #2c3431;
+      --accent: #3fbf8a; --accent-ink: #0b1310; --danger: #ff8a80; --warn: #ffc266; --ok: #8fd694;
+    --danger-bg: #3a1716; --warn-bg: #3a2a10; --ok-bg: #16301a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111413; --card: #1a1f1d; --ink: #e8ece9; --muted: #a2aca7; --line: #2c3431;
+    --accent: #3fbf8a; --accent-ink: #0b1310; --danger: #ff8a80; --warn: #ffc266; --ok: #8fd694;
+    --danger-bg: #3a1716; --warn-bg: #3a2a10; --ok-bg: #16301a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+                     border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  textarea { min-height: 96px; resize: vertical; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 12px 20px; cursor: pointer;
+           background: var(--accent); color: var(--accent-ink); min-height: 48px; }
+  button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .record { width: 100%; font-size: 1.1rem; }
+  .record.on { background: #c62828; color: #fff; }  /* fixed: 5.6:1 in both themes */
+  .timer { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: .92rem; color: var(--muted); }
+  .consent input { margin-top: 4px; width: 20px; height: 20px; flex: none; }
+  .or { text-align: center; color: var(--muted); margin: 12px 0; }
+  .result { display: none; }
+  .verdict { border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; }
+  .likely_scam { background: var(--danger-bg); color: var(--danger); }
+  .caution { background: var(--warn-bg); color: var(--warn); }
+  .no_flags { background: var(--ok-bg); color: var(--ok); }
+  .heard { color: var(--muted); font-style: italic; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .explanation { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .channels { margin: 12px 0 0; padding-left: 18px; }
+  .channels li { overflow-wrap: anywhere; }
+  .small { font-size: .85rem; color: var(--muted); }
+  .error { color: var(--danger); display: none; margin-top: 10px; }
+  .spinner { display: none; color: var(--muted); margin-top: 10px; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🛡️ KudiGuard</h1>
+  <p class="sub" data-i18n="tagline">Not sure about a message or call? Check it here in your language.</p>
+
+  <div class="card">
+    <label for="language" data-i18n="language">Language</label>
+    <select id="language">
+      <option value="ha">Hausa</option>
+      <option value="yo">Yorùbá</option>
+      <option value="ig">Igbo</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <button id="record" class="record" type="button" data-i18n="record">🎤 Tap to record</button>
+    <div class="row" style="justify-content: space-between; margin-top: 8px;">
+      <span class="timer" id="timer">0:00 / 1:30</span>
+      <span class="small" data-i18n="describe">Describe the call or read out the message.</span>
+    </div>
+    <div class="or" data-i18n="or">or type / paste it</div>
+    <textarea id="text" maxlength="4000" aria-label="Message" data-i18n-placeholder="placeholder"></textarea>
+    <div class="row" style="margin-top: 12px;">
+      <button id="send" type="button" data-i18n="check">Check</button>
+      <button id="clear" class="secondary" type="button" data-i18n="clear">Clear</button>
+    </div>
+    <div style="margin-top: 14px;" class="consent">
+      <input type="checkbox" id="consent">
+      <label for="consent" style="font-weight: 400; margin: 0;" data-i18n="consent">
+        I agree that KudiGuard keeps my message (numbers removed) for up to 90 days to improve the service.
+        Voice recordings are deleted after transcription. Guidance only, not financial advice.
+      </label>
+    </div>
+    <div class="spinner" id="spinner" role="status" data-i18n="checking">🔎 Checking…</div>
+    <div class="error" id="error" role="alert"></div>
+  </div>
+
+  <div class="card result" id="result" aria-live="polite">
+    <div class="verdict" id="verdict"></div>
+    <div class="heard" id="heard"></div>
+    <div class="explanation" id="explanation"></div>
+    <ul class="channels" id="channels"></ul>
+    <p class="small" id="disclaimer"></p>
+    <p class="small" id="latency"></p>
+  </div>
+
+  <footer>Powered by N-ATLAS · Awarri · NCAIR</footer>
+</main>
+<script>
+(() => {
+  "use strict";
+  // UI labels per language. Hausa, Yoruba and Igbo: DRAFT, pending native-speaker review.
+  const UI = {
+    en: { placeholder: "Someone called and said my BVN is blocked…", tagline: "Not sure about a message or call? Check it here in your language.", language: "Language",
+          record: "🎤 Tap to record", stop: "⏹️ Tap to stop", describe: "Describe the call or read out the message.",
+          or: "or type / paste it", check: "Check", clear: "Clear", checking: "🔎 Checking…",
+          consent: "I agree that KudiGuard keeps my message (numbers removed) for up to 90 days to improve the service. Voice recordings are deleted after transcription. Guidance only, not financial advice.",
+          needConsent: "Please tick the box to agree first.", empty: "Record a voice note or type a message.",
+          mic: "Microphone not available. Please type instead.", failed: "Sorry, something went wrong. Please try again.",
+          busy: "Too many checks. Please wait a minute.", heard: "I heard", seconds: "s" },
+    ha: { placeholder: "Wani ya kira ni ya ce an toshe BVN ɗina…", tagline: "Kuna shakka game da saƙo ko kira? Ku duba shi a nan da harshenku.", language: "Harshe",
+          record: "🎤 Taɓa don yin rikodi", stop: "⏹️ Taɓa don tsayawa", describe: "Ku bayyana kiran ko ku karanta saƙon.",
+          or: "ko ku rubuta / liƙa shi", check: "Duba", clear: "Share", checking: "🔎 Ana dubawa…",
+          consent: "Na amince KudiGuard ta adana saƙona (ba tare da lambobi ba) har kwanaki 90 don inganta aikin. Ana share rikodin murya bayan an rubuta shi. Jagora ce kawai, ba shawarar kuɗi ba.",
+          needConsent: "Don Allah ku fara amincewa ta danna akwatin.", empty: "Ku yi rikodin murya ko ku rubuta saƙo.",
+          mic: "Babu makirufo. Don Allah ku rubuta.", failed: "Yi haƙuri, an sami matsala. Don Allah ku sake gwadawa.",
+          busy: "Dubawa sun yi yawa. Don Allah ku jira minti ɗaya.", heard: "Na ji", seconds: "s" },
+    yo: { placeholder: "Ẹnìkan pè mí pé wọ́n ti dí BVN mi…", tagline: "Ṣé ẹ ń ṣiyèméjì nípa ìfiránṣẹ́ tàbí ìpè kan? Ẹ ṣàyẹ̀wò rẹ̀ níbí ní èdè yín.", language: "Èdè",
+          record: "🎤 Tẹ̀ láti gbohùn sílẹ̀", stop: "⏹️ Tẹ̀ láti dúró", describe: "Ẹ ṣàlàyé ìpè náà tàbí kí ẹ ka ìfiránṣẹ́ náà.",
+          or: "tàbí kí ẹ tẹ̀ ẹ́ / lẹ̀ ẹ́ síbí", check: "Ṣàyẹ̀wò", clear: "Pa á rẹ́", checking: "🔎 À ń ṣàyẹ̀wò…",
+          consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (láìsí nọ́ńbà) fún ọjọ́ 90 láti mú iṣẹ́ náà dára sí i. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó.",
+          needConsent: "Ẹ jọ̀ọ́ ẹ kọ́kọ́ fi àmì sí àpótí náà.", empty: "Ẹ gbohùn sílẹ̀ tàbí kí ẹ tẹ ìfiránṣẹ́ kan.",
+          mic: "Kò sí makirofóònù. Ẹ jọ̀ọ́ ẹ tẹ̀ ẹ́.", failed: "Ẹ má bínú, nǹkan kan ṣẹlẹ̀. Ẹ jọ̀ọ́ ẹ tún gbìyànjú.",
+          busy: "Àyẹ̀wò ti pọ̀ jù. Ẹ jọ̀ọ́ ẹ dúró fún ìṣẹ́jú kan.", heard: "Mo gbọ́", seconds: "s" },
+    ig: { placeholder: "Mmadụ kpọrọ m sị na e mechiela BVN m…", tagline: "Ị na-enwe obi abụọ maka ozi ma ọ bụ oku? Lelee ya ebe a n'asụsụ gị.", language: "Asụsụ",
+          record: "🎤 Pịa ka ị dekọọ", stop: "⏹️ Pịa ka ị kwụsị", describe: "Kọwaa oku ahụ ma ọ bụ gụọ ozi ahụ.",
+          or: "ma ọ bụ dee / mado ya", check: "Lelee", clear: "Hichapụ", checking: "🔎 Ana-elele…",
+          consent: "Ekwere m ka KudiGuard chekwaa ozi m (na-enweghị nọmba) ruo ụbọchị 90 iji meziwanye ọrụ ahụ. A na-ehichapụ ndekọ olu mgbe e dechara ya. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego.",
+          needConsent: "Biko buru ụzọ pịa igbe ahụ.", empty: "Dekọọ olu ma ọ bụ dee ozi.",
+          mic: "Enweghị igwe okwu. Biko dee ya.", failed: "Ndo, nsogbu mere. Biko nwaa ọzọ.",
+          busy: "Nlele dị ukwuu. Biko chere otu nkeji.", heard: "Anụrụ m", seconds: "s" },
+  };
+  const MAX_SECONDS = 90;
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode: fine */ } },
+  };
+  const session = store.get("kg_session") || (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") :
+    Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
+  store.set("kg_session", session);
+
+  let lang = store.get("kg_lang") || (navigator.language || "en").slice(0, 2);
+  if (!UI[lang]) lang = "ha";  // Hausa-first: other browser languages start in Hausa (selector above)
+  $("language").value = lang;
+  $("consent").checked = store.get("kg_consent") === "1";
+
+  const t = (key) => (UI[lang] && UI[lang][key]) || UI.en[key];
+  function applyLabels() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+    $("record").textContent = recorder ? t("stop") : t("record");
+  }
+
+  let recorder = null, chunks = [], timerId = null, started = 0, audioBlob = null;
+  function showError(message) { const el = $("error"); el.textContent = message; el.style.display = message ? "block" : "none"; }
+  function fmt(sec) { return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`; }
+  function tick() {
+    const sec = (Date.now() - started) / 1000;
+    $("timer").textContent = `${fmt(sec)} / ${fmt(MAX_SECONDS)}`;
+    if (sec >= MAX_SECONDS) stopRecording();
+  }
+
+  async function startRecording() {
+    showError("");
+    if (!$("consent").checked) { showError(t("needConsent")); $("consent").focus(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) { showError(t("mic")); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { showError(t("mic")); return; }
+    const type = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported(m)) || "";
+    recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    chunks = []; audioBlob = null;
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      audioBlob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      recorder = null; clearInterval(timerId);
+      $("record").classList.remove("on"); applyLabels();
+      send();
+    };
+    recorder.start();
+    started = Date.now(); timerId = setInterval(tick, 250);
+    $("record").classList.add("on"); applyLabels();
+  }
+  function stopRecording() { if (recorder && recorder.state !== "inactive") recorder.stop(); }
+
+  async function send() {
+    showError("");
+    if (!$("consent").checked) { showError(t("needConsent")); return; }
+    const text = $("text").value.trim();
+    if (!audioBlob && !text) { showError(t("empty")); return; }
+    const form = new FormData();
+    form.append("language", lang);
+    if (audioBlob) form.append("audio", audioBlob, "voice-note"); else form.append("text", text);
+    $("send").disabled = true; $("record").disabled = true; $("spinner").style.display = "block";
+    try {
+      const response = await fetch("/web/check", {
+        method: "POST", body: form,
+        headers: { "X-KudiGuard-Session": session, "X-KudiGuard-Consent": "yes" },
+      });
+      if (response.status === 429) { showError(t("busy")); return; }
+      if (!response.ok) {
+        let message = t("failed");
+        try { const body = await response.json(); if (body.detail && body.detail.message) message = body.detail.message; }
+        catch { /* not JSON */ }
+        showError(message); return;
+      }
+      render(await response.json());
+    } catch { showError(t("failed")); }
+    finally {
+      audioBlob = null; $("send").disabled = false; $("record").disabled = false; $("spinner").style.display = "none";
+    }
+  }
+
+  function render(data) {
+    const verdict = $("verdict");
+    verdict.className = `verdict ${data.verdict}`;
+    verdict.textContent = data.headline || "";
+    verdict.style.display = data.headline ? "block" : "none";
+    $("heard").textContent = data.transcript ? `🗣️ ${t("heard")}: “${data.transcript}”` : "";
+    $("explanation").textContent = data.explanation || "";
+    const list = $("channels"); list.replaceChildren();
+    for (const channel of data.report_channels || []) {
+      const item = document.createElement("li");
+      item.textContent = `${channel.label}: ${channel.value}`;
+      list.appendChild(item);
+    }
+    $("disclaimer").textContent = data.disclaimer || "";
+    $("latency").textContent = `${(data.latency_ms / 1000).toFixed(1)} ${t("seconds")}`;
+    $("result").style.display = "block";
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("record").addEventListener("click", () => (recorder ? stopRecording() : startRecording()));
+  $("send").addEventListener("click", () => { audioBlob = null; send(); });
+  $("clear").addEventListener("click", () => { $("text").value = ""; $("result").style.display = "none"; showError(""); });
+  $("language").addEventListener("change", (e) => { lang = e.target.value; store.set("kg_lang", lang); applyLabels(); });
+  $("consent").addEventListener("change", (e) => store.set("kg_consent", e.target.checked ? "1" : "0"));
+  applyLabels();
+})();
+</script>
+</body>
+</html>

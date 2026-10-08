@@ -37,6 +37,7 @@ from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
+from kudiguard.speech.service import SpeechResult
 from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, Store, UserState, utcnow
 
 log = logging.getLogger(__name__)
@@ -126,9 +127,6 @@ class Limits:
     )
     max_concurrent_turns: int = 8  # back-pressure: further turns wait for a slot
     max_waiting_turns: int = 200  # beyond this, new turns get a "busy, try again" reply (bounded memory)
-    # CPU-bound speech recognition across all turns. A transcription cancelled by a deadline finishes in its worker
-    # thread, so under timeouts briefly more than this many can be running.
-    max_concurrent_transcriptions: int = 4
     turn_deadline_s: float = 60.0  # hard limit per turn, including model queueing
     default_language: LanguageCode = "en"
 
@@ -137,7 +135,6 @@ class Limits:
             self.per_user_per_hour < 1
             or self.max_concurrent_turns < 1
             or self.max_waiting_turns < 0
-            or self.max_concurrent_transcriptions < 1
             or self.turn_deadline_s <= 0
         ):
             raise ValueError("limits must be positive")
@@ -209,7 +206,6 @@ class Conversation:
         self._matcher = CommandMatcher(self._registry)
         self._slots = asyncio.Semaphore(limits.max_concurrent_turns)
         self._waiting = 0  # turns queued for a slot
-        self._asr_slots = asyncio.Semaphore(limits.max_concurrent_transcriptions)
         self._user_locks = _KeyedLocks()
         self._tasks: set[asyncio.Task[None]] = set()
         self._pending: dict[str, list[InboundMessage]] = {}  # claimed, waiting for the user's lock (in order)
@@ -496,11 +492,9 @@ class Conversation:
             await self._send(turn, self._messages.text(turn.language, Msg.LISTENING), ack=True)
             turn.voice = True
             try:
-                data = await self._audio_of(
-                    message, turn.deadline
-                )  # network download: outside the CPU-bound ASR slots
-                async with self._asr_slots:
-                    speech = await self._engine.transcribe(data, turn.language)
+                # Network download first, outside the engine's CPU-bound speech slots.
+                data = await self._audio_of(message, turn.deadline)
+                speech = await self._transcribe(data, turn)
             except AudioError as exc:
                 too_big = exc.problem in (AudioProblem.TOO_LONG, AudioProblem.TOO_LARGE)
                 key = Msg.AUDIO_TOO_LONG if too_big else Msg.NOT_UNDERSTOOD
@@ -621,14 +615,25 @@ class Conversation:
         turn.voice = True
         try:
             data = await self._audio_of(message, turn.deadline)
-            async with self._asr_slots:
-                speech = await self._engine.transcribe(data, turn.language)
+            speech = await self._transcribe(data, turn)
         except AudioError as exc:
             log.info("merged voice note skipped: %s", exc.problem)
             return ""
         turn.asr_ms = (turn.asr_ms or 0) + speech.asr_ms
         turn.decode_ms = (turn.decode_ms or 0) + speech.decode_ms
         return speech.transcript.text.strip()
+
+    async def _transcribe(self, data: bytes, turn: _Turn) -> SpeechResult:
+        """Speech recognition within the turn's deadline: the engine's speech slots are shared with web/API voice,
+        so a long wait becomes "please resend" rather than a generic failure."""
+        left = turn.deadline - time.monotonic()
+        if left <= 0:
+            raise AudioError(AudioProblem.TIMEOUT, "no time left to transcribe")
+        try:
+            async with asyncio.timeout(left):
+                return await self._engine.transcribe(data, turn.language)
+        except TimeoutError as exc:
+            raise AudioError(AudioProblem.TIMEOUT, "transcription did not finish in time") from exc
 
     async def _audio_of(self, message: InboundMessage, deadline: float) -> bytes:
         """Inline bytes (web, API) or a lazy channel download (WhatsApp) — only ever for consented users."""
@@ -681,7 +686,8 @@ class Conversation:
         since = self._clock() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
         if await self._store.count_interactions_since(turn.user_hash, since):
             return True
-        return await self._store.count_active_users_since(since) < cap
+        # Only this channel's users: web sessions are client-chosen ids and must not exhaust the cap (review M9).
+        return await self._store.count_active_users_since(since, channels={turn.message.channel}) < cap
 
     async def _rate_limited(self, turn: _Turn) -> bool:
         since = self._clock() - timedelta(hours=1)

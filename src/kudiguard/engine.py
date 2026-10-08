@@ -10,6 +10,7 @@ fallback text. The model never decides the verdict and never writes contacts; it
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 import time
@@ -17,6 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from kudiguard.commands import CommandMatcher
 from kudiguard.domain import Flag, LanguageCode, Outcome, Verdict
@@ -102,9 +104,13 @@ class Engine:
         asr: ASR | None = None,
         ffmpeg: str | None = None,
         temp_dir: Path | None = None,
+        max_concurrent_transcriptions: int = 4,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
+        # One limit for every caller (WhatsApp, API, web): decoding + recognition are CPU-bound. A transcription
+        # cancelled by a deadline finishes in its worker thread, so briefly more may run under timeouts.
+        self.speech_slots = asyncio.Semaphore(max_concurrent_transcriptions)
         self._llm = llm
         self._knowledge = knowledge
         self._asr = asr
@@ -113,15 +119,35 @@ class Engine:
         self._guard = OutputGuard(registry)
         self._matcher = CommandMatcher(registry)
 
+    @property
+    def has_speech(self) -> bool:
+        return self._asr is not None and self._ffmpeg is not None
+
+    def topics(self) -> list[dict[str, Any]]:
+        """Knowledge entries answers are grounded on (title, source pack, flags), for API discovery."""
+        topics: list[dict[str, Any]] = []
+        for source in self._knowledge.sources:
+            for entry in getattr(source, "entries", ()):
+                topics.append(
+                    {
+                        "id": entry.id,
+                        "title": entry.title,
+                        "pack": source.manifest.id,
+                        "flags": [f.value for f in entry.flags],
+                    }
+                )
+        return topics
+
     # --- speech -------------------------------------------------------------------------------------------
 
     async def transcribe(self, data: bytes, language: LanguageCode) -> SpeechResult:
         """Raises ``AudioError`` (user-facing) or ``ASRError`` (system fault)."""
         if self._asr is None or self._ffmpeg is None:
             raise RuntimeError("speech is not configured (ASR and ffmpeg are required)")
-        return await transcribe_upload(
-            self._asr, data, language, ffmpeg=self._ffmpeg, temp_dir=self._temp_dir
-        )
+        async with self.speech_slots:
+            return await transcribe_upload(
+                self._asr, data, language, ffmpeg=self._ffmpeg, temp_dir=self._temp_dir
+            )
 
     # --- check --------------------------------------------------------------------------------------------
 

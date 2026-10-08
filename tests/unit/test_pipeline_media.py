@@ -1,5 +1,7 @@
 """Lazy media download inside the pipeline (WhatsApp voice notes arrive as a media id, not bytes)."""
 
+import asyncio
+
 import pytest
 from test_pipeline import VOICE_NOTE, Harness, interactions
 from test_pipeline import h as _harness_fixture
@@ -43,10 +45,10 @@ async def test_download_fault_gets_retry_message(h: Harness) -> None:
 
 
 async def test_download_happens_outside_the_speech_slots(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
-    h.configure(max_concurrent_transcriptions=1)
+    h.engine.speech_slots = asyncio.Semaphore(1)
     await h.onboard("en")
     held_during_download: list[bool] = []
-    slots = h.conversation._asr_slots  # observing an internal invariant
+    slots = h.engine.speech_slots
 
     async def fetch(message):  # type: ignore[no-untyped-def]
         held_during_download.append(slots.locked())
@@ -86,4 +88,23 @@ async def test_no_time_left_to_download(h: Harness) -> None:
     message = InboundMessage("whatsapp", "w1", "u", MessageKind.AUDIO, media_id="M")
     with pytest.raises(AudioError) as caught:
         await h.conversation._audio_of(message, deadline=0.0)  # long past
+    assert caught.value.problem is AudioProblem.TIMEOUT
+
+
+async def test_busy_speech_slots_are_bounded_by_the_turn_deadline(h: Harness) -> None:
+    h.configure(turn_deadline_s=0.3)
+    await h.onboard("en")
+    h.engine.speech_slots = asyncio.Semaphore(0)  # every slot busy with web/API voice
+    h.messenger.media["M"] = VOICE_NOTE.read_bytes()
+    texts = await asyncio.wait_for(h.say(kind=MessageKind.AUDIO, media_id="M"), timeout=3)
+    assert texts[-1] == h.t(Msg.NOT_UNDERSTOOD, seconds=90)  # "please resend", not a generic failure
+    assert (await interactions(h))[-1]["outcome"] == Outcome.AUDIO_ERROR.value
+
+
+async def test_no_time_left_to_transcribe(h: Harness) -> None:
+    from kudiguard.pipeline import _Turn
+
+    turn = _Turn(h.msg("x"), h.user_hash, "en", 0.0, deadline=0.0)
+    with pytest.raises(AudioError) as caught:
+        await h.conversation._transcribe(b"", turn)
     assert caught.value.problem is AudioProblem.TIMEOUT

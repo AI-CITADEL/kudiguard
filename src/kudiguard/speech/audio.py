@@ -42,7 +42,10 @@ def find_ffmpeg(explicit: str | None = None) -> str:
     """Locate ffmpeg: explicit path, $KUDIGUARD_FFMPEG, PATH, then the project's ``tools/ffmpeg`` (development)."""
     candidates = [explicit] if explicit else [os.environ.get("KUDIGUARD_FFMPEG"), shutil.which("ffmpeg")]
     if not explicit:
-        candidates += [str(p) for p in sorted(Path("tools/ffmpeg").glob("*/bin/ffmpeg*"))]
+        project_tools = (
+            Path(__file__).resolve().parents[3] / "tools" / "ffmpeg"
+        )  # source checkout (development)
+        candidates += [str(p) for p in sorted(project_tools.glob("*/bin/ffmpeg*"))]
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
             return candidate

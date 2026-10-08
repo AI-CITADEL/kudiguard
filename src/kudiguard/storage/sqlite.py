@@ -12,7 +12,7 @@ import asyncio
 import json
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -228,14 +228,16 @@ class SQLiteStore:
         )
         return int(row[0])
 
-    async def count_active_users_since(self, since: datetime) -> int:
-        row = await self._run(
-            lambda db: db.execute(
-                "SELECT COUNT(DISTINCT user_hash) FROM interactions INDEXED BY ix_interactions_time "
-                "WHERE created_at >= ?",
-                (_ts(since),),
-            ).fetchone()
-        )
+    async def count_active_users_since(self, since: datetime, channels: Collection[str] | None = None) -> int:
+        query = "SELECT COUNT(DISTINCT user_hash) FROM interactions INDEXED BY ix_interactions_time WHERE created_at >= ?"
+        params: list[str] = [_ts(since)]
+        if channels is not None:
+            wanted = sorted(set(channels))
+            if not wanted:
+                return 0
+            query += f" AND channel IN ({', '.join('?' * len(wanted))})"
+            params += wanted
+        row = await self._run(lambda db: db.execute(query, params).fetchone())
         return int(row[0])
 
     # --- erasure and retention ------------------------------------------------------------------------

@@ -7,6 +7,7 @@ free-text fields are passed through ``text.redact``. All datetimes must be timez
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -69,8 +70,8 @@ class Store(Protocol):
 
     async def count_interactions_since(self, user_hash: str, since: datetime) -> int: ...
 
-    async def count_active_users_since(self, since: datetime) -> int:
-        """Distinct users with an interaction since ``since`` (licence cap monitoring)."""
+    async def count_active_users_since(self, since: datetime, channels: Collection[str] | None = None) -> int:
+        """Distinct users with an interaction since ``since`` (licence cap), optionally only on ``channels``."""
         ...
 
     async def delete_user(self, user_hash: str) -> int:

@@ -383,13 +383,27 @@ async def test_slow_model_still_delivers_the_rules_verdict_in_time(h: Harness) -
     assert (await interactions(h))[-1]["outcome"] == Outcome.FALLBACK.value
 
 
-async def test_hard_turn_deadline(h: Harness) -> None:
+async def test_slow_transcription_asks_to_resend(h: Harness) -> None:
     h.configure(turn_deadline_s=0.2)
     await h.onboard("en")
     h.asr.delay_s = 5.0
     texts = await h.say(audio=VOICE_NOTE.read_bytes())
+    assert texts[-1] == h.t(Msg.NOT_UNDERSTOOD, seconds=90)
+    assert (await interactions(h))[-1]["outcome"] == Outcome.AUDIO_ERROR.value
+
+
+async def test_hard_turn_deadline(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    h.configure(turn_deadline_s=0.2)
+    await h.onboard("en")
+    original = h.store.count_interactions_since
+
+    async def stuck(*args: object) -> int:  # e.g. a locked database: nothing in the turn is bounded by it
+        await asyncio.sleep(5)
+        return await original(*args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(h.store, "count_interactions_since", stuck)
+    texts = await h.say(OTP_SCAM)
     assert texts[-1] == h.t(Msg.ERROR_RETRY)
-    assert (await interactions(h))[-1]["outcome"] == Outcome.ERROR.value
 
 
 async def test_failed_send_falls_back_and_receipt_failure_is_harmless(h: Harness) -> None:
@@ -706,7 +720,7 @@ async def test_busy_path_survives_a_hung_store(h: Harness, monkeypatch: pytest.M
 
 
 async def test_transcriptions_are_bounded_across_turns(h: Harness) -> None:
-    h.configure(max_concurrent_transcriptions=1)
+    h.engine.speech_slots = asyncio.Semaphore(1)
     users = [f"+23480300000{i:02d}" for i in range(3)]
     for user in users:
         await h.onboard("en", user=user)
@@ -860,3 +874,16 @@ async def test_no_licence_cap_skips_the_active_user_count(
     assert all(
         utcnow() - w < timedelta(days=1) for w in windows
     )  # ...but the 30-day licence window never does
+
+
+async def test_web_sessions_do_not_exhaust_the_whatsapp_licence_cap(h: Harness) -> None:
+    from kudiguard.domain import Interaction
+
+    h.configure(active_user_cap=1)
+    for n in range(5):  # client-chosen web session ids (review M9: cap exhaustion attack)
+        await h.store.add_interaction(
+            Interaction(channel="web", message_id=f"w{n}", user_hash=f"web-session-{n}", language="en",
+                        kind=MessageKind.TEXT)
+        )  # fmt: skip
+    await h.onboard("en")
+    assert (await h.say(OTP_SCAM))[0].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
