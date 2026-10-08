@@ -16,7 +16,8 @@ import httpx
 
 from kudiguard.config import Settings
 from kudiguard.engine import Engine
-from kudiguard.knowledge.service import knowledge_base_from_packs
+from kudiguard.knowledge.file_pack import KnowledgeConfigError
+from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLM
 from kudiguard.llm.openai_compat import OpenAICompatLLM
@@ -81,18 +82,28 @@ async def build_services(settings: Settings) -> Services:
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
     try:
-        embedder = None
-        if settings.embeddings:
-            from kudiguard.knowledge.embeddings import FastEmbedder
 
-            embedder = FastEmbedder(cache_dir=settings.embeddings_cache)
-        knowledge = knowledge_base_from_packs(
-            settings.data_dir / "packs",
-            client=client,
-            include=settings.packs or None,
-            embedder=embedder,
-            allow_samples=settings.allow_sample_packs,
-        )
+        def knowledge_with(embedder: object | None) -> KnowledgeBase:
+            return knowledge_base_from_packs(
+                settings.data_dir / "packs",
+                client=client,
+                include=settings.packs or None,
+                embedder=embedder,  # type: ignore[arg-type]
+                allow_samples=settings.allow_sample_packs,
+            )
+
+        knowledge = None
+        if settings.embeddings:
+            try:
+                from kudiguard.knowledge.embeddings import FastEmbedder
+
+                knowledge = knowledge_with(FastEmbedder(cache_dir=settings.embeddings_cache))
+            except KnowledgeConfigError:
+                raise  # a broken pack is a configuration error, not a missing model
+            except Exception as exc:  # model not cached / not installed: keyword search still works
+                log.warning("semantic search disabled (keyword search only): %s", exc)
+        if knowledge is None:
+            knowledge = knowledge_with(None)
         if failed := await knowledge.refresh_all():
             log.warning("knowledge sources unavailable at startup: %s", sorted(failed))
         api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None

@@ -49,7 +49,9 @@ class Settings(BaseSettings):
     api_keys: Annotated[tuple[str, ...], NoDecode] = ()
     api_rate_per_minute: int = Field(default=30, ge=1)  # per API key
     web_rate_per_minute: int = Field(default=6, ge=1)  # per client IP on the public web voice page
-    trust_proxy_headers: bool = False  # use X-Forwarded-For (only behind our own tunnel/proxy)
+    # Client IP from CF-Connecting-IP (else rightmost X-Forwarded-For). Only behind Cloudflare: any other proxy
+    # passes a client-sent CF-Connecting-IP through, which would make the web rate limit spoofable.
+    trust_proxy_headers: bool = False
 
     # --- WhatsApp (optional: the channel is mounted only when configured) -----------------------------------
     whatsapp_enabled: bool = True

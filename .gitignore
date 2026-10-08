@@ -10,3 +10,7 @@ __pycache__/
 models/
 exports/
 tools/
+deploy/cloudflared/kudiguard.yml
+var/
+deploy/cloudflared/cert.pem
+deploy/cloudflared/*.json

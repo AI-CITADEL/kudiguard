@@ -139,7 +139,7 @@ if __name__ == "__main__":
     parser.add_argument("--auto-language", action="store_true", help="no forced Whisper language token")
     parser.add_argument("--source", nargs="*", help="only these manifest sources (e.g. fleurs whatsapp)")
     parser.add_argument(
-        "--cache", type=Path, default=Path(os.environ.get("KUDIGUARD_MODEL_CACHE", r"***REMOVED***\ncair\.cache"))
+        "--cache", type=Path, default=Path(os.environ.get("KUDIGUARD_MODEL_CACHE", str(ROOT / "models")))
     )
     args = parser.parse_args()
     asyncio.run(main(args.proxy, args.compare, args.auto_language, args.cache, set(args.source or ())))

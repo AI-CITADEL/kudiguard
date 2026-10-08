@@ -44,7 +44,7 @@ async def main(cache: Path, quantization: str) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--cache", type=Path, default=Path(os.environ.get("KUDIGUARD_MODEL_CACHE", r"***REMOVED***\ncair\.cache"))
+        "--cache", type=Path, default=Path(os.environ.get("KUDIGUARD_MODEL_CACHE", str(ROOT / "models")))
     )
     parser.add_argument("--quantization", choices=["int8", "float32"], default="int8")
     args = parser.parse_args()

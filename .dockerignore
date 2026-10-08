@@ -1,0 +1,15 @@
+# Never send secrets, models, tools or local data into an image build.
+.env
+.env.*
+!.env.example
+.venv/
+models/
+tools/
+var/
+deploy/cloudflared/kudiguard.yml
+**/__pycache__/
+.git/
+data/eval/
+tests/
+deploy/cloudflared/cert.pem
+deploy/cloudflared/*.json

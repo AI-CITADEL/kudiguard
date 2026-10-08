@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from collections.abc import Sequence
 from datetime import timedelta
@@ -76,6 +77,13 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def redact_query_strings(record: logging.LogRecord) -> bool:
+    """uvicorn access-log filter: drop query strings (Meta's handshake sends hub.verify_token in the URL)."""
+    if isinstance(record.args, tuple) and len(record.args) >= 3 and isinstance(record.args[2], str):
+        record.args = (*record.args[:2], record.args[2].split("?", 1)[0], *record.args[3:])
+    return True
+
+
 def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     import logging
 
@@ -86,6 +94,7 @@ def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     logging.basicConfig(
         level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
+    logging.getLogger("uvicorn.access").addFilter(redact_query_strings)
 
     uvicorn.run(
         create_app(settings), host=args.host, port=args.port, log_level=args.log_level, proxy_headers=False

@@ -320,3 +320,40 @@ def test_cli_guards(
     assert cli.main(["stats"]) == 2
     assert "no evidence database" in capsys.readouterr().err
     assert not (cli_env / "missing.db").exists()  # never silently created
+
+
+async def test_missing_embedding_model_falls_back_to_keyword_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kudiguard.knowledge import embeddings
+
+    class Unavailable:
+        def __init__(self, **kwargs: object) -> None:
+            raise ValueError("Could not load model BAAI/bge-small-en-v1.5 from any source")
+
+    monkeypatch.setattr(embeddings, "FastEmbedder", Unavailable)
+    services = await build_services(base_settings(tmp_path, embeddings=True, packs=("kudiguard-core",)))
+    try:
+        assert any(t["id"] == "flag-asks-credentials" for t in services.engine.topics())
+    finally:
+        await services.aclose()
+
+
+async def test_broken_pack_is_still_a_startup_error_with_embeddings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kudiguard.knowledge import embeddings
+
+    monkeypatch.setattr(embeddings, "FastEmbedder", lambda **kwargs: None)
+    with pytest.raises(KnowledgeConfigError):
+        await build_services(base_settings(tmp_path, embeddings=True, packs=("no-such-pack",)))
+
+
+def test_access_log_drops_query_strings() -> None:
+    import logging
+
+    record = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
+                               ("1.2.3.4", "GET", "/webhooks/whatsapp?hub.verify_token=SECRET", "1.1", 200), None)  # fmt: skip
+    assert cli.redact_query_strings(record) and "SECRET" not in record.getMessage()
+    other = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, "plain", None, None)
+    assert cli.redact_query_strings(other) and other.getMessage() == "plain"

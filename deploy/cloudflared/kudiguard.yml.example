@@ -1,0 +1,8 @@
+# Named tunnel with a stable hostname (docs/DEPLOY.md). Copy to kudiguard.yml (git-ignored) and fill in.
+tunnel: <TUNNEL-UUID>
+credentials-file: <PATH-TO>/.cloudflared/<TUNNEL-UUID>.json
+no-autoupdate: true
+ingress:
+  - hostname: kudiguard.<your-domain>
+    service: http://127.0.0.1:8010
+  - service: http_status:404

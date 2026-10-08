@@ -1,0 +1,3 @@
+# KudiGuard quick tunnel: intentionally no ingress rules, so the --url flag decides (and any personal
+# ~/.cloudflared/config.yml of other projects is never used).
+no-autoupdate: true
