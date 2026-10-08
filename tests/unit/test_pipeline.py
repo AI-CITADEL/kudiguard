@@ -879,11 +879,24 @@ async def test_no_licence_cap_skips_the_active_user_count(
 async def test_web_sessions_do_not_exhaust_the_whatsapp_licence_cap(h: Harness) -> None:
     from kudiguard.domain import Interaction
 
-    h.configure(active_user_cap=1)
-    for n in range(5):  # client-chosen web session ids (review M9: cap exhaustion attack)
+    h.configure(active_user_cap=10)
+    for n in range(5):  # web sessions count toward the project-wide licence cap (they have their own sub-cap)
         await h.store.add_interaction(
             Interaction(channel="web", message_id=f"w{n}", user_hash=f"web-session-{n}", language="en",
                         kind=MessageKind.TEXT)
         )  # fmt: skip
     await h.onboard("en")
     assert (await h.say(OTP_SCAM))[0].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
+
+
+async def test_licence_cap_is_project_wide(h: Harness) -> None:
+    from kudiguard.domain import Interaction
+
+    h.configure(active_user_cap=3)
+    for n in range(3):  # web sessions and API clients are end users of the project too
+        await h.store.add_interaction(
+            Interaction(
+                channel="web", message_id=f"w{n}", user_hash=f"s{n}", language="en", kind=MessageKind.TEXT
+            )
+        )
+    assert await h.say("hello") == [h.t(Msg.AT_CAPACITY)]

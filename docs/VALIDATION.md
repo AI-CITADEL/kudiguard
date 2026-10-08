@@ -14,7 +14,7 @@ in from `kudiguard stats --exclude-users team.txt` (team testers' numbers, one p
 | Helpful (👍 of rated) | _x_ / _y_ (_z_%) |
 | Latency p50 / p95 | text _a_ / _b_ s · voice _c_ / _d_ s |
 
-Ten anonymised exchanges with English glosses, and tester quotes, go here (from `kudiguard export`, already redacted).
+Ten de-identified exchanges with English glosses, and tester quotes, go here (from `kudiguard export`, already redacted).
 
 ## Blind accuracy (never tuned on; docs/SPIKES.md S6–S7)
 | Test | Result |

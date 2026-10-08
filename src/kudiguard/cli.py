@@ -65,6 +65,26 @@ def cmd_export(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
+    async def rows() -> list[dict[str, object]]:
+        if not settings.db_path.is_file():
+            raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
+        store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
+        try:
+            return await store.export_patterns()
+        finally:
+            await store.close()
+
+    patterns = asyncio.run(rows())
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as handle:
+        for row in patterns:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"exported {len(patterns)} de-identified scam examples to {out}")
+    return 0
+
+
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     async def run() -> int:
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
@@ -124,6 +144,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     export = commands.add_parser("export", help="privacy-safe JSONL export of all interactions")
     export.add_argument("--out", required=True)
     export.set_defaults(func=cmd_export)
+
+    patterns = commands.add_parser("patterns", help="export the de-identified scam pattern library (JSONL)")
+    patterns.add_argument("--out", required=True)
+    patterns.set_defaults(func=cmd_patterns)
 
     purge = commands.add_parser("purge", help="delete evidence older than the retention period")
     purge.add_argument("--days", type=int, default=None)

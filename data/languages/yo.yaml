@@ -52,9 +52,9 @@ strings:
 
     Ẹ fi *àtẹ̀jíṣẹ́ ohùn* tàbí ọ̀rọ̀ ránṣẹ́ sí mi, tàbí kí ẹ dárí ọ̀rọ̀ tí ẹ kò dá lójú rẹ̀ sí mi.
 
-    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
+    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i; DELETE tún ń pa àwọn tí a mú láti inú ọ̀rọ̀ yín àìpẹ́ yìí rẹ́. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
     ℹ️ Ìtọ́sọ́nà ni èyí, kì í ṣe ìmọ̀ràn ìṣúná owó.
-    _Powered by N-ATLAS · Awarri_
+    _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Èdè wo ni kí n lò?
   btn_language_menu: Yan èdè
   language_set: ✅ Màá dá yín lóhùn ní {language}.
@@ -94,3 +94,4 @@ strings:
   warn_family_fallback: "⚠️ Ìkìlọ̀ nípa jìbìtì: ẹnìkan lè kàn sí yín pé òun wá láti báǹkì tàbí ilé-iṣẹ́ ìjọba, tàbí kí ó ṣèlérí owó fún yín. Ẹ má ṣe fún ẹnikẹ́ni ní OTP, PIN tàbí BVN yín, ẹ má sì san owó kankan kí ẹ tó gba owó. Ẹ kọ́kọ́ bá báǹkì yín sọ̀rọ̀."
   at_capacity: "😔 KudiGuard ti kún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ọjọ́ díẹ̀."
   busy: "⏳ Ọ̀pọ̀ ènìyàn ló ń béèrè báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ìṣẹ́jú kan."
+  privacy_link: "🔐 Ìkéde àṣírí: {url}"

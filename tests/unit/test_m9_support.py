@@ -357,3 +357,27 @@ def test_access_log_drops_query_strings() -> None:
     assert cli.redact_query_strings(record) and "SECRET" not in record.getMessage()
     other = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, "plain", None, None)
     assert cli.redact_query_strings(other) and other.getMessage() == "plain"
+
+
+def test_cli_patterns_export(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from datetime import date
+
+    from kudiguard.patterns import ScamPattern
+
+    async def seed() -> None:
+        store = await SQLiteStore.open(cli_env / "kg.db", hasher=UserHasher(SECRET.encode()))
+        await store.add_pattern(ScamPattern.from_check(language="ha", channel="whatsapp", verdict=Verdict.CAUTION,
+                                                       flags=(), text="ka turo min lambar", english=None,
+                                                       day=date(2026, 10, 8)))  # fmt: skip
+        await store.close()
+
+    asyncio.run(seed())
+    out = cli_env / "patterns.jsonl"
+    assert cli.main(["patterns", "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8").splitlines()[0])["language"] == "ha"
+    assert "1 de-identified" in capsys.readouterr().out
+
+
+def test_cli_patterns_needs_an_existing_database(cli_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KUDIGUARD_DB_PATH", str(cli_env / "missing.db"))
+    assert cli.main(["patterns", "--out", str(cli_env / "p.jsonl")]) == 2

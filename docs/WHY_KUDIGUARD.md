@@ -22,6 +22,22 @@ Meta WhatsApp Cloud ──webhook──► KudiGuard server
 No human operator and no autonomous "agent": a fixed, tested pipeline. The user installs nothing. One number serves
 everyone in parallel. Banks, fintechs and NGOs can call the same engine through the REST API (`/v1/check`).
 
+## What it can be used for
+
+1. **Personal scam check**: the core use. Anyone forwards a suspicious SMS or WhatsApp message, or describes a call by
+   voice, in their own language, and gets 🔴/🟠/🟢 plus what to do, before they send money or an OTP.
+2. **Banks and fintechs, via the API**: screen messages customers report, power the bank's own WhatsApp or app
+   "Is this real?" button, or check a transfer narration before payout. One integration protects millions of customers.
+3. **Telcos (MTN, Airtel, Glo)**: flag scam SMS in bulk, and point users to the NCC 622 complaint flow.
+4. **Call centres / IVR**: the same engine answering "is this call a scam?" on a phone line, for people without
+   smartphones (backlog).
+5. **Scam-trend intelligence**: the de-identified pattern library reveals new scams by language early (region later),
+   for EFCC, CBN, NCC, banks and the media. It is also a sellable dashboard.
+6. **Financial literacy at scale**: cooperatives, NGOs, schools and religious groups. "Ask anything about money" in
+   Hausa, Yoruba or Igbo by voice reaches low-literacy users that apps miss.
+7. **Family protection**: the "Warn my family" button spreads warnings to elderly parents, who are the most targeted.
+8. **Other languages and countries**: languages are configuration, so Ghana, Kenya or Pidgin need data, not a rebuild.
+
 ## How the server decides "scam or not"
 
 Two layers, on purpose:

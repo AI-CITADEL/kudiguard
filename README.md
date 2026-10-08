@@ -4,6 +4,9 @@
 message in **Hausa, Yoruba, Igbo or English** and get 🔴 / 🟠 / 🟢 with what to do and where to report, in seconds.
 Built on **N-ATLAS** (LLM) and the **NCAIR1** speech models for NAIC 2026. Why and how: [docs/WHY_KUDIGUARD.md](docs/WHY_KUDIGUARD.md).
 
+> N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by
+> Awarri Technologies. Used under the N-ATLaS licence (≤ 1,000 active end-users, enforced in code).
+
 ## Channels
 * **WhatsApp**: voice notes, text, forwarded messages; buttons for next steps, reporting and "warn my family".
 * **REST API** for banks, fintechs and NGOs: `POST /v1/check`, `/v1/check/audio`, `/v1/ask` (docs at `/docs`).
@@ -36,7 +39,7 @@ Then set the tunnel URL + `/webhooks/whatsapp` as the webhook in Meta. Details: 
 ## Develop
 `.venv\Scripts\python -m pytest` (921 tests, 100% coverage; `-m live` for real models) · `ruff check` · `mypy`.
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Validation: [docs/VALIDATION.md](docs/VALIDATION.md) ·
-Demo: [docs/DEMO.md](docs/DEMO.md).
+Sustainability: [docs/SUSTAINABILITY.md](docs/SUSTAINABILITY.md) · Demo: [docs/DEMO.md](docs/DEMO.md).
 
 ## Privacy
 Phone numbers stored only as keyed hashes; message text redacted; voice notes deleted after transcription; 90-day

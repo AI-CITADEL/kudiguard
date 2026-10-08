@@ -14,18 +14,20 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import html
 import logging
 import re
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -37,9 +39,11 @@ from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
 from kudiguard.engine import Answer, AnswerKind
 from kudiguard.envfile import load_env_file
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
+from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -238,6 +242,8 @@ def create_app(
     app.state.api_limiter = RateLimiter(config.api_rate_per_minute)
     app.state.web_limiter = RateLimiter(config.web_rate_per_minute)
     app.state.check_slots = asyncio.Semaphore(MAX_CONCURRENT_API_CHECKS)
+    app.state.pending_web_sessions = set()  # new web sessions whose first check is running (licence cap)
+    app.state.web_admission = asyncio.Lock()
     app.state.api_keys = api_keys
     app.include_router(_v1_router())
     app.include_router(_web_router())
@@ -246,6 +252,10 @@ def create_app(
     from kudiguard.channels.whatsapp import WhatsAppConfig
     from kudiguard.channels.whatsapp_routes import whatsapp_router
 
+    if not config.privacy_contact.strip():
+        log.warning(
+            "KUDIGUARD_PRIVACY_CONTACT is empty: /privacy offers no way to request access or deletion"
+        )
     if config.whatsapp_enabled:
         try:
             app.include_router(whatsapp_router(WhatsAppConfig.from_env(), _ConversationProxy(app)))
@@ -358,6 +368,7 @@ async def _check_in_slot(
         decode_ms, asr_ms = speech.decode_ms, speech.asr_ms
         text = transcript
     answer = await services.engine.check(text or "", language, deadline=deadline)
+    created = utcnow()
     total_ms = int((time.perf_counter() - started) * 1000)
     try:  # evidence must never break the answer
         await services.store.add_interaction(
@@ -378,10 +389,12 @@ async def _check_in_slot(
                 asr_ms=asr_ms,
                 llm_ms=answer.llm_ms,
                 total_ms=total_ms,
+                created_at=created,
             )
         )
     except Exception:
         log.exception("could not log %s check", channel)
+    await record_pattern(services.store, channel, answer, text or "", created)
     return answer, transcript, total_ms
 
 
@@ -521,6 +534,30 @@ def _v1_router() -> APIRouter:
 # --- web voice page --------------------------------------------------------------------------------------------
 
 
+async def _admit_web_session(services: Services, settings: Settings, session: str, pending: set[str]) -> bool:
+    """N-ATLAS licence cap for the website: a session new to the 30-day window needs room in both the web share
+    and the project-wide cap, counting new sessions whose first check is still running (``pending``), so a burst
+    cannot overshoot. Returning sessions are always served. Returns True for a newly admitted session."""
+    if settings.active_user_cap is None:
+        return False
+    since = utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
+    if session in pending or await services.store.count_interactions_since(
+        services.hasher.user_id(f"web:{session}"), since
+    ):
+        return False
+    in_flight = len(pending)
+    full = (
+        await services.store.count_active_users_since(since, channels={"web"}) + in_flight
+        >= settings.web_session_cap
+        or await services.store.count_active_users_since(since) + in_flight >= settings.active_user_cap
+    )
+    if full:
+        message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
+        raise HTTPException(503, {"problem": "at_capacity", "message": message})
+    pending.add(session)
+    return True
+
+
 def _web_router() -> APIRouter:
     router = APIRouter(include_in_schema=False)
 
@@ -528,25 +565,56 @@ def _web_router() -> APIRouter:
     async def page() -> FileResponse:
         return FileResponse(STATIC / "voice.html", media_type="text/html; charset=utf-8")
 
+    @router.get("/privacy")
+    async def privacy(request: Request) -> HTMLResponse:
+        """Privacy notice (required by Meta for Live mode; NDPA). Operator and contact come from settings."""
+        settings: Settings = request.app.state.settings
+        contact = settings.privacy_contact.strip()
+        years, rest = divmod(settings.pattern_retention_days, 365)
+        values = {
+            "OPERATOR": html.escape(settings.operator_name),
+            "CONTACT": (
+                f'email <a href="mailto:{html.escape(contact)}">{html.escape(contact)}</a>'
+                if contact
+                else "contact the operator"
+            ),
+            "RETENTION_DAYS": str(settings.retention_days),
+            "PATTERN_RETENTION": (
+                f"{years} year{'s' if years > 1 else ''}"
+                if years and not rest
+                else f"{settings.pattern_retention_days} days"
+            ),
+        }
+        page = (STATIC / "privacy.html").read_text(encoding="utf-8")
+        # One pass: a value can never introduce another placeholder.
+        return HTMLResponse(re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page))
+
     @router.post("/web/check")
     async def web_check(request: Request, services: ServicesDep) -> CheckResponse:
         # Consent, session and rate limit come in headers so they are checked before any upload is read.
-        if request.headers.get("x-kudiguard-consent") != "yes":
+        if request.headers.get("x-kudiguard-consent") != CONSENT_VERSION:  # consent to the current text only
             raise HTTPException(403, "consent is required")
         session = request.headers.get("x-kudiguard-session", "")
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
         settings: Settings = request.app.state.settings
         _too_many(request.app.state.web_limiter, client_ip(request, settings.trust_proxy_headers))
-        fields, audio = await _form(request)
-        text = fields.get("text", "")[:MAX_TEXT_CHARS]
-        if audio is None and not text.strip():
-            raise HTTPException(422, "send text or audio")
-        answer, transcript, ms = await _run_check(
-            request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
-            text=text if audio is None else None, audio=audio,
-        )  # fmt: skip
-        return _check_response(services, answer, transcript, ms)
+        pending: set[str] = request.app.state.pending_web_sessions
+        async with request.app.state.web_admission:  # check + reserve atomically (store counts yield)
+            admitted = await _admit_web_session(services, settings, session, pending)
+        try:
+            fields, audio = await _form(request)
+            text = fields.get("text", "")[:MAX_TEXT_CHARS]
+            if audio is None and not text.strip():
+                raise HTTPException(422, "send text or audio")
+            answer, transcript, ms = await _run_check(
+                request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
+                text=text if audio is None else None, audio=audio,
+            )  # fmt: skip
+            return _check_response(services, answer, transcript, ms)
+        finally:
+            if admitted:
+                pending.discard(session)  # now counted from the evidence log (or never served)
 
     return router
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KudiGuard</title>
-<meta name="description" content="Check a suspicious message or call in Hausa, Yoruba, Igbo or English. Powered by N-ATLAS.">
+<meta name="description" content="Check a suspicious message or call in Hausa, Yoruba, Igbo or English, with N-ATLaS.">
 <style>
   :root {
     --bg: #f6f7f5; --card: #ffffff; --ink: #1b1f1d; --muted: #5d6662; --line: #dfe3e0;
@@ -90,8 +90,8 @@
     <div style="margin-top: 14px;" class="consent">
       <input type="checkbox" id="consent">
       <label for="consent" style="font-weight: 400; margin: 0;" data-i18n="consent">
-        I agree that KudiGuard keeps my message (numbers removed) for up to 90 days to improve the service.
-        Voice recordings are deleted after transcription. Guidance only, not financial advice.
+        I agree that KudiGuard keeps my message (most numbers removed) for up to 90 days to improve the service.
+        Voice recordings are deleted after transcription. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard. Guidance only, not financial advice.
       </label>
     </div>
     <div class="spinner" id="spinner" role="status" data-i18n="checking">🔎 Checking…</div>
@@ -107,7 +107,8 @@
     <p class="small" id="latency"></p>
   </div>
 
-  <footer>Powered by N-ATLAS · Awarri · NCAIR</footer>
+  <footer>N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and
+    powered by Awarri Technologies. · Speech: NCAIR1 · <a href="/privacy" style="color: inherit;">Privacy</a></footer>
 </main>
 <script>
 (() => {
@@ -117,28 +118,28 @@
     en: { placeholder: "Someone called and said my BVN is blocked…", tagline: "Not sure about a message or call? Check it here in your language.", language: "Language",
           record: "🎤 Tap to record", stop: "⏹️ Tap to stop", describe: "Describe the call or read out the message.",
           or: "or type / paste it", check: "Check", clear: "Clear", checking: "🔎 Checking…",
-          consent: "I agree that KudiGuard keeps my message (numbers removed) for up to 90 days to improve the service. Voice recordings are deleted after transcription. Guidance only, not financial advice.",
+          consent: "I agree that KudiGuard keeps my message (most numbers removed) for up to 90 days to improve the service. Voice recordings are deleted after transcription. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard. Guidance only, not financial advice.",
           needConsent: "Please tick the box to agree first.", empty: "Record a voice note or type a message.",
           mic: "Microphone not available. Please type instead.", failed: "Sorry, something went wrong. Please try again.",
           busy: "Too many checks. Please wait a minute.", heard: "I heard", seconds: "s" },
     ha: { placeholder: "Wani ya kira ni ya ce an toshe BVN ɗina…", tagline: "Kuna shakka game da saƙo ko kira? Ku duba shi a nan da harshenku.", language: "Harshe",
           record: "🎤 Taɓa don yin rikodi", stop: "⏹️ Taɓa don tsayawa", describe: "Ku bayyana kiran ko ku karanta saƙon.",
           or: "ko ku rubuta / liƙa shi", check: "Duba", clear: "Share", checking: "🔎 Ana dubawa…",
-          consent: "Na amince KudiGuard ta adana saƙona (ba tare da lambobi ba) har kwanaki 90 don inganta aikin. Ana share rikodin murya bayan an rubuta shi. Jagora ce kawai, ba shawarar kuɗi ba.",
+          consent: "Na amince KudiGuard ta adana saƙona (an cire yawancin lambobi) har kwanaki 90 don inganta aikin. Ana share rikodin murya bayan an rubuta shi. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard. Jagora ce kawai, ba shawarar kuɗi ba.",
           needConsent: "Don Allah ku fara amincewa ta danna akwatin.", empty: "Ku yi rikodin murya ko ku rubuta saƙo.",
           mic: "Babu makirufo. Don Allah ku rubuta.", failed: "Yi haƙuri, an sami matsala. Don Allah ku sake gwadawa.",
           busy: "Dubawa sun yi yawa. Don Allah ku jira minti ɗaya.", heard: "Na ji", seconds: "s" },
     yo: { placeholder: "Ẹnìkan pè mí pé wọ́n ti dí BVN mi…", tagline: "Ṣé ẹ ń ṣiyèméjì nípa ìfiránṣẹ́ tàbí ìpè kan? Ẹ ṣàyẹ̀wò rẹ̀ níbí ní èdè yín.", language: "Èdè",
           record: "🎤 Tẹ̀ láti gbohùn sílẹ̀", stop: "⏹️ Tẹ̀ láti dúró", describe: "Ẹ ṣàlàyé ìpè náà tàbí kí ẹ ka ìfiránṣẹ́ náà.",
           or: "tàbí kí ẹ tẹ̀ ẹ́ / lẹ̀ ẹ́ síbí", check: "Ṣàyẹ̀wò", clear: "Pa á rẹ́", checking: "🔎 À ń ṣàyẹ̀wò…",
-          consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (láìsí nọ́ńbà) fún ọjọ́ 90 láti mú iṣẹ́ náà dára sí i. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó.",
+          consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (a yọ ọ̀pọ̀ nọ́ńbà kúrò) fún ọjọ́ 90 láti mú iṣẹ́ náà dára sí i. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó.",
           needConsent: "Ẹ jọ̀ọ́ ẹ kọ́kọ́ fi àmì sí àpótí náà.", empty: "Ẹ gbohùn sílẹ̀ tàbí kí ẹ tẹ ìfiránṣẹ́ kan.",
           mic: "Kò sí makirofóònù. Ẹ jọ̀ọ́ ẹ tẹ̀ ẹ́.", failed: "Ẹ má bínú, nǹkan kan ṣẹlẹ̀. Ẹ jọ̀ọ́ ẹ tún gbìyànjú.",
           busy: "Àyẹ̀wò ti pọ̀ jù. Ẹ jọ̀ọ́ ẹ dúró fún ìṣẹ́jú kan.", heard: "Mo gbọ́", seconds: "s" },
     ig: { placeholder: "Mmadụ kpọrọ m sị na e mechiela BVN m…", tagline: "Ị na-enwe obi abụọ maka ozi ma ọ bụ oku? Lelee ya ebe a n'asụsụ gị.", language: "Asụsụ",
           record: "🎤 Pịa ka ị dekọọ", stop: "⏹️ Pịa ka ị kwụsị", describe: "Kọwaa oku ahụ ma ọ bụ gụọ ozi ahụ.",
           or: "ma ọ bụ dee / mado ya", check: "Lelee", clear: "Hichapụ", checking: "🔎 Ana-elele…",
-          consent: "Ekwere m ka KudiGuard chekwaa ozi m (na-enweghị nọmba) ruo ụbọchị 90 iji meziwanye ọrụ ahụ. A na-ehichapụ ndekọ olu mgbe e dechara ya. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego.",
+          consent: "Ekwere m ka KudiGuard chekwaa ozi m (e wepụrụ ọtụtụ nọmba) ruo ụbọchị 90 iji meziwanye ọrụ ahụ. A na-ehichapụ ndekọ olu mgbe e dechara ya. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego.",
           needConsent: "Biko buru ụzọ pịa igbe ahụ.", empty: "Dekọọ olu ma ọ bụ dee ozi.",
           mic: "Enweghị igwe okwu. Biko dee ya.", failed: "Ndo, nsogbu mere. Biko nwaa ọzọ.",
           busy: "Nlele dị ukwuu. Biko chere otu nkeji.", heard: "Anụrụ m", seconds: "s" },
@@ -156,7 +157,8 @@
   let lang = store.get("kg_lang") || (navigator.language || "en").slice(0, 2);
   if (!UI[lang]) lang = "ha";  // Hausa-first: other browser languages start in Hausa (selector above)
   $("language").value = lang;
-  $("consent").checked = store.get("kg_consent") === "1";
+  const CONSENT_VERSION = "2026-10-08";  // keep in step with pipeline.CONSENT_VERSION
+  $("consent").checked = store.get("kg_consent") === CONSENT_VERSION;
 
   const t = (key) => (UI[lang] && UI[lang][key]) || UI.en[key];
   function applyLabels() {
@@ -211,7 +213,7 @@
     try {
       const response = await fetch("/web/check", {
         method: "POST", body: form,
-        headers: { "X-KudiGuard-Session": session, "X-KudiGuard-Consent": "yes" },
+        headers: { "X-KudiGuard-Session": session, "X-KudiGuard-Consent": CONSENT_VERSION },
       });
       if (response.status === 429) { showError(t("busy")); return; }
       if (!response.ok) {
@@ -250,7 +252,7 @@
   $("send").addEventListener("click", () => { audioBlob = null; send(); });
   $("clear").addEventListener("click", () => { $("text").value = ""; $("result").style.display = "none"; showError(""); });
   $("language").addEventListener("change", (e) => { lang = e.target.value; store.set("kg_lang", lang); applyLabels(); });
-  $("consent").addEventListener("change", (e) => store.set("kg_consent", e.target.checked ? "1" : "0"));
+  $("consent").addEventListener("change", (e) => store.set("kg_consent", e.target.checked ? CONSENT_VERSION : ""));
   applyLabels();
 })();
 </script>

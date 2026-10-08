@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     db_path: Path = ROOT / "var" / "kudiguard.db"
     hash_secret: SecretStr = SecretStr("")  # >= 32 bytes; pseudonymous user ids (privacy.UserHasher)
     retention_days: int = Field(default=90, ge=1)
+    pattern_retention_days: int = Field(default=730, ge=1)  # de-identified scam examples (kudiguard.patterns)
     allow_sample_packs: bool = False  # fictional demo packs (never in production)
     packs: Annotated[tuple[str, ...], NoDecode] = ()  # empty = every enabled pack
 
@@ -38,9 +39,9 @@ class Settings(BaseSettings):
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)
-    active_user_cap: int | None = Field(
-        default=1000, ge=1
-    )  # N-ATLAS licence: active users per rolling 30 days
+    # N-ATLAS licence: active end-users per rolling 30 days, project-wide (every channel counts).
+    active_user_cap: int | None = Field(default=1000, ge=1)
+    web_session_cap: int = Field(default=200, ge=1)  # share of that cap open to (anonymous) web sessions
     turn_deadline_s: float = Field(default=60.0, gt=0)
     default_language: str = "en"
 
@@ -52,6 +53,13 @@ class Settings(BaseSettings):
     # Client IP from CF-Connecting-IP (else rightmost X-Forwarded-For). Only behind Cloudflare: any other proxy
     # passes a client-sent CF-Connecting-IP through, which would make the web rate limit spoofable.
     trust_proxy_headers: bool = False
+
+    # --- public pages ----------------------------------------------------------------------------------------
+    operator_name: str = "the KudiGuard team"  # data controller named on /privacy
+    public_url: str = ""  # e.g. https://kudiguard.theaicitadel.com (privacy link in the WhatsApp welcome)
+    privacy_contact: str = (
+        ""  # email for privacy requests on /privacy (empty: "contact the operator" + warning)
+    )
 
     # --- WhatsApp (optional: the channel is mounted only when configured) -----------------------------------
     whatsapp_enabled: bool = True

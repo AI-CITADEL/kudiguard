@@ -39,3 +39,22 @@ def test_redact_keeps_amounts_written_without_commas(amount: str) -> None:
 
 def test_redact_keeps_ussd_amounts() -> None:
     assert redact("Dial *737*1*500000# to send") == "Dial *737*1*500000# to send"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("call 803 123 4567 now", "call [number] now"),
+        ("my number is 123-456-7890", "my number is [number]"),
+        ("acct 0123 456 789", "acct [number]"),
+        ("on 2026 10 08 at noon", "on 2026 10 08 at noon"),  # a date: kept
+        ("pay 5 000 000 naira", "pay 5 000 000 naira"),  # an amount: kept
+        ("dial *737*1*500 000#", "dial *737*1*500 000#"),
+        ("meet 10:30 12 45 2026", "meet 10:30 12 45 2026"),  # a time, not a number
+        ("pay N 50 000 000 000 now", "pay N 50 000 000 000 now"),  # an amount
+        ("BVN is 2 2 3 1 5 6 7 8 9 0 1", "BVN is [number]"),  # read out digit by digit
+        ("the 1 2 3 steps", "the 1 2 3 steps"),
+    ],
+)
+def test_grouped_numbers_without_prefix_are_masked(raw: str, expected: str) -> None:
+    assert redact(raw) == expected

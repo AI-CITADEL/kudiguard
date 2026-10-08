@@ -81,7 +81,8 @@ class Outcome(StrEnum):
 
 @dataclass(slots=True)
 class Interaction:
-    """One user turn, persisted as validation evidence. Text fields are stored redacted (no numbers/emails)."""
+    """One user turn, persisted as validation evidence. Text fields are stored redacted (most numbers and emails
+    masked; see ``text.redact``)."""
 
     channel: str
     message_id: str

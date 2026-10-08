@@ -59,9 +59,9 @@ strings:
 
     Ku aiko mini da *saƙon murya* ko rubutu, ko ku tura saƙon da kuke shakka a kai.
 
-    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su. Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ta hanyar ci gaba, kun amince da wannan.
+    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su. Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
     ℹ️ Wannan jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba.
-    _Powered by N-ATLAS · Awarri_
+    _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Wane harshe zan yi amfani da shi?
   btn_language_menu: Zaɓi harshe
   language_set: ✅ Zan amsa muku da {language}.
@@ -101,3 +101,4 @@ strings:
   warn_family_fallback: "⚠️ Gargaɗi kan damfara: wani zai iya tuntuɓarku yana cewa daga banki ko hukumar gwamnati yake, ko yana alƙawarin kuɗi. Kada ku taɓa bayar da OTP, PIN ko BVN ɗinku, kuma kada ku biya kuɗi don karɓar kuɗi. Ku tabbatar da bankinku tukuna."
   at_capacity: "😔 KudiGuard ta cika yanzu. Don Allah ku sake gwadawa bayan 'yan kwanaki."
   busy: "⏳ Mutane da yawa suna tambaya yanzu. Don Allah ku sake gwadawa bayan minti ɗaya."
+  privacy_link: "🔐 Sanarwar sirri: {url}"

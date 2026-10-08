@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
 from kudiguard.domain import Interaction, LanguageCode, Outcome
+from kudiguard.patterns import ScamPattern
 
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
@@ -75,11 +76,24 @@ class Store(Protocol):
         ...
 
     async def delete_user(self, user_hash: str) -> int:
-        """Erase everything stored for a user, atomically (the DELETE command). Returns rows removed."""
+        """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
+        their stored messages. Returns rows removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:
         """Retention: atomically remove data older than ``cutoff``. Returns rows removed."""
+        ...
+
+    async def add_pattern(self, pattern: ScamPattern) -> None:
+        """Keep a de-identified scam example (no link to any user; see ``kudiguard.patterns``)."""
+        ...
+
+    async def purge_patterns_before(self, cutoff: date) -> int:
+        """Delete scam examples from weeks before ``cutoff``'s week (their own, longer retention). Rows removed."""
+        ...
+
+    async def export_patterns(self) -> list[dict[str, Any]]:
+        """All scam examples, ordered by week (never by insertion order)."""
         ...
 
     async def export_interactions(self) -> list[dict[str, Any]]:

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Collection
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from kudiguard.domain import Interaction, Outcome
+from kudiguard.domain import Interaction, Outcome, Verdict
+from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
 from kudiguard.storage.export import export_row, protect
@@ -23,6 +24,7 @@ class MemoryStore:
         self._feedback: dict[int, bool] = {}
         self._next_id = 1
         self._closed = False
+        self._patterns: dict[str, ScamPattern] = {}
 
     async def get_user(self, user_hash: str) -> UserState | None:
         self._ensure_open()
@@ -95,6 +97,20 @@ class MemoryStore:
     async def delete_user(self, user_hash: str) -> int:
         self._ensure_open()
         removed = int(self._users.pop(user_hash, None) is not None)
+        for item in self._interactions.values():  # examples taken from this user's stored messages
+            if (
+                item.user_hash == user_hash
+                and item.transcript
+                and item.verdict
+                in (
+                    Verdict.LIKELY_SCAM,
+                    Verdict.CAUTION,
+                )
+            ):
+                key = (week_of(item.created_at.date()), deidentify(item.transcript))
+                for pattern_id in [k for k, p in self._patterns.items() if (p.week, p.text) == key]:
+                    del self._patterns[pattern_id]
+                    removed += 1
         for interaction_id in [k for k, v in self._interactions.items() if v.user_hash == user_hash]:
             del self._interactions[interaction_id]
             removed += 1 + int(self._feedback.pop(interaction_id, None) is not None)
@@ -114,6 +130,21 @@ class MemoryStore:
             del self._claimed[key]
             removed += 1
         return removed
+
+    async def add_pattern(self, pattern: ScamPattern) -> None:
+        self._ensure_open()
+        self._patterns[pattern.id] = pattern
+
+    async def purge_patterns_before(self, cutoff: date) -> int:
+        self._ensure_open()
+        old = [k for k, p in self._patterns.items() if p.week < week_of(cutoff)]
+        for key in old:
+            del self._patterns[key]
+        return len(old)
+
+    async def export_patterns(self) -> list[dict[str, Any]]:
+        self._ensure_open()
+        return [p.as_row() for p in sorted(self._patterns.values(), key=lambda p: (p.week, p.id))]
 
     async def export_interactions(self) -> list[dict[str, Any]]:
         self._ensure_open()

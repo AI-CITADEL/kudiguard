@@ -158,9 +158,9 @@ strings:
 
     Send me a *voice note* or a message, or forward a message you are unsure about.
 
-    🔒 We keep your messages for up to 90 days to improve the service. Your phone number is stored only in coded form, and voice notes are deleted after they are transcribed. Send *DELETE* at any time to erase your messages, or *STOP* to stop. By continuing, you agree to this.
+    🔒 We keep your messages for up to 90 days to improve the service. Your phone number is stored only in coded form, and voice notes are deleted after they are transcribed. Send *DELETE* at any time to erase your messages, or *STOP* to stop. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard; DELETE also removes those taken from your recent messages. By continuing, you agree to this.
     ℹ️ This is guidance, not financial advice.
-    _Powered by N-ATLAS · Awarri_
+    _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: "Which language should I use?"
   btn_language_menu: "Choose language"
   language_set: "✅ I will reply in {language}."
@@ -200,3 +200,4 @@ strings:
   warn_family_fallback: "⚠️ Scam alert: someone may contact you pretending to be from a bank or a government agency, or promising money. Never share your OTP, PIN or BVN, and never pay a fee to receive money. Check with your bank first."
   at_capacity: "😔 KudiGuard is full right now. Please try again in a few days."
   busy: "⏳ Many people are asking right now. Please try again in a minute."
+  privacy_link: "🔐 Privacy notice: {url}"

@@ -17,6 +17,7 @@ from kudiguard.engine import Engine
 from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLMError, Purpose
+from kudiguard.pipeline import CONSENT_VERSION
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.speech.base import ASRError
@@ -240,7 +241,7 @@ async def test_openapi_documents_the_public_api(api: Api) -> None:
 
 # --- web voice page --------------------------------------------------------------------------------------------
 
-WEB = {"x-kudiguard-session": SESSION, "x-kudiguard-consent": "yes"}
+WEB = {"x-kudiguard-session": SESSION, "x-kudiguard-consent": CONSENT_VERSION}
 
 
 async def test_web_page_is_served(api: Api) -> None:
@@ -517,3 +518,117 @@ async def test_json_endpoints_have_a_small_body_cap(api: Api) -> None:
         "/v1/check", content=chunked(), headers={"content-type": "application/json", "x-api-key": KEY}
     )
     assert streamed.status_code == 413  # not FastAPI's generic 400
+
+
+async def test_privacy_page(registry: LanguageRegistry) -> None:
+    config = settings(operator_name="Veldt <Labs>", privacy_contact="privacy@example.org")
+    async for api in _start(registry, config):
+        page = await api.client.get("/privacy")
+        assert page.status_code == 200 and "text/html" in page.headers["content-type"]
+        assert "90 days" in page.text and "DELETE" in page.text and "ndpc.gov.ng" in page.text
+        assert "outside" in page.text and "names or addresses" in page.text
+        assert "Veldt &lt;Labs&gt;" in page.text and "mailto:privacy@example.org" in page.text  # escaped
+        assert "{{" not in page.text
+
+
+async def test_privacy_page_without_contact(api: Api) -> None:
+    page = await api.client.get("/privacy")
+    assert "contact the operator" in page.text and "the KudiGuard team" in page.text
+    assert "90 days" in page.text and "2 years" in page.text
+    assert "/privacy" not in (await api.client.get("/openapi.json")).text
+    assert 'href="/privacy"' in (await api.client.get("/")).text
+
+
+async def test_privacy_page_reflects_configured_retention(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(retention_days=30, pattern_retention_days=400,
+                                               operator_name="{{CONTACT}} Ltd")):  # fmt: skip
+        page = (await api.client.get("/privacy")).text
+        assert "30 days" in page and "400 days" in page and "{{CONTACT}} Ltd" in page  # one-pass substitution
+
+
+async def test_web_scam_checks_feed_the_library_but_api_checks_do_not(api: Api) -> None:
+    await api.check()  # B2B API: its end users did not consent to us
+    assert await api.store.export_patterns() == []
+    await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)
+    [row] = await api.store.export_patterns()
+    assert row["channel"] == "web" and SESSION not in str(row)
+
+
+async def test_web_sessions_have_their_own_share_of_the_licence_cap(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(web_session_cap=1, active_user_cap=100)):
+        assert (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)).status_code == 200
+        other = {**WEB, "x-kudiguard-session": "zzzzzzzzzzzzzzzzzzzz"}
+        full = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=other)
+        assert full.status_code == 503 and full.json()["detail"]["problem"] == "at_capacity"
+        again = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)
+        assert again.status_code == 200  # a returning session is always served
+
+
+async def test_web_respects_the_project_wide_cap(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(web_session_cap=50, active_user_cap=1)):
+        await api.check()  # one API client already active
+        response = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)
+        assert response.status_code == 503
+
+
+async def test_no_cap_configured(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(active_user_cap=None)):
+        assert (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)).status_code == 200
+
+
+async def test_a_burst_of_new_web_sessions_cannot_overshoot_the_share(registry: LanguageRegistry) -> None:
+    import asyncio
+
+    async for api in _start(
+        registry, settings(web_session_cap=2, active_user_cap=100, web_rate_per_minute=100)
+    ):
+        api.llm.delay_s = 0.05  # first checks overlap
+
+        async def new_session(n: int, api: Api = api) -> int:
+            headers = {**WEB, "x-kudiguard-session": f"burst-session-{n:04d}-xxxx"}
+            return (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=headers)).status_code
+
+        codes = await asyncio.gather(*(new_session(n) for n in range(5)))
+        assert sorted(codes) == [200, 200, 503, 503, 503]
+        assert api.app.state.pending_web_sessions == set()
+
+
+async def test_outdated_web_consent_is_refused(api: Api) -> None:
+    old = {**WEB, "x-kudiguard-consent": "2020-01-01"}
+    assert (await api.client.post("/web/check", data={"text": "x"}, headers=old)).status_code == 403
+
+
+async def test_burst_cannot_overshoot_the_share_with_sqlite(
+    registry: LanguageRegistry, tmp_path: Path
+) -> None:
+    """SQLite counts run in a thread (they yield), so admission must be atomic."""
+    import asyncio
+
+    from kudiguard.storage.sqlite import SQLiteStore
+
+    config = settings(web_session_cap=2, active_user_cap=100, web_rate_per_minute=100)
+    llm = FakeLLM(analyse=analysis("x", "scam_check"), compose="1. Do not share the code.")
+    hasher = UserHasher(b"s" * MIN_SECRET_BYTES)
+    store = await SQLiteStore.open(tmp_path / "kg.db", hasher=hasher)
+    async with httpx.AsyncClient() as http:
+        knowledge = knowledge_base_from_packs(
+            ROOT / "data" / "packs", client=http, include=["kudiguard-core"]
+        )
+        engine = Engine(registry=registry, llm=llm, knowledge=knowledge)
+
+        async def factory(_: Settings) -> Services:
+            return Services(config, registry, engine, store, hasher, llm, closers=[store.close])
+
+        app = create_app(config, services_factory=factory)
+        async with app.router.lifespan_context(app):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+
+                async def new_session(n: int) -> int:
+                    headers = {**WEB, "x-kudiguard-session": f"sqlite-burst-{n:04d}-xxxxxx"}
+                    return (
+                        await client.post("/web/check", data={"text": OTP_SCAM}, headers=headers)
+                    ).status_code
+
+                codes = await asyncio.gather(*(new_session(n) for n in range(8)))
+    assert codes.count(200) == 2 and codes.count(503) == 6

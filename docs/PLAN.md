@@ -64,7 +64,7 @@ Each milestone: write tests → implement → `ruff` + `mypy` + `pytest` (covera
 |---|---|
 | Working artefact | Live WhatsApp number + single-file web voice page fallback + repo |
 | N-ATLAS integration depth | N-ATLAS LLM does structured red-flag extraction **and** reply generation; NCAIR1 ASR per language for all voice |
-| ≥50 real interactions (target 80–100) | SQLite log (hashed users) → `kudiguard export` → `docs/VALIDATION.md`: unique non-team users, language split, verdict mix, helpful %, p50/p95 latency, 10 anonymised transcripts with glosses, testimonials |
+| ≥50 real interactions (target 80–100) | SQLite log (hashed users) → `kudiguard export` → `docs/VALIDATION.md`: unique non-team users, language split, verdict mix, helpful %, p50/p95 latency, 10 de-identified transcripts with glosses, testimonials |
 | Technical rigour | ASR WER on 20 Hausa + 20 English recorded clips; scam precision/recall on 30 labelled scenarios (`scripts/eval_*.py`) |
 | Docs, video, team, Track B docs | README, ARCHITECTURE, SUSTAINABILITY (cost/interaction, licence path, partners), DEMO script; video filmed D3 |
 

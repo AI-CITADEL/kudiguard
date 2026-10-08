@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KudiGuard Privacy</title>
+<meta name="description" content="How KudiGuard handles your data (Nigeria Data Protection Act 2023).">
+<style>
+  :root { --bg: #f6f7f5; --card: #ffffff; --ink: #1b1f1d; --muted: #5d6662; --line: #dfe3e0; --accent: #0b7a53; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #111413; --card: #1a1f1d; --ink: #e8ece9; --muted: #a2aca7; --line: #2c3431; --accent: #3fbf8a; }
+  }
+  :root[data-theme="dark"] { --bg: #111413; --card: #1a1f1d; --ink: #e8ece9; --muted: #a2aca7; --line: #2c3431; --accent: #3fbf8a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 24px 0 6px; }
+  .muted { color: var(--muted); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px 12px; margin-top: 16px; }
+  a { color: var(--accent); }
+  li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🛡️ KudiGuard Privacy Notice</h1>
+  <p class="muted">Effective 8 October 2026 · Operated by {{OPERATOR}} · Nigeria Data Protection Act 2023</p>
+
+  <section>
+    <h2>What KudiGuard does</h2>
+    <p>KudiGuard checks messages and voice notes for signs of money scams and answers money-safety questions, on
+    WhatsApp, on this website and through an API for partner organisations. It gives guidance only, not financial advice.</p>
+  </section>
+
+  <section>
+    <h2>What we collect and keep</h2>
+    <ul>
+      <li><strong>Your phone number</strong> is kept only in a one-way coded form (a keyed hash), so we can recognise
+        returning users without storing the number. On the website we use a random session id instead.</li>
+      <li><strong>Your messages</strong> and our replies, with most phone, account and card numbers and email addresses
+        automatically masked. Other details you type, such as names or addresses, are kept as written, so please leave
+        them out.</li>
+      <li>Our scam assessment, an English translation of your message, the channel used (WhatsApp or website), your
+        language, when you agreed to this notice, your 👍/👎 feedback, and timing information.</li>
+      <li><strong>Voice notes</strong> are turned into text and then deleted; the audio itself is not stored.</li>
+    </ul>
+    <p>We do not ask for your contacts, location or photos, and we never ask for PINs, OTPs or passwords.</p>
+  </section>
+
+  <section>
+    <h2>Why (legal basis)</h2>
+    <p>To answer you, to improve the service and measure how well it works, and to protect others from scams
+    (including improving KudiGuard's scam detection and, after review, training its models), based on
+    your <strong>consent</strong>, which you give by continuing after our welcome message (or ticking the box on this
+    website).</p>
+  </section>
+
+  <section>
+    <h2>Who processes it</h2>
+    <ul>
+      <li>The AI models (N-ATLAS and the NCAIR1 speech models) run on KudiGuard's own server. Your messages are not sent
+        to outside AI companies.</li>
+      <li><strong>Meta (WhatsApp)</strong> carries messages between you and us; <strong>Cloudflare</strong> provides the
+        secure network connection to our server. Each follows its own privacy policy and may process data outside
+        Nigeria under its own safeguards.</li>
+      <li>We do not sell or share your data for advertising. Anonymised totals (for example, how many checks were made in
+        each language) may be published.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How long</h2>
+    <ul>
+      <li>Messages and replies: deleted automatically <strong>{{RETENTION_DAYS}} days</strong> after they were sent.</li>
+      <li>Your settings (language, consent): deleted {{RETENTION_DAYS}} days after your last message.</li>
+      <li><strong>Scam examples:</strong> when a message is judged a likely scam or suspicious, a separate copy is kept
+        for up to <strong>{{PATTERN_RETENTION}}</strong> to protect others and improve KudiGuard: its wording and English
+        translation (most numbers, emails and card numbers masked; most links reduced to the website name), the language,
+        channel, our assessment and the week, without your number or any id of you or the conversation. While your own
+        messages are still stored ({{RETENTION_DAYS}} days), DELETE also removes the examples taken from them; after that
+        they can no longer be matched to you.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Your rights</h2>
+    <ul>
+      <li>On WhatsApp, send <strong>DELETE</strong> to erase everything linked to you, immediately.</li>
+      <li>Send <strong>STOP</strong> to stop receiving messages; your data is then kept only until it expires or you
+        send DELETE.</li>
+      <li>To access, correct or delete your data (including from the website), or to object to its use: {{CONTACT}}.</li>
+      <li>You can complain to the <a href="https://ndpc.gov.ng">Nigeria Data Protection Commission</a>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Security</h2>
+    <p>Data is protected in transit (HTTPS), phone numbers are stored only in coded form, and data is kept on
+    access-controlled systems. Changes to this notice will be announced to users before they take effect.</p>
+  </section>
+
+  <p class="muted" style="margin-top: 24px;"><a href="/">← Back to KudiGuard</a> · N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies.</p>
+</main>
+</body>
+</html>

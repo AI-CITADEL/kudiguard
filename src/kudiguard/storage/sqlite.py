@@ -14,11 +14,12 @@ import sqlite3
 import threading
 from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
+from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
 from kudiguard.storage.export import export_row, protect
@@ -75,6 +76,20 @@ MIGRATIONS: Sequence[str] = (
         helpful INTEGER NOT NULL,
         at TEXT NOT NULL
     );
+    """,
+    # 2: de-identified scam pattern library (no user link; random ids, WITHOUT ROWI***REMOVED*** no insertion-order leak)
+    """
+    CREATE TABLE scam_patterns (
+        id TEXT PRIMARY KEY,
+        week TEXT NOT NULL,
+        language TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        verdict TEXT NOT NULL,
+        flags TEXT NOT NULL DEFAULT '[]',
+        text TEXT NOT NULL,
+        english TEXT
+    ) WITHOUT ROWID;
+    CREATE INDEX ix_patterns_week ON scam_patterns (week, text);
     """,
 )
 
@@ -245,6 +260,18 @@ class SQLiteStore:
     async def delete_user(self, user_hash: str) -> int:
         def work(db: sqlite3.Connection) -> int:
             with _transaction(db):
+                scams = db.execute(
+                    "SELECT created_at, transcript FROM interactions WHERE user_hash = ? AND transcript IS NOT NULL "
+                    "AND verdict IN ('likely_scam', 'caution')",
+                    (user_hash,),
+                ).fetchall()
+                patterns = 0
+                for row in scams:  # examples taken from this user's stored messages (still matchable to them)
+                    week = week_of(_dt_required(row["created_at"]).date()).isoformat()
+                    patterns += db.execute(
+                        "DELETE FROM scam_patterns WHERE week = ? AND text = ?",
+                        (week, deidentify(row["transcript"])),
+                    ).rowcount
                 feedback = db.execute(
                     "DELETE FROM feedback WHERE interaction_id IN (SELECT id FROM interactions WHERE user_hash = ?)",
                     (user_hash,),
@@ -252,7 +279,7 @@ class SQLiteStore:
                 turns = db.execute("DELETE FROM interactions WHERE user_hash = ?", (user_hash,)).rowcount
                 users = db.execute("DELETE FROM users WHERE user_hash = ?", (user_hash,)).rowcount
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # erased pages must not linger in the WAL file
-            return feedback + turns + users
+            return patterns + feedback + turns + users
 
         return await self._run(work)
 
@@ -273,6 +300,34 @@ class SQLiteStore:
         return await self._run(work)
 
     # --- reporting ------------------------------------------------------------------------------------
+
+    async def add_pattern(self, pattern: ScamPattern) -> None:
+        values = (
+            pattern.id, pattern.week.isoformat(), pattern.language, pattern.channel, pattern.verdict.value,
+            json.dumps([f.value for f in pattern.flags]), pattern.text, pattern.english,
+        )  # fmt: skip
+        await self._run(
+            lambda db: db.execute("INSERT INTO scam_patterns VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
+        )
+
+    async def purge_patterns_before(self, cutoff: date) -> int:
+        cursor = await self._run(
+            lambda db: db.execute("DELETE FROM scam_patterns WHERE week < ?", (week_of(cutoff).isoformat(),))
+        )
+        return int(cursor.rowcount)
+
+    async def export_patterns(self) -> list[dict[str, Any]]:
+        rows = await self._run(
+            lambda db: db.execute("SELECT * FROM scam_patterns ORDER BY week, id").fetchall()
+        )
+        return [
+            ScamPattern(
+                language=r["language"], channel=r["channel"], verdict=Verdict(r["verdict"]),
+                flags=tuple(Flag(f) for f in json.loads(r["flags"])), text=r["text"], english=r["english"],
+                week=date.fromisoformat(r["week"]), id=r["id"],
+            ).as_row()
+            for r in rows
+        ]  # fmt: skip
 
     async def export_interactions(self) -> list[dict[str, Any]]:
         rows = await self._run(

@@ -54,6 +54,7 @@ class Msg(StrEnum):
     WARN_FAMILY_FALLBACK = "warn_family_fallback"
     AT_CAPACITY = "at_capacity"
     BUSY = "busy"
+    PRIVACY_LINK = "privacy_link"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

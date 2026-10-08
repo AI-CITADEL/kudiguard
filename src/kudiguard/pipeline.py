@@ -24,7 +24,7 @@ import logging
 import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -33,16 +33,18 @@ from kudiguard.domain import InboundMessage, Interaction, LanguageCode, MessageK
 from kudiguard.engine import Answer, AnswerKind, Engine
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageStatus
+from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
 from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult
 from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, Store, UserState, utcnow
+from kudiguard.text import redact
 
 log = logging.getLogger(__name__)
 
-CONSENT_VERSION = "2026-10-07"  # bump when the welcome/consent text changes materially
+CONSENT_VERSION = "2026-10-08"  # bump when the welcome/consent text changes materially (also in voice.html)
 REPLY_RESERVE_S = 3.0  # of the turn deadline, kept for rendering, logging and sending the reply
 FAILURE_DEADLINE_S = (
     10.0  # for the error reply/log after a failed turn (a hung channel must not wedge a user)
@@ -158,6 +160,7 @@ class _Turn:
     voice: bool = False  # any voice note in this turn (the reply echoes "I heard: …")
     replied: bool = False  # the user has received this turn's answer (or a fixed reply)
     logged: bool = False  # an evidence row exists for this turn
+    logged_at: datetime | None = None  # its timestamp (scam examples are dated from it)
     interaction_id: int | None = None  # the turn's evidence row
 
 
@@ -194,6 +197,7 @@ class Conversation:
         hasher: UserHasher,
         limits: Limits = DEFAULT_LIMITS,
         clock: Callable[[], datetime] = utcnow,
+        privacy_url: str = "",
     ) -> None:
         self._engine = engine
         self._registry = engine.registry
@@ -203,6 +207,7 @@ class Conversation:
         self._hasher = hasher
         self._limits = limits
         self._clock = clock
+        self._privacy_url = privacy_url
         self._matcher = CommandMatcher(self._registry)
         self._slots = asyncio.Semaphore(limits.max_concurrent_turns)
         self._waiting = 0  # turns queued for a slot
@@ -433,7 +438,10 @@ class Conversation:
             last_seen_at=now,
         )
         await self._store.save_user(state)
-        await self._send(turn, self._messages.text(turn.language, Msg.WELCOME))
+        welcome = self._messages.text(turn.language, Msg.WELCOME)
+        if self._privacy_url:
+            welcome += "\n" + self._messages.text(turn.language, Msg.PRIVACY_LINK, url=self._privacy_url)
+        await self._send(turn, welcome)
         await self._messenger.send(turn.message.user_id, self._language_menu(turn.language))
         return None
 
@@ -540,6 +548,8 @@ class Conversation:
             contacts=answer.contacts,
         )
         interaction_id = await self._log(turn, outcome=answer.outcome, answer=answer, reply=reply)
+        assert turn.logged_at is not None
+        await record_pattern(self._store, turn.message.channel, answer, turn.transcript or "", turn.logged_at)
         await self._store.save_user(dataclasses.replace(user, last_interaction_id=interaction_id))
         feedback = (
             Button(
@@ -686,8 +696,9 @@ class Conversation:
         since = self._clock() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
         if await self._store.count_interactions_since(turn.user_hash, since):
             return True
-        # Only this channel's users: web sessions are client-chosen ids and must not exhaust the cap (review M9).
-        return await self._store.count_active_users_since(since, channels={turn.message.channel}) < cap
+        # The licence caps the whole project: every channel counts. Web sessions (client-chosen ids) have their own
+        # sub-cap in the web endpoint, so they can never use up more than their share (review M9).
+        return await self._store.count_active_users_since(since) < cap
 
     async def _rate_limited(self, turn: _Turn) -> bool:
         since = self._clock() - timedelta(hours=1)
@@ -721,6 +732,7 @@ class Conversation:
         llm_ms: int | None = None,
         reply_to: int | None = None,
     ) -> int:
+        logged_at = self._clock()
         interaction_id = await self._store.add_interaction(
             Interaction(
                 channel=turn.message.channel,
@@ -740,16 +752,37 @@ class Conversation:
                 llm_ms=llm_ms if llm_ms is not None else (answer.llm_ms if answer else None),
                 total_ms=int((time.perf_counter() - turn.started) * 1000),
                 error=error,
-                created_at=self._clock(),
+                created_at=logged_at,
                 reply_to=reply_to,
             )
         )
         turn.logged = True
+        turn.logged_at = logged_at
         turn.interaction_id = interaction_id
         return interaction_id
 
 
 AUDIO = MessageKind.AUDIO
+
+
+async def record_pattern(store: Store, channel: str, answer: Answer, text: str, now: datetime) -> None:
+    """Keep a de-identified example of a 🔴/🟠 check (consented channels only). Never fails the turn.
+
+    Built from ``redact(text)``, exactly what the store keeps as the transcript, and dated with the interaction's own
+    timestamp, so DELETE can find it again (``storage``: same function, same input, same week).
+    """
+    if answer.verdict not in REPORT_VERDICTS or channel not in PATTERN_CHANNELS or not text.strip():
+        return
+    try:
+        await store.add_pattern(
+            ScamPattern.from_check(
+                language=answer.language, channel=channel, verdict=answer.verdict, flags=answer.flags,
+                text=redact(text), english=redact(answer.english) if answer.english else None,
+                day=now.astimezone(UTC).date(),
+            )
+        )  # fmt: skip
+    except Exception:
+        log.exception("could not record a scam pattern")
 
 
 def _consented(user: UserState) -> bool:

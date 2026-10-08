@@ -125,7 +125,11 @@ pip temp/cache and HF_HOME are redirected to ***REMOVED***.
 
 ## S5 — Official NCAIR1 ASR configs (7 Oct 2026)
 
-Access: Hausa-ASR, Yoruba-ASR, Igbo-ASR granted (classic Read token); NigerianAccentedEnglish pending.
+Access: all four official models granted (Hausa-ASR, Yoruba-ASR, Igbo-ASR, NigerianAccentedEnglish; classic Read
+token) and converted to CTranslate2 int8 by `scripts/prepare_asr.py` (7 Oct 2026). Smoke test of the official
+**NCAIR1/NigerianAccentedEnglish** model on the 11-s WhatsApp-style English fixture: **0% WER, 1.9–2.1 s** end to end;
+the live server's `/v1/check/audio` used it (6.9 s incl. N-ATLAS). Every language's voice path uses its NCAIR1 model
+(`asr_model` in `data/languages/*.yaml`).
 `generation_config.json` of all three: `language: None`, task transcribe (`forced_decoder_ids [[1, None], [2, 50359]]`),
 multilingual Whisper vocabulary with no Igbo token. NCAIR does not pin a language token, so at inference Whisper
 detects the language (+~1.2 s). Our config forces `ha`/`yo` (faster) and leaves Igbo on auto. **To decide with data:**

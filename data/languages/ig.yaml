@@ -50,9 +50,9 @@ strings:
 
     Zitere m *ozi olu* ma ọ bụ ozi ederede, ma ọ bụ zigharịa ozi ọ bụla ị na-enweghị obi ike na ya.
 
-    🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha. Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. Site n'ịga n'ihu, ị kwenyere na nke a.
+    🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha. Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
     ℹ️ Nke a bụ ndụmọdụ, ọ bụghị ndụmọdụ ego nke ọkachamara.
-    _Powered by N-ATLAS · Awarri_
+    _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Kedu asụsụ m ga-eji?
   btn_language_menu: Họrọ asụsụ
   language_set: ✅ Aga m aza gị n'asụsụ {language}.
@@ -92,3 +92,4 @@ strings:
   warn_family_fallback: "⚠️ Ịdọ aka ná ntị maka aghụghọ: mmadụ nwere ike ịkpọtụrụ unu na-ekwu na o si n'ụlọ akụ ma ọ bụ ụlọ ọrụ gọọmentị, ma ọ bụ na-ekwe nkwa ego. Unu enyela onye ọ bụla OTP, PIN ma ọ bụ BVN unu, unu akwụkwala ego ka unu nata ego. Buru ụzọ jụọ ụlọ akụ unu."
   at_capacity: "😔 KudiGuard juputara ugbu a. Biko nwaa ọzọ mgbe ụbọchị ole na ole gachara."
   busy: "⏳ Ọtụtụ mmadụ na-ajụ ajụjụ ugbu a. Biko nwaa ọzọ mgbe otu nkeji gachara."
+  privacy_link: "🔐 Ọkwa nzuzo: {url}"

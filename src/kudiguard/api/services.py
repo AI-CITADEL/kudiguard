@@ -21,6 +21,7 @@ from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLM
 from kudiguard.llm.openai_compat import OpenAICompatLLM
+from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
 from kudiguard.speech.audio import find_ffmpeg
@@ -60,11 +61,20 @@ class Services:
                 log.exception("error while shutting down")
 
 
-async def purge_loop(store: Store, retention_days: int, interval_s: float = PURGE_INTERVAL_S) -> None:
-    """Delete evidence older than the retention period (NDPA): at startup, then every ``interval_s``."""
+async def purge_loop(
+    store: Store,
+    retention_days: int,
+    interval_s: float = PURGE_INTERVAL_S,
+    pattern_retention_days: int = PATTERN_RETENTION_DAYS,
+) -> None:
+    """Delete evidence (and, on their own clock, scam examples) older than their retention periods (NDPA)."""
     while True:
         try:
-            removed = await store.purge_before(utcnow() - timedelta(days=retention_days))
+            now = utcnow()
+            removed = await store.purge_before(now - timedelta(days=retention_days))
+            removed += await store.purge_patterns_before(
+                (now - timedelta(days=pattern_retention_days)).date()
+            )
             if removed:
                 log.info("retention purge removed %d rows", removed)
         except Exception:
@@ -154,8 +164,15 @@ async def build_services(settings: Settings) -> Services:
                 messenger=WhatsAppMessenger(whatsapp, client=client),
                 hasher=hasher,
                 limits=limits,
+                privacy_url=f"{settings.public_url.rstrip('/')}/privacy" if settings.public_url else "",
             )
-        services.background.append(asyncio.create_task(purge_loop(store, settings.retention_days)))
+        services.background.append(
+            asyncio.create_task(
+                purge_loop(
+                    store, settings.retention_days, pattern_retention_days=settings.pattern_retention_days
+                )
+            )
+        )
         return services
     except BaseException:
         for close in reversed(closers):

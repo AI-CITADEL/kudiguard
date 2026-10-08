@@ -34,7 +34,7 @@ def tokens(text: str, stopwords: frozenset[str] = frozenset()) -> list[str]:
     return [t for t in _TOKEN.findall(normalize(text)) if t not in stopwords]
 
 
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+")  # anchored: linear on long inputs
 _PHONE = re.compile(r"(?<![\w+])(?:\+|0)[\d ()-]{8,}\d")  # +234 803 123 4567, 0803-123-4567
 # Account/BVN/card numbers. Not amounts: "N500000", "N 500000", "₦ 500000", "500000 naira", "500000k", "2.5000000",
 # nor USSD fields: "*737*1*500000#".
@@ -44,6 +44,10 @@ _LONG_NUMBER = re.compile(
 )
 _CARD = re.compile(r"(?<!\w)\d{4}(?:[ -]?\d{4}){2,3}(?!\w)")  # 5399 8312 3456 7890
 _MIN_PHONE_DIGITS = 10
+# Digits in groups without a leading 0/+: "803 123 4567", "123-456-7890", "0123 456 789" (masked at >= 10 digits;
+# shorter groups such as dates "2026 10 08" or amounts "5 000 000" are kept).
+_GROUPED = re.compile(r"(?<![\w₦$£€.,*:])(?<!\b[Nn] )(?<![₦$] )\d{2,4}(?:[ -]\d{2,5}){2,4}(?![\w#:]|[.,]\d)")
+_SPOKEN = re.compile(r"(?<![\w.,])\d(?:[ -]\d){9,}(?![\w.,])")  # digits read out one by one: "2 2 3 1 …"
 
 
 def _mask_phone(match: re.Match[str]) -> str:
@@ -59,4 +63,6 @@ def redact(text: str) -> str:
     text = _EMAIL.sub("[email]", text)
     text = _CARD.sub("[number]", text)
     text = _PHONE.sub(_mask_phone, text)
+    text = _GROUPED.sub(_mask_phone, text)
+    text = _SPOKEN.sub("[number]", text)
     return _LONG_NUMBER.sub("[number]", text)
