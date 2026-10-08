@@ -66,22 +66,38 @@ class Reply:
     text: str
 
 
+class Outcome(StrEnum):
+    """How a turn ended (validation evidence and monitoring)."""
+
+    ANSWERED = "answered"  # model-composed reply
+    FIXED_REPLY = "fixed_reply"  # greeting / content-free / command: fixed text, no model
+    FALLBACK = "fallback"  # model failed or was blocked by the output guard: fixed fallback text
+    AUDIO_ERROR = "audio_error"  # unusable voice note (too long, no speech, undecodable)
+    ERROR = "error"  # system fault
+
+
 @dataclass(slots=True)
 class Interaction:
-    """One user turn, persisted as validation evidence."""
+    """One user turn, persisted as validation evidence. Text fields are stored redacted (no numbers/emails)."""
 
     channel: str
     message_id: str
     user_hash: str
     language: LanguageCode
     kind: MessageKind
+    outcome: Outcome = Outcome.ANSWERED
+    intent: str | None = None
     transcript: str | None = None
     english: str | None = None
     verdict: Verdict | None = None
     flags: tuple[Flag, ...] = ()
     reply: str | None = None
+    decode_ms: int | None = None
     asr_ms: int | None = None
     llm_ms: int | None = None
     total_ms: int | None = None
     error: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # The interaction a button press refers to ("What should I do?", "Warn my family").
+    reply_to: int | None = None
+    id: int | None = None  # assigned by the store
