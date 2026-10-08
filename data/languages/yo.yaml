@@ -8,6 +8,14 @@ status: beta
 asr_model: NCAIR1/Yoruba-ASR
 review:
   lexicon: pending-native-review
+  strings: pending-native-review
+
+output_guard:
+  safety_claims:
+    - 'ki i se (?:etan|jibiti|ojoro)'
+    - 'ko si ewu'
+  refusals:
+    - 'mi o le ran'
 
 lexicon:
   flags:
@@ -17,3 +25,44 @@ lexicon:
     - 'jibiti'
     - 'ojoro'
     - 'ayederu'
+
+# Fixed user-facing text: DRAFT, pending native-speaker review. Buttons (btn_*) max 20 chars.
+strings:
+  welcome: |-
+    👋 Ẹ káàbọ̀ sí *KudiGuard*. Mo ń ràn yín lọ́wọ́ láti dá ẹ̀tàn owó mọ̀ àti láti dáhùn ìbéèrè nípa owó.
+
+    Ẹ fi *àtẹ̀jíṣẹ́ ohùn* tàbí ọ̀rọ̀ ránṣẹ́ sí mi, tàbí kí ẹ dárí ọ̀rọ̀ tí ẹ kò dá lójú rẹ̀ sí mi.
+
+    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
+    ℹ️ Ìtọ́sọ́nà ni èyí, kì í ṣe ìmọ̀ràn ìṣúná owó.
+    _Powered by N-ATLAS · Awarri_
+  choose_language: Èdè wo ni kí n lò?
+  btn_language_menu: Yan èdè
+  language_set: ✅ Màá dá yín lóhùn ní {language}.
+  beta_language: ℹ️ Ìtìlẹ́yìn {language} ṣì jẹ́ tuntun, nítorí náà àwọn ìdáhùn kan lè ní àṣìṣe.
+  listening: 🎧 Mo ń gbọ́…
+  checking: 🔎 Mo ń ṣàyẹ̀wò…
+  i_heard: '🗣️ Mo gbọ́: “{transcript}”'
+  verdict_likely_scam: 🔴 *Èyí jọ Ẹ̀TÀN*
+  verdict_caution: '🟠 *Ẹ ṣọ́ra: àwọn àmì ìkìlọ̀ wà*'
+  verdict_no_flags: 🟢 *Mi ò rí àmì ẹ̀tàn kankan.* Síbẹ̀, ẹ jẹ́rìí sí i lọ́dọ̀ báǹkì yín kí ẹ tó ṣe ohunkóhun.
+  what_to_do: '*Ohun tí ẹ máa ṣe:*'
+  where_to_report: '*Ibi tí ẹ ti lè fi ẹjọ́ sùn:*'
+  disclaimer: _Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn ìṣúná owó._
+  feedback_prompt: Ṣé èyí ràn yín lọ́wọ́?
+  feedback_thanks: 🙏 Ẹ ṣé! Èsì yín ń ràn wá lọ́wọ́ láti dáàbò bo ọ̀pọ̀ ènìyàn.
+  btn_helpful: 👍 Ó wúlò
+  btn_not_helpful: 👎 Kò wúlò
+  btn_what_to_do: Kí ni kí n ṣe?
+  btn_report: Ibi tí mo lè fi sùn
+  btn_warn_family: Kìlọ̀ fún ẹbí mi
+  warn_family_intro: Ẹ fi èyí ránṣẹ́ sí ẹbí àti ọ̀rẹ́ yín 👇
+  warn_family_footer: Láti ọwọ́ KudiGuard. Ẹ ṣàyẹ̀wò àwọn ọ̀rọ̀ tí ẹ kò dá lójú lọ́fẹ̀ẹ́ lórí WhatsApp.
+  greeting_reply: 👋 Ẹ n lẹ́ o! Ẹ fi ohùn tàbí ọ̀rọ̀ tí ẹ kò dá lójú ránṣẹ́ sí mi, tàbí kí ẹ béèrè ìbéèrè èyíkéyìí nípa owó.
+  not_understood: Ẹ má bínú, mi ò gbọ́ ọ dáadáa. Ẹ jọ̀ọ́ ẹ tún gbìyànjú tàbí kí ẹ kọ ọ̀rọ̀ yín.
+  audio_too_long: ⏱️ Ẹ jọ̀ọ́ ẹ fi ohùn tí kò ju ìṣẹ́jú-àáyá {seconds} lọ ránṣẹ́.
+  unsupported: Mo lè ka ọ̀rọ̀ àti gbọ́ ohùn. Ẹ jọ̀ọ́ ẹ fi ọ̀kan nínú wọn ránṣẹ́.
+  rate_limited: ⏳ Ẹ ti fi ọ̀pọ̀ ọ̀rọ̀ ránṣẹ́. Ẹ jọ̀ọ́ ẹ dúró díẹ̀ kí ẹ tó tún gbìyànjú.
+  error_retry: 😔 Ẹ má bínú, nǹkan kan ṣẹlẹ̀ ní ẹ̀gbẹ́ mi. Ẹ jọ̀ọ́ ẹ tún gbìyànjú láìpẹ́.
+  stopped: Ẹ kò ní gba ọ̀rọ̀ láti ọ̀dọ̀ KudiGuard mọ́. Ẹ fi ọ̀rọ̀ èyíkéyìí ránṣẹ́ láti tún bẹ̀rẹ̀.
+  deleted: 🗑️ A ti pa àwọn ọ̀rọ̀ yín rẹ́.

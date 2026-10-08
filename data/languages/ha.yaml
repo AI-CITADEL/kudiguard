@@ -8,11 +8,25 @@ status: stable
 asr_model: NCAIR1/Hausa-ASR
 review:
   lexicon: pending-native-review
+  strings: pending-native-review
+
+output_guard:
+  safety_claims:
+    - 'ba (?:zamba|damfara|yaudara) ba(?:ne)?'
+    - 'babu (?:wani )?hadari'
+    - '(?:yana|ya) da (?:aminci|tsaro)'
+  refusals:
+    - 'ba zan iya taimaka'
 
 lexicon:
   flags:
     asks_credentials:
       - 'lambar sirri'
+    prize_lottery:
+      - '(?:kun|ka|kin|na|an|ya|ta|sun) ci (?:kyauta\w*|gasa\w*|lambar yabo)'
+    upfront_fee:
+      - 'kudin (?:rajista|rijista|sarrafawa|aiki|kwastam)'
+      - '(?:sai|dole|tukuna)\W+(?:\w+\W+){0,2}?(?:na|ku|ka|ki|in|mu) biya'
     account_threat:
       - '(?:an )?toshe'
     urgency:
@@ -22,3 +36,44 @@ lexicon:
     - '(?:dan )?damfara'
     - 'zamba'
     - 'yaudara'
+
+# Fixed user-facing text: DRAFT, pending native-speaker review. Buttons (btn_*) max 20 chars.
+strings:
+  welcome: |-
+    👋 Barka da zuwa *KudiGuard*. Ina taimaka muku gane damfarar kuɗi da amsa tambayoyi game da kuɗi.
+
+    Ku aiko mini da *saƙon murya* ko rubutu, ko ku tura saƙon da kuke shakka a kai.
+
+    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su. Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ta hanyar ci gaba, kun amince da wannan.
+    ℹ️ Wannan jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba.
+    _Powered by N-ATLAS · Awarri_
+  choose_language: Wane harshe zan yi amfani da shi?
+  btn_language_menu: Zaɓi harshe
+  language_set: ✅ Zan amsa muku da {language}.
+  beta_language: ℹ️ Tallafin {language} sabo ne, don haka wasu amsoshi na iya samun kurakurai.
+  listening: 🎧 Ina saurare…
+  checking: 🔎 Ina dubawa…
+  i_heard: '🗣️ Na ji: “{transcript}”'
+  verdict_likely_scam: 🔴 *Wannan yana kama da DAMFARA*
+  verdict_caution: '🟠 *Ku yi hankali: akwai alamun gargaɗi*'
+  verdict_no_flags: 🟢 *Ban ga alamun damfara ba.* Duk da haka ku tabbatar da bankinku kafin ku yi komai.
+  what_to_do: '*Abin da za ku yi:*'
+  where_to_report: '*Inda za ku kai rahoto:*'
+  disclaimer: _Jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba._
+  feedback_prompt: Shin wannan ya taimaka?
+  feedback_thanks: 🙏 Na gode! Ra'ayinku yana taimaka mana kare mutane da yawa.
+  btn_helpful: 👍 Ya taimaka
+  btn_not_helpful: 👎 Bai taimaka ba
+  btn_what_to_do: Me zan yi?
+  btn_report: Ina zan kai rahoto?
+  btn_warn_family: Gargaɗi iyalina
+  warn_family_intro: Ku tura wannan ga iyalinku da abokanku 👇
+  warn_family_footer: An raba daga KudiGuard. Ku duba saƙonnin da kuke shakka kyauta a WhatsApp.
+  greeting_reply: 👋 Sannu! Ku aiko mini saƙon murya ko saƙon da kuke shakka, ko ku yi kowace tambaya game da kuɗi.
+  not_understood: Yi haƙuri, ban ji sosai ba. Don Allah ku sake gwadawa ko ku rubuta saƙonku.
+  audio_too_long: ⏱️ Don Allah ku aika saƙon murya wanda bai wuce daƙiƙa {seconds} ba.
+  unsupported: Ina iya karanta rubutu da sauraron saƙon murya. Don Allah ku aika ɗaya daga cikinsu.
+  rate_limited: ⏳ Kun aiko saƙonni da yawa. Don Allah ku jira kaɗan sannan ku sake gwadawa.
+  error_retry: 😔 Yi haƙuri, an sami matsala a ɓangarena. Don Allah ku sake gwadawa nan ba da daɗewa ba.
+  stopped: Ba za ku ƙara samun saƙonni daga KudiGuard ba. Ku aika kowane saƙo don sake farawa.
+  deleted: 🗑️ An share saƙonninku.

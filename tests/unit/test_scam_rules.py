@@ -177,6 +177,8 @@ def test_flags_unique_and_ordered_by_weight(en: Lexicon) -> None:
         "Join our cooperative, put 20k and get 40k in 7 days",
         "Forex investment: invest $100 and earn $1000 weekly",
         "Send 0.1 BTC and get 0.2 BTC back guaranteed",
+        "Someone on Facebook said if I invest 50,000 naira I will get 150,000 naira in one week",
+        "Abeg invest 20k, you go collect 60k after 2 weeks",
         "Your NIN is not linked, visit nimc-verify.com.ng or your SIM will be barred",
         "CBN is giving N250,000 grant, apply now via this link",
         "My dear, I am stuck at the airport, send me $500 for customs clearance",
@@ -249,3 +251,27 @@ def test_secrecy_amplifies_a_money_request(en: Lexicon) -> None:
     assert alone.verdict is Verdict.NOT_A_CHECK
     combined = assess(["Send me money today, keep this secret, don't tell your wife"], en)
     assert combined.verdict is Verdict.LIKELY_SCAM
+
+
+def test_hausa_prize_and_fee_scam_caught_by_native_rules(registry: LanguageRegistry) -> None:
+    text = "Sun ce na ci kyautar naira dubu dari biyar, amma sai na biya kuɗin rajista tukuna."
+    result = assess([text], registry.lexicon_for("ha"))
+    assert {Flag.PRIZE_LOTTERY, Flag.UPFRONT_FEE} <= set(result.flags)
+    assert result.verdict is Verdict.LIKELY_SCAM
+
+
+def test_asking_about_secrecy_is_not_a_red_flag(en: Lexicon) -> None:
+    assert Flag.SECRECY not in assess(["Why should I keep it secret?"], en).flags
+    assert Flag.SECRECY in assess(["He told me to keep it secret from my wife"], en).flags
+
+
+@pytest.mark.parametrize(
+    ("text", "flagged"),
+    [
+        ("Keep this secret, send me 5k", True),
+        ("He wants me to keep it secret", True),
+        ("I want to keep it secret from my husband", False),
+    ],
+)
+def test_secrecy_rule_needs_someone_asking(en: Lexicon, text: str, flagged: bool) -> None:
+    assert (Flag.SECRECY in assess([text], en).flags) is flagged

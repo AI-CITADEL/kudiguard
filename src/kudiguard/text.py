@@ -36,9 +36,12 @@ def tokens(text: str, stopwords: frozenset[str] = frozenset()) -> list[str]:
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _PHONE = re.compile(r"(?<![\w+])(?:\+|0)[\d ()-]{8,}\d")  # +234 803 123 4567, 0803-123-4567
+# Account/BVN/card numbers. Not amounts: "N500000", "N 500000", "₦ 500000", "500000 naira", "500000k", "2.5000000",
+# nor USSD fields: "*737*1*500000#".
 _LONG_NUMBER = re.compile(
-    r"(?<![\w₦$£€])(?<!\d[.,])\d{6,}(?!\w|[.,]\d)"
-)  # account/BVN/card numbers; not amounts
+    r"(?<![\w₦$£€*])(?<!\d[.,])(?<!\b[Nn] )(?<![₦$] )\d{6,}(?!\w|[.,]\d|#|\s?(?:naira|kobo|k)\b)",
+    re.IGNORECASE,
+)
 _CARD = re.compile(r"(?<!\w)\d{4}(?:[ -]?\d{4}){2,3}(?!\w)")  # 5399 8312 3456 7890
 _MIN_PHONE_DIGITS = 10
 

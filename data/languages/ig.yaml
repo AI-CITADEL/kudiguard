@@ -8,6 +8,14 @@ status: beta
 asr_model: NCAIR1/Igbo-ASR
 review:
   lexicon: pending-native-review
+  strings: pending-native-review
+
+output_guard:
+  safety_claims:
+    - '(?:o )?a?bughi (?:aghugho|wayo)'
+    - 'enweghi ihe ize ndu'
+  refusals:
+    - 'enweghi m ike inyere'
 
 lexicon:
   flags:
@@ -16,3 +24,44 @@ lexicon:
   check_intent:
     - 'wayo'
     - 'aghugho'
+
+# Fixed user-facing text: DRAFT, pending native-speaker review. Buttons (btn_*) max 20 chars.
+strings:
+  welcome: |-
+    👋 Nnọọ na *KudiGuard*. Ana m enyere gị aka ịmata aghụghọ ego na ịza ajụjụ gbasara ego.
+
+    Zitere m *ozi olu* ma ọ bụ ozi ederede, ma ọ bụ zigharịa ozi ọ bụla ị na-enweghị obi ike na ya.
+
+    🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha. Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. Site n'ịga n'ihu, ị kwenyere na nke a.
+    ℹ️ Nke a bụ ndụmọdụ, ọ bụghị ndụmọdụ ego nke ọkachamara.
+    _Powered by N-ATLAS · Awarri_
+  choose_language: Kedu asụsụ m ga-eji?
+  btn_language_menu: Họrọ asụsụ
+  language_set: ✅ Aga m aza gị n'asụsụ {language}.
+  beta_language: ℹ️ Nkwado {language} ka dị ọhụrụ, ya mere ụfọdụ azịza nwere ike inwe mperi.
+  listening: 🎧 Ana m ege ntị…
+  checking: 🔎 Ana m enyocha…
+  i_heard: '🗣️ Anụrụ m: “{transcript}”'
+  verdict_likely_scam: 🔴 *Nke a yiri AGHỤGHỌ*
+  verdict_caution: '🟠 *Kpachara anya: e nwere ihe ịdọ aka ná ntị*'
+  verdict_no_flags: 🟢 *Ahụghị m ihe ịdọ aka ná ntị.* Ka o sina dị, kwado ya na ụlọ akụ gị tupu i mee ihe ọ bụla.
+  what_to_do: '*Ihe ị ga-eme:*'
+  where_to_report: '*Ebe ị ga-akọ ya:*'
+  disclaimer: _Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego nke ọkachamara._
+  feedback_prompt: Nke a ọ baara gị uru?
+  feedback_thanks: 🙏 Daalụ! Echiche gị na-enyere anyị aka ichebe ọtụtụ mmadụ.
+  btn_helpful: 👍 Ọ baara m uru
+  btn_not_helpful: 👎 Ọ baghị uru
+  btn_what_to_do: Gịnị ka m ga-eme?
+  btn_report: Ebe m ga-akọ ya
+  btn_warn_family: Dọọ ezinụlọ ná ntị
+  warn_family_intro: Zigaara ezinụlọ gị na ndị enyi gị nke a 👇
+  warn_family_footer: Site na KudiGuard. Lelee ozi ọ bụla na-enye gị nsogbu n'efu na WhatsApp.
+  greeting_reply: 👋 Ndewo! Zitere m ozi olu ma ọ bụ ozi ị na-enweghị obi ike na ya, ma ọ bụ jụọ m ajụjụ ọ bụla gbasara ego.
+  not_understood: Ndo, anụghị m ya nke ọma. Biko nwaa ọzọ ma ọ bụ dee ozi gị.
+  audio_too_long: ⏱️ Biko zite ozi olu na-erughị sekọnd {seconds}.
+  unsupported: Enwere m ike ịgụ ederede na ige ozi olu. Biko zite otu n'ime ha.
+  rate_limited: ⏳ I zitela ọtụtụ ozi. Biko chere ntakịrị wee nwaa ọzọ.
+  error_retry: 😔 Ndo, nsogbu dapụtara n'akụkụ m. Biko nwaa ọzọ n'oge na-adịghị anya.
+  stopped: Ị gaghị enwetakwa ozi site na KudiGuard. Zite ozi ọ bụla iji malite ọzọ.
+  deleted: 🗑️ Ehichapụla ozi gị.

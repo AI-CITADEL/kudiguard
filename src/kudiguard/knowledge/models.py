@@ -52,13 +52,25 @@ class Contact(_Strict):
     pinned: bool = False  # always shown first (e.g. "your own bank")
     verified: bool = False  # a human checked this against an official source
     note: Short | None = None
+    label_i18n: dict[LanguageCode, Short] = Field(default_factory=dict)  # label per language
+    value_i18n: dict[LanguageCode, Short] = Field(default_factory=dict)  # only for `note` (instructions)
 
     @model_validator(mode="after")
     def _value_matches_kind(self) -> Contact:
         pattern = _CONTACT_VALUE.get(self.kind)
         if pattern and not pattern.match(self.value):
             raise ValueError(f"{self.kind.value} contact has an invalid value: {self.value!r}")
+        if self.value_i18n and self.kind is not ContactKind.NOTE:
+            raise ValueError(
+                "value_i18n is only allowed for note contacts: numbers and links are never translated"
+            )
         return self
+
+    def label_for(self, language: LanguageCode) -> str:
+        return self.label_i18n.get(language, self.label)
+
+    def value_for(self, language: LanguageCode) -> str:
+        return self.value_i18n.get(language, self.value)
 
 
 class Entry(_Strict):
@@ -173,6 +185,7 @@ class SourcedEntry:
     source_name: str
     sample: bool = False
     relevance: float | None = None
+    kind: PackKind = PackKind.CORE
 
 
 @dataclass(frozen=True, slots=True)

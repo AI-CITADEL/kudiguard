@@ -1,37 +1,58 @@
-# Official reporting channels. `verified: true` only after a team member has checked the value against the
-# organisation's own website, with the date in `note`. Unverified contacts are shown with a "check first" note.
+# Official reporting channels. `verified: true` only after the value was checked against the organisation's own
+# website; the source and date are in `note`. Unverified contacts are never shown to users (render.py).
 - label: Your own bank
   kind: note
   value: Call the number printed on the back of your bank card or listed on the bank's official website
   pinned: true
   verified: true
   note: Always-correct instruction rather than a specific number
-
-- label: NCC consumer helpline (telecom and SIM fraud)
-  kind: phone
-  value: "622"
-  flags: [account_threat, impersonation, asks_credentials]
-  verified: false
+  # Translations: DRAFT, pending native-speaker review.
+  label_i18n:
+    ha: Bankinku
+    yo: Báǹkì yín
+    ig: Ụlọ akụ gị
+  value_i18n:
+    ha: Ku kira lambar da ke bayan katin bankinku ko wadda ke shafin yanar gizon bankin na hukuma
+    yo: Ẹ pe nọ́mbà tó wà lẹ́yìn káàdì báǹkì yín tàbí èyí tó wà lórí ojú-ìwé ayélujára báǹkì náà
+    ig: Kpọọ nọmba dị n'azụ kaadị ụlọ akụ gị ma ọ bụ nke dị na webụsaịtị ụlọ akụ ahụ
 
 - label: EFCC (report financial crimes)
   kind: web
   value: https://www.efcc.gov.ng
   flags: [asks_credentials, guaranteed_returns, upfront_fee, prize_lottery, wrong_transfer, money_request, impersonation, remote_access, fake_payment]
-  verified: false
+  verified: true
+  note: Verified 2026-10-07 on efcc.gov.ng
+
+- label: EFCC Eagle Eye app (anonymous reporting)
+  kind: app
+  value: Eagle Eye, on the Play Store or App Store
+  flags: [asks_credentials, guaranteed_returns, upfront_fee, prize_lottery, money_request, impersonation]
+  verified: true
+  note: Verified 2026-10-07 on efcc.gov.ng/records/eagle-eye-app
 
 - label: SEC Nigeria (check if an investment company is registered)
   kind: web
   value: https://sec.gov.ng
   flags: [guaranteed_returns]
-  verified: false
+  verified: true
+  note: Verified 2026-10-07 on sec.gov.ng ("Registered Capital Market Operators" search)
 
-- label: FCCPC (approved loan apps, complaints)
+- label: FCCPC complaints (loan apps, unfair treatment; after first contacting the business)
   kind: web
-  value: https://fccpc.gov.ng
+  value: https://complaints.fccpc.gov.ng
   flags: [upfront_fee]
-  verified: false
+  verified: true
+  note: Verified 2026-10-07 on fccpc.gov.ng ("File a Complaint")
+
+- label: NCC 622 (after first complaining to your network and getting a ticket number)
+  kind: phone
+  value: "622"
+  flags: [account_threat, impersonation, asks_credentials]
+  verified: true
+  note: Verified 2026-10-07 on ncc.gov.ng; second-level escalation line, toll-free
 
 - label: CBN Consumer Protection (if your bank does not resolve a complaint)
   kind: email
   value: cpd@cbn.gov.ng
-  verified: false
+  verified: true
+  note: Verified 2026-10-07 on cbn.gov.ng (Complaints Management)

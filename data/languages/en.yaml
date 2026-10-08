@@ -12,6 +12,29 @@ order: 4
 status: stable
 asr_model: NCAIR1/NigerianAccentedEnglish
 
+# Output guard: patterns (accent-folded, like the lexicon) checked on every generated reply.
+output_guard:
+  # Anchored to a subject so ordinary advice ("keep your PIN safe", "your money is safe only when...") passes.
+  safety_claims:
+    - '(?:it|this|that|the)\W+(?:(?:offer|message|link|app|company|investment|deal|person|caller|alert|account|business|opportunity)\W+)?(?:is|looks|seems|appears|sounds)\W+(?:to be\W+)?(?:completely\W+|totally\W+|very\W+|quite\W+)?(?:safe|genuine|legit\w*|trustworthy|real|authentic|verified)(?!\W+to say)'
+    - '(?:not|isn''t|is not|isnt)\W+(?:a\W+)?(?:scam|fraud\w*)'
+    - 'no (?:scam|fraud)\w*(?: here)?'
+    - 'no (?:risk|danger)(?!\W*free)'
+    - 'nothing to (?:worry|fear)'
+    - '(?:safe|okay|ok|fine|alright) to (?:pay|send|share|click|invest|proceed|transfer)'
+    - 'go ahead (?:and )?(?:pay|send|share|invest|transfer|click)'
+    - 'you can (?:trust (?:them|him|her|it|this)|go ahead)'
+    - 'e dey real'
+    - 'na correct'
+    - 'nothing suspicious'
+    - 'feel free to (?:pay|send|share|transfer|invest)'
+    - '(?:perfectly )?fine for you to (?:pay|send|share|transfer|invest)'
+    - '(?:don''t|do not|dont) (?:need|have) to worry'
+  refusals:
+    - 'i\W*(?:can''t|cannot|can not|am unable to|''m unable to|won''t be able to)\W+(?:help|assist|provide)'
+    - 'as an ai'
+    - 'i''m sorry,? but i'
+
 lexicon:
   flags:
     asks_credentials:
@@ -33,6 +56,7 @@ lexicon:
       - '\d+ ?% (?:daily|weekly|monthly|per day|per week|per month|every (?:day|week|month))'
       - '(?:daily|weekly) (?:profit|returns?|roi|income)'
       - '(?:invest|put|pay|send|deposit)\W+(?:\w+\W+){0,3}?(?:and|to) (?:get|earn|receive|make)\W+[^\w\s]?\d[\w.,]*\W+(?:\w+\W+){0,3}?(?:in|within|every|daily|weekly|monthly|back|guaranteed)'
+      - '(?:invest|put|pay|send|deposit)\W+(?:\w+\W+){0,5}?(?:i|you|u) (?:will|go|would|shall|can) (?:get|earn|receive|make|collect)\W+[^\w\s]?\d[\w.,]*\W+(?:\w+\W+){0,3}?(?:in|within|after|every|daily|weekly|monthly|back)'
     wrong_transfer:
       - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:your|ur) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
       - '(?:mistakenly|wrongly) (?:sent|transferred|credited|paid)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:you|your)'
@@ -46,7 +70,7 @@ lexicon:
       - 'pay\W+(?:\w+\W+){0,4}?(?:registration|form|medical|delivery|customs|clearance)'
       - 'for (?:the )?(?:customs|clearance)'
     prize_lottery:
-      - '(?:you|u) (?:have |just )?won'
+      - '(?:you|u|i) (?:have |just )?won'
       - 'winner'
       - 'prize'
       - 'lottery'
@@ -61,8 +85,8 @@ lexicon:
       - 'stuck (?:at|in) (?:the )?(?:airport|customs|border|hospital)'
       - '(?:send|lend) me\W+(?:some )?(?:money|[^\w\s]?\d)'
     suspicious_link:
-      - 'https?://\S+'
-      - 'www\.\S+'
+      - 'https?://(?![\w.-]*\.gov\.ng(?:[/\s]|$))\S+'
+      - 'www\.(?![\w.-]*\.gov\.ng(?:[/\s]|$))\S+'
       - 'bit\.ly'
       - 'tinyurl'
       - '\w+\.apk'
@@ -74,7 +98,7 @@ lexicon:
       - 'bank (?:staff|official|manager|agent|officer)'
       - '(?:gt ?bank|gtco|access|zenith|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic)\w* ?(?:support|care|help|team)'
       - 'on (?:twitter|x|telegram|facebook|instagram)'
-      - 'cbn'
+      - 'cbn(?!\.gov\.ng)'
       - 'central bank'
       - 'efcc'
       - 'police'
@@ -93,14 +117,21 @@ lexicon:
       - 'expires? (?:today|soon)'
     secrecy:
       - "(?:don'?t|do not) (?:tell|inform) (?:anyone|anybody|your (?:bank|family|wife|husband))"
-      - 'keep (?:it|this) (?:secret|confidential|between us)'
+      - '(?:told|asked|said|begged|warned|wants? (?:me|us|you))\W+(?:\w+\W+){0,3}?(?:to\W+)?keep (?:it|this|the \w+) (?:secret|confidential|between us)'
+      - '(?:please|pls|abeg) keep (?:it|this) (?:secret|confidential|between us)'
+      - 'keep (?:it|this) between us'
+      - '(?:^|[.!?,;]\s?)keep (?:it|this) (?:secret|confidential)'
   check_intent:
+    - '(?:someone|somebody|a man|a woman|a lady|a caller|a guy) (?:called|call|texted|sent|messaged|asked|said|told|dm|dmed)'
+    - '(?:called|asked|told|texted|messaged|dmed|begged|warned) (?:me|us)'
+    - '(?:they|he|she|dem|e) (?:called|call|texted|sent|send|messaged|asked|ask|told|tell)\W+(?:me|us)\b'
     - 'scam\w*'
     - 'fraud\w*'
     - 'fake'
     - 'legit\w*'
     - 'genuine'
     - 'is (?:this|it|that) (?:real|true|safe|correct)'
+    - 'is (?:this|that|the) (?:number|link|account|site|website|app|page|company|person|message|offer) (?:real|legit\w*|genuine|safe|correct|fake|a scam|true)'
     - 'na (?:real|true|lie|scam|wayo)'
     - 'can i trust'
     - 'should i (?:trust|pay|send|believe|click)'
@@ -109,3 +140,44 @@ lexicon:
     - 'wayo'
     - 'ojoro'
     - 'suspicious'
+
+# Fixed user-facing text (WhatsApp formatting: *bold*, _italic_). Buttons (btn_*) max 20 characters.
+strings:
+  welcome: |-
+    👋 Welcome to *KudiGuard*. I help you spot money scams and answer money questions.
+
+    Send me a *voice note* or a message, or forward a message you are unsure about.
+
+    🔒 We keep your messages for up to 90 days to improve the service. Your phone number is stored only in coded form, and voice notes are deleted after they are transcribed. Send *DELETE* at any time to erase your messages, or *STOP* to stop. By continuing, you agree to this.
+    ℹ️ This is guidance, not financial advice.
+    _Powered by N-ATLAS · Awarri_
+  choose_language: "Which language should I use?"
+  btn_language_menu: "Choose language"
+  language_set: "✅ I will reply in {language}."
+  beta_language: "ℹ️ {language} support is new, so some answers may contain mistakes."
+  listening: "🎧 Listening…"
+  checking: "🔎 Checking…"
+  i_heard: "🗣️ I heard: “{transcript}”"
+  verdict_likely_scam: "🔴 *This looks like a SCAM*"
+  verdict_caution: "🟠 *Be careful: there are warning signs*"
+  verdict_no_flags: "🟢 *No red flags found.* Still confirm with your bank before you act."
+  what_to_do: "*What to do:*"
+  where_to_report: "*Where to report:*"
+  disclaimer: "_Guidance only, not financial advice._"
+  feedback_prompt: "Was this helpful?"
+  feedback_thanks: "🙏 Thank you! Your feedback helps us protect more people."
+  btn_helpful: "👍 Helpful"
+  btn_not_helpful: "👎 Not helpful"
+  btn_what_to_do: "What should I do?"
+  btn_report: "Where to report"
+  btn_warn_family: "Warn my family"
+  warn_family_intro: "Forward this to your family and friends 👇"
+  warn_family_footer: "Shared from KudiGuard. Check suspicious messages for free on WhatsApp."
+  greeting_reply: "👋 Hello! Send me a voice note or a message you are unsure about, or ask me any money question."
+  not_understood: "Sorry, I could not hear that clearly. Please try again or type your message."
+  audio_too_long: "⏱️ Please send a voice note shorter than {seconds} seconds."
+  unsupported: "I can read text and listen to voice notes. Please send one of those."
+  rate_limited: "⏳ You have sent many messages. Please wait a little and try again."
+  error_retry: "😔 Sorry, something went wrong on my side. Please try again in a moment."
+  stopped: "You will not get messages from KudiGuard anymore. Send any message to start again."
+  deleted: "🗑️ Your messages have been deleted."

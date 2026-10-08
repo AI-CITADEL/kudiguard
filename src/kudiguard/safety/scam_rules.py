@@ -39,7 +39,7 @@ _FLAG_ORDER = {flag: i for i, flag in enumerate(Flag)}
 Patterns = tuple[re.Pattern[str], ...]
 
 
-def _compile(term: str) -> re.Pattern[str]:
+def compile_term(term: str) -> re.Pattern[str]:
     # Compare against .lower() so regex escapes such as \S and \W are not mistaken for capitals.
     if fold(term) != term.lower():
         raise ValueError(f"term {term!r} must be written without accents (write {fold(term)!r})")
@@ -67,8 +67,8 @@ class Lexicon:
                 raise ValueError(
                     f"unknown flag {name!r}; expected one of {[f.value for f in Flag]}"
                 ) from None
-            compiled[flag] = tuple(_compile(t) for t in terms)
-        return cls(MappingProxyType(compiled), tuple(_compile(t) for t in check_intent))
+            compiled[flag] = tuple(compile_term(t) for t in terms)
+        return cls(MappingProxyType(compiled), tuple(compile_term(t) for t in check_intent))
 
     def merge(self, other: Lexicon) -> Lexicon:
         flags = {f: self.flags.get(f, ()) + other.flags.get(f, ()) for f in {*self.flags, *other.flags}}
@@ -96,7 +96,7 @@ def assess(
 
     flags = tuple(sorted(found, key=lambda f: (-WEIGHTS[f], _FLAG_ORDER[f])))
     score = sum(WEIGHTS[f] for f in flags)
-    checking = is_check or any(p.search(text) for p in lexicon.check_intent for text in corpus)
+    checking = is_check or _check_phrase(corpus, lexicon)
 
     if score >= SCAM_THRESHOL***REMOVED***
         verdict = Verdict.LIKELY_SCAM
@@ -107,3 +107,12 @@ def assess(
     else:
         verdict = Verdict.NOT_A_CHECK
     return ScamAssessment(verdict=verdict, flags=flags, score=score)
+
+
+def _check_phrase(corpus: Sequence[str], lexicon: Lexicon) -> bool:
+    return any(p.search(text) for p in lexicon.check_intent for text in corpus)
+
+
+def has_check_intent(texts: Sequence[str | None], lexicon: Lexicon) -> bool:
+    """The text itself asks for a check or reports an encounter ("is this real?", "someone called me...")."""
+    return _check_phrase([normalize(t) for t in texts if t and t.strip()], lexicon)

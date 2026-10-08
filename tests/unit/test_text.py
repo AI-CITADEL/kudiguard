@@ -27,3 +27,15 @@ def test_redact(raw: str, expected: str) -> None:
 
 def test_tokens_drop_stopwords_and_normalise() -> None:
     assert tokens("How do I check my O.T.P?", frozenset({"how", "do", "i", "my"})) == ["check", "otp"]
+
+
+@pytest.mark.parametrize(
+    "amount",
+    ["Pay 500000 naira now", "N 500000", "₦ 500000", "they want 1000000 Naira", "send 500000k"],
+)
+def test_redact_keeps_amounts_written_without_commas(amount: str) -> None:
+    assert redact(amount) == amount
+
+
+def test_redact_keeps_ussd_amounts() -> None:
+    assert redact("Dial *737*1*500000# to send") == "Dial *737*1*500000# to send"

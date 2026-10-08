@@ -172,3 +172,34 @@ Cut: Twilio, vLLM, BM25, Docker for GPU path, strict mypy, TTS (pre-recorded pro
 | **Partner knowledge plug-in** (files or partner API) | Lock-in: the partner's FAQ, fraud desk and custom lexicon live in our platform | Enterprise plan packaging, partner admin UI for packs, per-partner lexicon overrides, onboarding via LangExtract import |
 | **Anonymised scam-trends dashboard** | Long-term moat: per-partner trends; cross-institution intelligence feed | Consent + aggregation pipeline (NDPA), partner dashboard, paid intelligence feed/API |
 | **MCP server** | Cheap extra distribution channel for AI agents and developer tools | Thin wrapper over `/v1/check` and `/v1/ask` (~1 day) |
+| **Call-centre / IVR voice agent** | Banks' biggest support cost: answer and triage local-language calls, hand off to humans | New channel adapter on the same pipeline; needs streaming ASR, TTS (native-speaker voices), < 1.5 s turn latency, barge-in, telephony (SIP / Africa's Talking), human handoff with transcript + verdict, CRM/ticket integration |
+
+### Call-centre / IVR voice agent (backlog detail)
+
+**Why it fits**
+* The core is channel-agnostic: a phone call is one more adapter next to WhatsApp and the REST API, reusing speech
+  recognition, scam rules, knowledge packs and N-ATLAS prompts.
+* Partner knowledge packs map onto call-centre scripts: a bank's FAQ, fraud desk and block codes are what agents read today.
+* Commercial value: call-centre staffing is one of banks' biggest support costs and local-language callers are the worst
+  served. Even handling only the first minute (understand the caller in Hausa, classify the issue, catch fraud, hand a
+  transcript and verdict to a human) is a strong sale.
+
+**What a live phone channel needs beyond V1**
+1. Real-time speech: streaming ASR plus spoken replies (N-ATLAS has no TTS: native-speaker recorded voices or a separate
+   voice model).
+2. Conversational latency under ~1.5 s per turn (vs ~4 s per WhatsApp reply): streaming generation, shorter answers,
+   likely a dedicated GPU per few concurrent calls.
+3. Interruption handling: barge-in, silence and crosstalk.
+4. Telephony: SIP or Africa's Talking voice, call-recording consent, 8 kHz call audio (ASR fine-tuning on phone speech).
+5. Human handoff: transfer with transcript, detected language and verdict; CRM and ticketing integration.
+
+The M7 pipeline keeps this open: channels are adapters; the core never assumes WhatsApp.
+
+### Carried into M7 (pipeline) from the M3 review
+* Greetings get fixed text (`greeting_reply`), no model call.
+* Retry/fallback helper: on output-guard hit (safety claim, refusal, empty) or untranslated analysis, retry once, then
+  fall back to fixed text built from verdict + verified contacts.
+* A message is a check if intent is `scam_check` **or** the rules found any flag.
+* "What should I do?" / "Where to report" buttons: actions are English in the KB, so compose a short translated
+  follow-up (or pre-translated actions) rather than sending English.
+* Redact `analysis.english` before logging; pass `native_name` to `language_set`.
