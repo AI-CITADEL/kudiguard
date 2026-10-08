@@ -21,10 +21,11 @@ from typing import Any
 from kudiguard.domain import Flag, LanguageCode, Verdict
 from kudiguard.knowledge.models import KnowledgeResult, PackKind
 from kudiguard.languages import PIVOT
+from kudiguard.llm.base import DEFAULT_REPEAT_PENALTY, DEFAULT_TEMPERATURE, ChatRequest, Purpose
 from kudiguard.text import fold, redact
 
-TEMPERATURE = 0.1  # N-ATLAS model card
-REPEAT_PENALTY = 1.12  # N-ATLAS model card (llama.cpp name)
+TEMPERATURE = DEFAULT_TEMPERATURE
+REPEAT_PENALTY = DEFAULT_REPEAT_PENALTY
 MAX_INPUT_CHARS = 2000  # ~90 s of speech; longer text is cut before prompting
 ANALYSE_MAX_TOKENS = 400
 TRANSLATE_MAX_TOKENS = 300
@@ -192,33 +193,6 @@ _WORD = re.compile(r"\w+")
 
 
 @dataclass(frozen=True, slots=True)
-class ChatRequest:
-    messages: tuple[Mapping[str, str], ...]
-    max_tokens: int
-    temperature: float = TEMPERATURE
-    repeat_penalty: float = REPEAT_PENALTY
-    json_schema: Mapping[str, Any] | None = None
-    stop: tuple[str, ...] = ()
-
-    def payload(self) -> dict[str, Any]:
-        """OpenAI-compatible chat-completions body (llama.cpp accepts ``repeat_penalty``)."""
-        body: dict[str, Any] = {
-            "messages": [dict(m) for m in self.messages],
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "repeat_penalty": self.repeat_penalty,
-        }
-        if self.stop:
-            body["stop"] = list(self.stop)
-        if self.json_schema is not None:
-            body["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {"name": "analysis", "schema": dict(self.json_schema)},
-            }
-        return body
-
-
-@dataclass(frozen=True, slots=True)
 class Analysis:
     english: str
     intent: Intent
@@ -235,11 +209,14 @@ def _data(text: str) -> str:
     return text.strip()[:MAX_INPUT_CHARS]
 
 
-def _chat(system: str, user: str, max_tokens: int, schema: Mapping[str, Any] | None = None) -> ChatRequest:
+def _chat(
+    purpose: Purpose, system: str, user: str, max_tokens: int, schema: Mapping[str, Any] | None = None
+) -> ChatRequest:
     return ChatRequest(
         messages=({"role": "system", "content": system}, {"role": "user", "content": user}),
         max_tokens=max_tokens,
         json_schema=schema,
+        purpose=purpose,
     )
 
 
@@ -257,7 +234,8 @@ def _words(text: str) -> set[str]:
 def analyse_request(text: str, language_name: str) -> ChatRequest:
     flags = "\n".join(f"  {f.value}: {FLAG_TEXT[f]}" for f in Flag)
     system = _ANALYSE_SYSTEM.format(language=language_name, flags=flags)
-    return _chat(system, f"<message>\n{_data(text)}\n</message>", ANALYSE_MAX_TOKENS, ANALYSIS_SCHEMA)
+    user = f"<message>\n{_data(text)}\n</message>"
+    return _chat(Purpose.ANALYSE, system, user, ANALYSE_MAX_TOKENS, ANALYSIS_SCHEMA)
 
 
 def _untranslated(english: str, original: str | None, source_language: LanguageCode | None) -> bool:
@@ -310,7 +288,7 @@ def parse_analysis(
 def translate_request(text: str, language_name: str) -> ChatRequest:
     """Plain translation, used when the analyse step did not produce a usable English translation."""
     system = _TRANSLATE_SYSTEM.format(language=language_name)
-    return _chat(system, f"<message>\n{_data(text)}\n</message>", TRANSLATE_MAX_TOKENS)
+    return _chat(Purpose.TRANSLATE, system, f"<message>\n{_data(text)}\n</message>", TRANSLATE_MAX_TOKENS)
 
 
 def clean_translation(text: str) -> str:
@@ -398,13 +376,14 @@ def compose_request(
             },
         ),
         max_tokens=COMPOSE_MAX_TOKENS,
+        purpose=Purpose.COMPOSE,
         stop=COMPOSE_STOP,
     )
 
 
 def warn_family_request(*, language_name: str, english: str, flags: Sequence[Flag]) -> ChatRequest:
     user = f"<message>\n{_data(english)}\n</message>\nWarning signs: {_flag_list(flags)}"
-    return _chat(_WARN_SYSTEM.format(language=language_name), user, WARN_MAX_TOKENS)
+    return _chat(Purpose.WARN, _WARN_SYSTEM.format(language=language_name), user, WARN_MAX_TOKENS)
 
 
 # --- output hygiene -----------------------------------------------------------------------------------

@@ -203,3 +203,10 @@ The M7 pipeline keeps this open: channels are adapters; the core never assumes W
 * "What should I do?" / "Where to report" buttons: actions are English in the KB, so compose a short translated
   follow-up (or pre-translated actions) rather than sending English.
 * Redact `analysis.english` before logging; pass `native_name` to `language_set`.
+
+### Trusted-site search (backlog)
+Open-web search is out of scope for V1 (scam/SEO pages could be repeated as facts; prompt injection from page text;
++1–3 s latency; paid API; queries leave the system). Planned instead: a `KnowledgeSource` that searches **only an
+allowlist of official domains** (cbn.gov.ng, efcc.gov.ng, ncc.gov.ng, fccpc.gov.ng, sec.gov.ng, nimc.gov.ng, NIBSS,
+partner banks' sites), runs **only when the packs return no good hit**, redacts the query, treats page text as
+untrusted data (same output guard), and cites the source link. Results restated by N-ATLAS in the user's language.

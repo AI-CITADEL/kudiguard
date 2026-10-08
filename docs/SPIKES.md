@@ -87,3 +87,22 @@ analysis contributes no flags; model-only flags on `other` capped at caution; ba
 vouched for; final scoring keeps the texts so "is this a scam?" counts); content-free messages and greetings get
 fixed text; guard tuned (subject-anchored English claims, everyday "no problem" phrases removed, paraphrases added);
 secrecy rule needs someone asking for secrecy; native step labels; USSD amounts not redacted.
+
+## S3 — LLM latency profile and cache slots (7 Oct 2026, `scripts/bench_llm.py`, 108 calls)
+
+| Call | p50 | p95 | prompt processing p50 |
+|---|---|---|---|
+| analyse | 1,070 ms | 1,870 ms | 32 ms |
+| compose | 1,633 ms | 4,460 ms | 35 ms |
+
+Prompt processing is ~2% of each call on the RTX 4070; generation dominates. Pinning analyse/compose to separate
+llama.cpp slots (`-np 2`, `id_slot`) could save at most ~35 ms/call while costing KV-cache VRAM on an already full
+8 GB card → **not adopted**; server stays `-np 1`. The client keeps optional slot routing for bigger GPUs.
+Latency levers that matter: fewer generated tokens (step cap, `stop`), short analyse output, ASR on CPU in parallel.
+
+**S3 correction (M4 review, measured live):** prompt processing is cheap *because* llama.cpp's host-RAM prompt cache
+reuses the shared prefix even when analyse and compose alternate on one slot (analyse after a compose: 34 tokens
+processed, ~31 ms). With caching off, analyse processes all 442 prompt tokens: ~176 ms (+~150 ms/call). Slot pinning
+would therefore save ~0 ms today. `scripts/run_llm.ps1` now sets `--cache-ram 2048` explicitly so a llama.cpp
+upgrade or default change cannot silently add that latency. Client overhead vs raw httpx: not measurable
+(32.9 vs 33.9 ms p50). llama.cpp aborts generation when the client disconnects, so client-side deadlines are safe.
