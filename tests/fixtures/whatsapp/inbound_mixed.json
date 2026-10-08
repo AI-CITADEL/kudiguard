@@ -1,0 +1,77 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WABA_ID",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {"display_phone_number": "2348000000000", "phone_number_id": "PNID123"},
+            "contacts": [{"profile": {"name": "Test User"}, "wa_id": "2348000000001"}],
+            "messages": [
+              {
+                "from": "2348000000001",
+                "id": "wamid.TEXT1",
+                "timestamp": "1760000010",
+                "type": "text",
+                "text": {"body": "Someone called and asked for my OTP"},
+                "context": {"forwarded": true}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.AUDIO1",
+                "timestamp": "1760000005",
+                "type": "audio",
+                "audio": {"mime_type": "audio/ogg; codecs=opus", "sha256": "abc", "id": "MEDIA123", "voice": true}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.BUTTON1",
+                "timestamp": "1760000020",
+                "type": "interactive",
+                "interactive": {"type": "button_reply", "button_reply": {"id": "steps:12", "title": "What should I do?"}}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.LIST1",
+                "timestamp": "1760000030",
+                "type": "interactive",
+                "interactive": {"type": "list_reply", "list_reply": {"id": "lang:ha", "title": "Hausa", "description": ""}}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.TEMPLATE1",
+                "timestamp": "1760000031",
+                "type": "button",
+                "button": {"payload": "helpful:12", "text": "Helpful"}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.IMAGE1",
+                "timestamp": "1760000040",
+                "type": "image",
+                "image": {"mime_type": "image/jpeg", "id": "MEDIA999", "caption": "is this alert real?"}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.REACTION1",
+                "timestamp": "1760000050",
+                "type": "reaction",
+                "reaction": {"message_id": "wamid.OUT1", "emoji": "👍"}
+              },
+              {
+                "from": "2348000000001",
+                "id": "wamid.UNSUPPORTED1",
+                "timestamp": "1760000060",
+                "type": "unsupported",
+                "errors": [{"code": 131051, "title": "Message type unknown"}]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

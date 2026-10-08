@@ -81,7 +81,7 @@ def split_answer(answer: str) -> tuple[str, ...]:
             current = sentence
         else:
             current = f"{current} {sentence}".strip()
-    if current:
+    if current:  # pragma: no branch - always true here: the caller only splits answers over the length cap
         facts.append(current)
     if len(facts) > MAX_FACTS:
         log.warning("FAQ answer truncated to %d facts (%d chars)", MAX_FACTS, len(answer))

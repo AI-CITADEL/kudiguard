@@ -94,6 +94,7 @@ class FakeMessenger:
     fail_acknowledge: bool = False
     fail_on: set[str] = field(default_factory=set)  # sends of these texts raise
     hang: bool = False  # every send blocks forever (a stuck channel)
+    media: dict[str, bytes] = field(default_factory=dict)  # media_id -> bytes served by fetch_media
 
     async def acknowledge(self, message: InboundMessage) -> None:
         if self.fail_acknowledge:
@@ -113,6 +114,11 @@ class FakeMessenger:
     @property
     def texts(self) -> list[str]:
         return [m.text for _, m in self.sent]
+
+    async def fetch_media(self, message: InboundMessage) -> bytes:
+        if message.media_id not in self.media:
+            raise RuntimeError(f"unknown media {message.media_id}")
+        return self.media[message.media_id]
 
     def clear(self) -> None:
         self.sent.clear()

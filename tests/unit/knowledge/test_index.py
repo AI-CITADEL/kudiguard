@@ -214,3 +214,8 @@ def test_scam_entries_down_weighted_in_free_text_search() -> None:
 def test_fuse_weights_scale_scores() -> None:
     assert fuse([(0, 5.0), (1, 4.5)]) == [0, 1]
     assert fuse([(0, 5.0), (1, 4.5)], weights={0: 0.5}) == [1, 0]
+
+
+def test_len_counts_entries_not_contacts() -> None:
+    assert len(EntryIndex(ENTRIES, CONTACTS)) == len(ENTRIES)
+    assert len(EntryIndex([], CONTACTS)) == 0

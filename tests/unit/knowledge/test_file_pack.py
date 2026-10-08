@@ -195,3 +195,19 @@ def test_contact_values_validated_by_kind(kind: str, value: str, ok: bool) -> No
     else:
         with pytest.raises(ValueError, match="invalid value"):
             Contact.model_validate(data)
+
+
+def test_split_answer_caps_fact_count_and_logs(caplog: pytest.LogCaptureFixture) -> None:
+    answer = " ".join(f"{i:04d}" + "z" * 990 + "." for i in range(MAX_FACTS + 3))
+    with caplog.at_level("WARNING", logger="kudiguard.knowledge.file_pack"):
+        facts = split_answer(answer)
+    assert len(facts) == MAX_FACTS
+    assert [f[:4] for f in facts] == [f"{i:04d}" for i in range(MAX_FACTS)]  # the head is kept, the tail cut
+    assert "truncated" in caplog.text
+
+
+def test_undecodable_pack_file_is_a_config_error(tmp_path: Path) -> None:
+    pack = make_pack(tmp_path)
+    (pack / "pack.yaml").write_bytes(b"id: acme\nname: \xff\xfe Acme\n")
+    with pytest.raises(KnowledgeConfigError, match=r"pack\.yaml.*codec can't decode"):
+        load_manifest(pack)

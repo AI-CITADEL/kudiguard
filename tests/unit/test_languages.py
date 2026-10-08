@@ -153,3 +153,15 @@ def test_asr_configuration_is_per_language(registry: LanguageRegistry) -> None:
     tokens = registry.asr_whisper_languages()
     assert tokens["NCAIR1/Hausa-ASR"] == "ha"
     assert tokens["NCAIR1/Igbo-ASR"] is None  # Whisper has no Igbo token
+
+
+@pytest.mark.parametrize("template", ["Send {} now", "Send {0} now", "Hi {user.name}", "Hi {names[0]}"])
+def test_positional_or_attribute_placeholders_rejected(tmp_path: Path, template: str) -> None:
+    _write(tmp_path, "en.yaml", MINIMAL_EN + f"strings: {{greet: '{template}'}}\n")
+    with pytest.raises(LanguageConfigError, match=r"en\.yaml: 'greet' placeholders must be names"):
+        LanguageRegistry.load(tmp_path)
+
+
+def test_named_placeholders_accepted(tmp_path: Path) -> None:
+    _write(tmp_path, "en.yaml", MINIMAL_EN + "strings: {greet: 'Hi {name}, {{literal}} braces ok'}\n")
+    assert LanguageRegistry.load(tmp_path).get("en").strings["greet"].startswith("Hi {name}")

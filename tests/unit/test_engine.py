@@ -180,3 +180,36 @@ async def test_transcribe_requires_speech_configuration(
 ) -> None:
     with pytest.raises(RuntimeError, match="speech is not configured"):
         await engine_with(registry, knowledge, FakeLLM()).transcribe(b"x", "en")
+
+
+async def test_next_steps_without_any_guidance_is_fixed_text_and_no_model(registry: LanguageRegistry) -> None:
+    from kudiguard.knowledge.models import PackKind, PackManifest, Query, SourceResult
+
+    class EmptyCore:
+        manifest = PackManifest(id="core", name="Core", owner="x", kind=PackKind.CORE)
+
+        async def search(self, query: Query) -> SourceResult:
+            return SourceResult()
+
+        async def refresh(self) -> None:
+            return None
+
+    llm = FakeLLM(steps="should never be used")
+    engine = engine_with(registry, KnowledgeBase([EmptyCore()]), llm)
+    for lang in ("en", "ha"):
+        steps = await engine.next_steps(OTP_SCAM, (Flag.ASKS_CREDENTIALS,), lang)
+        assert steps.outcome is Outcome.FALLBACK
+        assert steps.text == Messages(registry).text(lang, Msg.FALLBACK_STEPS)
+        assert steps.llm_ms == 0
+    assert llm.requests == []
+
+
+async def test_guarded_warning_falls_back_but_reports_model_time(
+    registry: LanguageRegistry, knowledge: KnowledgeBase
+) -> None:
+    llm = FakeLLM(warn="It is safe to send the code.")  # blocked by the output guard twice
+    warned = await engine_with(registry, knowledge, llm).warning(HA_OTP_EN, (Flag.ASKS_CREDENTIALS,), "ha")
+    assert warned.outcome is Outcome.FALLBACK
+    assert warned.text == Messages(registry).text("ha", Msg.WARN_FAMILY_FALLBACK)
+    assert warned.llm_ms == 200  # both attempts' latency is still accounted for
+    assert len(llm.calls(Purpose.WARN)) == 2

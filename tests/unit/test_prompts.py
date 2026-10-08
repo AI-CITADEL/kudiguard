@@ -326,3 +326,23 @@ def test_native_step_labels_are_capped(raw: str) -> None:
 
 def test_fullwidth_links_are_masked() -> None:
     assert clean_reply("Go to ｂｉｔ.ｌｙ/abc now.") == "Go to [link removed] now."  # noqa: RUF001
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"english": "Send the OTP",}',  # trailing comma
+        "{'english': 'Send the OTP'}",  # Python-style quotes
+        'Sure! {"english": "a"} and also {"intent": "x"}',  # greedy match spans two objects
+    ],
+)
+def test_braced_but_invalid_json_is_rejected(raw: str) -> None:
+    assert parse_analysis(raw) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["This is a scam.\n1. Do not pay.", "Do not share it!", "Is this real?", "Wait...", "Done.   \n\n"],
+)
+def test_truncated_reply_that_ends_a_sentence_is_kept_whole(text: str) -> None:
+    assert clean_reply(text, truncated=True) == clean_reply(text) == text.rstrip()

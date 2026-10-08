@@ -239,3 +239,112 @@ def test_failed_conversion_leaves_no_partial_model(
 async def test_first_call_latency_excludes_model_load() -> None:
     transcript = await NatlasASR(MODELS, loader=FakeLoader(delay=0.3)).transcribe(speech(2), "ha")
     assert transcript.latency_ms < 300
+
+
+# --- coverage gaps: optional-runtime boundaries (faked), punctuation-only loops ---------------------------
+
+
+def test_conversion_retries_without_missing_tokenizer_files(
+    tmp_path: Path, fake_ct2: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import sys
+
+    from kudiguard.speech.natlas_asr import TOKENIZER_FILES, ct2_loader
+
+    attempts: list[list[str] | None] = []
+
+    class PickyConverter:
+        def __init__(self, repo: str, copy_files: list[str] | None = None) -> None:
+            self.copy_files = copy_files
+
+        def convert(self, output: str, quantization: str) -> None:
+            attempts.append(self.copy_files)
+            out = Path(output)
+            out.mkdir(parents=True)
+            (out / "model.bin").write_bytes(b"ct2")
+            if self.copy_files:
+                (out / "partial.json").write_bytes(b"{}")
+                raise OSError("tokenizer.json not found in repo")
+
+    monkeypatch.setattr(sys.modules["ctranslate2.converters"], "TransformersConverter", PickyConverter)
+    transcribe = ct2_loader(cache_dir=tmp_path)("NCAIR1/Yoruba-ASR")
+    assert transcribe(np.zeros(16_000, np.float32)) == "Hello world."
+    assert attempts == [list(TOKENIZER_FILES), None]
+    target = tmp_path / "ct2" / "NCAIR1--Yoruba-ASR-int8"
+    assert sorted(p.name for p in target.iterdir()) == [
+        "model.bin"
+    ]  # the failed attempt's files were cleared
+    assert "without optional tokenizer files" in caplog.text
+
+
+def test_conversion_errors_unrelated_to_tokenizer_are_not_retried(
+    tmp_path: Path, fake_ct2: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kudiguard.speech.natlas_asr import ct2_loader
+
+    def bad(self: FakeConverter, output: str, quantization: str) -> None:
+        FakeConverter.conversions.append(self.repo)
+        raise ValueError("unsupported architecture")
+
+    monkeypatch.setattr(FakeConverter, "convert", bad)
+    with pytest.raises(ValueError, match="architecture"):
+        ct2_loader(cache_dir=tmp_path)("NCAIR1/Hausa-ASR")
+    assert FakeConverter.conversions == ["NCAIR1/Hausa-ASR"]
+
+
+@pytest.fixture
+def fake_transformers(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    import sys
+    import types
+
+    seen: dict[str, object] = {"calls": []}
+
+    def pipeline(task: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        seen["task"], seen["kwargs"] = task, kwargs
+
+        def run(inputs: dict[str, object], generate_kwargs: dict[str, object]) -> dict[str, object]:
+            seen["calls"].append((inputs, generate_kwargs))  # type: ignore[union-attr]
+            return {"text": " Send the code "}
+
+        return run
+
+    torch = types.SimpleNamespace(set_num_threads=lambda n: seen.__setitem__("threads", n))
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "transformers", types.SimpleNamespace(pipeline=pipeline))
+    return seen
+
+
+def test_transformers_loader_forces_language_and_cpu(tmp_path: Path, fake_transformers: dict) -> None:
+    from kudiguard.speech.natlas_asr import transformers_loader
+
+    loader = transformers_loader(
+        cache_dir=tmp_path, token="hf_x", whisper_languages={"NCAIR1/Hausa-ASR": "ha"}, threads=3
+    )
+    transcribe = loader("NCAIR1/Hausa-ASR")
+    samples = np.zeros(16_000, np.float32)
+    assert transcribe(samples) == " Send the code "  # raw text; cleaning happens in NatlasASR
+    assert fake_transformers["threads"] == 3
+    assert fake_transformers["task"] == "automatic-speech-recognition"
+    assert fake_transformers["kwargs"] == {
+        "model": "NCAIR1/Hausa-ASR",
+        "device": "cpu",
+        "token": "hf_x",
+        "model_kwargs": {"cache_dir": str(tmp_path)},
+    }
+    ((inputs, generate),) = fake_transformers["calls"]
+    assert inputs["sampling_rate"] == SAMPLE_RATE and inputs["raw"] is samples
+    assert generate == {"task": "transcribe", "temperature": 0.0, "language": "ha"}
+
+
+def test_transformers_loader_without_language_or_cache(fake_transformers: dict) -> None:
+    from kudiguard.speech.natlas_asr import transformers_loader
+
+    transformers_loader()("NCAIR1/Igbo-ASR")(np.zeros(10, np.float32))
+    assert fake_transformers["kwargs"]["model_kwargs"] is None  # type: ignore[index]
+    ((_, generate),) = fake_transformers["calls"]
+    assert "language" not in generate  # the model's own generation config decides
+
+
+@pytest.mark.parametrize("raw", ["- - - - - - -", "… … … … … ok", "?? ?? ?? ?? ?? ??"])
+def test_punctuation_only_runs_are_not_treated_as_loops(raw: str) -> None:
+    assert collapse_repeats(raw) == raw

@@ -54,13 +54,16 @@ class Harness:
         )  # fmt: skip
 
     def msg(self, text: str | None = None, *, user: str = PHONE, kind: MessageKind | None = None,
-            button: str | None = None, audio: bytes | None = None, message_id: str | None = None) -> InboundMessage:  # fmt: skip
+            button: str | None = None, audio: bytes | None = None, message_id: str | None = None,
+            media_id: str | None = None) -> InboundMessage:  # fmt: skip
         self.counter += 1
         if kind is None:
-            kind = MessageKind.BUTTON if button else MessageKind.AUDIO if audio else MessageKind.TEXT
+            kind = (
+                MessageKind.BUTTON if button else MessageKind.AUDIO if audio or media_id else MessageKind.TEXT
+            )
         return InboundMessage(
             channel="whatsapp", message_id=message_id or f"wamid.{self.counter}", user_id=user, kind=kind,
-            text=text, audio=audio, button_id=button,
+            text=text, audio=audio, button_id=button, media_id=media_id,
         )  # fmt: skip
 
     async def say(self, text: str | None = None, **kwargs: object) -> list[str]:
@@ -650,7 +653,8 @@ async def test_button_between_texts_keeps_its_place(h: Harness) -> None:
     assert 0 < report_at < len(h.messenger.texts) - 1  # after the first answer, before the last
 
 
-async def test_merged_messages_are_acknowledged_and_merged_voice_gets_listening(h: Harness) -> None:
+async def test_queued_voice_note_absorbs_the_following_text_and_all_are_acknowledged(h: Harness) -> None:
+    """The voice note heads its own turn (queued behind the first) and absorbs the text queued after it."""
     await h.onboard("en")
     h.messenger.clear()
     note = VOICE_NOTE.read_bytes()
@@ -734,9 +738,125 @@ async def test_drain_cancels_stuck_turns_cleanly(h: Harness) -> None:
     assert h.conversation._pending == {}
 
 
-async def test_fault_in_a_merged_voice_note_is_logged_by_its_real_name(h: Harness) -> None:
+async def test_fault_in_a_queued_voice_note_is_logged_by_its_real_name(h: Harness) -> None:
     await h.onboard("en")
     h.asr.error = ASRError("model crashed")
     await _queue_behind_a_slow_turn(h, h.msg("someone called me"), [h.msg(audio=VOICE_NOTE.read_bytes())])
     row = (await interactions(h))[-1]
     assert row["outcome"] == Outcome.ERROR.value and str(row["error"]).startswith("ASRError")
+
+
+# --- coverage gaps: failure-of-failure paths, edge inputs ---------------------------------------------------
+
+
+async def test_reply_failure_while_store_is_down_is_swallowed(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def broken(channel: str, message_id: str) -> bool:
+        raise RuntimeError("database locked")
+
+    monkeypatch.setattr(h.store, "claim_message", broken)
+    h.messenger.fail_sends = 1
+    assert await h.say(OTP_SCAM) == []  # handle() never raises, even when both store and channel fail
+    assert "could not send" in caplog.text
+
+
+async def test_unmarkable_undelivered_answer_does_not_crash_or_double_reply(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    await h.onboard("en")
+    h.llm.script[Purpose.ANALYSE] = [analysis("x", "question")]
+    h.messenger.fail_sends = 1  # the answer cannot be delivered...
+
+    async def broken(*args: object) -> None:
+        raise RuntimeError("database locked")
+
+    monkeypatch.setattr(h.store, "set_outcome", broken)  # ...nor marked as undelivered
+    assert await h.say("How do I open a savings account?") == [h.t(Msg.ERROR_RETRY)]
+    assert "could not mark the answer undelivered" in caplog.text
+    rows = await interactions(h)
+    assert len(rows) == 1 and rows[0]["outcome"] != Outcome.ERROR.value  # the row keeps its original outcome
+
+
+async def test_failure_to_log_the_failure_still_tells_the_user(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    await h.onboard("en")
+
+    async def broken(*args: object) -> int:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(h.store, "add_interaction", broken)
+    assert await h.say("hello") == [h.t(Msg.ERROR_RETRY)]  # the fixed reply is logged first, so never sent
+    assert "could not log the failure" in caplog.text
+
+
+async def test_stop_from_an_unknown_user_creates_no_record(h: Harness) -> None:
+    assert await h.say("STOP") == [h.t(Msg.STOPPED)]
+    assert await h.store.get_user(h.user_hash) is None  # nothing stored about someone we never onboarded
+
+
+async def test_text_turn_with_merged_voice_note_says_listening(h: Harness) -> None:
+    await h.onboard("en")
+    h.messenger.clear()
+    # The 2nd message (text) starts its own turn and absorbs the 3rd (voice): the turn was not voice until then.
+    rest = [h.msg("he said my account is blocked"), h.msg(audio=VOICE_NOTE.read_bytes())]
+    await _queue_behind_a_slow_turn(h, h.msg("someone called me"), rest)
+    analyses = [r.messages[-1]["content"] for r in h.llm.calls(Purpose.ANALYSE)]
+    assert len(analyses) == 2 and "account is blocked" in analyses[1] and "OTP" in analyses[1]
+    assert h.messenger.texts.count(h.t(Msg.LISTENING)) == 1
+    last = (await interactions(h))[-1]
+    assert last["kind"] == "audio" and last["asr_ms"] is not None
+
+
+async def test_system_fault_in_merged_voice_note_surfaces_unwrapped(h: Harness) -> None:
+    await h.onboard("en")
+    h.asr.error = ASRError("model crashed")
+    rest = [h.msg("he said my account is blocked"), h.msg(audio=VOICE_NOTE.read_bytes())]
+    await _queue_behind_a_slow_turn(h, h.msg("someone called me"), rest)
+    row = (await interactions(h))[-1]
+    assert row["outcome"] == Outcome.ERROR.value
+    assert str(row["error"]).startswith("ASRError: model crashed")  # not "ExceptionGroup: ..."
+    assert h.messenger.texts[-1] == h.t(Msg.ERROR_RETRY)
+
+
+async def test_voice_message_without_audio_or_media_reference(h: Harness) -> None:
+    await h.onboard("en")
+    texts = await h.say(kind=MessageKind.AUDIO)
+    assert texts == [h.t(Msg.LISTENING), h.t(Msg.NOT_UNDERSTOOD, seconds=90)]
+    row = (await interactions(h))[-1]
+    assert row["outcome"] == Outcome.AUDIO_ERROR.value and row["error"] == AudioProblem.EMPTY.value
+    assert h.asr.languages == []  # nothing reached speech recognition
+
+
+async def test_button_with_non_numeric_reference_gets_generic_follow_up(h: Harness) -> None:
+    await h.onboard("en")
+    texts = await h.say(button="warn:abc")
+    assert h.t(Msg.WARN_FAMILY_FALLBACK) in texts[0]
+    row = (await interactions(h))[-1]
+    assert row["intent"] == "button:warn" and row["reply_to"] is None
+
+
+async def test_no_licence_cap_skips_the_active_user_count(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import timedelta
+
+    from kudiguard.pipeline import utcnow
+
+    h.configure(active_user_cap=None)
+    windows: list[object] = []
+    original = h.store.count_interactions_since
+
+    async def spy(user_hash: str, since):  # type: ignore[no-untyped-def]
+        windows.append(since)
+        return await original(user_hash, since)
+
+    monkeypatch.setattr(h.store, "count_interactions_since", spy)
+    await h.onboard("en")
+    texts = await h.say(OTP_SCAM)
+    assert texts[0].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
+    assert windows  # the hourly rate limit still counts...
+    assert all(
+        utcnow() - w < timedelta(days=1) for w in windows
+    )  # ...but the 30-day licence window never does

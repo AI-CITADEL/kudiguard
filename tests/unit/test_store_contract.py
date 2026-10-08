@@ -216,3 +216,13 @@ async def test_set_outcome_marks_undelivered_answers(store: Store) -> None:
     assert stored is not None and stored.outcome is Outcome.ERROR
     assert stored.error is not None and "08031234567" not in stored.error
     await store.set_outcome(999, Outcome.ERROR)  # unknown id: no-op
+
+
+async def test_retention_purge_forgets_old_message_claims(store: Store) -> None:
+    assert await store.claim_message("whatsapp", "wamid.1")
+    assert await store.purge_before(utcnow() - timedelta(days=1)) == 0  # a fresh claim is kept...
+    assert not await store.claim_message("whatsapp", "wamid.1")  # ...so a redelivery is still a duplicate
+    assert (
+        await store.purge_before(utcnow() + timedelta(minutes=1)) == 1
+    )  # the claim itself counts as removed
+    assert await store.claim_message("whatsapp", "wamid.1")  # nothing about the old message id remains

@@ -211,3 +211,42 @@ def test_no_tiny_last_chunk(seconds: float) -> None:
     assert all(c.duration_s <= 30.0 for c in chunks)
     assert min(c.duration_s for c in chunks) >= seconds / len(chunks) - 3.5
     assert sum(len(c.samples) for c in chunks) == int(seconds * SAMPLE_RATE)
+
+
+def _files_in(directory: Path) -> list[Path]:
+    return list(directory.iterdir())
+
+
+async def test_hung_ffmpeg_is_a_timeout_and_temp_file_is_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[list[str]] = []
+
+    def hang(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        seen.append(args)
+        assert kwargs["timeout"] == 0.5
+        raise subprocess.TimeoutExpired(args, 0.5)
+
+    monkeypatch.setattr("kudiguard.speech.audio.subprocess.run", hang)
+    with pytest.raises(AudioError) as info:
+        await decode(b"not really audio", ffmpeg="ffmpeg", timeout_s=0.5, temp_dir=tmp_path)
+    assert problem(info) is AudioProblem.TIMEOUT
+    assert seen and _files_in(tmp_path) == []  # the upload never lingers on disk
+
+
+@pytest.mark.parametrize("samples", [0, 1, 319])  # shorter than one 20 ms analysis frame
+def test_audio_shorter_than_a_frame_has_no_speech(samples: int) -> None:
+    with pytest.raises(AudioError) as info:
+        trim_silence(Audio(np.full(samples, 0.5, dtype=np.float32)))
+    assert problem(info) is AudioProblem.NO_SPEECH
+
+
+@pytest.mark.parametrize("seconds", [30.01, 61.0, 95.3, 300.0])
+@pytest.mark.parametrize("search_s", [0.0, 0.5, 3.0])
+def test_split_never_exceeds_the_window_and_covers_everything(seconds: float, search_s: float) -> None:
+    rng = np.random.default_rng(int(seconds * 100))
+    audio = Audio((rng.standard_normal(int(seconds * SAMPLE_RATE)) * 0.1).astype(np.float32))
+    chunks = split(audio, max_s=30.0, search_s=search_s)
+    assert all(len(c.samples) <= 30 * SAMPLE_RATE for c in chunks)
+    assert sum(len(c.samples) for c in chunks) == len(audio.samples)
+    assert len(chunks) == int(np.ceil(len(audio.samples) / (30 * SAMPLE_RATE)))  # no fallback windows needed

@@ -380,3 +380,20 @@ async def test_non_object_items_are_dropped_not_fatal(client: httpx.AsyncClient,
     result = await source(client, clock).search(Query(text="daily transfer limit"))
     assert result.hits[0].entry.id == "limit"
     assert result.contacts == ()
+
+
+async def test_undeclared_oversize_stream_is_cut_off_mid_body(clock: Clock) -> None:
+    pulled: list[int] = []
+
+    async def body() -> AsyncIterator[bytes]:
+        for n in range(10):
+            pulled.append(n)
+            yield b"x" * 600
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=body())  # chunked: no content-length to reject up front
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(SourceUnavailable, match="response exceeds 1000 bytes"):
+            await source(client, clock, "live", max_bytes=1_000).search(Query(text="limit"))
+    assert pulled == [0, 1]  # stopped reading as soon as the cap was crossed

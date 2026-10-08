@@ -324,3 +324,40 @@ async def test_factory_shares_one_embedder() -> None:
         kb = knowledge_base_from_packs(PACKS, client=client, embedder=embedder)
         await kb.search(Query(text="how do i save money"))
     assert embedder.calls == 1
+
+
+async def test_overlong_first_safety_fact_is_truncated_with_ellipsis() -> None:
+    from kudiguard.knowledge.service import ELLIPSIS, MIN_FACT_CHARS
+
+    src = FakeSource(
+        "core",
+        kind=PackKind.CORE,
+        result=SourceResult(flag_entries=(e("f1", "a" * 500), e("f2", "b " * 300))),
+    )
+    result = await KnowledgeBase([src], limits=Limits(chars=200, hits=0)).search(QUERY)
+    first, second = (s.entry for s in result.entries)
+    assert first.facts[0] == "a" * 197 + ELLIPSIS  # room = budget - len(title "f1")
+    assert len(first.facts[0]) == 198
+    # The budget is spent, yet the second safety entry still keeps MIN_FACT_CHARS of its first fact.
+    assert second.facts[0].endswith(ELLIPSIS) and len(second.facts[0]) <= MIN_FACT_CHARS
+    assert not second.facts[0][:-1].endswith(" ")  # trailing whitespace stripped before the ellipsis
+
+
+async def test_query_cache_evicts_least_recently_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    import kudiguard.knowledge.service as service
+
+    monkeypatch.setattr(service, "QUERY_CACHE_SIZE", 2)
+    embedder = CountingEmbedder()
+    kb = KnowledgeBase([core()], embedder=embedder)
+    for text in (
+        "one",
+        "two",
+        "one",
+        "three",
+    ):  # "one" refreshed, so "two" is the oldest when "three" arrives
+        await kb.search(Query(text=text))
+    assert embedder.calls == 3
+    await kb.search(Query(text="one"))
+    assert embedder.calls == 3  # still cached
+    await kb.search(Query(text="two"))
+    assert embedder.calls == 4  # evicted, embedded again

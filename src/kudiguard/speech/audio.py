@@ -154,7 +154,9 @@ def split(audio: Audio, *, max_s: float = WHISPER_WINDOW_S, search_s: float = CU
         rms = _frame_rms(samples[low:high], frame)
         cut = low + (int(np.argmin(rms)) * frame + frame // 2 if rms.size else (high - low))
         cuts.append(min(cut, cuts[-1] + limit))
-    if len(samples) - cuts[-1] > limit:  # pathological: no room left; fall back to fixed windows
+    if (
+        len(samples) - cuts[-1] > limit
+    ):  # pragma: no cover - defensive; the cut bounds guarantee the tail fits
         cuts += list(range(cuts[-1] + limit, len(samples), limit))
     cuts.append(len(samples))
     return [Audio(samples[a:b]) for a, b in itertools.pairwise(cuts) if b > a]

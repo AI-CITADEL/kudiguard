@@ -85,6 +85,10 @@ class Messenger(Protocol):
         """Deliver ``message`` to the channel user. Raises on delivery failure."""
         ...
 
+    async def fetch_media(self, message: InboundMessage) -> bytes:
+        """Download ``message.media_id``. Raises ``AudioError`` (e.g. TOO_LARGE) for user-facing problems."""
+        ...
+
 
 class Action(StrEnum):
     """Reply-button and menu actions; ids are ``<action>:<ref>`` (ref = interaction id or language code)."""
@@ -227,6 +231,11 @@ class Conversation:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return True
+
+    async def wait_idle(self) -> None:
+        """Wait until every background turn submitted so far has finished (tests, deploy health checks)."""
+        while self._tasks:
+            await asyncio.gather(*set(self._tasks), return_exceptions=True)
 
     async def drain(self, timeout_s: float = 30.0) -> None:
         """Graceful shutdown: refuse new turns, wait for running ones, cancel what is left after ``timeout_s``."""
@@ -487,10 +496,14 @@ class Conversation:
             await self._send(turn, self._messages.text(turn.language, Msg.LISTENING), ack=True)
             turn.voice = True
             try:
+                data = await self._audio_of(
+                    message, turn.deadline
+                )  # network download: outside the CPU-bound ASR slots
                 async with self._asr_slots:
-                    speech = await self._engine.transcribe(message.audio or b"", turn.language)
+                    speech = await self._engine.transcribe(data, turn.language)
             except AudioError as exc:
-                key = Msg.AUDIO_TOO_LONG if exc.problem is AudioProblem.TOO_LONG else Msg.NOT_UNDERSTOOD
+                too_big = exc.problem in (AudioProblem.TOO_LONG, AudioProblem.TOO_LARGE)
+                key = Msg.AUDIO_TOO_LONG if too_big else Msg.NOT_UNDERSTOOD
                 await self._store.save_user(user)
                 await self._log(turn, outcome=Outcome.AUDIO_ERROR, error=exc.problem.value)
                 await self._send(turn, self._messages.text(turn.language, key, seconds=int(MAX_SECONDS)))
@@ -607,14 +620,30 @@ class Conversation:
             return (message.text or "").strip()
         turn.voice = True
         try:
+            data = await self._audio_of(message, turn.deadline)
             async with self._asr_slots:
-                speech = await self._engine.transcribe(message.audio or b"", turn.language)
+                speech = await self._engine.transcribe(data, turn.language)
         except AudioError as exc:
             log.info("merged voice note skipped: %s", exc.problem)
             return ""
         turn.asr_ms = (turn.asr_ms or 0) + speech.asr_ms
         turn.decode_ms = (turn.decode_ms or 0) + speech.decode_ms
         return speech.transcript.text.strip()
+
+    async def _audio_of(self, message: InboundMessage, deadline: float) -> bytes:
+        """Inline bytes (web, API) or a lazy channel download (WhatsApp) — only ever for consented users."""
+        if message.audio is not None:
+            return message.audio
+        if message.media_id is None:
+            raise AudioError(AudioProblem.EMPTY, "no audio and no media reference")
+        left = deadline - time.monotonic()
+        if left <= 0:
+            raise AudioError(AudioProblem.TIMEOUT, "no time left to download the voice note")
+        try:
+            async with asyncio.timeout(left):  # a stuck download must not eat the whole turn
+                return await self._messenger.fetch_media(message)
+        except TimeoutError as exc:
+            raise AudioError(AudioProblem.TIMEOUT, "voice note download timed out") from exc
 
     def _chosen_language(self, message: InboundMessage) -> LanguageCode | None:
         parsed = parse_button(message.button_id) if message.kind is MessageKind.BUTTON else None

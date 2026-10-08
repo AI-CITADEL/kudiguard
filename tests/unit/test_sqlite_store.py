@@ -138,3 +138,28 @@ async def test_erased_text_is_not_left_readable_on_disk(tmp_path: Path) -> None:
         return any(secret_words.encode() in f.read_bytes() for f in tmp_path.glob("kg.db*"))
 
     assert not await asyncio.to_thread(leftover)
+
+
+def test_failure_after_the_transaction_already_ended_is_not_masked(tmp_path: Path) -> None:
+    db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
+    db.execute("CREATE TABLE t (x INTEGER)")
+    with pytest.raises(RuntimeError, match="original"), _transaction(db):
+        db.execute("INSERT INTO t VALUES (1)")
+        db.execute("ROLLBACK")  # e.g. SQLite rolled back on its own (disk full, I/O error)
+        raise RuntimeError("original")  # must surface, not "cannot rollback - no transaction is active"
+    assert not db.in_transaction and db.execute("SELECT COUNT(*) FROM t").fetchone()[0] == 0
+    db.close()
+
+
+async def test_migration_failing_outside_a_transaction_closes_and_raises_the_real_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "kg.db"
+    await (await SQLiteStore.open(path, hasher=HASHER)).close()
+    monkeypatch.setattr(sqlite_module, "MIGRATIONS", (*MIGRATIONS, "COMMIT; THIS IS NOT SQL"))
+    with pytest.raises(sqlite3.OperationalError, match="syntax error"):
+        await SQLiteStore.open(path, hasher=HASHER)
+    db = sqlite3.connect(path)
+    assert db.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    db.close()
+    path.unlink()  # the failed opener closed its connection (an open handle would block this on Windows)

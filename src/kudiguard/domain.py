@@ -29,6 +29,7 @@ class InboundMessage:
     audio: bytes | None = None
     audio_mime: str | None = None
     button_id: str | None = None
+    media_id: str | None = None  # provider media reference; fetched lazily (after consent) via the channel
 
 
 class Flag(StrEnum):
