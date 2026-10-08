@@ -82,6 +82,7 @@ class LanguageConfig(BaseModel):
     order: int
     status: LanguageStatus
     asr_model: str
+    asr_whisper_language: str | None = None  # Whisper language token for the ASR model (None = model decides)
     review: dict[str, ReviewStatus] = Field(default_factory=dict)  # e.g. {lexicon: ..., strings: ...}
     lexicon: _LexiconSpec = Field(default_factory=_LexiconSpec)
     output_guard: _OutputGuardSpec = Field(default_factory=_OutputGuardSpec)
@@ -171,3 +172,11 @@ class LanguageRegistry:
             return own
         pivot = self._own_guards.get(PIVOT, GuardPatterns((), ()))
         return GuardPatterns(pivot.safety_claims + own.safety_claims, pivot.refusals + own.refusals)
+
+    def asr_models(self) -> dict[LanguageCode, str]:
+        """Language code -> speech model repo, for enabled languages."""
+        return {lang.code: lang.asr_model for lang in self.enabled}
+
+    def asr_whisper_languages(self) -> dict[str, str | None]:
+        """Speech model repo -> Whisper language token (see ``speech.natlas_asr.ct2_loader``)."""
+        return {lang.asr_model: lang.asr_whisper_language for lang in self.enabled}

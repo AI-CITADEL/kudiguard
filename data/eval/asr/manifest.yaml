@@ -1,0 +1,5 @@
+# ASR evaluation clips. Add real recordings (WhatsApp voice notes) per language with native-typed references.
+# Target before submission: 20 Hausa + 20 English clips (PLAN §2), plus Yoruba/Igbo samples.
+- file: en_otp_tts.ogg
+  lang: en
+  reference: "Hello. Someone called me and said my account will be blocked. He asked me to send the OTP code that was sent to my phone. Is this a scam?"

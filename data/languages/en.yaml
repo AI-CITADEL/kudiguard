@@ -11,6 +11,7 @@ native_name: English
 order: 4
 status: stable
 asr_model: NCAIR1/NigerianAccentedEnglish
+asr_whisper_language: en
 
 # Output guard: patterns (accent-folded, like the lexicon) checked on every generated reply.
 output_guard:

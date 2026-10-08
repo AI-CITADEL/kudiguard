@@ -106,3 +106,19 @@ processed, ~31 ms). With caching off, analyse processes all 442 prompt tokens: ~
 would therefore save ~0 ms today. `scripts/run_llm.ps1` now sets `--cache-ram 2048` explicitly so a llama.cpp
 upgrade or default change cannot silently add that latency. Client overhead vs raw httpx: not measurable
 (32.9 vs 33.9 ms p50). llama.cpp aborts generation when the client disconnects, so client-side deadlines are safe.
+
+## S4 — Speech recognition runtime on CPU (7 Oct 2026)
+
+Proxy: public `openai/whisper-small` (the NCAIR1 models are Whisper-small fine-tunes; gated weights not yet
+accessible). Clip: 10.9 s English voice note (Windows TTS → WhatsApp-style Opus → `speech.audio.decode`).
+
+| Runtime | Threads | Latency (3 runs) | Transcript |
+|---|---|---|---|
+| transformers (fp32) | 4 | 11.3 – 19.7 s | word-perfect |
+| transformers (fp32) | 16 | 5.8 – 8.2 s | word-perfect |
+| **faster-whisper / CTranslate2 int8** | 16 | **1.6 – 1.9 s** | identical, word-perfect |
+
+Decision: ASR runs on faster-whisper with the NCAIR1 weights converted once to CTranslate2 int8 (cached on ***REMOVED***);
+transformers kept as reference/fallback. The int8-vs-fp32 WER on real NCAIR1 models must be measured once the gated
+weights are accessible (`scripts/eval_asr.py`). One-time conversion: ~2 min per model. Note: the C: drive is full;
+pip temp/cache and HF_HOME are redirected to ***REMOVED***.

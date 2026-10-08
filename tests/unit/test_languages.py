@@ -146,3 +146,10 @@ def test_strings_not_in_pivot_rejected(tmp_path: Path) -> None:
 def test_shipped_languages_have_complete_strings(registry: LanguageRegistry) -> None:
     pivot = registry.get("en").strings.keys()
     assert all(lang.strings.keys() == pivot for lang in registry.enabled)
+
+
+def test_asr_configuration_is_per_language(registry: LanguageRegistry) -> None:
+    assert registry.asr_models()["ha"] == "NCAIR1/Hausa-ASR"
+    tokens = registry.asr_whisper_languages()
+    assert tokens["NCAIR1/Hausa-ASR"] == "ha"
+    assert tokens["NCAIR1/Igbo-ASR"] is None  # Whisper has no Igbo token

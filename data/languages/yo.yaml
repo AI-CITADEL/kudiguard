@@ -6,6 +6,7 @@ native_name: Yorùbá
 order: 2
 status: beta
 asr_model: NCAIR1/Yoruba-ASR
+asr_whisper_language: yo
 review:
   lexicon: pending-native-review
   strings: pending-native-review

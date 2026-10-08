@@ -6,6 +6,7 @@ native_name: Hausa
 order: 1
 status: stable
 asr_model: NCAIR1/Hausa-ASR
+asr_whisper_language: ha
 review:
   lexicon: pending-native-review
   strings: pending-native-review

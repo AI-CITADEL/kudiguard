@@ -93,7 +93,10 @@ Web voice page  ─┘
 * LLM: `tosinamuda/N-ATLaS-GGUF` Q4_K_M (4.92 GB, ungated) on native Windows `llama-server` CUDA 12.4,
   `-c 4096 -ngl 99`; pass `temperature 0.1`, `repeat_penalty 1.12`, `max_tokens 250` explicitly.
   Quant kept private (no renamed redistribution). Record file SHA256.
-* ASR: NCAIR1 models via `transformers` on **CPU** (avoid VRAM contention); one model per language, lazy-loaded.
+* ASR: the official NCAIR1 models, converted once to **CTranslate2 int8** and run with faster-whisper on **CPU**
+  (avoid VRAM contention): ~1.7–3.6 s per 11 s voice note vs 6–20 s with transformers (SPIKES S4). Conversion is
+  done offline by `scripts/prepare_asr.py`; quantisation configurable (`int8`/`float32`); transformers kept as the
+  reference runtime. Disclose the conversion in README/submission with the measured int8-vs-float32 WER.
 * ffmpeg required (WhatsApp sends `audio/ogg; codecs=opus`).
 * Stable public URL: cloudflared named tunnel or ngrok static domain; watchdog script restarts server + tunnel.
 
@@ -210,3 +213,11 @@ Open-web search is out of scope for V1 (scam/SEO pages could be repeated as fact
 allowlist of official domains** (cbn.gov.ng, efcc.gov.ng, ncc.gov.ng, fccpc.gov.ng, sec.gov.ng, nimc.gov.ng, NIBSS,
 partner banks' sites), runs **only when the packs return no good hit**, redacts the query, treats page text as
 untrusted data (same output guard), and cites the source link. Results restated by N-ATLAS in the user's language.
+
+### Open item — NCAIR1 speech validation (blocks submission, not development)
+Waiting for `HF_TOKEN` (account must accept the NCAIR1 model terms). Then:
+1. `python scripts/prepare_asr.py` — convert and load all four official models (int8).
+2. Record ≥20 Hausa + ≥20 English WhatsApp voice notes (+ Yoruba/Igbo samples) into `data/eval/asr/manifest.yaml`.
+3. `python scripts/eval_asr.py --compare` — WER/CER per language, int8 vs float32; record in SPIKES and the submission.
+4. Read each model's `generation_config.json` and set `asr_whisper_language` accordingly (esp. Igbo).
+5. Run `pytest -m live` (the NCAIR1 test stops skipping).
