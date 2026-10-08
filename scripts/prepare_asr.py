@@ -14,20 +14,11 @@ import os
 import time
 from pathlib import Path
 
+from kudiguard.envfile import load_env_file
 from kudiguard.languages import LanguageRegistry
 from kudiguard.speech.natlas_asr import NatlasASR, ct2_loader
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_env_file(path: Path) -> None:
-    """Minimal KEY=VALUE loader for kudiguard/.env (values are never printed)."""
-    if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if "=" in line and not line.lstrip().startswith("#"):
-            key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 async def main(cache: Path, quantization: str) -> int:

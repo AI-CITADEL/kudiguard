@@ -20,6 +20,7 @@ from statistics import mean, median
 
 import yaml
 
+from kudiguard.envfile import load_env_file
 from kudiguard.languages import LanguageRegistry
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.speech.base import ASRError, AudioError
@@ -68,26 +69,33 @@ def summarise(label: str, by_language: dict[str, list[tuple[float, ...]]]) -> No
         )
 
 
-async def main(proxy: bool, compare: bool, cache: Path) -> None:
+async def main(proxy: bool, compare: bool, auto_language: bool, cache: Path) -> None:
+    load_env_file(ROOT / ".env")  # HF_TOKEN for one-time conversions of gated models
     registry = LanguageRegistry.load(ROOT / "data" / "languages")
     rows = yaml.safe_load(MANIFEST.read_text(encoding="utf-8")) or []
     models = {code: PROXY for code in registry.asr_models()} if proxy else registry.asr_models()
     tokens = {PROXY: None} if proxy else registry.asr_whisper_languages()
+    if auto_language:  # let each fine-tuned model detect the language (NCAIR's own generation config)
+        tokens = dict.fromkeys(tokens)
     ffmpeg = find_ffmpeg()
     for quantization in ("int8", "float32") if compare else ("int8",):
         loader = ct2_loader(cache_dir=cache, whisper_languages=tokens, quantization=quantization)
         languages = sorted({row["lang"] for row in rows})
         asr = NatlasASR(models, loader=loader, max_loaded=len(languages))
         await asr.preload(languages)  # latency below is per message, not first-use model loading
-        summarise(f"CTranslate2 {quantization} (proxy={proxy})", await evaluate(asr, rows, ffmpeg))
+        summarise(
+            f"CTranslate2 {quantization} (proxy={proxy}, auto_language={auto_language})",
+            await evaluate(asr, rows, ffmpeg),
+        )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--proxy", action="store_true")
     parser.add_argument("--compare", action="store_true", help="int8 vs float32 on the same weights")
+    parser.add_argument("--auto-language", action="store_true", help="no forced Whisper language token")
     parser.add_argument(
         "--cache", type=Path, default=Path(os.environ.get("KUDIGUARD_MODEL_CACHE", r"***REMOVED***\ncair\.cache"))
     )
     args = parser.parse_args()
-    asyncio.run(main(args.proxy, args.compare, args.cache))
+    asyncio.run(main(args.proxy, args.compare, args.auto_language, args.cache))

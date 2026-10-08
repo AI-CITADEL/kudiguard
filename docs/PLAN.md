@@ -219,5 +219,5 @@ Waiting for `HF_TOKEN` (account must accept the NCAIR1 model terms). Then:
 1. `python scripts/prepare_asr.py` — convert and load all four official models (int8).
 2. Record ≥20 Hausa + ≥20 English WhatsApp voice notes (+ Yoruba/Igbo samples) into `data/eval/asr/manifest.yaml`.
 3. `python scripts/eval_asr.py --compare` — WER/CER per language, int8 vs float32; record in SPIKES and the submission.
-4. Read each model's `generation_config.json` and set `asr_whisper_language` accordingly (esp. Igbo).
+4. Done (SPIKES S5): no language pinned by NCAIR. A/B forced (`ha`/`yo`) vs auto (null) on recorded clips; keep the more accurate.
 5. Run `pytest -m live` (the NCAIR1 test stops skipping).

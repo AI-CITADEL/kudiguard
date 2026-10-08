@@ -1,5 +1,165 @@
-# ASR evaluation clips. Add real recordings (WhatsApp voice notes) per language with native-typed references.
-# Target before submission: 20 Hausa + 20 English clips (PLAN §2), plus Yoruba/Igbo samples.
+# ASR evaluation clips. `source`: tts (synthetic), fleurs (Google FLEURS dev, CC-BY-4.0, read speech),
+# whatsapp (real recordings from testers). Add real voice notes with native-typed references.
 - file: en_otp_tts.ogg
   lang: en
-  reference: "Hello. Someone called me and said my account will be blocked. He asked me to send the OTP code that was sent to my phone. Is this a scam?"
+  reference: Hello. Someone called me and said my account will be blocked. He asked me to send the OTP code that was sent to my phone. Is this a scam?
+- file: fleurs/ha/10140605325461661233.ogg
+  lang: ha
+  source: fleurs
+  reference: Dubunnan shekarun da suka gabata, wani mutum da ake kira Aristarchus yace Tsarin Rana ya zagaya Rana.
+- file: fleurs/ha/10196261624983995568.ogg
+  lang: ha
+  source: fleurs
+  reference: Amazon kuma shine kogi mafi fadi a Duniya, a wasu lokutan nisan mil shida.
+- file: fleurs/ha/10255951444507289726.ogg
+  lang: ha
+  source: fleurs
+  reference: A farkon lamari, kabilar Byzantine da ke gabashi ta karfafa saka tufafi.
+- file: fleurs/ha/10403460126806275266.ogg
+  lang: ha
+  source: fleurs
+  reference: A cikin wannan na’urar sufuri mai sauyawa kowa na da alaka da juna tare da tallafawa, tsarin sufuri ne wanda ya dogara da motocin daidaikun mutane.
+- file: fleurs/ha/10493053480703738801.ogg
+  lang: ha
+  source: fleurs
+  reference: NHK ta kuma ruwaito cewa masana’antar samar da makamashin nukiliya ta Kashiwazaki Kariwa a gundumar Niigata tana aiki yadda yakamata.
+- file: fleurs/ha/10541695474305773697.ogg
+  lang: ha
+  source: fleurs
+  reference: Ta kai ga wannan matsayin ne saboda yawan tofa albarkatun bakin mutane tare da kwarin gwiwa wanda maza da mata ke rokar cewa amfani da magungunan hana haihuwa sun zama dole.
+- file: fleurs/ha/1056418673832587344.ogg
+  lang: ha
+  source: fleurs
+  reference: Kasancewa a kasar waje a karo na farko, na sa matafiya yin hakuri da nuna fahimta, saboda sanin cewa matafiya na bukatar hakan domin su saba da wajen.
+- file: fleurs/ha/10647831178029349649.ogg
+  lang: ha
+  source: fleurs
+  reference: Sabuwar Daula ta daulolin baya na Misra su na yaba yadda kakanninsu su ka giggina abubuwa na tarihi, wadanda ko a wancan lokacin sun haura shekaru dubu.
+- file: fleurs/ha/10672551815457404310.ogg
+  lang: ha
+  source: fleurs
+  reference: Karfin barnansa ta shafe kowa daga sarki har na gama-gari.
+- file: fleurs/ha/10674933498692553496.ogg
+  lang: ha
+  source: fleurs
+  reference: Tsibiran Gabashin Afirka suna cikin Tekun India kusa da gaɓar gabashin Afirka.
+- file: fleurs/ha/10733726006528148982.ogg
+  lang: ha
+  source: fleurs
+  reference: Yanzu ana samu a faɗin rukunin tsibiran, jerin nau’ikan abincin yan Java, yawancin kayan kamshin da su ka fi sakawa shine na gyada, yaji da sukari (musamman sukarin kwakwa) da kuma wasu kayan kanshin.
+- file: fleurs/ha/1074952044173178551.ogg
+  lang: ha
+  source: fleurs
+  reference: Kila wasu marasa lafiya sun kamu da cutar a asibiti, Dokta Moll yana tsammani, kuma aƙalla biyu sun kasance ma'aikatan kiwon lafiya na asibiti.
+- file: fleurs/ha/10821153721925056044.ogg
+  lang: ha
+  source: fleurs
+  reference: Wayar tauraron dan adam a gaba daya ba za ta maye gurbin wayar hannu ba, domin sai kun kasance a waje tare da yin saiti da tauraron dan adam don yin kiran da wayar.
+- file: fleurs/ha/10936740582099403670.ogg
+  lang: ha
+  source: fleurs
+  reference: Duk da haka kashi tamanin cikin kayan mu sun samu haraji a kasashen Amurka ta tsakiya. Zamu kula da kai.
+- file: fleurs/ha/10981349753509921173.ogg
+  lang: ha
+  source: fleurs
+  reference: A cikin wannan na’urar sufuri mai sauyawa kowa na da alaka da juna tare da tallafawa, tsarin sufuri ne wanda ya dogara da motocin daidaikun mutane.
+- file: fleurs/ha/11040657459138523578.ogg
+  lang: ha
+  source: fleurs
+  reference: Za ka iya ganin dalar a cikin duhu kuma za ka iya ganin su a tsanake kafin shirin ya fara.
+- file: fleurs/ha/11128877153935247319.ogg
+  lang: ha
+  source: fleurs
+  reference: Tsohon kakakin majalisar Newt Gingrich, gwamnan Texas Rick Perry, da uwargidan majalisar wakilai, Michele Bachmann sun gama a mataki na hudu, na biyar, da na shida, bi da bi.
+- file: fleurs/ha/11144841766139916225.ogg
+  lang: ha
+  source: fleurs
+  reference: Kasancewa a kasar waje a karo na farko, na sa matafiya yin hakuri da nuna fahimta, saboda sanin cewa matafiya na bukatar hakan domin su saba da wajen.
+- file: fleurs/ha/1123207833508888276.ogg
+  lang: ha
+  source: fleurs
+  reference: Sannan, sai Lakkha Singh ya yi jagora a rera waƙar bhajans.
+- file: fleurs/ha/11321429069040044610.ogg
+  lang: ha
+  source: fleurs
+  reference: Daga karshe, an sauya tayoyin katako da na karfe. A cikin 1767 an kaddamar da farkon hanyar jirgin kasa kerar karfe.
+- file: fleurs/yo/10003175936942512650.ogg
+  lang: yo
+  source: fleurs
+  reference: Ètò ẹ̀kọ́ kan yíò kárí gbogbo ìṣẹ̀lẹ̀ tí wọ́n pẹ̀kẹ́lù níbí fún ẹ̀kúnrẹ́rẹ́ tó ga, lọ́pọ̀ ìgbà pẹ̀lú ìrírí oníse.
+- file: fleurs/yo/10176590090087071233.ogg
+  lang: yo
+  source: fleurs
+  reference: Ẹni tó sọ̀rọ̀ fún Búsì Godoni Johanudro pé ilérí Koria Ariwa ní “ìgbésẹ̀ nlá sọ́na àlébá láti yọ irin ogún nukilia kúrò ní irekusu Koria.
+- file: fleurs/yo/10277327190226151554.ogg
+  lang: yo
+  source: fleurs
+  reference: A lè bẹ̀rẹ̀ sih ní gbeh ìgbé ayé to faramọ́ra, bẹ́ẹ̀ sì ni a tún lè jẹ́ ajàjàgbara kí a lè mú àdínkù bá ìyà tí o le.
+- file: fleurs/yo/10284659619078123674.ogg
+  lang: yo
+  source: fleurs
+  reference: Ọ̀pọ̀lọpọ̀ àwọn ìgúnrégé (ìgúnrégé ebí APS, fún àpẹrẹ) dọ́gba sí tàbí súmọ ìpín náà.
+- file: fleurs/yo/10309431960949816341.ogg
+  lang: yo
+  source: fleurs
+  reference: Àwọn onímò Sayensi wípé búbúgbàmà ti ìkọlù náà jẹ títóbi gan.
+- file: fleurs/yo/10329484556822835935.ogg
+  lang: yo
+  source: fleurs
+  reference: Púpọ̀ nínu ayé àwọn ẹbí Ibru ṣẹlẹ̀ ní afẹ́fẹ́ ìta.
+- file: fleurs/yo/10344632553186011005.ogg
+  lang: yo
+  source: fleurs
+  reference: Àwọn safari ló fẹ́rẹ̀ jẹ́ òǹfà ìrìnafẹ́ jùlọ ní ilẹ̀ adúláwọ̀ àti ohun táwọn àlejò ma ń péwò jù.
+- file: fleurs/yo/10376433366647605669.ogg
+  lang: yo
+  source: fleurs
+  reference: Kẹ́rẹ́sìmẹsì jẹ́ ọ̀kan lára ìsinmi tó se pàtàkì jùlọ nínú ẹ̀sìn Krìstẹ́nì, ó sì tún jẹ́ àjọyọ ọjọ́ ìbí Jẹ́sù.
+- file: fleurs/yo/10377511664592166435.ogg
+  lang: yo
+  source: fleurs
+  reference: Àwọn ara ìlú Portugali parun wọn si tún sẹ àtúnkọ́ rè pélù orúkọ Casa Brance, kó tó di pé wọn tún sẹ àtúnkọ lẹ́yìn ìsẹ̀lẹ̀ ìwárìrì-ilè ní 1755.
+- file: fleurs/yo/10413474360284328474.ogg
+  lang: yo
+  source: fleurs
+  reference: Wọ́n ríran dada ní òkùnkùn pẹ̀lú iràn òkùnkùn àti pe wọn ma n yọ́ rìn náà. Àwọn Osiloti ma n pa àwọ̀ da láti bá àyíká rẹ̀ rẹ́ kó ba lè bà léàwọn eranko tí wọ́n ma jẹ.
+- file: fleurs/ig/10052828106951583547.ogg
+  lang: ig
+  source: fleurs
+  reference: Akara ya maka mgbututu n'ụbọchị Tuzde, mana azọpụtara ya ka ụlọ ikpe kpegharịrị ikpe na mberede.
+- file: fleurs/ig/10103553451894900727.ogg
+  lang: ig
+  source: fleurs
+  reference: Oge ya bụ ọgụ gwụchara mgbe e wegara ndị merụrụ ahụ n'ụlọ ọgwụ, ihe dị ka ndị mkpọrọ 40 fọrọ afọ nọọrọ na mpụga, jụ ịlaghachi n'ime ụlọ mkpọrọ ha.
+- file: fleurs/ig/10113848700658111019.ogg
+  lang: ig
+  source: fleurs
+  reference: Ndị nchọpụta ihe tụrụ aro sị na, n'agbanyeghị na nke a bụ ọdụ daịnosọ na-eto eto, ihe ngosi ahụ gosiri nku anụ tochara etocha na-abụghị nku nwa anụ.
+- file: fleurs/ig/10127366476560418519.ogg
+  lang: ig
+  source: fleurs
+  reference: Ndọrọndọrọ kachasị ukwu nke afọ ahụ na-eme na Disemba na fịịldị polo n’ime Las Cañitas.
+- file: fleurs/ig/10239828863378124248.ogg
+  lang: ig
+  source: fleurs
+  reference: Ozugbo ị na-esi n'ọwụwụ mmiri ahụ pụta, igwughachi azụ na-aka ara ahụ karịa na nkịtị.
+- file: fleurs/ig/10261303055208693134.ogg
+  lang: ig
+  source: fleurs
+  reference: Mgbe a sị ya kwuo okwu gbasara ihe mere, Mila kwuru, "Mike na-ekwu ọtụtụ okwu mgbe a na-eme ọnụnụ ahụ...anọ m na-akwado ya mere na anụghị m ihe ọ na-ekwu."
+- file: fleurs/ig/1030036533391546572.ogg
+  lang: ig
+  source: fleurs
+  reference: N'ikpeazụ, eji wiil ígwè dochie wiil osisi. N'afọ 1767, e wepụtara wiil nke mbụ ejị igwe rụọ kpam kpam.
+- file: fleurs/ig/10349684322323917804.ogg
+  lang: ig
+  source: fleurs
+  reference: Satilaịti nọ n'ikuku na enweta oku ma zighachi ya n'ala na ntabi anya.
+- file: fleurs/ig/10391370518659646849.ogg
+  lang: ig
+  source: fleurs
+  reference: E nwere ọtụtụ ọnụ mmiri, n’ihi nnọnetiti nke Ọklandị nke ọdụ ụgbọ mmiri abụọ. Ndị nke kacha ewu ewu nọ n’ebe atọ.
+- file: fleurs/ig/10421826058165449649.ogg
+  lang: ig
+  source: fleurs
+  reference: N’okporo ụzọ ebe ais na sno dị, nrapara dị ala nakwa ịnweghị ike ịnya moto n'elu ya dịka ị nọ na asfalt nkịtị.

@@ -14,6 +14,13 @@ asr_model: NCAIR1/NigerianAccentedEnglish
 asr_whisper_language: en
 
 # Output guard: patterns (accent-folded, like the lexicon) checked on every generated reply.
+commands:
+  stop: [stop, unsubscribe, stop messages]
+  delete: [delete, delete my data, erase my data, delete everything]
+  language: [language, change language, languages]
+  greetings: [hi, hello, hey, hiya, good morning, good afternoon, good evening, good day, thanks, thank you,
+    thank you so much, thanks a lot, ok, okay, ok thanks, okay thank you, alright, nice, great, cool]
+
 output_guard:
   # Anchored to a subject so ordinary advice ("keep your PIN safe", "your money is safe only when...") passes.
   safety_claims:

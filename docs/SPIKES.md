@@ -122,3 +122,32 @@ Decision: ASR runs on faster-whisper with the NCAIR1 weights converted once to C
 transformers kept as reference/fallback. The int8-vs-fp32 WER on real NCAIR1 models must be measured once the gated
 weights are accessible (`scripts/eval_asr.py`). One-time conversion: ~2 min per model. Note: the C: drive is full;
 pip temp/cache and HF_HOME are redirected to ***REMOVED***.
+
+## S5 — Official NCAIR1 ASR configs (7 Oct 2026)
+
+Access: Hausa-ASR, Yoruba-ASR, Igbo-ASR granted (classic Read token); NigerianAccentedEnglish pending.
+`generation_config.json` of all three: `language: None`, task transcribe (`forced_decoder_ids [[1, None], [2, 50359]]`),
+multilingual Whisper vocabulary with no Igbo token. NCAIR does not pin a language token, so at inference Whisper
+detects the language (+~1.2 s). Our config forces `ha`/`yo` (faster) and leaves Igbo on auto. **To decide with data:**
+A/B forced vs auto on the recorded clips (`eval_asr.py`, toggle `asr_whisper_language` to null) before submission.
+
+## S6 — Official NCAIR1 ASR accuracy on public clips (8 Oct 2026)
+
+Clips: Google FLEURS dev (CC-BY-4.0), native speakers reading Wikipedia-style sentences, re-encoded to WhatsApp-style
+Opus 16 kHz / 24 kbps (`scripts/fetch_eval_audio.py`, attribution in `data/eval/asr/SOURCES.md`). CTranslate2 int8 on CPU.
+
+| Lang | n | WER | WER incl. tone marks | CER | p50 latency (forced) | p50 latency (auto) |
+|---|---|---|---|---|---|---|
+| ha | 20 | 29.8% | 29.8% | 9.5% | 2.2 s | 3.8 s |
+| yo | 10 | 32.0% | 63.3% | 7.9% | 2.1 s | 4.2 s |
+| ig | 9 (+1 rejected) | 44.4% | 47.8% | 22.4% | 3.6 s | 4.5 s |
+| en | 1 (TTS) | 0% | 0% | 0% | 2.1 s | 3.5 s |
+
+* **Forced vs auto language: identical accuracy, forced 1.4–2 s faster** → keep `asr_whisper_language: ha/yo`.
+  Igbo has no Whisper token, so it always auto-detects (hence slower). Backlog: test forcing a neighbouring token.
+* Read encyclopedic sentences (named entities, numbers) are harder than everyday speech; FLEURS may also overlap NCAIR1
+  training data. Treat as indicative only. Low CER (8–10% ha/yo) means most errors are word splits/spelling, which the
+  downstream LLM tolerates; Yoruba tone marks are often dropped (WER 63% counting tones) — the analyse step folds them.
+* One Igbo clip (peak −50 dBFS, near-silent) is rejected as `no_speech` by design → user is asked to resend.
+* Still required: real WhatsApp voice notes from testers about money/scams (`source: whatsapp`), ≥20 ha + ≥20 en.
+* Pending: `--compare` (int8 vs float32) on these clips.

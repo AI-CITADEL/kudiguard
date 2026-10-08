@@ -11,6 +11,13 @@ review:
   lexicon: pending-native-review
   strings: pending-native-review
 
+commands:
+  stop: [tsaya, daina]
+  delete: [goge, goge bayanai na]
+  language: [harshe, canja harshe]
+  greetings: [sannu, sannu da zuwa, ina kwana, ina wuni, barka, barka da safe, barka da rana, barka da yamma,
+    salam, assalamu alaikum, na gode, nagode, mun gode, to, madalla]
+
 output_guard:
   safety_claims:
     - 'ba (?:zamba|damfara|yaudara) ba(?:ne)?'

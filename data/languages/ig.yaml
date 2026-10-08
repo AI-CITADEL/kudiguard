@@ -11,6 +11,12 @@ review:
   lexicon: pending-native-review
   strings: pending-native-review
 
+commands:
+  stop: [kwụsị]
+  delete: [hichapụ, hichapụ ozi m]
+  language: [asụsụ, gbanwee asụsụ]
+  greetings: [ndewo, kedu, kedụ, ụtụtụ ọma, ehihie ọma, mgbede ọma, daalụ, daalụ nke ukwuu, nnọọ, ọ dị mma]
+
 output_guard:
   safety_claims:
     - '(?:o )?a?bughi (?:aghugho|wayo)'

@@ -11,6 +11,13 @@ review:
   lexicon: pending-native-review
   strings: pending-native-review
 
+commands:
+  stop: [dúró]
+  delete: [pa rẹ́, pa á rẹ́]
+  language: [èdè, yí èdè padà]
+  greetings: [báwo, báwo ni, ẹ n lẹ́, ẹ kú àárọ̀, ẹ kú ọ̀sán, ẹ kú ìrọ̀lẹ́, ẹ kú alẹ́, ẹ ṣé, ẹ ṣeun, o ṣé, o ṣeun,
+    ẹ ṣé gan, pẹ̀lẹ́, ó dáa]
+
 output_guard:
   safety_claims:
     - 'ki i se (?:etan|jibiti|ojoro)'

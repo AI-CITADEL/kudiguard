@@ -62,6 +62,16 @@ class _OutputGuardSpec(BaseModel):
     refusals: list[str] = Field(default_factory=list)  # "I can't help" in this language
 
 
+class _CommandsSpec(BaseModel):
+    """Whole-message phrases, written naturally (matching ignores case, accents and punctuation)."""
+
+    model_config = ConfigDict(extra="forbid")
+    stop: list[str] = Field(default_factory=list)  # stop receiving messages
+    delete: list[str] = Field(default_factory=list)  # erase my data
+    language: list[str] = Field(default_factory=list)  # show the language menu
+    greetings: list[str] = Field(default_factory=list)  # greetings and thanks: fixed reply, no model call
+
+
 @dataclass(frozen=True, slots=True)
 class GuardPatterns:
     safety_claims: Patterns
@@ -86,6 +96,7 @@ class LanguageConfig(BaseModel):
     review: dict[str, ReviewStatus] = Field(default_factory=dict)  # e.g. {lexicon: ..., strings: ...}
     lexicon: _LexiconSpec = Field(default_factory=_LexiconSpec)
     output_guard: _OutputGuardSpec = Field(default_factory=_OutputGuardSpec)
+    commands: _CommandsSpec = Field(default_factory=_CommandsSpec)
     strings: dict[str, str] = Field(default_factory=dict)  # fixed UI text; keys must match the pivot's
 
 
