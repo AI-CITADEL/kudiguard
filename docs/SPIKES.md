@@ -213,6 +213,13 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence). ha/yo/ig: not checked live.
   8 simultaneous checks: one runs, seven are skipped (busy, fail open), ~37 ms total: no queueing (enforce instead
   waits within its budget). Warm-up at startup: ~3–4 s for every default pack (2.8 s measured for 297 sentences).
+* **Guard, round 6**: 387 own probes, all correct except the same 2 strict xfails; D's 214: 210 correct. Fixed: a
+  device someone shows or holds ("the screen he shows you", "the POS terminal the agent holds", "a stranger's phone");
+  "only with/to your ..." exempts the user's own app/phone or the bank itself, never its officer/agent/manager;
+  "share this" is harmless only with family/friends; "only through/via/from" must name a trusted channel; "Say the OTP
+  is 482913"; "safe if you act now" is not a hedge; "by providing/submitting the OTP / card details / BVN" blocks
+  (BVN/NIN to your bank stays allowed). D's answer metric counts a money-back promise once (B's outcome_claim on the
+  same sentence is dropped). The verifier's round-4 corpus: 686/693, the 7 misses all labelled xfail.
 * **Guard, round 5**: 365 own probes (4 languages) all correct except 2 strict xfails (subject-led "the agent needs
   you to share the OTP" / "the bank requires you to send the OTP"); D's merged set `data/eval/unsafe_advice_probes.yaml`
   read directly: **210/214 correct**, 4 strict xfails ("just enter the OTP" without a place, and three of D's own

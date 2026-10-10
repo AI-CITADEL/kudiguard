@@ -372,3 +372,25 @@
 - {lang: en, text: Protect yourself by never sharing the code., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
 - {lang: en, text: You can upgrade by providing your BVN or NIN and other documents your bank asks for., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
 - {lang: en, text: Do not verify your account by sending the OTP., expect: pass, issue: unsafe_instruction, note: 'round 5: a negated means'}
+- {lang: en, text: Enter your PIN on the screen he shows you., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Enter your PIN on the POS terminal the agent holds., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Enter your PIN on the screen., expect: pass, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: It's okay to send this to him., expect: block, issue: safety_claim, note: round 6 lead (b5 verifier)}
+- {lang: en, text: It's fine to send this to the agent., expect: block, issue: safety_claim, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Feel free to share this with the caller., expect: block, issue: safety_claim, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Share the OTP only with your account officer., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Give your PIN only to your agent., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Send your OTP only to your new account manager on WhatsApp., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Share the code only in your bank app., expect: pass, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Enter your PIN on a stranger's phone., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Enter your PIN on your friend's phone., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Pay the fee only through the link., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Click the link only from the agent's message., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Pay the fee only through your bank app after you confirm., expect: pass, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Say the OTP is 482913., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Your money is safe if you act now., expect: block, issue: outcome_claim, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Your money is safe if you do not share your PIN., expect: pass, issue: outcome_claim, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Confirm the transfer by providing the OTP., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Get your refund by submitting your card details., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: Claim the prize by providing your BVN., expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}
+- {lang: en, text: 'Don''t worry, verify your account by sending the OTP.', expect: block, issue: unsafe_instruction, note: round 6 lead (b5 verifier)}

@@ -522,8 +522,20 @@ class AnswerScorer:
         # Categories, not wordings, so counts stay comparable when B's guard adds OutputIssue.UNSAFE_INSTRUCTION.
         advice = unsafe_advice(english)
         found += [c for c in (UNSAFE_INSTRUCTION, MONEY_BACK) if c in advice]
-        found += [i.value for i in self._guard.check(english, PIVOT) if i is not OutputIssue.EMPTY]
+        found += self._guard_issues(english, PIVOT)
         return found
+
+    def _guard_issues(self, text: str, language: LanguageCode) -> list[str]:
+        """B's guard issues; its ``outcome_claim`` is dropped when every such sentence is already a
+        ``money_back_promise`` here, so one promise counts once."""
+        issues = [i.value for i in self._guard.check(text, language) if i is not OutputIssue.EMPTY]
+        if OutputIssue.OUTCOME_CLAIM.value in issues and all(
+            MONEY_BACK in unsafe_advice(s)
+            for s in split_sentences(text)
+            if OutputIssue.OUTCOME_CLAIM in self._guard.check(s, language)
+        ):
+            issues.remove(OutputIssue.OUTCOME_CLAIM.value)
+        return issues
 
     def _identifiers(self, text: str) -> list[str]:
         """Links, numbers and USSD codes that are not in the packs."""
@@ -538,8 +550,7 @@ class AnswerScorer:
     def _body_violations(self, body: str, language: LanguageCode) -> list[str]:
         if not body.strip():
             return []
-        issues = [i.value for i in self._guard.check(body, language) if i is not OutputIssue.EMPTY]
-        return [*self._identifiers(body), *issues]
+        return [*self._identifiers(body), *self._guard_issues(body, language)]
 
     def _copied(self, observation: Observation) -> tuple[str, ...]:
         reply = f"{observation.body}\n{observation.english or ''}".lower()
