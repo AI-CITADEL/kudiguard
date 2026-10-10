@@ -475,8 +475,9 @@ class Conversation:
         # The welcome's language is kept provisionally (no consent yet) so a reply in it is understood. Donation
         # consent is separate and survives a new main consent text, but never a STOP: a stopped user who comes back
         # starts without it (a fresh yes is required); the "offered" marks stay.
+        # welcome_version stays unset until the welcome was actually delivered (a failed send is not "shown").
         state = UserState(turn.user_hash, language=turn.language, created_at=user.created_at if user else now,
-                          last_seen_at=now, welcome_version=CONSENT_VERSION)  # fmt: skip
+                          last_seen_at=now)  # fmt: skip
         if user is not None:
             state = dataclasses.replace(
                 state,
@@ -494,6 +495,9 @@ class Conversation:
         if self._privacy_url:
             welcome += "\n" + self._messages.text(turn.language, Msg.PRIVACY_LINK, url=self._privacy_url)
         await self._send(turn, welcome)
+        await self._store.save_user(
+            dataclasses.replace(state, welcome_version=CONSENT_VERSION)
+        )  # now it was shown
         await self._messenger.send(turn.message.user_id, self._language_menu(turn.language))
         return None
 

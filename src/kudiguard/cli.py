@@ -89,22 +89,23 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
-    async def run() -> tuple[int, int]:
+    async def run() -> tuple[int, int, int]:
         if not settings.db_path.is_file():  # never create an empty database (its vault would match no files)
             raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
         try:
             vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
             voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
-            await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
-            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice
+            markers = await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
+            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice, markers
         finally:
             await store.close()
 
-    rows, voice = asyncio.run(run())
+    rows, voice, markers = asyncio.run(run())
     print(
         f"removed {rows} rows older than {args.days} days; "
-        f"{voice} donated voice samples older than {settings.voice_retention_days} days"
+        f"{voice} donated voice samples older than {settings.voice_retention_days} days; "
+        f"{markers} DELETE markers older than {DELETION_MARKER_DAYS} days"
     )
     return 0
 

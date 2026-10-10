@@ -14,7 +14,7 @@ import pytest
 from kudiguard import cli, voice_cli
 from kudiguard.donation import DONATION_VERSION, Donation, Sealer, VoiceVault
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
-from kudiguard.storage.base import UserState, VoiceSample
+from kudiguard.storage.base import DELETION_MARKER_DAYS, UserState, VoiceSample
 from kudiguard.storage.sqlite import SQLiteStore
 
 SECRET = "s" * MIN_SECRET_BYTES
@@ -196,7 +196,11 @@ def test_purge_removes_expired_voice_samples(
     env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     assert cli.main(["purge"]) == 0
-    assert capsys.readouterr().out.strip().endswith("0 donated voice samples older than 365 days")
+    assert (
+        capsys.readouterr()
+        .out.strip()
+        .endswith("0 donated voice samples older than 365 days; 0 DELETE markers older than 30 days")
+    )
     monkeypatch.setenv("KUDIGUARD_VOICE_RETENTION_DAYS", "1")
     assert cli.main(["purge"]) == 0
     assert "5 donated voice samples older than 1 days" in capsys.readouterr().out
@@ -453,9 +457,49 @@ def test_a_delete_after_the_form_is_never_undone_by_the_import(
     assert state is not None and state.donation_source == "form"
 
 
+def test_a_delete_during_the_import_wins(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The server handles DELETE in another process: if it lands between the import's check and its save, the
+    re-check after the save erases the row again."""
+    original = SQLiteStore.save_user
+
+    async def save_then_deleted(self: SQLiteStore, state: UserState) -> None:
+        await original(self, state)
+        await self.delete_user(state.user_hash)  # the tester's DELETE arrives right now
+
+    monkeypatch.setattr(SQLiteStore, "save_user", save_then_deleted)
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{recently(2)}") == 0
+    printed = capsys.readouterr().out
+    assert "for 0 testers" in printed and "1 deleted" in printed
+    monkeypatch.undo()
+    assert stored_user(env, "+2348099999999") is None
+
+
+def test_a_number_listed_twice_keeps_its_most_recent_answer(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    older, newer = recently(5), recently(1)
+    assert (
+        preconsent(env, f"0809 999 9999,yes,yes,yes,{newer}", f"+234 809 999 9999,yes,yes,yes,{older}") == 0
+    )
+    assert "for 1 testers" in capsys.readouterr().out
+    state = stored_user(env, "+2348099999999")
+    assert state is not None and state.donation_at == datetime.fromisoformat(newer)
+
+
+def test_form_answers_must_be_younger_than_any_delete_marker(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert voice_cli.PRECONSENT_MAX_AGE_DAYS < DELETION_MARKER_DAYS
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{recently(29.5)}") == 0
+    assert "1 too old" in capsys.readouterr().out
+
+
 def test_delete_markers_expire_with_the_purge(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     delete_user(env, "+2348099999999", datetime.now(UTC) - timedelta(days=31))
     assert cli.main(["purge"]) == 0
+    assert "; 1 DELETE markers older than 30 days" in capsys.readouterr().out
 
     async def marker() -> datetime | None:
         store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))

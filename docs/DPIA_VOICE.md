@@ -178,7 +178,8 @@ against the gazetted text before filing.
   * **DELETE marker (s.34 compliance record, s.24 minimisation):** DELETE leaves only a keyed HMAC of the user's
     hash (its own label, no number and no content) with the time.
     * It is read only by the sign-up import, so an earlier form answer can never re-enrol someone who deleted.
-    * It is purged after 30 days, the same limit as a form answer's age.
+    * It is purged within 30 days: the purge loop runs every 6 hours and drops markers one interval early.
+    * Form answers older than 29 days are never imported, so a marker always outlives the answers it must block.
     * It is disclosed on /privacy under DELETE.
   * DELETE also resets the "offered" mark (N5), so a returning user may be offered once more.
 * **Objection (s.36):** treated as withdrawal.

@@ -170,6 +170,40 @@ def test_voice_donation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+async def test_one_failing_purge_step_never_skips_the_others(caplog: pytest.LogCaptureFixture) -> None:
+    from datetime import datetime, timedelta
+
+    from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
+
+    caplog.set_level("INFO", logger="kudiguard.api.services")
+    marker_cutoffs: list[datetime] = []
+
+    class Store:
+        async def purge_before(self, cutoff: object) -> int:
+            raise RuntimeError("locked")
+
+        async def purge_patterns_before(self, cutoff: object) -> int:
+            return 1
+
+        async def purge_deletion_markers(self, cutoff: datetime) -> int:
+            marker_cutoffs.append(cutoff)
+            return 2
+
+    class Vault:
+        async def purge(self, cutoff: object) -> int:
+            raise OSError("disk")
+
+    task = asyncio.create_task(purge_loop(Store(), 90, interval_s=3600, donations=Vault()))  # type: ignore[arg-type]
+    await asyncio.sleep(0.02)
+    task.cancel()
+    assert len(marker_cutoffs) == 1  # ran although evidence (before) and voice (after) failed
+    expected = utcnow() - timedelta(days=DELETION_MARKER_DAYS) + timedelta(hours=1)  # one interval early
+    assert abs((marker_cutoffs[0] - expected).total_seconds()) < 5
+    assert "retention purge failed (evidence)" in caplog.text
+    assert "retention purge failed (donated voice notes)" in caplog.text
+    assert "retention purge removed 3 rows" in caplog.text
+
+
 async def test_purge_loop_expires_donated_voice_notes_on_their_own_clock() -> None:
     from datetime import date, timedelta
 

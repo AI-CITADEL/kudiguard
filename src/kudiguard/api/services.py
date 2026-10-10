@@ -10,7 +10,7 @@ import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -72,22 +72,54 @@ async def purge_loop(
     voice_retention_days: int = VOICE_RETENTION_DAYS,
 ) -> None:
     """Delete evidence (and, on their own clocks, scam examples and donated voice notes) older than their retention
-    periods (NDPA s.24)."""
+    periods (NDPA s.24), every ``interval_s``."""
     while True:
-        try:
-            now = utcnow()
-            removed = await store.purge_before(now - timedelta(days=retention_days))
-            removed += await store.purge_patterns_before(
-                (now - timedelta(days=pattern_retention_days)).date()
-            )
-            if donations is not None:
-                removed += await donations.purge((now - timedelta(days=voice_retention_days)).date())
-            removed += await store.purge_deletion_markers(now - timedelta(days=DELETION_MARKER_DAYS))
-            if removed:
-                log.info("retention purge removed %d rows", removed)
-        except Exception:
-            log.exception("retention purge failed")
+        removed = await _purge_once(
+            store,
+            utcnow(),
+            retention_days,
+            pattern_retention_days,
+            interval_s,
+            donations,
+            voice_retention_days,
+        )
+        if removed:
+            log.info("retention purge removed %d rows", removed)
         await asyncio.sleep(interval_s)
+
+
+async def _purge_once(
+    store: Store,
+    now: datetime,
+    retention_days: int,
+    pattern_retention_days: int,
+    interval_s: float,
+    donations: VoiceVault | None,
+    voice_retention_days: int,
+) -> int:
+    """One retention pass; each step on its own, so one failing never skips the others."""
+    # DELETE markers are dropped one interval early, so none ever outlives DELETION_MARKER_DAYS (/privacy).
+    marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s)
+    steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
+        ("evidence", lambda: store.purge_before(now - timedelta(days=retention_days))),
+        (
+            "scam examples",
+            lambda: store.purge_patterns_before((now - timedelta(days=pattern_retention_days)).date()),
+        ),
+        ("deletion markers", lambda: store.purge_deletion_markers(marker_cutoff)),
+    ]
+    if donations is not None:
+        vault = donations
+        steps.append(
+            ("donated voice notes", lambda: vault.purge((now - timedelta(days=voice_retention_days)).date()))
+        )
+    removed = 0
+    for name, work in steps:
+        try:
+            removed += await work()
+        except Exception:
+            log.exception("retention purge failed (%s)", name)
+    return removed
 
 
 async def build_services(settings: Settings) -> Services:

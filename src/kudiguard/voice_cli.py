@@ -350,9 +350,9 @@ def cmd_remove(settings: Settings, args: argparse.Namespace) -> int:
 
 
 PRECONSENT_COLUMNS = ("number", "donate_confirmed", "age_confirmed", "own_voice_confirmed", "consented_at")
-PRECONSENT_MAX_AGE_DAYS = (
-    DELETION_MARKER_DAYS  # older answers are not imported (DELETE markers last this long)
-)
+# Older answers are not imported. One day shorter than a DELETE marker's life (the purge loop drops markers up to
+# one 6-hour interval early), so a marker always outlives every form answer it must block.
+PRECONSENT_MAX_AGE_DAYS = DELETION_MARKER_DAYS - 1
 _PHONE_TEXT = re.compile(r"^(?:whatsapp:|tel:)?[\d\s()+.\-]+$", re.IGNORECASE)  # digits and separators only
 _NIGERIAN_MOBILE = re.compile(r"^234[789][01]\d{8}$")
 _LOCAL_WITHOUT_ZERO = re.compile(r"^[789][01]\d{8}$")  # a spreadsheet dropped the leading 0 of 0803...
@@ -444,20 +444,23 @@ def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
     Never resurrects consent: rows whose user deleted their data, stopped, withdrew, declined, was offered or was
     active after the form are skipped (those testers are asked in the chat instead). A DELETE leaves only a coded
     marker for ``PRECONSENT_MAX_AGE_DAYS``, the same limit as the form's age, so a deleted tester is never re-enrolled.
-    Rows never imply main consent: the tester still gets the welcome in the chat. A number listed twice counts once."""
+    Rows never imply main consent: the tester still gets the welcome in the chat. A number listed twice counts once,
+    with its most recent answer. A DELETE that lands while a row is being saved wins: the row is re-checked after the
+    save and erased again."""
+    freshest: dict[str, datetime] = {}
     rows = read_preconsents(Path(args.csv), args.version)
+    for number, at in rows:
+        freshest[number] = max(at, freshest.get(number, at))
+    duplicates = len(rows) - len(freshest)
 
     async def run() -> tuple[int, int, Counter[str]]:
         store, _, hasher = await _open(settings)
         recorded_existing, recorded_new, skipped = 0, 0, Counter[str]()
+        if duplicates:
+            skipped["listed twice"] = duplicates
         now = datetime.now(UTC)
-        seen: set[str] = set()
         try:
-            for number, at in rows:
-                if number in seen:
-                    skipped["listed twice"] += 1
-                    continue
-                seen.add(number)
+            for number, at in freshest.items():
                 user_hash = hasher.user_id(number)
                 user = await store.get_user(user_hash)
                 if reason := preconsent_blocker(user, at, now, await store.deleted_at(user_hash)):
@@ -470,6 +473,11 @@ def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
                         donation_offered_at=at, donation_offered_version=args.version,
                     )
                 )  # fmt: skip
+                deleted = await store.deleted_at(user_hash)  # a DELETE between our check and our save wins
+                if deleted is not None and deleted >= at:
+                    await store.delete_user(user_hash)
+                    skipped["deleted"] += 1
+                    continue
                 if user is None:
                     recorded_new += 1
                 else:

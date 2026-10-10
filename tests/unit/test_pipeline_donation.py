@@ -307,6 +307,33 @@ async def test_a_form_tester_gets_the_welcome_before_anything_is_processed(d: Ha
     assert d.t(Msg.DONATION_OFFER) not in texts and len(await samples(d)) == 1
 
 
+async def test_a_welcome_that_could_not_be_sent_does_not_count_as_shown(d: Harness) -> None:
+    """Consent needs the notice to have been delivered: if the welcome send fails, the next message gets it again."""
+    d.messenger.fail_on = {d.t(Msg.WELCOME)}
+    assert await d.say("hello") == [d.t(Msg.ERROR_RETRY)]
+    state = await user(d)
+    assert state.welcome_version is None and state.consented_at is None
+    d.messenger.fail_on = set()
+    texts = await d.say(QUESTION)  # would have been taken as consent had the welcome counted
+    assert texts[0] == d.t(Msg.WELCOME) and (await user(d)).consented_at is None
+    assert [r["outcome"] for r in await interactions(d)] == ["error"]  # only the failed send was logged
+    assert d.llm.requests == []  # nothing was processed
+
+
+async def test_a_failed_language_menu_alone_still_lets_the_user_agree(d: Harness) -> None:
+    d.messenger.fail_on = {d.t(Msg.CHOOSE_LANGUAGE)}
+    texts = await d.say("hello")
+    assert texts[0] == d.t(Msg.WELCOME)  # the notice was delivered; only the menu failed
+    assert (await user(d)).welcome_version == CONSENT_VERSION
+    d.messenger.fail_on = set()
+    await d.say(QUESTION)  # continuing after the welcome = consent, and the question is answered
+    assert (await user(d)).consent_version == CONSENT_VERSION
+    assert [r["outcome"] for r in await interactions(d)] == [
+        "error",
+        "answered",
+    ]  # the menu failure, the answer
+
+
 async def test_a_language_button_never_skips_the_welcome(d: Harness) -> None:
     """A stranger tapping a language option (an old or forwarded menu) is welcomed, not signed up."""
     texts = await d.say(button="lang:yo")
