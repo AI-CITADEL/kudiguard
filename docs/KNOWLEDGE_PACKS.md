@@ -4,6 +4,13 @@ KudiGuard answers from **knowledge packs**. Our core pack carries scam-safety gu
 or NGO plugs in its own FAQ, safety messages and contact channels, with no code changes. Answers are composed in the
 user's language (Hausa, Yoruba, Igbo, English…) from your content, so you write it once, in English.
 
+**Shipped packs:** `kudiguard-core` (scam red flags, basic money literacy, verified report contacts) and
+`money-skills` (planning irregular income, emergency money, savings goals, ajo/esusu/adashe/isusu groups,
+cooperatives, deposit insurance, debt, credit history, investing, crypto/forex warnings, insurance, micro pension,
+small-business records and pricing, family support). `money-skills` is a partner-kind pack below core priority with no
+red-flag tags, so it never takes a red-flag slot from core safety guidance; it was added as a pack; the only code change was the optional `cite` manifest field.
+Partner packs that tag entries with red flags share the red-flag slots with core (round-robin).
+
 ## Option A — files (no engineering needed)
 
 ```
@@ -24,6 +31,7 @@ owner: Acme Bank Plc
 kind: partner            # 'core' is reserved for KudiGuard's safety pack
 priority: 50             # higher = your answers and contacts come first
 content_language: en
+cite: true               # your facts reach the model as "(source: Acme Bank)"; only KudiGuard's own packs may set false
 source: {type: files}
 ```
 

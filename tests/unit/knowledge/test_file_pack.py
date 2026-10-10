@@ -66,6 +66,17 @@ async def test_core_text_search(core: FilePackSource, text: str, best: str) -> N
     assert (await core.search(Query(text=text))).hits[0].entry.id == best
 
 
+def test_money_skills_pack_ships_enabled_below_core(core: FilePackSource) -> None:
+    money = FilePackSource.load(PACKS / "money-skills")
+    assert money.manifest.kind is PackKind.PARTNER  # 'core' is reserved for the safety pack
+    assert money.manifest.enabled and not money.manifest.sample
+    assert money.manifest.priority < core.manifest.priority  # supplements core, never outranks it on ties
+    assert not money.contacts  # report channels live in the verified core pack only
+    assert not {e.id for e in money.entries} & {e.id for e in core.entries}
+    assert not any(e.flags for e in money.entries)  # never takes a red-flag slot from core safety guidance
+    assert money.manifest.cite is False  # our own content, not cited as a third party
+
+
 def test_sample_bank_pack_loads_as_partner_sample() -> None:
     bank = FilePackSource.load(PACKS / "demo-bank")
     assert bank.manifest.kind is PackKind.PARTNER
@@ -98,6 +109,7 @@ def test_faq_keywords_split_and_bom_tolerated(tmp_path: Path) -> None:
     [
         ({"pack.yaml": "name: x\n"}, "pack.yaml"),
         ({"pack.yaml": "id: [unclosed"}, "pack.yaml"),
+        ({"pack.yaml": MANIFEST + "cite: false\n"}, "reserved"),  # partners can never hide attribution
         ({"topics_yaml": "- id: a\n  title: T\n  facts: [f]\n  flags: [nope]\n"}, "topics.yaml"),
         ({"topics_yaml": "id: not-a-list\n"}, "topics.yaml"),
         ({"contacts_yaml": "- label: L\n  kind: pigeon\n  value: v\n"}, "contacts.yaml"),

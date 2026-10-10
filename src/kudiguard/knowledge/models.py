@@ -18,6 +18,7 @@ from kudiguard.domain import Flag, LanguageCode
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_.-]{0,79}$")]
 Short = Annotated[str, StringConstraints(min_length=1, max_length=200, strip_whitespace=True)]
 Long = Annotated[str, StringConstraints(min_length=1, max_length=1000, strip_whitespace=True)]
+OWN_PACK_OWNER = "KudiGuard"  # owner of the packs we write ourselves
 
 
 class _Strict(BaseModel):
@@ -140,8 +141,15 @@ class PackManifest(_Strict):
     content_language: LanguageCode = "en"
     enabled: bool = True
     sample: bool = False  # fictional demo content; never present as real
+    cite: bool = True  # partner facts carry "(source: <name>)" in prompts; False for KudiGuard's own packs
     description: Annotated[str, StringConstraints(max_length=500)] = ""
     source: Annotated[FilesSourceSpec | HttpSourceSpec, Field(discriminator="type")] = FilesSourceSpec()
+
+    @model_validator(mode="after")
+    def _partners_are_cited(self) -> PackManifest:
+        if not self.cite and self.owner != OWN_PACK_OWNER:
+            raise ValueError(f"cite: false is reserved for {OWN_PACK_OWNER}'s own packs")
+        return self
 
 
 class KnowledgePayload(_Strict):
@@ -186,6 +194,7 @@ class SourcedEntry:
     sample: bool = False
     relevance: float | None = None
     kind: PackKind = PackKind.CORE
+    cite: bool = True
 
 
 @dataclass(frozen=True, slots=True)

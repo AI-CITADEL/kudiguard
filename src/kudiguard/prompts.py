@@ -322,7 +322,7 @@ def _facts_block(knowledge: KnowledgeResult) -> tuple[list[str], list[str]]:
     facts: list[str] = []
     actions: list[str] = []
     for item in knowledge.entries[:MAX_ENTRIES]:
-        suffix = f" (source: {item.source_name})" if item.kind is PackKind.PARTNER else ""
+        suffix = f" (source: {item.source_name})" if item.kind is PackKind.PARTNER and item.cite else ""
         facts.extend(f"{fact}{suffix}" for fact in item.entry.facts)
         actions.extend(item.entry.actions)
     return facts[:MAX_FACTS], list(dict.fromkeys(actions))

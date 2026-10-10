@@ -1,5 +1,6 @@
 # Retrieval benchmark: English pivot queries (as N-ATLAS would translate them) -> acceptable entry ids.
-# Packs: kudiguard-core (+ demo-bank where noted). Used by tests/integration/test_retrieval_quality.py.
+# Packs: kudiguard-core (+ demo-bank where noted); money-skills ids are accepted where they answer better
+# (scored with the production pack set in test_pipeline_accuracy_*_production). Used by tests/integration/test_retrieval_quality.py.
 - {q: "How do I start saving money?", want: [saving-basics]}
 - {q: "how do i keep money aside every month", want: [saving-basics, budgeting]}
 - {q: "What is a BVN?", want: [bvn-basics]}
@@ -26,7 +27,7 @@
 - {q: "Will my bank call me to ask for my PIN?", want: [faq-bank-calls, flag-asks-credentials]}
 # --- dev set 1: paraphrases written after content was frozen (partly tuned on since); see blind.yaml for held-out ---
 - {q: "they took money from my account but my brother never received it", want: [failed-transfer]}
-- {q: "i want to put small small money away for my children's school fees", want: [saving-basics, budgeting]}
+- {q: "i want to put small small money away for my children's school fees", want: [saving-basics, budgeting, saving-for-a-goal]}
 - {q: "a man at the market collected my atm and gave me another one", want: [pos-safety]}
 - {q: "how do i stop someone from entering my account", want: [protect-account]}
 - {q: "they keep sending me messages saying i owe them and threatening me", want: [loan-apps]}
@@ -41,8 +42,8 @@
 - {q: "i lost my phone and my bank app is on it what do i do", want: [lost-phone, protect-account]}
 - {q: "my sim card stopped working suddenly and now i see debit alerts", want: [faq-sim-swap, unauthorised-debit]}
 - {q: "the pos man said the network failed but money left my account", want: [failed-transfer, pos-safety, unauthorised-debit]}
-- {q: "i want to join ajo contribution with my colleagues is it good", want: [saving-basics]}
-- {q: "which company can i trust to invest my money", want: [flag-guaranteed-returns]}
+- {q: "i want to join ajo contribution with my colleagues is it good", want: [saving-basics, savings-groups]}
+- {q: "which company can i trust to invest my money", want: [flag-guaranteed-returns, investing-basics]}
 - {q: "how do i know if an investment company is registered", want: [flag-guaranteed-returns]}
 - {q: "my bank did not solve my complaint where else can i go", want: [failed-transfer, report-fraud, unauthorised-debit]}
 - {q: "what is the meaning of interest rate on a loan", want: [faq-interest, loan-apps]}
@@ -51,8 +52,8 @@
 - {q: "they said i should pay money to collect the grant from government", want: [flag-upfront-fee]}
 - {q: "how do i keep my atm card from being stolen at the pos", want: [pos-safety]}
 - {q: "i sent money to the wrong account number how can i get it back", want: [sent-to-wrong-account]}
-- {q: "what is the best way to save for emergency", want: [saving-basics]}
+- {q: "what is the best way to save for emergency", want: [saving-basics, emergency-fund]}
 - {q: "someone i met on facebook is asking me to send money for his flight", want: [flag-money-request]}
 - {q: "how do i stop people from using my phone to open my bank app", want: [protect-account]}
-- {q: "is it good to borrow money to start business", want: [loan-apps, faq-interest]}
+- {q: "is it good to borrow money to start business", want: [loan-apps, faq-interest, borrowing-wisely]}
 - {q: "they told me to download an app so they can help me fix my account", want: [flag-remote-access]}

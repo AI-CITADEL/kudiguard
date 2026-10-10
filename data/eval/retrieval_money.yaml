@@ -1,0 +1,24 @@
+# Money-skills development set (written with the pack, so NOT blind): guards that each entry is reachable.
+# Pack set as in production: kudiguard-core + money-skills.
+- {q: "I sell pepper in the market and some days I make nothing, how do I plan", want: [irregular-income]}
+- {q: "how much money should I keep for emergencies", want: [emergency-fund]}
+- {q: "I need to pay rent in six months, how do I gather the money", want: [saving-for-a-goal]}
+- {q: "why everything is costing more every month and my savings is not enough", want: [inflation]}
+- {q: "what does compound interest mean", want: [interest-basics, faq-interest]}
+- {q: "is it wise to join thrift contribution in my street", want: [savings-groups]}
+- {q: "the woman collecting our daily contribution has disappeared", want: [faq-ajo-collector-ran, savings-groups]}
+- {q: "how do I join a cooperative society at work", want: [cooperatives]}
+- {q: "if my microfinance bank closes will I lose my money", want: [deposit-insurance]}
+- {q: "is it okay to keep my money in a savings app that pays interest", want: [savings-apps]}
+- {q: "should I collect loan to buy goods for my shop", want: [borrowing-wisely]}
+- {q: "I owe three different lenders and I cannot pay", want: [debt-trap]}
+- {q: "will not paying my loan affect me when I want another loan later", want: [credit-history]}
+- {q: "I have some money and want to invest it, what should I know", want: [investing-basics]}
+- {q: "how can I buy FGN savings bond", want: [government-securities]}
+- {q: "someone on telegram wants to manage my forex account for me", want: [crypto-forex]}
+- {q: "do I need insurance for my shop", want: [insurance-basics]}
+- {q: "I am a tailor, how can I save for when I am old", want: [micro-pension]}
+- {q: "how do I keep account of what I sell every day", want: [business-records]}
+- {q: "my capital keeps finishing because I use shop money at home", want: [separate-business-money]}
+- {q: "how do I know the right price to sell my goods", want: [pricing-profit]}
+- {q: "my relatives always ask me for money and I have nothing left", want: [family-support]}

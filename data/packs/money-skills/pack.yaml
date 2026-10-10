@@ -1,0 +1,16 @@
+# KudiGuard's own money-skills content: practical lessons beyond the core safety pack (which already covers basic
+# saving, budgeting and loan apps; entries here go deeper and never repeat it). Loaded as a partner-kind pack below core
+# priority, so core safety answers win ties and weak money-skills matches are dropped.
+id: money-skills
+name: Money Skills
+owner: KudiGuard
+kind: partner
+priority: 5  # below core (10): core answers win ties and come first
+content_language: en
+cite: false  # our own content: not cited as a third-party source
+description: >
+  Everyday money skills for people with daily or irregular income: saving goals, emergency money, savings groups
+  (ajo, esusu, adashe, isusu), avoiding debt traps, small-business records, and checking investments, insurance and
+  pensions before paying.
+source:
+  type: files

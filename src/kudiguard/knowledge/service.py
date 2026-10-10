@@ -94,7 +94,7 @@ def _trim(item: SourcedEntry, budget: int) -> SourcedEntry:
 
 def _sourced(source: KnowledgeSource, entry: Entry, relevance: float | None = None) -> SourcedEntry:
     m = source.manifest
-    return SourcedEntry(entry, m.id, m.name, m.sample, relevance, m.kind)
+    return SourcedEntry(entry, m.id, m.name, m.sample, relevance, m.kind, m.cite)
 
 
 class KnowledgeBase:

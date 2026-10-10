@@ -205,10 +205,13 @@ async def test_query_embedded_once_shared_and_cached() -> None:
 # --- building from the shipped packs directory --------------------------------------------------------
 
 
-async def test_build_sources_default_is_core_only() -> None:
+async def test_build_sources_default_is_every_enabled_real_pack() -> None:
     async with httpx.AsyncClient() as client:
         sources = build_sources(PACKS, client=client)
-    assert [s.manifest.id for s in sources] == ["kudiguard-core"]
+    assert [s.manifest.id for s in sources] == [
+        "kudiguard-core",
+        "money-skills",
+    ]  # fictional samples stay off
 
 
 async def test_sample_packs_refused_unless_allowed() -> None:

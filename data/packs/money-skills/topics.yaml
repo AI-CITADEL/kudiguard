@@ -1,0 +1,229 @@
+# Money skills. Same authoring rules as the core pack:
+#  * one idea per fact, short sentences, no jargon (N-ATLAS restates them in the user's language)
+#  * never promise an outcome ("you will be rich"); never call a product "safe" or recommend a named company
+#  * no figures that change often (rates, limits, prices): point to the official source instead
+#  * do not repeat the core pack (saving-basics, budgeting, loan-apps, account-tiers, ...)
+
+# --- planning money ------------------------------------------------------------------------------------
+- id: irregular-income
+  title: Planning money when your income changes every day
+  facts:
+    - Traders, drivers, artisans and farmers often earn different amounts each day or season.
+    - Work out how much your household needs each week for food, rent, transport and school fees.
+    - On good days, put the extra aside for slow days instead of spending it.
+    - Keep a small "slow-day" fund so a bad week does not force you to borrow.
+  actions:
+    - For one month, write down what you earn each day. Use your lowest normal week to plan spending.
+  keywords: [daily income, irregular income, trader, market, okada, keke, artisan, farmer, harvest, slow days, sales not regular]
+
+- id: emergency-fund
+  title: Building emergency money step by step
+  facts:
+    - Emergency money is for sickness, a lost job, a broken tool or an urgent journey, not for wants.
+    - Start with a small target, such as one week of household spending, then grow it slowly.
+    - A common long-term goal is enough to cover three months of basic needs.
+    - Keep it where you can reach it quickly, but not in your everyday spending account.
+  actions:
+    - If you use your emergency money, start rebuilding it as soon as income comes in.
+  keywords: [emergency, emergencies, emergency money, emergency fund, how much to keep, rainy day, hospital bill, sudden expense, unexpected]
+
+- id: saving-for-a-goal
+  title: Saving for school fees, rent or a big purchase
+  facts:
+    - Write down the goal, the amount and the date you need it.
+    - Divide the amount by the number of weeks or months left. That is how much to save each time.
+    - Start early. Saving a little over many months is easier than finding a large sum at once.
+    - Keep each goal's money apart so it is not used for something else.
+  keywords: [school fees, rent, goal, target saving, save for, buy land, wedding, big purchase, sallah, christmas]
+
+- id: inflation
+  title: Why prices rise and what it means for your savings
+  facts:
+    - Inflation means prices go up over time, so the same naira buys less.
+    - Cash kept at home does not grow, so it loses buying power when prices rise.
+    - Savings that earn interest lose less to rising prices than cash at home.
+    - Rising prices do not make every "high return" offer real. Scammers use inflation fears to sell fake investments.
+  keywords: [inflation, prices going up, costing more, things are expensive, prices rising, cost of living, naira value, money losing value, keep cash at home, under mattress]
+
+- id: interest-basics
+  title: How interest works on savings and loans
+  facts:
+    - Compound interest means interest is added to your savings, and then you also earn interest on that interest.
+    - So savings grow faster the longer you leave them.
+    - Loans work the same way against you. Unpaid interest can grow the debt quickly.
+    - A rate "per month" or "per week" is much higher than the same number "per year".
+  actions:
+    - Always ask whether a rate is per day, per week, per month or per year.
+  keywords: [interest, interest rate, compound interest, per month, per annum, percent]
+
+# --- savings groups and institutions -------------------------------------------------------------------
+- id: savings-groups
+  title: Ajo, esusu, adashe and isusu savings groups
+  facts:
+    - In a rotating savings group, members pay in regularly and each member takes the full pot in turn.
+    - These groups depend on trust. The biggest risks are a collector who disappears and members who stop paying after their turn.
+    - Groups with written records, known members and an agreed order of collection have fewer disputes.
+  actions:
+    - Join groups where you know the members and the collector personally.
+    - Ask for the rules, the collection order and a record of every payment, in writing or in a shared notebook.
+    - Be careful with online "ajo" groups run by strangers. Many are scams.
+  keywords: [ajo, esusu, adashe, isusu, contribution, thrift, daily contribution, rotating savings, alajo, collector]
+
+- id: cooperatives
+  title: Joining a cooperative society
+  facts:
+    - A cooperative is a group whose members save together and can borrow from the group at agreed terms.
+    - Cooperatives in Nigeria should be registered with their state's cooperative department.
+    - Members have a right to see the written rules (called bye-laws) and the accounts.
+  actions:
+    - Before joining, ask for the registration certificate, the written rules and how loans and withdrawals work.
+  keywords: [cooperative, co-operative society, thrift and credit, staff cooperative, union savings, bye-laws]
+
+- id: deposit-insurance
+  title: What happens to your money if a bank fails
+  facts:
+    - The NDIC (Nigeria Deposit Insurance Corporation) protects deposits if a licensed bank or other covered institution fails, up to a limit.
+    - This covers licensed banks, microfinance banks, payment service banks and licensed mobile money wallets.
+    - Money given to unlicensed investment schemes or ajo collectors is not insured.
+  actions:
+    - Check the current insurance limit and covered institutions on the NDIC website (ndic.gov.ng).
+    - Check that a bank, microfinance bank or wallet provider is licensed on the CBN website before you save with it.
+  keywords: [ndic, deposit insurance, bank collapse, bank fails, microfinance bank, is my money protected, licensed bank]
+
+- id: savings-apps
+  title: Using savings and fintech apps
+  facts:
+    - Many apps offer savings with interest. Real providers are licensed by the CBN or registered with the SEC.
+    - A licence claim inside the app is not proof. Check it yourself on the CBN or SEC website.
+    - Higher interest usually means higher risk or money locked for longer.
+    - An app that promises very high fixed returns, or pays you to bring others, is a warning sign.
+  actions:
+    - Read the withdrawal rules before you lock money. Some apps charge for early withdrawal.
+    - Download apps only from the Play Store or App Store, and read other users' reviews.
+  keywords: [savings app, keep money in app, fintech, fixed savings, target savings app, lock funds, piggyvest, cowrywise, interest app]
+
+# --- borrowing and debt --------------------------------------------------------------------------------
+- id: borrowing-wisely
+  title: When borrowing helps and when it hurts
+  facts:
+    - Borrowing can help when the money brings income, such as stock for a shop or a tool for your trade.
+    - Borrowing for daily spending or celebrations often leaves you poorer.
+    - Borrowing from one lender to repay another is a sign of a debt trap.
+  actions:
+    - Before you borrow, write down how and when you will repay from your income.
+    - Compare the total amount you will repay from at least two lenders.
+  keywords: [should i borrow, take a loan, collect loan, business loan, loan for shop, borrow money, borrow from friend, lender, owe]
+
+- id: debt-trap
+  title: Getting out of debt
+  facts:
+    - List every debt with the amount, the charges and the due date.
+    - Pay the most expensive debt first, while paying at least the minimum on the others.
+    - Some lenders agree to a new repayment plan if you talk to them before you miss payments.
+    - Do not take a new loan to repay an old one unless it is clearly cheaper.
+  actions:
+    - Stop new borrowing while you repay.
+    - If a lender harasses you or your contacts, report it to the FCCPC.
+  keywords: [debt, in debt, owing, cannot repay, too many loans, debt trap, repayment plan, default]
+
+- id: credit-history
+  title: Your credit history
+  facts:
+    - Banks and licensed lenders report your loans to credit bureaus, companies that keep records of how people repay.
+    - Repaying on time helps you get loans later at better terms. Missed payments make borrowing harder.
+    - You can ask a CBN-licensed credit bureau for your own credit report. Ask whether there is a fee.
+  keywords: [credit score, credit history, not paying loan, unpaid loan, late repayment, credit report, credit bureau, crc, blacklisted, loan history]
+
+# --- investing and protection --------------------------------------------------------------------------
+- id: investing-basics
+  title: Before you invest
+  facts:
+    - Invest only money you will not need soon, after you have emergency money.
+    - Every investment can lose money. Higher possible profit means higher risk.
+    - Spreading money across different things lowers the damage if one fails.
+    - Investment companies and platforms must be registered with the SEC (Securities and Exchange Commission).
+  actions:
+    - Check the company on the SEC Nigeria website before paying anything.
+    - If you do not understand how the money is made, do not invest.
+  keywords: [invest, investment, stocks, shares, mutual fund, where to invest, grow money, returns]
+
+- id: government-securities
+  title: Treasury bills and government savings bonds
+  facts:
+    - The Federal Government borrows from the public through treasury bills and FGN savings bonds.
+    - Treasury bills are short loans to the government, for one year or less.
+    - FGN savings bonds are sold by the Debt Management Office (DMO) through approved stockbrokers.
+    - Treasury bills can be bought through banks and licensed dealers.
+  actions:
+    - Check current offers and approved sellers on the DMO (dmo.gov.ng) or CBN websites, not from people on social media.
+  keywords: [treasury bill, t-bill, fgn bond, savings bond, government bond, dmo]
+
+- id: crypto-forex
+  title: Crypto, forex trading and "signals"
+  facts:
+    - Crypto and forex prices can rise or fall sharply. You can lose most of your money quickly.
+    - Paid "account managers" who trade for you, paid "signals" and promises of daily profit are common scams.
+    - Most forex and crypto platforms advertised on social media are not registered with the SEC.
+    - Even on a registered platform you can lose your money.
+  actions:
+    - Check any platform on the SEC Nigeria website. Never send money to a person to "trade for you".
+  keywords: [crypto, bitcoin, usdt, forex, fx trading, trade for me, manage my account, trading signals, account manager, binary options]
+
+- id: insurance-basics
+  title: Insurance in plain words
+  facts:
+    - Insurance means paying a small amount regularly. In return, the insurer pays for a big loss such as sickness, fire or a crash.
+    - Health insurance is offered through state health insurance schemes and NHIA-accredited providers.
+    - Insurance companies must be licensed by NAICOM. Some sell small, cheap plans through their official app or USSD code.
+  actions:
+    - Check the company on the NAICOM website first. Never buy insurance from someone who calls or messages you.
+    - Before paying, ask what is covered, what is not covered and how to make a claim.
+  keywords: [insurance, health insurance, nhia, micro insurance, naicom, life insurance, shop insurance]
+
+- id: micro-pension
+  title: Saving for old age when you are self-employed
+  facts:
+    - The Micro Pension Plan lets self-employed people and informal workers save for old age.
+    - You save with a pension company called a PFA (Pension Fund Administrator), licensed by PenCom (National Pension Commission).
+    - Part of the savings can be withdrawn for emergencies, from three months after your first payment. The rest is kept for old age.
+  actions:
+    - Check the list of licensed PFAs on the PenCom website (pencom.gov.ng) before you register.
+  keywords: [pension, retirement, old age, when I am old, save for old age, micro pension, pfa, pencom, self-employed pension]
+
+# --- small business ------------------------------------------------------------------------------------
+- id: business-records
+  title: Keeping simple records for your business
+  facts:
+    - Write down every sale and every cost each day, even in a small notebook.
+    - Records show which goods make profit and which do not.
+    - Lenders and cooperatives are more willing to lend when you can show records.
+  keywords: [record keeping, sales book, keep account, what I sell, business records, bookkeeping, track sales, shop account, profit and loss]
+
+- id: separate-business-money
+  title: Keeping business money apart from home money
+  facts:
+    - Mixing shop money with household money makes it hard to know if the business is making a profit.
+    - Pay yourself a fixed amount from the business, like a salary, and leave the rest in the business.
+    - A separate account or wallet for the business makes this easier.
+  keywords: [business account, mix money, shop money, capital finished, eating my capital, pay myself]
+
+- id: pricing-profit
+  title: Pricing your goods so you make a profit
+  facts:
+    - Profit is what is left after all costs, including goods, transport, rent, levies, data and your own time.
+    - Many small businesses lose money because they price goods without counting every cost.
+    - When costs rise, check your prices again.
+  actions:
+    - For each product, add up the full cost of one item, then set a price above it.
+  keywords: [profit, pricing, how much to sell, cost price, selling price, loss, margin]
+
+# --- family money --------------------------------------------------------------------------------------
+- id: family-support
+  title: Helping family without running out of money
+  facts:
+    - Supporting family is important, but giving away all your savings can leave you unable to handle your own emergencies.
+    - Deciding in advance how much you can give each month makes requests easier to answer.
+    - Urgent requests for money by message, even from family, can be from scammers using a stolen or copied account.
+  actions:
+    - Call the person on a number you already know before sending money.
+  keywords: [black tax, family support, relatives, relatives asking for money, always asking me for money, sending money home, help family]

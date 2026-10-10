@@ -30,6 +30,20 @@ def sourced(
     return SourcedEntry(entry, partner.lower().replace(" ", "-"), partner, kind=PackKind.PARTNER)
 
 
+def test_own_partner_packs_are_not_cited_as_a_source() -> None:
+    import dataclasses
+
+    from kudiguard.knowledge.models import KnowledgeResult
+    from kudiguard.prompts import _facts_block
+
+    own = dataclasses.replace(
+        sourced("budget", ("Write down what you spend.",), partner="Money Skills"), cite=False
+    )
+    cited = sourced("bvn", ("A BVN links your accounts.",), partner="Demo Bank")
+    facts, _ = _facts_block(KnowledgeResult(entries=(own, cited)))
+    assert facts == ["Write down what you spend.", "A BVN links your accounts. (source: Demo Bank)"]
+
+
 KNOWLEDGE = KnowledgeResult(
     entries=(
         sourced("otp", ("Banks never ask for your OTP.",), ("Do not share the code.", "Call your bank.")),
