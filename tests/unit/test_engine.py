@@ -10,7 +10,7 @@ from kudiguard.engine import RETRY_TEMPERATURE, AnswerKind, Engine
 from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
-from kudiguard.llm.base import LLMError, Purpose
+from kudiguard.llm.base import DEFAULT_SEED, LLMError, Purpose
 from kudiguard.prompts import Intent
 from kudiguard.safety.output_guard import OutputIssue
 
@@ -70,7 +70,8 @@ async def test_guard_hit_retries_warmer_then_succeeds(
     llm = FakeLLM(analyse=analysis("x", "scam_check"), compose=["This is not a scam, go ahead.", GOOD_REPLY])
     answer = await engine_with(registry, knowledge, llm).check(OTP_SCAM, "en")
     composes = llm.calls(Purpose.COMPOSE)
-    assert [c.temperature for c in composes] == [0.1, RETRY_TEMPERATURE]
+    assert [c.temperature for c in composes] == [0.0, RETRY_TEMPERATURE]
+    assert {c.seed for c in composes} == {DEFAULT_SEED}  # the warmer retry is reproducible too
     assert answer.outcome is Outcome.ANSWERED and answer.body.startswith("1.")
     assert OutputIssue.SAFETY_CLAIM in answer.issues
 
@@ -212,4 +213,6 @@ async def test_guarded_warning_falls_back_but_reports_model_time(
     assert warned.outcome is Outcome.FALLBACK
     assert warned.text == Messages(registry).text("ha", Msg.WARN_FAMILY_FALLBACK)
     assert warned.llm_ms == 200  # both attempts' latency is still accounted for
-    assert len(llm.calls(Purpose.WARN)) == 2
+    warns = llm.calls(Purpose.WARN)
+    assert [c.temperature for c in warns] == [0.0, RETRY_TEMPERATURE]
+    assert {c.seed for c in warns} == {DEFAULT_SEED}  # follow-up retries reproduce too

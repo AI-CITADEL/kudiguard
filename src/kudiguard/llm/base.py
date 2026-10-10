@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
 
-DEFAULT_TEMPERATURE = 0.1  # N-ATLAS model card
+# Greedy decoding: the same prompt gives near-identical replies (the N-ATLAS model card suggests 0.1; compare with
+# `scripts/eval_prompts.py --temperature 0.1 --no-seed`). Not bit-exact: llama.cpp's prompt cache can change batch
+# sizes and flip a near-tied token (its README says so); we keep the cache for ~150 ms/call. The guard retry runs
+# warmer.
+DEFAULT_TEMPERATURE = 0.0
+DEFAULT_SEED = 42  # no effect at temperature 0 (greedy); fixes the warmer guard retry so it reproduces too
 DEFAULT_REPEAT_PENALTY = 1.12  # N-ATLAS model card (llama.cpp name)
 
 
@@ -42,6 +47,7 @@ class ChatRequest:
     max_tokens: int
     temperature: float = DEFAULT_TEMPERATURE
     repeat_penalty: float = DEFAULT_REPEAT_PENALTY
+    seed: int | None = DEFAULT_SEED  # None = the backend picks one (non-reproducible)
     json_schema: Mapping[str, Any] | None = None
     stop: tuple[str, ...] = ()
     purpose: Purpose = Purpose.GENERAL
@@ -51,6 +57,8 @@ class ChatRequest:
     def __post_init__(self) -> None:
         if self.timeout_s is not None and self.timeout_s <= 0:
             raise ValueError(f"timeout_s must be positive, got {self.timeout_s}")
+        if not self.temperature >= 0:  # also rejects NaN
+            raise ValueError(f"temperature must be >= 0, got {self.temperature}")
 
     def payload(self) -> dict[str, Any]:
         """OpenAI-compatible chat-completions body (llama.cpp also accepts ``repeat_penalty``)."""
@@ -60,6 +68,8 @@ class ChatRequest:
             "temperature": self.temperature,
             "repeat_penalty": self.repeat_penalty,
         }
+        if self.seed is not None:
+            body["seed"] = self.seed  # OpenAI and llama.cpp both accept it
         if self.stop:
             body["stop"] = list(self.stop)
         if self.json_schema is not None:

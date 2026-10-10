@@ -5,7 +5,9 @@
 Runs analyse -> (translate fallback) -> rules -> knowledge -> compose for every case in data/eval/prompts.yaml,
 mirroring the production policy, and checks objective properties: usable translation, intent, verdict, output
 guard (safety claims, refusals), truncation, sign-offs, wrong reply language, worked-example leakage and task echo.
-Outputs vary run to run even at temperature 0.1, so use --runs > 1 before trusting a change.
+Decoding is greedy (temperature 0, seeded retry), so runs are near-identical; llama.cpp's prompt cache can still flip
+near-tied tokens, so use --runs > 1 to check stability. Compare settings with --temperature/--no-seed (FixedSampling)
+and --no-cache-prompt for bit-exact A/B runs on a cold server.
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ import time
 from collections import Counter
 from pathlib import Path
 from statistics import median
-from typing import Any
 
 import httpx
 import yaml
@@ -28,7 +29,9 @@ from kudiguard.engine import Engine
 from kudiguard.knowledge.models import Query
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import PIVOT, LanguageRegistry
+from kudiguard.llm.base import LLM, ChatRequest, LLMError
 from kudiguard.llm.openai_compat import OpenAICompatLLM
+from kudiguard.llm.sampling import add_sampling_arguments, describe, with_sampling
 from kudiguard.prompts import (
     Intent,
     clean_reply,
@@ -62,11 +65,10 @@ TASK_ECHO = re.compile(r"\b(task:|answer the user's|money question)", re.IGNOREC
 
 @dataclasses.dataclass
 class Context:
-    client: httpx.AsyncClient
-    url: str
     kb: KnowledgeBase
     registry: LanguageRegistry
     guard: OutputGuard
+    llm: LLM
     engine: Engine
     timings: dict[str, list[float]]
 
@@ -76,14 +78,12 @@ def english_ratio(text: str) -> float:
     return sum(w in ENGLISH_STOPWORDS for w in words) / max(len(words), 1)
 
 
-async def chat(ctx: Context, payload: dict[str, Any], timer: str | None = None) -> tuple[str, str | None]:
+async def chat(ctx: Context, request: ChatRequest, timer: str | None = None) -> tuple[str, str | None]:
     started = time.perf_counter()
-    response = await ctx.client.post(ctx.url, json=payload)
-    response.raise_for_status()
+    completion = await ctx.llm.complete(request)  # through the LLM port, so --temperature/--no-seed apply
     if timer:
         ctx.timings[timer].append(time.perf_counter() - started)
-    choice = response.json()["choices"][0]
-    return str(choice["message"]["content"]), choice.get("finish_reason")
+    return completion.text, completion.finish_reason
 
 
 async def run_case(ctx: Context, case: dict[str, str], *, verbose: bool) -> list[str]:
@@ -127,7 +127,10 @@ async def run_case(ctx: Context, case: dict[str, str], *, verbose: bool) -> list
         flags=result.flags,
         knowledge=knowledge,
     )
-    content, finish = await chat(ctx, request.payload(), "compose")
+    try:
+        content, finish = await chat(ctx, request, "compose")
+    except LLMError as exc:  # production budget (20 s): a slow compose is a finding, not a crash
+        return [*problems, f"{tag}: compose failed ({exc})"]
     truncated = finish == "length"
     reply = clean_reply(content, truncated=truncated)
 
@@ -151,30 +154,33 @@ async def run_case(ctx: Context, case: dict[str, str], *, verbose: bool) -> list
     return problems
 
 
-async def main(url: str, runs: int) -> None:
+async def main(args: argparse.Namespace) -> None:
+    url, runs = args.url, args.runs
     registry = LanguageRegistry.load(ROOT / "data" / "languages")
     cases = yaml.safe_load((ROOT / "data" / "eval" / "prompts.yaml").read_text(encoding="utf-8"))
     problems: list[str] = []
     async with httpx.AsyncClient(timeout=120) as client:
         kb = knowledge_base_from_packs(ROOT / "data" / "packs", client=client)
+        base = OpenAICompatLLM(  # no transport retry: it would blur the timings
+            url.split("/v1/")[0], client=client, retries=0, cache_prompt=not args.no_cache_prompt
+        )
+        llm = with_sampling(base, args)
         ctx = Context(
-            client=client,
-            url=url,
             kb=kb,
             registry=registry,
             guard=OutputGuard(registry),
-            engine=Engine(
-                registry=registry, llm=OpenAICompatLLM(url.split("/v1/")[0], client=client), knowledge=kb
-            ),
+            llm=llm,
+            engine=Engine(registry=registry, llm=llm, knowledge=kb),
             timings={"analyse": [], "compose": []},
         )
         for run in range(runs):
             for case in cases:
                 problems += await run_case(ctx, case, verbose=run == 0)
 
-    print(f"\n{runs} run(s) x {len(cases)} cases = {runs * len(cases)} conversations")
+    print(f"\n{runs} run(s) x {len(cases)} cases = {runs * len(cases)} conversations ({describe(args)})")
     a, c = ctx.timings["analyse"], ctx.timings["compose"]
-    print(f"analyse p50 {median(a):.1f}s  compose p50 {median(c):.1f}s  max {max(c):.1f}s")
+    if a and c:
+        print(f"analyse p50 {median(a):.1f}s  compose p50 {median(c):.1f}s  max {max(c):.1f}s")
     kinds = Counter(p.rsplit(": ", 1)[1].split(" (")[0] for p in problems)
     print(f"{len(problems)} problems: " + (", ".join(f"{k}={v}" for k, v in kinds.most_common()) or "none"))
     for problem in problems:
@@ -185,5 +191,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="http://127.0.0.1:8081/v1/chat/completions")
     parser.add_argument("--runs", type=int, default=1)
+    add_sampling_arguments(parser)
     args = parser.parse_args()
-    asyncio.run(main(args.url, args.runs))
+    asyncio.run(main(args))

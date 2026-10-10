@@ -55,3 +55,16 @@ async def test_hausa_scam_end_to_end(llm: OpenAICompatLLM, registry: LanguageReg
     assert reply
     assert OutputGuard(registry).check(reply, "ha") == ()
     assert completion.latency_ms < 15_000
+
+
+async def test_same_request_twice_gives_the_same_text() -> None:
+    """Greedy decoding with the prompt cache off is bit-exact (with it on, near-tied tokens can flip)."""
+    request = analyse_request(
+        "Someone called and asked me to send the OTP they just sent to my phone.", "English"
+    )
+    async with httpx.AsyncClient() as client:
+        llm = OpenAICompatLLM("http://127.0.0.1:8081", client=client, cache_prompt=False)
+        if not await llm.ready():
+            pytest.skip("llama-server not running on :8081")
+        first, second = (await llm.complete(request)).text, (await llm.complete(request)).text
+    assert first == second

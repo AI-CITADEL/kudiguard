@@ -91,7 +91,7 @@ Web voice page  ─┘
 ## 4. Serving (measured on D0 spike)
 
 * LLM: `tosinamuda/N-ATLaS-GGUF` Q4_K_M (4.92 GB, ungated) on native Windows `llama-server` CUDA 12.4,
-  `-c 4096 -ngl 99`; pass `temperature 0.1`, `repeat_penalty 1.12`, `max_tokens 250` explicitly.
+  `-c 4096 -ngl 99`; pass `temperature 0` (greedy) + `seed 42`, `repeat_penalty 1.12`, `max_tokens 250` explicitly.
   Quant kept private (no renamed redistribution). Record file SHA256.
 * ASR: the official NCAIR1 models, converted once to **CTranslate2 int8** and run with faster-whisper on **CPU**
   (avoid VRAM contention): ~1.7–3.6 s per 11 s voice note vs 6–20 s with transformers (SPIKES S4). Conversion is
