@@ -6,10 +6,13 @@
     kudiguard voice access --user +234803... [--out var/voice-access]   (NDPA s.34: a donor's own samples)
     kudiguard voice erase --user web:<session id>                       (s.34/s.35 requests that come by email)
     kudiguard voice remove <id> [<id> ...]                              (a reviewer found a child's/another voice)
+    kudiguard voice preconsent --csv signups.csv --version 2026-10-10    (tester sign-up form: 18+ and own voice)
+    kudiguard voice wipe --all                                          (before rotating the key, or to end it)
 
-Exports are decrypted copies of personal data: they go only to git-ignored folders of this checkout (``var/`` or
-``exports/``) or outside it, are shared only with named transcribers under written confidentiality who work on them
-locally (no copies abroad or in cloud drives), and are deleted as soon as the references are typed (docs/DPIA_VOICE.md).
+Exports are decrypted copies of personal data: they go only to the git-ignored ``var/`` (next to the database) or
+``exports/`` folders, never into a cloud-synced folder, are shared only with named transcribers under written
+confidentiality who work on them locally (no copies abroad or in cloud drives), and are deleted as soon as the
+references are typed (docs/DPIA_VOICE.md).
 """
 
 from __future__ import annotations
@@ -17,23 +20,30 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import dataclasses
 import random
 from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from kudiguard.config import ROOT, Settings
-from kudiguard.donation import Sealer, VoiceIntegrityError, VoiceVault
+from kudiguard.donation import DONATION_VERSION, Sealer, VoiceIntegrityError, VoiceVault
 from kudiguard.privacy import UserHasher
 from kudiguard.speech.metrics import POOLED_METRICS
-from kudiguard.storage.base import Store, VoiceSample
+from kudiguard.storage.base import Store, UserState, VoiceSample, aware
 from kudiguard.storage.sqlite import SQLiteStore
+from kudiguard.text import redact
 
 MANIFEST = "manifest.csv"
 COLUMNS = ("id", "language", "week", "duration_s", "asr_hypothesis", "reference")
-FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")  # same rule as the review kit's spreadsheet cells
-IGNORED_DIRS = ("var", "exports")  # git-ignored folders of the checkout (.gitignore)
+# Cells a spreadsheet may evaluate: these first characters (incl. full-width forms) after any leading blanks
+# (incl. no-break and ideographic spaces), or a leading tab/CR/LF. Same semantics as the review kit's cells.
+FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "\t", "\r", "\n", "\uff1d", "\uff0b", "\uff0d", "\uff20")
+EXPORT_DIRS = ("var", "exports")  # git-ignored folders of the checkout (.gitignore)
+CLOUD_SYNCED = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "icloud drive", "box")
+TRUE = frozenset({"yes", "y", "true", "1", "x", "ticked"})
 REMINDER = (
     "PRIVACY: these are real people's voices (personal data, NDPA 2023). Share them only with named transcribers "
     "under written confidentiality, who work locally (no cloud drives, no copies abroad), and delete every copy "
@@ -60,14 +70,24 @@ def audio_suffix(data: bytes) -> str:
     return ".bin"
 
 
+def _needs_escape(value: str) -> bool:
+    if value.startswith(FORMULA_PREFIXES) or value.lstrip().startswith(FORMULA_PREFIXES):
+        return True
+    return value.startswith("'") and _needs_escape(value[1:])  # so that a real leading apostrophe round-trips
+
+
 def spreadsheet_cell(value: str) -> str:
     """CSV formula-injection guard (OWASP): a leading apostrophe makes spreadsheets show text, not evaluate it."""
-    return "'" + value if value.startswith(FORMULA_PREFIXES) else value
+    return "'" + value if _needs_escape(value) else value
 
 
 def plain_cell(value: str) -> str:
-    """Undo ``spreadsheet_cell`` when reading a manifest back."""
-    return value[1:] if value.startswith("'") and value[1:].startswith(FORMULA_PREFIXES) else value
+    """Undo ``spreadsheet_cell`` exactly: strip the apostrophe only where escaping added it."""
+    return value[1:] if value.startswith("'") and _needs_escape(value[1:]) else value
+
+
+def truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in TRUE
 
 
 def choose(
@@ -92,16 +112,15 @@ def choose(
     return sorted(chosen, key=lambda s: (s.language, s.id))
 
 
-def safe_out(out: Path, root: Path | None = None) -> Path:
-    """Inside this checkout, only git-ignored folders: decrypted audio must never be committed."""
-    root = root or ROOT
+def safe_out(out: Path, allowed: Iterable[Path] = ()) -> Path:
+    """Only the git-ignored ``var/`` and ``exports/`` folders (or ``allowed``, e.g. the database's folder), and never a
+    cloud-synced folder: decrypted audio must not be committed or uploaded anywhere."""
     resolved = out.resolve()
-    if resolved.is_relative_to(root.resolve()) and not any(
-        resolved.is_relative_to((root / name).resolve()) for name in IGNORED_DIRS
-    ):
-        raise ValueError(
-            f"{out}: inside the repository use a git-ignored folder ({', '.join(IGNORED_DIRS)}/)"
-        )
+    roots = [(ROOT / name).resolve() for name in EXPORT_DIRS] + [a.resolve() for a in allowed]
+    if not any(resolved.is_relative_to(root) for root in roots):
+        raise ValueError(f"{out}: export only under {', '.join(str(r) for r in roots)} (git-ignored)")
+    if any(part.lower() in CLOUD_SYNCED for part in resolved.parts):
+        raise ValueError(f"{out}: is inside a cloud-synced folder; export to a local folder")
     if (resolved / MANIFEST).exists():
         raise ValueError(f"{resolved / MANIFEST} already exists: use a new folder")
     return resolved
@@ -150,7 +169,7 @@ def wer_by_language(rows: Iterable[Mapping[str, str]]) -> dict[str, dict[str, fl
     pending: Counter[str] = Counter()
     for row in rows:
         groups = (row.get("language") or "?", "all")
-        reference = (row.get("reference") or "").strip()
+        reference = redact((row.get("reference") or "").strip())  # numbers as [number], like the hypothesis
         for group in groups:
             if not reference:
                 pending[group] += 1
@@ -208,14 +227,13 @@ def stats(samples: Iterable[VoiceSample]) -> dict[str, dict[str, Any]]:
 async def _open(settings: Settings) -> tuple[Store, VoiceVault, UserHasher]:
     if not settings.db_path.is_file():
         raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
-    secret = settings.hash_secret.get_secret_value().encode()
-    hasher = UserHasher(secret)
+    hasher = UserHasher(settings.hash_secret.get_secret_value().encode())
     store = await SQLiteStore.open(settings.db_path, hasher=hasher)
-    return store, VoiceVault(settings.voice_dir, store, Sealer(secret)), hasher
+    return store, VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret())), hasher
 
 
 def cmd_export(settings: Settings, args: argparse.Namespace) -> int:
-    out = safe_out(Path(args.out))
+    out = safe_out(Path(args.out), [settings.db_path.parent])
     languages = frozenset(args.languages.split(",")) if args.languages else None
 
     async def run() -> tuple[int, int]:
@@ -258,7 +276,7 @@ def cmd_stats(settings: Settings, args: argparse.Namespace) -> int:
 
 def cmd_access(settings: Settings, args: argparse.Namespace) -> int:
     """Answer an access request: the donor's consent record and samples, and with --out a copy of their audio."""
-    out = safe_out(Path(args.out)) if args.out else None
+    out = safe_out(Path(args.out), [settings.db_path.parent]) if args.out else None
 
     async def run() -> int:
         store, vault, hasher = await _open(settings)
@@ -268,7 +286,8 @@ def cmd_access(settings: Settings, args: argparse.Namespace) -> int:
             if user is not None and user.donation_version:
                 assert user.donation_at is not None
                 print(
-                    f"donation consent: version {user.donation_version}, given {user.donation_at.isoformat()}"
+                    f"donation consent: version {user.donation_version}, given {user.donation_at.isoformat()} "
+                    f"via {user.donation_source or 'chat'}"
                 )
             else:
                 print("donation consent: none on record")
@@ -296,7 +315,7 @@ def cmd_erase(settings: Settings, args: argparse.Namespace) -> int:
             removed = await vault.erase(user_hash)
             user = await store.get_user(user_hash)
             if user is not None:
-                user.donation_version, user.donation_at = None, None
+                user.donation_version, user.donation_at, user.donation_source = None, None, None
                 await store.save_user(user)
             return removed
         finally:
@@ -317,6 +336,81 @@ def cmd_remove(settings: Settings, args: argparse.Namespace) -> int:
             await store.close()
 
     print(f"deleted {asyncio.run(run())} of {len(args.ids)} voice samples")
+    return 0
+
+
+def read_preconsents(path: Path, version: str) -> list[tuple[str, datetime]]:
+    """Rows of the tester sign-up export: number, age_confirmed, own_voice_confirmed, consented_at. Every row must
+    have both boxes ticked and a timezone-aware time; any bad row rejects the whole file (nothing half-imported)."""
+    if version != DONATION_VERSION:
+        raise ValueError(
+            f"the form must show the current donation text (version {DONATION_VERSION}), not {version}"
+        )
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        missing = {"number", "age_confirmed", "own_voice_confirmed", "consented_at"} - set(
+            reader.fieldnames or ()
+        )
+        if missing:
+            raise ValueError(f"{path}: missing columns {sorted(missing)}")
+        rows, errors = [], []
+        for line, row in enumerate(reader, start=2):
+            number = (row["number"] or "").strip()
+            try:
+                at = aware(datetime.fromisoformat((row["consented_at"] or "").strip()))
+            except ValueError:
+                at = None
+            confirmed = truthy(row["age_confirmed"]) and truthy(row["own_voice_confirmed"])
+            if number and confirmed and at is not None and at <= datetime.now(UTC):
+                rows.append((number, at))
+            else:
+                errors.append(line)
+    if errors:
+        raise ValueError(
+            f"{path}: rows {errors} lack a number, a ticked 18+ box, a ticked own-voice box or a past, timezone-aware "
+            "consented_at; nothing was imported"
+        )
+    return rows
+
+
+def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
+    """Record sign-up-form consent as if the tester had tapped "Yes, I am 18+" (source=form; not asked again)."""
+    rows = read_preconsents(Path(args.csv), args.version)
+
+    async def run() -> int:
+        store, _, hasher = await _open(settings)
+        try:
+            for number, at in rows:
+                user_hash = hasher.user_id(number)
+                user = await store.get_user(user_hash) or UserState(user_hash, created_at=at, last_seen_at=at)
+                await store.save_user(
+                    dataclasses.replace(
+                        user, donation_version=args.version, donation_at=at, donation_source="form",
+                        donation_offered_at=at, donation_offered_version=args.version,
+                    )
+                )  # fmt: skip
+            return len(rows)
+        finally:
+            await store.close()
+
+    print(f"recorded donation consent (source: form) for {asyncio.run(run())} testers.")
+    print("Delete the sign-up export now: it holds phone numbers. Only hashes were stored.")
+    return 0
+
+
+def cmd_wipe(settings: Settings, args: argparse.Namespace) -> int:
+    """Delete every donated sample (rows and files): before rotating the key, or to end the programme."""
+    if not args.all:
+        raise ValueError("refusing to wipe without --all")
+
+    async def run() -> int:
+        store, vault, _ = await _open(settings)
+        try:
+            return await vault.wipe()
+        finally:
+            await store.close()
+
+    print(f"deleted all {asyncio.run(run())} donated voice samples")
     return 0
 
 
@@ -353,3 +447,12 @@ def add_commands(commands: Any) -> None:
     remove = sub.add_parser("remove", help="delete single samples flagged by a reviewer (child, other voice)")
     remove.add_argument("ids", nargs="+", help="sample ids from the manifest")
     remove.set_defaults(func=cmd_remove)
+
+    pre = sub.add_parser("preconsent", help="record donation consent given on the tester sign-up form")
+    pre.add_argument("--csv", required=True, help="number,age_confirmed,own_voice_confirmed,consented_at")
+    pre.add_argument("--version", required=True, help="the donation text version shown on the form")
+    pre.set_defaults(func=cmd_preconsent)
+
+    wipe = sub.add_parser("wipe", help="delete every donated sample (before rotating the key)")
+    wipe.add_argument("--all", action="store_true", help="required: confirms deleting everything")
+    wipe.set_defaults(func=cmd_wipe)

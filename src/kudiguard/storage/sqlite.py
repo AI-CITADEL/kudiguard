@@ -95,7 +95,11 @@ MIGRATIONS: Sequence[str] = (
     """
     ALTER TABLE users ADD COLUMN donation_version TEXT;
     ALTER TABLE users ADD COLUMN donation_at TEXT;
+    ALTER TABLE users ADD COLUMN donation_source TEXT;
     ALTER TABLE users ADD COLUMN donation_offered_at TEXT;
+    ALTER TABLE users ADD COLUMN donation_offered_version TEXT;
+    CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+    INSERT INTO meta VALUES ('voice_vault_id', lower(hex(randomblob(16))));
     CREATE TABLE voice_samples (
         id TEXT PRIMARY KEY,
         user_hash TEXT NOT NULL,
@@ -112,7 +116,7 @@ MIGRATIONS: Sequence[str] = (
 )
 _USER_COLUMNS = (
     "user_hash, language, consented_at, consent_version, stopped, last_interaction_id, created_at, last_seen_at, "
-    "donation_version, donation_at, donation_offered_at"
+    "donation_version, donation_at, donation_source, donation_offered_at, donation_offered_version"
 )
 
 
@@ -181,7 +185,9 @@ class SQLiteStore:
             last_seen_at=_dt_required(row["last_seen_at"]),
             donation_version=row["donation_version"],
             donation_at=_dt(row["donation_at"]),
+            donation_source=row["donation_source"],
             donation_offered_at=_dt(row["donation_offered_at"]),
+            donation_offered_version=row["donation_offered_version"],
         )
 
     async def save_user(self, state: UserState) -> None:
@@ -196,16 +202,20 @@ class SQLiteStore:
             _ts(state.last_seen_at),
             state.donation_version,
             _ts(state.donation_at) if state.donation_at else None,
+            state.donation_source,
             _ts(state.donation_offered_at) if state.donation_offered_at else None,
+            state.donation_offered_version,
         )
         await self._run(
             lambda db: db.execute(
-                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (user_hash) DO UPDATE SET language = excluded.language,
                      consented_at = excluded.consented_at, consent_version = excluded.consent_version,
                      stopped = excluded.stopped, last_interaction_id = excluded.last_interaction_id,
                      last_seen_at = excluded.last_seen_at, donation_version = excluded.donation_version,
-                     donation_at = excluded.donation_at, donation_offered_at = excluded.donation_offered_at""",
+                     donation_at = excluded.donation_at, donation_source = excluded.donation_source,
+                     donation_offered_at = excluded.donation_offered_at,
+                     donation_offered_version = excluded.donation_offered_version""",
                 values,
             )
         )
@@ -411,9 +421,20 @@ class SQLiteStore:
             sample.id, sample.user_hash, week_of(sample.week).isoformat(), sample.language, sample.channel,
             sample.consent_version, redact(sample.hypothesis), sample.duration_s,
         )  # fmt: skip
-        await self._run(
-            lambda db: db.execute("INSERT INTO voice_samples VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
+
+        def work(db: sqlite3.Connection) -> None:
+            try:
+                db.execute("INSERT INTO voice_samples VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
+            except sqlite3.IntegrityError as exc:  # same contract as the memory store
+                raise ValueError("duplicate voice sample id") from exc
+
+        await self._run(work)
+
+    async def voice_vault_id(self) -> str:
+        row = await self._run(
+            lambda db: db.execute("SELECT value FROM meta WHERE key = 'voice_vault_id'").fetchone()
         )
+        return str(row[0])
 
     async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
         query = "SELECT * FROM voice_samples"

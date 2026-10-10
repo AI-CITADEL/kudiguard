@@ -212,7 +212,8 @@ def _timestamp(raw: Any, now: float) -> int:
 
 
 def _forwarded(raw: dict[str, Any]) -> bool:
-    """``context.forwarded`` / ``context.frequently_forwarded`` (Cloud API): the sender did not record it."""
+    """``context.forwarded`` / ``context.frequently_forwarded``. Meta documents these for text, image and video,
+    not audio, so this is a safety net: donation also requires ``audio.voice`` (recorded in the app)."""
     context = raw.get("context")
     return isinstance(context, dict) and (
         context.get("forwarded") is True or context.get("frequently_forwarded") is True
@@ -245,7 +246,15 @@ def _parse_message(raw: Any, now: float, max_age_s: float) -> tuple[int, Inbound
         return make(MessageKind.TEXT, text=body["body"])
     if kind == "audio" and isinstance(body.get("id"), str):
         mime = body.get("mime_type") if isinstance(body.get("mime_type"), str) else None
-        return make(MessageKind.AUDIO, media_id=body["id"], audio_mime=mime, forwarded=_forwarded(raw))
+        voice_note, forwarded = body.get("voice") is True, _forwarded(raw)
+        log.info("voice message: recorded=%s forwarded=%s", voice_note, forwarded)  # flags only, no content
+        return make(
+            MessageKind.AUDIO,
+            media_id=body["id"],
+            audio_mime=mime,
+            voice_note=voice_note,
+            forwarded=forwarded,
+        )
     if kind == "interactive":
         reply = body.get("button_reply") or body.get("list_reply")
         if isinstance(reply, dict) and isinstance(reply.get("id"), str):

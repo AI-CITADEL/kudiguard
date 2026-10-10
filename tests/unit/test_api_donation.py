@@ -17,7 +17,7 @@ FILES = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
 
 @pytest.fixture
 async def api(registry: LanguageRegistry, tmp_path: Path) -> AsyncIterator[Api]:
-    async for running in _start(registry, settings()):
+    async for running in _start(registry, settings(voice_donation=True)):
         running.app.state.services.donations = VoiceVault(
             tmp_path / "voice", running.store, Sealer(b"s" * MIN_SECRET_BYTES)
         )
@@ -79,7 +79,7 @@ async def test_unticking_deletes_this_sessions_recordings_only(api: Api) -> None
     response = await api.client.post("/web/donation/withdraw", headers=mine)
     assert response.status_code == 200 and response.json() == {"deleted": 1}
     [left] = await api.store.voice_samples()
-    assert vault(api).path(left.id).exists() and len(list(vault(api).directory.iterdir())) == 1
+    assert vault(api).path(left.id).exists() and len(list(vault(api).directory.glob("*.kgv"))) == 1
     assert (await api.client.post("/web/donation/withdraw", headers=mine)).json() == {"deleted": 0}
 
 
@@ -90,7 +90,7 @@ async def test_withdrawal_needs_a_valid_session(api: Api) -> None:
 
 
 async def test_withdrawal_without_a_vault_still_deletes_rows(registry: LanguageRegistry) -> None:
-    async for running in _start(registry, settings()):
+    async for running in _start(registry, settings(voice_donation=True)):
         user_hash = UserHasher(b"s" * MIN_SECRET_BYTES).user_id(f"web:{SESSION}")
         await running.store.add_voice_sample(
             VoiceSample("a" * 32, user_hash, utcnow().date(), "en", "web", DONATION_VERSION, "x")
@@ -109,7 +109,47 @@ async def test_privacy_page_describes_donation_and_reviewers(api: Api) -> None:
     assert 'id="donation"' in page and "12 months" in page and "18 or older" in page
     assert "STOP DONATING" in page and "AES-256-GCM" in page and "72 hours" in page
     assert "trusted reviewers" in page and "written confidentiality" in page
-    assert "identify you" in page and "forward" in page and "{{" not in page
+    assert "identify you" in page and "try not to" in page and "{{" not in page
+    assert "Available now." in page and "same browser" in page and "donation code" in page
+    assert "outside Nigeria (during the pilot)" in page and "s.43" in page and "Meta" in page
+    assert "in Nigeria</strong>" not in page  # never claimed by default
+
+
+async def test_privacy_page_follows_the_storage_location_and_switch(registry: LanguageRegistry) -> None:
+    async for running in _start(registry, settings(storage_location="nigeria")):
+        page = (await running.client.get("/privacy")).text
+        assert "<strong>in Nigeria</strong>" in page and "Not switched on yet" in page
+        assert "outside Nigeria (during the pilot)" not in page and "Cloudflare" in page
+
+
+@pytest.mark.parametrize(("enabled", "nigeria"), [(False, False), (True, True)])
+async def test_the_web_page_is_told_whether_donation_is_on_and_where_data_is(
+    registry: LanguageRegistry, enabled: bool, nigeria: bool
+) -> None:
+    config = settings(voice_donation=enabled, storage_location="nigeria" if nigeria else "outside-nigeria")
+    async for running in _start(registry, config):
+        page = (await running.client.get("/")).text
+        assert (
+            "{{CONFIG}}" not in page
+            and "text/html" in (await running.client.get("/")).headers["content-type"]
+        )
+        assert (
+            f'const CONFIG = {{"donation": {str(enabled).lower()}, "storageInNigeria": {str(nigeria).lower()}}};'
+            in page
+        )
+
+
+async def test_with_donation_off_the_header_is_refused(registry: LanguageRegistry) -> None:
+    async for running in _start(registry, settings()):  # the default: off
+        response = await running.client.post(
+            "/web/check", data={"language": "en"}, files=FILES, headers=DONATING
+        )
+        assert response.status_code == 403 and "not enabled" in response.json()["detail"]
+        assert await running.store.voice_samples() == [] and await running.store.export_interactions() == []
+        withdraw = await running.client.post(
+            "/web/donation/withdraw", headers={"x-kudiguard-session": SESSION}
+        )
+        assert withdraw.json() == {"deleted": 0}  # withdrawal always works
 
 
 async def test_privacy_page_reflects_configured_voice_retention(registry: LanguageRegistry) -> None:

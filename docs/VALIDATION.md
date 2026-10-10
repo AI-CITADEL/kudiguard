@@ -26,16 +26,24 @@ Ten de-identified exchanges with English glosses, and tester quotes, go here (fr
 ## Speech on real voice notes (donated, opt-in)
 Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The transcription loop:
 
-1. `kudiguard voice export --out var/voice-export/2026-10 --n 50 --seed 1 [--languages ha,yo]`: a seeded random
-   sample per language, decrypted to `audio/<id>.<ext>` plus `manifest.csv` (UTF-8 BOM, formula-safe) with the
-   automatic `asr_hypothesis` and an empty `reference` column. Only git-ignored folders (`var/`, `exports/`) or
-   outside the checkout are accepted.
-2. Native-speaker transcribers (written confidentiality; work locally, no cloud drives, no copies abroad) type
-   exactly what was said into `reference`, listening to the audio, not editing the hypothesis. They report sample
-   ids that contain a child's or another person's voice: `kudiguard voice remove <id> ...` deletes them.
-3. `kudiguard voice wer var/voice-export/2026-10/manifest.csv`: pooled WER per language (diacritics folded and
-   kept) and CER, the same scoring as `scripts/eval_asr.py` (`kudiguard.speech.metrics`). Copy the table here.
-4. Delete the export folder and every transcriber's copy.
+1. **Export a sample:** `kudiguard voice export --out var/voice-export/2026-10 --n 50 --seed 1 [--languages ha,yo]`.
+   * This draws a seeded random sample per language.
+   * It writes the decrypted audio to `audio/<id>.<ext>`, plus `manifest.csv` (UTF-8 BOM, formula-safe) with the
+     automatic `asr_hypothesis` and an empty `reference` column.
+   * Only `var/` or `exports/` are accepted, never a cloud-synced folder.
+2. **Transcribe:** native-speaker transcribers work under written confidentiality, locally, with no cloud drives
+   and no copies abroad.
+   * Listen to the audio and type exactly what was said into `reference`. Do not edit the hypothesis.
+   * Type every number as `[number]`. References are masked like the hypotheses anyway.
+   * Keep tone marks where you hear them.
+   * Save the file as **CSV UTF-8**.
+   * Report sample ids that contain a child's voice, another person's voice, or a PIN, OTP, BVN or account number
+     read out. Delete them with `kudiguard voice remove <id> ...`.
+3. **Score:** `kudiguard voice wer var/voice-export/2026-10/manifest.csv` gives pooled WER per language (diacritics
+   folded and kept) and CER, with the same scoring as `scripts/eval_asr.py` (`kudiguard.speech.metrics`). Copy the
+   table here. The hypotheses come from the model that ran at donation time. To compare a new model, re-transcribe
+   the same clips with it (and keep the human references).
+4. **Clean up:** delete the export folder and every transcriber's copy.
 
 `kudiguard voice stats` counts donors, samples and minutes per language.
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import html
+import json
 import logging
 import re
 import time
@@ -27,7 +28,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -39,6 +40,7 @@ from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation
 from kudiguard.engine import Answer, AnswerKind
 from kudiguard.envfile import load_env_file
+from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
 from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
@@ -563,8 +565,15 @@ def _web_router() -> APIRouter:
     router = APIRouter(include_in_schema=False)
 
     @router.get("/")
-    async def page() -> FileResponse:
-        return FileResponse(STATIC / "voice.html", media_type="text/html; charset=utf-8")
+    async def page(request: Request) -> HTMLResponse:
+        """The web page, told whether voice donation is on and where data is stored (its texts follow)."""
+        settings: Settings = request.app.state.settings
+        config = {
+            "donation": settings.voice_donation,
+            "storageInNigeria": settings.storage_location is StorageLocation.NIGERIA,
+        }
+        page = (STATIC / "voice.html").read_text(encoding="utf-8")
+        return HTMLResponse(page.replace("{{CONFIG}}", json.dumps(config)))
 
     @router.get("/privacy")
     async def privacy(request: Request) -> HTMLResponse:
@@ -585,6 +594,12 @@ def _web_router() -> APIRouter:
                 if years and not rest
                 else f"{settings.pattern_retention_days} days"
             ),
+            "STORAGE_LOCATION": html.escape(settings.storage_location.english),
+            "DONATION_STATUS": (
+                "Available now."
+                if settings.voice_donation
+                else "Not switched on yet: this describes how it will work once it is."
+            ),
             "VOICE_RETENTION": (
                 "12 months"
                 if settings.voice_retention_days == 365
@@ -604,12 +619,15 @@ def _web_router() -> APIRouter:
             raise HTTPException(403, "consent is required")
         # Voice donation: a separate, optional box with its own version; absent = no donation.
         donating = request.headers.get("x-kudiguard-donation", "")
+        settings: Settings = request.app.state.settings
+        if donating and not settings.voice_donation:
+            raise HTTPException(403, "voice donation is not enabled on this server")
         if donating and donating != DONATION_VERSION:
             raise HTTPException(403, "voice donation consent is out of date: reload the page")
+        consented_at = utcnow()  # a withdrawal after this moment wins over the background write
         session = request.headers.get("x-kudiguard-session", "")
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
-        settings: Settings = request.app.state.settings
         _too_many(request.app.state.web_limiter, client_ip(request, settings.trust_proxy_headers))
         pending: set[str] = request.app.state.pending_web_sessions
         async with request.app.state.web_admission:  # check + reserve atomically (store counts yield)
@@ -631,6 +649,7 @@ def _web_router() -> APIRouter:
                     Donation(
                         user_hash=services.hasher.user_id(f"web:{session}"), channel="web", language=answer.language,
                         audio=audio, hypothesis=transcript or "", consent_version=donating,
+                        consented_at=consented_at,
                     ),
                 )  # fmt: skip
             return _check_response(services, answer, transcript, ms)

@@ -292,6 +292,18 @@ async def test_withdrawal_deletes_only_that_donors_samples(store: Store) -> None
     assert await store.delete_voice_samples("u1") == []
 
 
+async def test_sample_ids_are_unique(store: Store) -> None:
+    await store.add_voice_sample(sample("1" * 32))
+    with pytest.raises(ValueError, match="duplicate"):
+        await store.add_voice_sample(sample("1" * 32, user="u2"))
+    assert [s.user_hash for s in await store.voice_samples()] == ["u1"]
+
+
+async def test_the_voice_vault_id_is_stable_per_database(store: Store) -> None:
+    first = await store.voice_vault_id()
+    assert len(first) == 32 and await store.voice_vault_id() == first
+
+
 async def test_a_single_flagged_sample_can_be_deleted(store: Store) -> None:
     await store.add_voice_sample(sample("1" * 32))
     await store.add_voice_sample(sample("2" * 32))

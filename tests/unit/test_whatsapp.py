@@ -105,7 +105,7 @@ def test_parse_mixed_payload_in_time_order() -> None:
      ({"from": "2348000000002", "id": "wamid.QUOTED"}, False), ({"forwarded": "yes"}, False), ("junk", False)],
 )  # fmt: skip
 def test_forwarded_voice_notes_are_marked(context: Any, forwarded: bool) -> None:
-    """Cloud API ``context.forwarded``: a forwarded voice note is not the sender's voice (never donated)."""
+    """``context.forwarded`` (documented for other types; kept as a safety net for audio)."""
     payload = fixture("inbound_mixed.json")
     value = payload["entry"][0]["changes"][0]["value"]
     audio = next(m for m in value["messages"] if m["type"] == "audio")
@@ -113,7 +113,23 @@ def test_forwarded_voice_notes_are_marked(context: Any, forwarded: bool) -> None
         audio["context"] = context
     value["messages"] = [audio]
     [message] = parse_webhook(payload, phone_number_id="PNID123", now=NOW)
-    assert message.kind is MessageKind.AUDIO and message.forwarded is forwarded
+    assert message.kind is MessageKind.AUDIO and message.forwarded is forwarded and message.voice_note
+
+
+@pytest.mark.parametrize(
+    ("voice", "recorded"), [(True, True), (False, False), ("true", False), (None, False)]
+)
+def test_only_notes_recorded_in_whatsapp_are_marked_as_voice(voice: Any, recorded: bool) -> None:
+    """Meta's audio object: ``voice: true`` for a note recorded in the app, absent/false for an audio file."""
+    payload = fixture("inbound_mixed.json")
+    value = payload["entry"][0]["changes"][0]["value"]
+    audio = next(m for m in value["messages"] if m["type"] == "audio")
+    audio["audio"].pop("voice")
+    if voice is not None:
+        audio["audio"]["voice"] = voice
+    value["messages"] = [audio]
+    [message] = parse_webhook(payload, phone_number_id="PNID123", now=NOW)
+    assert message.voice_note is recorded and not message.forwarded
 
 
 def test_statuses_produce_no_messages() -> None:

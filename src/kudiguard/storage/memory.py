@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import uuid
 from collections.abc import Collection
 from datetime import date, datetime
 from typing import Any
@@ -26,6 +27,7 @@ class MemoryStore:
         self._closed = False
         self._patterns: dict[str, ScamPattern] = {}
         self._voice: dict[str, VoiceSample] = {}
+        self._vault_id = uuid.uuid4().hex
 
     async def get_user(self, user_hash: str) -> UserState | None:
         self._ensure_open()
@@ -156,6 +158,8 @@ class MemoryStore:
 
     async def add_voice_sample(self, sample: VoiceSample) -> None:
         self._ensure_open()
+        if sample.id in self._voice:
+            raise ValueError("duplicate voice sample id")
         self._voice[sample.id] = dataclasses.replace(
             sample, week=week_of(sample.week), hypothesis=redact(sample.hypothesis)
         )
@@ -172,6 +176,10 @@ class MemoryStore:
     async def delete_voice_sample(self, sample_id: str) -> bool:
         self._ensure_open()
         return bool(self._drop_voice([sample_id] if sample_id in self._voice else []))
+
+    async def voice_vault_id(self) -> str:
+        self._ensure_open()
+        return self._vault_id
 
     async def purge_voice_samples(self, cutoff: date) -> list[str]:
         self._ensure_open()

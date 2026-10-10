@@ -14,8 +14,9 @@ Production behaviour:
   user hash) or move ordering to a shared queue; user-state saves are last-writer-wins.
 * Per-turn store cost: claim, get_user, the licence-cap count (one indexed per-user count; a global count only for
   users new to the 30-day window), the hourly rate-limit count, then the evidence row and one user save.
-* Voice-note donation (``kudiguard.donation``, opt-in): offered at most once, after an answered voice note that was
-  not a scam warning; a donor's voice notes are kept only after their reply was sent (never on the hot path).
+* Voice-note donation (``kudiguard.donation``, opt-in, off unless ``accept_donations``): offered once per offer text,
+  after an answered voice note that was not a scam warning; after the turn has released its slot, a background task
+  (tracked, so shutdown waits for it) keeps a donor's voice notes or makes the offer. Never on the reply path.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from kudiguard.commands import Command, CommandMatcher, Match
 from kudiguard.domain import InboundMessage, Interaction, LanguageCode, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation, VoiceVault
 from kudiguard.engine import Answer, AnswerKind, Engine
+from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageStatus
 from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
@@ -53,6 +55,7 @@ FAILURE_DEADLINE_S = (
     10.0  # for the error reply/log after a failed turn (a hung channel must not wedge a user)
 )
 ACK_DEADLINE_S = 3.0
+DONATION_DEADLINE_S = 60.0  # the background donation step (write or offer) after a turn
 MAX_COALESCED = 5  # quick successive notes/texts merged into one check (people split one story over messages)
 
 
@@ -172,6 +175,7 @@ class _Turn:
     logged_at: datetime | None = None  # its timestamp (scam examples are dated from it)
     interaction_id: int | None = None  # the turn's evidence row
     calm_answer: bool = False  # answered, and not a scam warning: a fair moment to offer voice donation
+    received_at: datetime | None = None  # when the turn started (donation consent must stand at this time)
     # Own (not forwarded) voice notes of this turn with their transcripts, for donation after the reply.
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
 
@@ -211,6 +215,8 @@ class Conversation:
         clock: Callable[[], datetime] = utcnow,
         privacy_url: str = "",
         donations: VoiceVault | None = None,
+        accept_donations: bool = False,
+        storage: StorageLocation = StorageLocation.OUTSIDE_NIGERIA,
     ) -> None:
         self._engine = engine
         self._registry = engine.registry
@@ -221,7 +227,9 @@ class Conversation:
         self._limits = limits
         self._clock = clock
         self._privacy_url = privacy_url
-        self._donations = donations
+        self._donations = donations  # also used to erase when collection is off
+        self._collecting = donations is not None and accept_donations  # KUDIGUARD_VOICE_DONATION
+        self._storage = storage
         self._matcher = CommandMatcher(self._registry)
         self._slots = asyncio.Semaphore(limits.max_concurrent_turns)
         self._waiting = 0  # turns queued for a slot
@@ -255,9 +263,10 @@ class Conversation:
     async def drain(self, timeout_s: float = 30.0) -> None:
         """Graceful shutdown: refuse new turns, wait for running ones, cancel what is left after ``timeout_s``."""
         self._closing = True
-        if not self._tasks:
-            return
-        _, pending = await asyncio.wait(set(self._tasks), timeout=timeout_s)
+        deadline = time.monotonic() + timeout_s
+        while self._tasks and (left := deadline - time.monotonic()) > 0:  # turns may start donation tasks
+            await asyncio.wait(set(self._tasks), timeout=left)
+        pending = set(self._tasks)
         for task in pending:
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
@@ -380,24 +389,28 @@ class Conversation:
     # --- one turn ---------------------------------------------------------------------------------------
 
     async def _turn(self, turn: _Turn) -> None:
+        turn.received_at = (
+            utcnow()
+        )  # real time, compared with withdrawal tombstones (not the injectable clock)
         message = turn.message
         match = self._matcher.match(message.text) if message.kind is MessageKind.TEXT else Match()
         user = await self._store.get_user(turn.user_hash)
         if user is not None and user.language:
             turn.language = user.language
 
-        if match.command is Command.STOP:  # also ends voice donation (already donated notes stay deletable)
+        if match.command is Command.STOP:  # also ends voice donation and deletes what was donated
+            removed = await self._erase_donations(turn.user_hash)
+            donor = removed > 0 or (user is not None and user.donation_version is not None)
             if user is not None:
                 await self._store.save_user(
                     dataclasses.replace(
-                        user,
-                        stopped=True,
-                        last_seen_at=self._clock(),
-                        donation_version=None,
-                        donation_at=None,
+                        user, stopped=True, last_seen_at=self._clock(), donation_version=None,
+                        donation_at=None, donation_source=None,
                     )
-                )
-            await self._send(turn, self._messages.text(turn.language, Msg.STOPPED))
+                )  # fmt: skip
+            await self._send(
+                turn, self._messages.text(turn.language, Msg.STOPPED_DONOR if donor else Msg.STOPPED)
+            )
             return
         if match.command is Command.DELETE:
             if self._donations is not None:
@@ -456,16 +469,17 @@ class Conversation:
             return consented
         turn.language = match.greeting_language or turn.language
         # The welcome's language is kept provisionally (no consent yet) so a reply in it is understood. Donation
-        # consent ends with the main consent; the "offered once" mark stays.
-        state = UserState(
-            turn.user_hash,
-            language=turn.language,
-            created_at=user.created_at if user else now,
-            last_seen_at=now,
-            donation_offered_at=user.donation_offered_at if user else None,
-        )
+        # consent is separate and survives a new main consent text (STOP already ended it for stopped users).
+        state = UserState(turn.user_hash, language=turn.language, created_at=user.created_at if user else now,
+                          last_seen_at=now)  # fmt: skip
+        if user is not None:
+            state = dataclasses.replace(
+                state, donation_version=user.donation_version, donation_at=user.donation_at,
+                donation_source=user.donation_source, donation_offered_at=user.donation_offered_at,
+                donation_offered_version=user.donation_offered_version,
+            )  # fmt: skip
         await self._store.save_user(state)
-        welcome = self._messages.text(turn.language, Msg.WELCOME)
+        welcome = self._messages.text(turn.language, Msg.WELCOME, where=self._where(turn.language))
         if self._privacy_url:
             welcome += "\n" + self._messages.text(turn.language, Msg.PRIVACY_LINK, url=self._privacy_url)
         await self._send(turn, welcome)
@@ -483,8 +497,6 @@ class Conversation:
                 last_seen_at=now,
                 consented_at=now if new_consent else user.consented_at,
                 consent_version=CONSENT_VERSION if new_consent else user.consent_version,
-                donation_version=None if new_consent else user.donation_version,
-                donation_at=None if new_consent else user.donation_at,
             )
         )
         turn.language = code
@@ -513,7 +525,10 @@ class Conversation:
             await self._donation_choice(turn, user, parsed[1])
             return
         if match.command is Command.DONATE:
-            await self._offer_donation(turn, user)
+            if self._collecting:
+                await self._offer_donation(turn, user)
+            else:
+                await self._send(turn, self._messages.text(turn.language, Msg.DONATION_UNAVAILABLE))
             return
         if await self._rate_limited(turn):
             await self._send(turn, self._messages.text(turn.language, Msg.RATE_LIMITED))
@@ -526,7 +541,7 @@ class Conversation:
             await self._fixed(turn, Msg.GREETING_REPLY, transcript=turn.message.text)
         else:
             await self._check(turn, user)
-            await self._after_voice(turn, user)
+            self._after_voice(turn, user)
 
     # --- checks -----------------------------------------------------------------------------------------
 
@@ -659,84 +674,108 @@ class Conversation:
     def _keep_for_donation(
         self, turn: _Turn, message: InboundMessage, data: bytes, speech: SpeechResult
     ) -> None:
-        if self._donations is not None and not message.forwarded:  # a forwarded note is someone else's voice
+        # Only notes recorded in the app and not marked forwarded: never someone else's recording, if we can tell.
+        if self._collecting and message.voice_note and not message.forwarded:
             turn.voice_notes.append((data, speech))
 
-    async def _after_voice(self, turn: _Turn, user: UserState) -> None:
-        """After the reply was sent: keep a donor's voice notes, or make the one-time offer. Never raises."""
+    def _after_voice(self, turn: _Turn, user: UserState) -> None:
+        """After the reply was sent: keep a donor's voice notes or make the offer, in a tracked background task that
+        does not hold the turn's slot. A withdrawal later in the queue still wins (``VoiceVault`` tombstones)."""
         notes, turn.voice_notes = turn.voice_notes, []
-        if not notes or self._donations is None or not turn.replied:
+        if not notes or not turn.replied:
             return
+        if user.donation_version == DONATION_VERSION:  # consent stood when these notes arrived
+            work = self._donate_notes(turn, notes)
+        elif turn.calm_answer and _offer_due(user):
+            work = self._user_locks.run(turn.user_hash, lambda: self._offer_later(turn))
+        else:
+            return
+        task = asyncio.create_task(self._background(work), name="donation")
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    @staticmethod
+    async def _background(work: Coroutine[Any, Any, None]) -> None:
         try:
-            async with asyncio.timeout(FAILURE_DEADLINE_S):
-                if user.donation_version == DONATION_VERSION:  # consent given before this voice note arrived
-                    for data, speech in notes:
-                        await self._donations.donate(
-                            Donation(
-                                user_hash=turn.user_hash, channel=turn.message.channel, language=turn.language,
-                                audio=data, hypothesis=speech.transcript.text, consent_version=DONATION_VERSION,
-                                duration_s=speech.transcript.duration_s,
-                            )
-                        )  # fmt: skip
-                elif (
-                    user.donation_offered_at is None and turn.calm_answer
-                ):  # never after a warning or "unclear"
-                    latest = await self._store.get_user(turn.user_hash)  # this turn saved it (interaction id)
-                    await self._offer_donation(turn, latest or user)
+            async with asyncio.timeout(DONATION_DEADLINE_S):
+                await work
         except Exception:
             log.exception("voice donation step failed (the reply was already sent)")
 
+    async def _donate_notes(self, turn: _Turn, notes: list[tuple[bytes, SpeechResult]]) -> None:
+        assert self._donations is not None and turn.received_at is not None
+        for data, speech in notes:
+            await self._donations.donate(
+                Donation(
+                    user_hash=turn.user_hash, channel=turn.message.channel, language=turn.language, audio=data,
+                    hypothesis=speech.transcript.text, consent_version=DONATION_VERSION,
+                    duration_s=speech.transcript.duration_s, consented_at=turn.received_at,
+                )
+            )  # fmt: skip
+
+    async def _offer_later(self, turn: _Turn) -> None:
+        """Runs under the user's lock, after any message already queued: the state is re-read and re-checked."""
+        latest = await self._store.get_user(turn.user_hash)
+        if latest is not None and not latest.stopped and _consented(latest) and _offer_due(latest):
+            await self._offer_donation(turn, latest)
+
     async def _offer_donation(self, turn: _Turn, user: UserState) -> None:
-        """The donation request: its own message and buttons, separate from the main consent."""
-        if self._donations is None:  # not configured on this server
-            await self._send(turn, self._messages.text(turn.language, Msg.GREETING_REPLY))
-            return
-        buttons = (
-            Button(
-                button_id(Action.DONATE, DONATE_YES), self._messages.text(turn.language, Msg.BTN_DONATE_YES)
-            ),
-            Button(
-                button_id(Action.DONATE, DONATE_NO), self._messages.text(turn.language, Msg.BTN_DONATE_NO)
-            ),
+        """The donation request: its own message and buttons, separate from the main consent. Recorded before it is
+        sent, so a quick "Yes" can never be overwritten by this save."""
+        buttons = tuple(
+            Button(button_id(Action.DONATE, ref), self._messages.text(turn.language, title))
+            for ref, title in ((DONATE_YES, Msg.BTN_DONATE_YES), (DONATE_NO, Msg.BTN_DONATE_NO))
         )
-        await self._send(turn, self._messages.text(turn.language, Msg.DONATION_OFFER), buttons)
-        if user.donation_offered_at is None:
-            await self._store.save_user(dataclasses.replace(user, donation_offered_at=self._clock()))
+        await self._store.save_user(
+            dataclasses.replace(
+                user, donation_offered_at=self._clock(), donation_offered_version=DONATION_VERSION
+            )
+        )
+        text = self._messages.text(turn.language, Msg.DONATION_OFFER, where=self._where(turn.language))
+        await self._send(turn, text, buttons)
 
     async def _donation_choice(self, turn: _Turn, user: UserState, ref: str) -> None:
-        if ref == DONATE_YES and self._donations is not None:
+        if ref == DONATE_NO:  # declining or withdrawing always works, even with collection switched off
+            await self._withdraw_donation(turn, user, declined=True)
+        elif not self._collecting:
+            await self._send(turn, self._messages.text(turn.language, Msg.DONATION_UNAVAILABLE))
+        elif ref == DONATE_YES:
             now = self._clock()
             await self._store.save_user(
                 dataclasses.replace(
-                    user, donation_version=DONATION_VERSION, donation_at=now,
-                    donation_offered_at=user.donation_offered_at or now,
+                    user, donation_version=DONATION_VERSION, donation_at=now, donation_source="chat",
+                    donation_offered_at=user.donation_offered_at or now, donation_offered_version=DONATION_VERSION,
                 )
             )  # fmt: skip
             await self._send(turn, self._messages.text(turn.language, Msg.DONATION_ON))
-        elif ref != DONATE_NO:  # "Yes" under an older offer text (or an unknown ref): show the current offer
+        else:  # "Yes" under an older offer text (or an unknown ref): show the current offer
             await self._offer_donation(turn, user)
-        else:
-            await self._withdraw_donation(turn, user, declined=True)
 
     async def _withdraw_donation(
         self, turn: _Turn, user: UserState | None, *, declined: bool = False
     ) -> None:
         """Withdrawal = stop collecting AND delete everything donated (most protective)."""
-        if self._donations is not None:
-            removed = await self._donations.erase(turn.user_hash)
-        else:  # no files on this server; the rows (if any) still go
-            removed = len(await self._store.delete_voice_samples(turn.user_hash))
+        removed = await self._erase_donations(turn.user_hash)
         was_donating = user is not None and user.donation_version is not None
         if user is not None:
             now = self._clock()
             await self._store.save_user(
                 dataclasses.replace(
-                    user, donation_version=None, donation_at=None, last_seen_at=now,
+                    user, donation_version=None, donation_at=None, donation_source=None, last_seen_at=now,
                     donation_offered_at=user.donation_offered_at or now,
+                    donation_offered_version=user.donation_offered_version or DONATION_VERSION,
                 )
             )  # fmt: skip
         key = Msg.DONATION_DECLINED if declined and not (was_donating or removed) else Msg.DONATION_OFF
         await self._send(turn, self._messages.text(turn.language, key))
+
+    async def _erase_donations(self, user_hash: str) -> int:
+        if self._donations is not None:
+            return await self._donations.erase(user_hash)
+        return len(await self._store.delete_voice_samples(user_hash))  # no files on this server; the rows go
+
+    def _where(self, language: LanguageCode) -> str:
+        return self._messages.text(language, self._storage.message)
 
     # --- helpers ----------------------------------------------------------------------------------------
 
@@ -906,6 +945,13 @@ async def record_pattern(store: Store, channel: str, answer: Answer, text: str, 
         )  # fmt: skip
     except Exception:
         log.exception("could not record a scam pattern")
+
+
+def _offer_due(user: UserState) -> bool:
+    """Never offered; or donating under an older offer text (collection pauses until they answer the new one)."""
+    if user.donation_version is None:
+        return user.donation_offered_version is None
+    return user.donation_version != DONATION_VERSION and user.donation_offered_version != DONATION_VERSION
 
 
 def _consented(user: UserState) -> bool:

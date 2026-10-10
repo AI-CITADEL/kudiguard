@@ -151,9 +151,11 @@ async def build_services(settings: Settings) -> Services:
         closers.append(store.close)
 
         services = Services(settings, registry, engine, store, hasher, llm, closers=closers)
+        # Always built (erasure and retention must work even while collection is off).
         services.donations = VoiceVault(
-            settings.voice_dir, store, Sealer(settings.hash_secret.get_secret_value().encode())
-        )
+            settings.voice_dir, store, Sealer(settings.voice_secret()), max_per_day=settings.voice_max_per_day,
+            max_bytes=int(settings.voice_max_gb * 1024**3),
+        )  # fmt: skip
         whatsapp = None
         if settings.whatsapp_enabled:
             try:
@@ -176,6 +178,8 @@ async def build_services(settings: Settings) -> Services:
                 limits=limits,
                 privacy_url=f"{settings.public_url.rstrip('/')}/privacy" if settings.public_url else "",
                 donations=services.donations,
+                accept_donations=settings.voice_donation,
+                storage=settings.storage_location,
             )
         services.background.append(
             asyncio.create_task(

@@ -61,6 +61,10 @@ class Msg(StrEnum):
     DONATION_ON = "donation_on"
     DONATION_OFF = "donation_off"
     DONATION_DECLINED = "donation_declined"
+    DONATION_UNAVAILABLE = "donation_unavailable"
+    STOPPED_DONOR = "stopped_donor"
+    WHERE_OUTSIDE = "where_outside"
+    WHERE_NIGERIA = "where_nigeria"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

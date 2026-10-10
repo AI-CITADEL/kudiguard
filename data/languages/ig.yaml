@@ -53,6 +53,7 @@ strings:
     Zitere m *ozi olu* ma ọ bụ ozi ederede, ma ọ bụ zigharịa ozi ọ bụla ị na-enweghị obi ike na ya.
 
     🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. Ndị nyocha ole na ole a tụkwasịrị obi (ndị otu anyị ma ọ bụ ndị asụsụ ahụ bụ asụsụ obodo ha, n'okpuru nkwekọrịta nzuzo e dere ede) nwere ike ịgụ ụfọdụ ozi na nzaghachi, e zochiri nọmba, na-enweghị nọmba ekwentị gị ma ọ bụ ihe ọ bụla na-egosi onye ị bụ, iji lelee ịdị mma na nchekwa; a na-ehichapụ mbipụta ha mgbe nlele ahụ gasịrị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha, ma ọ bụrụ na ị họrọghị inye ha onyinye (anyị ga-ajụ iche). Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
+    🌍 Iji rụọ ọrụ KudiGuard, ozi gị na-agafe na WhatsApp (Meta) na Cloudflare, na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. Iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị echedo data dị na mba ofesi kpamkpam. Site n'ịga n'ihu, ị kwenyekwara na mbufe a.
     ℹ️ Nke a bụ ndụmọdụ, ọ bụghị ndụmọdụ ego nke ọkachamara.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Kedu asụsụ m ga-eji?
@@ -99,13 +100,17 @@ strings:
   donation_offer: |-
     🎙️ *Ọ bụ nhọrọ: nyere KudiGuard aka ịghọta olu ndị Naịjirịa*
     Anyị nwere ike ichekwa ozi olu ị ga-ezite site ugbu a, iji nwalee ma melite nghọta okwu anyị?
-    • Naanị ma ọ bụrụ na ị gbaala afọ *18 ma ọ bụ karịa*, na naanị ozi olu nke bụ *olu gị*. Biko ezitela ndekọ olu ndị ọzọ; anyị anaghị echekwa ozi olu e zigharịrị.
+    • Naanị ma ọ bụrụ na ị gbaala afọ *18 ma ọ bụ karịa*, na naanị ozi olu nke bụ *olu gị*. Biko ezitela ndekọ olu ndị ọzọ. Anyị na-agbalị ka anyị ghara ichekwa ozi olu e zigharịrị, ndị nyocha anyị na-ehichapụkwa olu ndị ọzọ.
     • Ndị nyocha na ndị odee ole na ole a tụkwasịrị obi, n'okpuru nkwekọrịta nzuzo e dere ede, na-ege ha ntị ma dee ihe e kwuru. Anyị anaghị eji olu gị amata onye ị bụ, anyị anaghịkwa ere ya ma ọ bụ bipụta ya.
-    • A na-echekwa ha na nzuzo (encrypted) na sava nke KudiGuard n'onwe ya ruo ọnwa 12, na-enweghị nọmba ekwentị gị.
-    • Zipu *STOP DONATING* n'oge ọ bụla iji kwụsị ma hichapụ ha (*DELETE* na-ehichapụkwa ha).
+    • A na-echekwa ha na nzuzo (encrypted) na sava anyị {where} ruo ọnwa 12, na-enweghị nọmba ekwentị gị. Iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị echedo data dị na mba ofesi kpamkpam.
+    • Zipu *STOP DONATING* n'oge ọ bụla iji kwụsị ma hichapụ ha (*STOP* na *DELETE* na-ehichapụkwa ha).
     KudiGuard na-arụ ọrụ otu ihe ahụ ma ị kwere ma ọ bụ jụ.
-  btn_donate_yes: "✅ Ee, adị m 18+"
+  btn_donate_yes: "Ee, adị m 18+"
   btn_donate_no: "Mba, daalụ"
-  donation_on: "✅ Daalụ! Site ugbu a anyị na-echekwa ozi olu i ji olu gị zite (ọ bụghị ndị e zigharịrị) ruo ọnwa 12 iji melite nghọta okwu. Zipu *STOP DONATING* n'oge ọ bụla iji kwụsị ma hichapụ ha."
+  donation_on: "✅ Daalụ! Site ugbu a anyị na-echekwa ozi olu i ji olu gị dekọọ ruo ọnwa 12 iji melite nghọta okwu. Zipu *STOP DONATING* n'oge ọ bụla iji kwụsị ma hichapụ ha."
   donation_off: "🗑️ Onyinye olu akwụsịla. Ehichapụla ozi olu niile i nyere n'onyinye, a gaghịkwa echekwa ndị ọhụrụ."
   donation_declined: "👍 Ọ dịghị nsogbu. A gaghị echekwa ozi olu gị: a na-ehichapụ ha mgbe e dechara ha."
+  donation_unavailable: "🎙️ Onyinye olu adịbeghị. Daalụ maka ọchịchọ gị!"
+  stopped_donor: "Ị gaghị enwetakwa ozi site na KudiGuard, ehichapụkwala ozi olu i nyere n'onyinye. Zite ozi ọ bụla iji malite ọzọ."
+  where_outside: "na mpụga Naịjirịa n'oge nnwale a"
+  where_nigeria: "na Naịjirịa"

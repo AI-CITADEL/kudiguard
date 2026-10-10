@@ -12,6 +12,8 @@ from typing import Annotated
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from kudiguard.hosting import StorageLocation
+
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
 
 
@@ -24,8 +26,15 @@ class Settings(BaseSettings):
     hash_secret: SecretStr = SecretStr("")  # >= 32 bytes; pseudonymous user ids (privacy.UserHasher)
     retention_days: int = Field(default=90, ge=1)
     pattern_retention_days: int = Field(default=730, ge=1)  # de-identified scam examples (kudiguard.patterns)
-    voice_dir: Path = ROOT / "var" / "voice"  # donated voice notes, encrypted (kudiguard.donation)
-    voice_retention_days: int = Field(default=365, ge=1)  # 12 months, stated in the donation offer
+    # Voice-note donation (kudiguard.donation; docs/DPIA_VOICE.md). Off until the DPIA is signed off.
+    voice_donation: bool = False
+    voice_dir: Path = ROOT / "var" / "voice"  # encrypted audio; must belong to db_path (marker file)
+    voice_retention_days: int = Field(default=365, ge=1, le=365)  # the offer promises at most 12 months
+    voice_key: SecretStr | None = None  # >= 32 bytes; default: derived from hash_secret
+    voice_max_per_day: int = Field(default=20, ge=1)  # samples per donor per day
+    voice_max_gb: float = Field(default=5.0, gt=0)  # stop collecting beyond this folder size
+    # Where the server stores data, as told to users (kudiguard.hosting): outside-nigeria | nigeria.
+    storage_location: StorageLocation = StorageLocation.OUTSIDE_NIGERIA
     allow_sample_packs: bool = False  # fictional demo packs (never in production)
     packs: Annotated[tuple[str, ...], NoDecode] = ()  # empty = every enabled pack
 
@@ -72,6 +81,11 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return tuple(part.strip() for part in value.split(",") if part.strip())
         return value
+
+    def voice_secret(self) -> bytes:
+        """Input key for donated-audio encryption: ``voice_key`` if set, else the hash secret."""
+        own = self.voice_key.get_secret_value() if self.voice_key else ""  # empty in .env = not set
+        return (own or self.hash_secret.get_secret_value()).encode()
 
     def api_key_map(self) -> dict[str, str]:
         """``{key: client name}``; raises on malformed or weak entries (fail fast at startup)."""

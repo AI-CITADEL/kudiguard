@@ -4,7 +4,7 @@
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
     kudiguard purge [--days 90]          (also donated voice notes past KUDIGUARD_VOICE_RETENTION_DAYS)
-    kudiguard voice export|wer|stats|access|erase|remove   (kudiguard.voice_cli)
+    kudiguard voice export|wer|stats|access|erase|remove|preconsent|wipe   (kudiguard.voice_cli)
 
 Exports contain no phone numbers or provider ids (pseudonymous user hashes, redacted text).
 """
@@ -90,11 +90,11 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     async def run() -> tuple[int, int]:
+        if not settings.db_path.is_file():  # never create an empty database (its vault would match no files)
+            raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
         try:
-            vault = VoiceVault(
-                settings.voice_dir, store, Sealer(settings.hash_secret.get_secret_value().encode())
-            )
+            vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
             voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
             return await store.purge_before(utcnow() - timedelta(days=args.days)), voice
         finally:

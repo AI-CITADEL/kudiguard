@@ -41,11 +41,16 @@ class UserState:
     created_at: datetime = field(default_factory=utcnow)
     last_seen_at: datetime = field(default_factory=utcnow)
     # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
-    # text the user accepted with its "Yes, I am 18+" button (so it records the age confirmation too); None = not
-    # donating. Kept while the user has donated samples, as proof of consent (NDPA s.26(1)).
+    # text the user accepted together with the 18+ and own-voice confirmations (the chat's "Yes, I am 18+" button or
+    # the sign-up form's ticked boxes); None = not donating. It survives a change of the main consent text; only
+    # STOP, STOP DONATING, "No" and DELETE end it. Kept while the user has donated samples, as proof of consent (s.26).
     donation_version: str | None = None
     donation_at: datetime | None = None
-    donation_offered_at: datetime | None = None  # the offer is made at most once
+    donation_source: str | None = None  # how consent was given: "chat" or "form" (tester sign-up form)
+    donation_offered_at: datetime | None = None  # when the offer was last shown
+    donation_offered_version: str | None = (
+        None  # which offer text: offered once per text, to old donors again
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,7 +132,7 @@ class Store(Protocol):
 
     async def add_voice_sample(self, sample: VoiceSample) -> None:
         """Record a donated voice note (the hypothesis is redacted). The audio file is the caller's
-        (``donation.VoiceVault``)."""
+        (``donation.VoiceVault``). Raises ``ValueError`` for an id that already exists."""
         ...
 
     async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
@@ -140,6 +145,11 @@ class Store(Protocol):
 
     async def delete_voice_sample(self, sample_id: str) -> bool:
         """Remove one sample row (a reviewer found a child's or another person's voice). False if unknown."""
+        ...
+
+    async def voice_vault_id(self) -> str:
+        """A random id created once per database; the voice folder carries it too, so files are only ever swept
+        against the database they belong to."""
         ...
 
     async def purge_voice_samples(self, cutoff: date) -> list[str]:

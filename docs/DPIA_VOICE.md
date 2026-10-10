@@ -1,153 +1,209 @@
 # DPIA: opt-in voice-note donation
 
-Data protection impact assessment under the Nigeria Data Protection Act 2023 (NDPA) s.28, and the NDPC's General
-Application and Implementation Directive (GAID 2025, in force 19 September 2025). Status: **draft for the operator's
-sign-off**. This is an engineering assessment, not legal advice. **Before scaling beyond the pilot, have a qualified
+This is a data protection impact assessment under the Nigeria Data Protection Act 2023 (NDPA) s.28, and under the
+NDPC's General Application and Implementation Directive (GAID 2025), in force since 19 September 2025.
+
+**Status: draft for the operator's sign-off.** The feature stays off (`KUDIGUARD_VOICE_DONATION=false`) until §10 is
+signed. This is an engineering assessment, not legal advice. **Before scaling beyond the pilot, have a qualified
 Nigerian data-protection lawyer or a licensed DPCO review it.** Items marked **DECIDE** need the operator or a lawyer.
+Section numbers come from reproductions of the Act, because the official PDF could not be fetched; check them
+against the gazetted text before filing.
 
 ## 1. What is processed, and why
-* **Purpose (only one):** test and improve speech recognition for Hausa, Yoruba, Igbo and Nigerian English.
-  Native-speaker transcribers type what was said, and `kudiguard voice wer` measures the word error rate.
-  The recordings are never used for anything else (s.24(1)(b)).
-* **Who:** adult users who opt in. On WhatsApp the offer comes at most once, after an answered voice note that was
-  not a scam warning, or when the user sends "donate voice". On the website, the user ticks a separate box, which is
-  unticked by default.
-* **What (s.24(1)(c), minimisation):**
-  * the original audio as received, at most 16 MB and 90 s of speech;
+* **Purpose (only one):** to test and improve speech recognition for Hausa, Yoruba, Igbo and Nigerian English.
+  Native-speaker transcribers type what was said, and `kudiguard voice wer` measures the word error rate. Nothing
+  else is done with the recordings (s.24, purpose limitation).
+* **Who:** adults who opt in. There are three ways to say yes. Each one confirms 18+ and own voice, and shows the
+  same text and version (`DONATION_VERSION`).
+  * *WhatsApp:* the offer comes after an answered voice note that was not a scam warning, or when the user sends
+    "donate voice". The user taps "Yes, I am 18+". The offer is shown once per offer text.
+  * *Website:* a separate checkbox, unticked by default, sent with its own version header.
+  * *Tester sign-up form:* see `docs/TESTER_SIGNUP.md`. The operator imports the form with `kudiguard voice
+    preconsent`. Every row must have both boxes ticked and a timestamp, otherwise nothing is imported. These
+    testers are not asked again in the chat.
+* **What we keep (s.24, minimisation):**
+  * the original audio, at most 16 MB and 90 s of speech;
   * a random sample id;
   * the donor's keyed hash (`privacy.UserHasher`), never the phone number;
-  * language, channel and the ISO week (no timestamp);
+  * language, channel and ISO week (no timestamp);
   * the version of the donation text accepted;
-  * the duration, when known;
+  * the duration, when known (not recorded on the web);
   * the automatic transcript, with numbers and emails masked (`text.redact`).
-* **Consent record (s.26(1)):** the user row stores `donation_version` and `donation_at`. Each sample row stores the
-  version too. A donor's user row is kept while they have samples.
-* **Retention (s.24(1)(d)):** 12 months (`KUDIGUARD_VOICE_RETENTION_DAYS=365`). The purge loop runs every 6 hours, and
-  `kudiguard purge` can also be run. A sample is deleted when the week it arrived in is 12 months old, so none is
-  kept longer than 12 months.
-* **Why the week and not the date:** the week is enough to apply retention and to compare model versions over time.
-  It also makes linking a sample to an exact entry in the 90-day evidence log harder. The donor hash still links the
+* **What is never kept:**
+  * Text messages.
+  * WhatsApp voice notes not recorded in the app (Meta's `audio.voice` is not true), or marked forwarded
+    (`context.forwarded` / `frequently_forwarded`).
+  * Anything received before the yes.
+* **Consent record (s.26, burden of proof):**
+  * *Chat and form:* the user row stores `donation_version`, `donation_at` and `donation_source` (chat or form).
+  * *Web:* web donors have no account. Their proof is the `consent_version` stored on every sample (N6).
+  * A donor's user row is kept while they have samples.
+* **Retention (s.24):** 12 months. `KUDIGUARD_VOICE_RETENTION_DAYS` is capped at 365, the figure the offer promises.
+  * The purge runs every 6 hours and on `kudiguard purge`.
+  * A sample is deleted once the week it arrived in is 12 months old, so none outlives the promise.
+* **Why the week and not the date:** the week is enough for retention and for comparing model versions. It also
+  makes it harder to link a sample to an exact entry in the 90-day evidence log. The donor hash still links the
   two, deliberately, so that withdrawal, erasure and access requests can be honoured.
 
 ## 2. Lawful basis and conditions
-* **Consent (s.25(1)(a), s.26):**
-  * *Separate:* its own message, buttons, version and record. KudiGuard works the same without it, so consent is not
-    bundled with the service (s.26(2)).
-  * *Explicit, affirmative:* a "Yes, I am 18+" button or a ticked box. Silence and "No" mean no (s.26(3), s.26(7)).
-  * *Informed:* the offer states the following, in plain words in all four languages (s.26(6)):
+* **Consent (s.25, s.26):**
+  * *Separate:* its own text, buttons or boxes, version and record. KudiGuard works the same without it, so consent
+    is not a condition of the service.
+  * *Explicit and affirmative:* silence, no answer and "No" all mean no. No box is pre-ticked.
+  * *Informed:* the offer states the following, in plain words in all four languages:
     * the purpose;
-    * the age limit;
-    * own voice only, and forwarded voice notes are never kept;
-    * who listens to the recordings;
+    * 18+ only, own voice only;
+    * who listens: reviewers and transcribers under written confidentiality;
     * that we never identify speakers;
-    * encryption and retention;
-    * how to withdraw (s.26(4)).
-  * *Versioned:* `DONATION_VERSION`. A "Yes" button under an older offer text shows the current offer again.
-* **Withdrawal (s.35):** as easy as giving consent. The user sends "STOP DONATING" (or a phrase in their language),
-  taps "No, thanks", or unticks the web box. This stops collection and deletes every donated sample (rows and files),
-  and the user gets a confirmation. DELETE does the same and erases everything else too. STOP also ends donation.
-  Earlier processing stays lawful (s.26(5)).
-* **Sensitive data (s.30, s.65):** s.65 counts biometric data as sensitive when it is processed "for the purpose of
-  uniquely identifying a natural person". Its definition lists "voice recognition" as an example. KudiGuard never
-  uses voices to identify or verify anyone and will never build speaker identification. We still apply the
-  stricter regime: explicit, specific consent (s.30(1)(a)), encryption at rest, and restricted access. **DECIDE:**
-  a lawyer should confirm whether s.30 applies.
-* **Children (s.31):** the age of majority is 18. Donation is offered to adults only, and the "Yes" button itself
-  confirms the age. A "No", or no answer, means no donation. We do not verify age with an ID (s.31(2)–(3)): asking
-  for an ID would collect far more data than the risk warrants. **DECIDE:** whether self-declaration is enough.
-  Reviewers must delete, and report, any sample that is clearly a child's voice.
-* **Third parties:** the offer asks for the donor's own voice only. Forwarded WhatsApp voice notes, flagged by the
-  Cloud API's `context.forwarded` / `frequently_forwarded`, are never kept. Forwarded scam audio is usually a
-  scammer's or a victim's voice, and those people have not consented. Reviewers delete any sample that clearly
-  contains someone else's voice. Text is never donated. The web page records live from the microphone; it cannot
-  upload files.
+    * encryption, 12-month retention, and the storage location (§5);
+    * how to withdraw.
+  * *Versioned:* when the offer text changes, the new `DONATION_VERSION` pauses collection for old donors. They are
+    offered the new text once, and nothing more is kept until they answer.
+  * *Survives the main notice:* a change of the main consent text does not end donation. Only STOP, STOP DONATING,
+    "No" and DELETE end it.
+* **Withdrawal (s.35):** as easy as giving consent.
+  * WhatsApp: STOP DONATING, the "No, thanks" button, STOP, or DELETE.
+  * Web: untick the box, or press "Delete my donated recordings".
+  * Each of these stops collection **and deletes every donated sample** (rows and files) and sends a confirmation.
+  * A withdrawal leaves a tombstone: a write that is still in progress, whose consent predates the withdrawal, is
+    refused.
+  * Processing done before the withdrawal stays lawful.
+* **Sensitive data (s.30, s.65):**
+  * s.65 counts biometric data as sensitive when it is processed for unique identification, and lists "voice
+    recognition" as an example. KudiGuard never identifies or verifies speakers and will never build speaker
+    identification.
+  * A voice can also reveal race or ethnic origin, another s.65 category. Accent and language are exactly what we
+    study, so we treat the recordings as potentially sensitive.
+  * We apply the stricter regime anyway: explicit, specific consent, encryption at rest, and restricted access.
+  * **DECIDE:** a lawyer should confirm the s.30 position.
+* **Children (s.31):**
+  * The age of majority is 18. Every route to a yes includes an 18+ confirmation, and "No" or no answer means no.
+  * Age is self-declared. Verifying it by ID would collect far more data than the risk warrants. **DECIDE:**
+    whether that is enough.
+  * Reviewers delete (`kudiguard voice remove`) any recording that is clearly a child's voice.
+* **Other people's voices:**
+  * The offer asks for the donor's own voice only.
+  * Meta documents `voice` (recorded in the app) on audio messages, but documents `context.forwarded` only for
+    other message types. So exclusion of forwarded voice notes is **best effort**, and the texts say "we try not to
+    keep forwarded voice notes".
+  * Reviewers delete other people's voices.
+  * **Before enabling,** confirm on the live number with one real forwarded voice note. The log line
+    `voice message: recorded=… forwarded=…` shows which flags Meta sent. Record the result here.
+  * The web page records live from the microphone. It has no file upload.
 
 ## 3. Necessity and proportionality
-* Real WhatsApp voice notes have noise, codecs and code-switching that read-speech sets such as FLEURS lack. Without
-  references from these voice notes we cannot measure or improve accuracy, and speech errors lead to wrong scam
-  advice.
-* Less intrusive options were considered:
-  * Asking the team to record speech: done already (FLEURS, TTS clips). It does not represent users.
+* Real WhatsApp voice notes have noise, codecs and code-switching that read-speech sets lack. Without references
+  from them we cannot measure or improve accuracy, and speech errors lead to wrong scam advice.
+* Alternatives were considered:
+  * Team recordings and public data (FLEURS, TTS): already used, but they do not represent users.
   * Keeping only transcripts: this cannot measure ASR errors, because the reference must come from the audio.
-* The scope is proportionate: opt-in, adults only, own voice only, a sample is transcribed rather than everything,
-  12 months, and no identification.
+* Proportionate scope: opt-in, adults only, own voice only, a sample transcribed rather than everything, 12
+  months, no identification, per-donor daily cap (20) and a folder size cap.
 
 ## 4. Security (s.39) and access
-* **Encryption at rest:** AES-256-GCM, with a random nonce per file and the sample id authenticated. The key comes
-  from `KUDIGUARD_HASH_SECRET` through HKDF-SHA256 with its own label.
-  * Files are named by random ids under `KUDIGUARD_VOICE_DIR` (git-ignored `var/voice/`), with mode 0600 on POSIX.
-  * A backup of `var/` without `.env` cannot be decrypted.
-  * The secret sits on the same host, so this does not protect against a full compromise of the host.
-* **Access:** only named reviewers and transcribers under written confidentiality agreements.
-  * `kudiguard voice export` writes decrypted copies only to git-ignored folders (`var/`, `exports/`) or outside the
-    checkout, and prints a privacy reminder.
-  * Transcribers work locally, with no cloud drives, and delete their copies once the references are typed.
-  * The operator deletes the export folder after `kudiguard voice wer`.
-* **Ordering and robustness:**
-  * Writes happen only after the reply is sent and never affect it.
-  * Writes and erasure are serialised, so a withdrawal can never be overtaken by a write that is still in progress.
-  * Erasure deletes rows, then files. A file left behind by a crash is swept by the next purge.
+* **Encryption at rest:** AES-256-GCM, with a random nonce per file and the sample id authenticated.
+  * The key comes from `KUDIGUARD_VOICE_KEY` through HKDF-SHA256 with its own label. If that is not set, it comes
+    from `KUDIGUARD_HASH_SECRET`.
+  * A copy of `var/` without `.env` cannot be decrypted.
+  * The key is on the same host, so this does not protect against a full compromise of the host.
+* **Key rotation:**
+  1. `kudiguard voice wipe --all` deletes every sample. They would be undecryptable after the rotation anyway.
+  2. Change `KUDIGUARD_VOICE_KEY`, or the hash secret.
+  3. Restart.
+* **File system:**
+  * Files are named by random ids under `KUDIGUARD_VOICE_DIR` (default `var/voice/`, git-ignored).
+  * On POSIX: mode 0600, the directory is fsynced after each write.
+  * On Windows the mode bits do nothing, so restrict `var\` and `.env` to the service account with `icacls`
+    (docs/DEPLOY.md).
+  * A `.vault` marker binds the folder to its database. Purges sweep orphan files only when the marker matches,
+    and writes refuse a folder that belongs to another database. This safety check replaces a cruder "database
+    empty but folder has files" rule, which would also leave genuinely erased-but-locked audio behind forever.
+* **Access:** only named reviewers and transcribers under written confidentiality.
+  * `kudiguard voice export` writes decrypted copies only under `var/` (next to the database) or `exports/`. It
+    refuses cloud-synced folders (OneDrive, Dropbox, Google Drive, iCloud, Box) and prints a privacy reminder.
+  * Transcribers work locally, with no cloud drives and no copies abroad, and delete their copies once the
+    references are typed. The operator deletes the export folder after `kudiguard voice wer`.
+* **Robustness:**
+  * Writes run after the reply, in a background task that does not hold a turn slot. They never affect the reply.
+  * Writes are serialised with erasure.
+  * Erasure deletes rows, then files.
   * SQLite runs with `secure_delete` and a WAL checkpoint after erasure.
-  * **Note:** `KUDIGUARD_VOICE_DIR` must belong to `KUDIGUARD_DB_PATH`. The purge deletes files the database does not
-    know about.
+  * A live turn and `kudiguard voice erase` run in different processes and are not serialised. Run erasure
+    requests when the donor is not mid-conversation, or simply re-run them (they are idempotent).
 
-## 5. Where the data is (ss.41–43)
-* Donated audio is stored only on KudiGuard's own server and never in third-party cloud storage. Transcribers must
-  not take copies abroad or upload them anywhere.
-* This is a **design choice** that keeps us out of the cross-border transfer rules (NDPA ss.41–43 and GAID 2025,
-  already in force). It is not a localisation mandate.
-* The CBN's payment-data localisation circular (in force January 2027) covers payment-system participants. It does
-  not apply to KudiGuard's donations, though it is relevant to partner banks' own data.
-* **In transit:** WhatsApp voice notes pass through Meta's servers, and web and webhook traffic passes through
-  Cloudflare's tunnel, before they reach us. Both are disclosed on /privacy.
-* **DECIDE:** confirm the physical location of the server (currently the team's PC). If it is outside Nigeria,
-  storing donations there is itself a transfer that needs a basis under s.41/s.43 (e.g. informed consent to the
-  transfer, stated in the offer), because no NDPC adequacy decisions had been published as of mid-2026.
+## 5. Where the data is (ss.41–43): transfer outside Nigeria
+* **During the pilot the server is the team's PC, outside Nigeria.** It will move to Nigeria or to the cloud later.
+* Messages, including voice notes, pass through **WhatsApp (Meta)** and **Cloudflare**, both outside Nigeria, and
+  are stored on our server.
+* Every user is told this before agreeing:
+  * the welcome text and web consent in four languages;
+  * the donation offer;
+  * /privacy, "Where your data goes".
+* Each text says that Nigerian data-protection law may not fully protect data held abroad. Continuing (or ticking
+  the box) is the user's informed consent to the transfer (s.43). No NDPC adequacy decision had been published as
+  of mid-2026, and these rules are already in force under the NDPA and GAID 2025.
+* **The location is a setting:** `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (default) or `nigeria`. Every text
+  renders the setting, so it stays true after the move. Nothing claims "stored in Nigeria" by default.
+* Moving the server abroad again requires a new `CONSENT_VERSION`. Moving it into Nigeria needs no new consent, but
+  the transfer through Meta and Cloudflare remains.
+* The CBN payment-data localisation circular (in force January 2027) covers payment-system participants. It does
+  not apply to KudiGuard, though it is relevant to partner banks' own data.
+* Transcribers must not take copies abroad or upload them anywhere.
 
 ## 6. Data-subject rights (ss.34–38)
-* **Access (s.34(1)(a)–(b)):** `kudiguard voice access --user <number | web:<session id>> [--out var/...]`. This prints
-  the consent record and the samples, and copies the audio for a secure hand-over.
-* **Erasure and withdrawal (s.34(1)(d), s.35):**
-  * On WhatsApp: in-chat commands or buttons.
-  * On the web: untick the box (`POST /web/donation/withdraw`).
-  * By email: `kudiguard voice erase --user ...`.
+* **Access (s.34):** `kudiguard voice access --user <number | web:<donation code>> [--out var/...]` prints the
+  consent record (version, time, source) and the samples, and copies the audio for a secure hand-over.
+* **Identity check:** answer only the person behind the number or code.
+  * For a WhatsApp number, message that number and ask them to confirm.
+  * Web donors see their donation code when they tick the box.
+  * Never accept a number alone from an email.
+* **Erasure and withdrawal (s.34, s.35):**
+  * In chat: STOP DONATING, STOP, DELETE or "No".
+  * On the web: untick the box, or press "Delete my donated recordings". This works only in the same browser;
+    otherwise the donor quotes the donation code.
+  * By request: `kudiguard voice erase --user …`.
+  * DELETE also resets the "offered" mark (N5), so a returning user may be offered once more.
 * **Objection (s.36):** treated as withdrawal.
 * **Automated decisions (s.37):** none are made from donations.
-* **Rectification (s.34(1)(c)):** the only free text is the automatic transcript, which is not used about the person.
-* **Contact:** `KUDIGUARD_PRIVACY_CONTACT`, shown on /privacy.
+* **Rectification:** the only free text is the automatic transcript, which is not used about the person.
 
 ## 7. Risks
 | Risk | Likelihood / impact | Mitigations | Residual |
 |---|---|---|---|
-| Re-identification by voice (someone recognises the speaker) | Medium / medium | Few named listeners under confidentiality; no phone numbers; random ids; no speaker identification; 12-month limit | Low–medium (voice is inherently identifying) |
-| Third-party voices (forwarded scam calls, family members) | Medium / medium | Forwarded voice notes excluded; own-voice wording; reviewers delete others' voices | Low |
-| Children donating | Low / high | 18+ in the offer, button and web box; no answer = no; reviewers delete | Low (self-declared) |
-| Sensitive content (health, money troubles) in the speech | Medium / medium | Purpose limited to ASR; hypothesis redacted; access limited; withdrawal deletes | Low–medium |
-| Breach (stolen disk, leaked backup, leaked export) | Low / high | Encryption at rest; key derived from a secret kept out of backups; git-ignored exports; deleting export copies | Low |
-| Function creep (training other models, sharing) | Low / medium | Single stated purpose; a new use needs a new consent version | Low |
-| Consent not demonstrable | Low / medium | Versioned record per user and per sample; record kept while samples exist | Low |
+| Re-identification by voice | Medium / medium | Few named listeners under confidentiality; no numbers; random ids; no speaker identification; 12 months | Low–medium |
+| Third-party voices (forwarded scam calls, family members) | Medium / medium | `audio.voice` required; `forwarded` checked; own-voice wording; reviewers delete | Low–medium (forwarded flag not documented for audio) |
+| Children donating | Low / high | 18+ on every route; no answer means no; reviewers delete | Low (self-declared) |
+| **Spoken financial identifiers** (OTP, PIN, BVN, account numbers read aloud) | Medium / high | /privacy asks donors not to read them out; transcripts masked; transcribers type numbers as `[number]`; reviewers `remove` samples with credentials | Low–medium |
+| Sensitive content (health, money troubles, ethnicity through accent) | Medium / medium | Single purpose; restricted access; withdrawal deletes | Low–medium |
+| Transfer abroad (pilot server, Meta, Cloudflare) | Certain / medium | Informed consent (s.43); encryption at rest; move to Nigeria planned | Medium until the move |
+| Breach (stolen disk, leaked backup, leaked export) | Low / high | Encryption; key kept out of backups; exports only to local git-ignored folders and deleted after use | Low |
+| Function creep | Low / medium | Single stated purpose; a new use needs a new consent version | Low |
+| Consent not demonstrable | Low / medium | Versioned record per user and per sample; source recorded; form rows validated | Low |
 
-Overall residual risk: **low to medium, acceptable** with the controls above. It is not high, so prior consultation
-with the NDPC (s.28(2)) is not expected. **DECIDE:** the lawyer confirms this.
+Overall residual risk: **medium during the pilot**, mainly because of the transfer abroad. It falls to low after
+the move to Nigeria. It is not "high", so prior consultation with the NDPC (s.28) is not expected. **DECIDE:** the
+lawyer confirms this.
 
 ## 8. Incident procedure (s.40)
 1. **Contain:**
    * Revoke access.
-   * Rotate `KUDIGUARD_HASH_SECRET` if the secret may have leaked. Rotation makes stored samples undecryptable;
-     purge them.
+   * If the key may have leaked: `kudiguard voice wipe --all`, then rotate the key (§4).
    * Stop the server if the leak is ongoing.
 2. **Assess:** what leaked (audio, rows, exports), how many donors, and whether the data was encrypted.
 3. **Notify the NDPC within 72 hours** of becoming aware, if the breach is likely to risk people's rights. Partial
-   information may be given in phases (s.40(2), (9)).
-4. **Tell affected users** in plain language if the risk is high (s.40(3)). WhatsApp donors can be messaged through
-   the bot only within 24 h of their last message. Otherwise post a notice on /privacy.
-5. **Record** every breach, including ones not notified (s.40(8)), in `var/incidents.md`. Keep it out of git.
+   information may follow in phases.
+4. **Tell affected people immediately**, in plain language, when the risk to them is high.
+   * WhatsApp donors: through the bot, but only within 24 hours of their last message. Otherwise use another
+     channel the operator holds.
+   * Everyone: also post a notice on /privacy.
+5. **Record** every breach, including ones not notified, in `var/incidents.md`. Keep it out of git.
 
 ## 9. Controller obligations
-* **Controller:** `KUDIGUARD_OPERATOR_NAME`. **Privacy contact or DPO:** `KUDIGUARD_PRIVACY_CONTACT`. Under s.32, a DPO
-  is mandatory only for data controllers of major importance (DCPMIs).
-* **Registration (s.44; GAID Arts. 8–10; NDPC Guidance Notice NDPC/HQ/GN/VOL.02/24):** the tiers count data subjects
-  over 6 months.
+* **Controller:** `KUDIGUARD_OPERATOR_NAME`.
+* **Privacy contact:** `KUDIGUARD_PRIVACY_CONTACT`. A DPO is mandatory only for data controllers of major
+  importance (s.32).
+* **Registration (s.44; GAID; NDPC Guidance Notice NDPC/HQ/GN/VOL.02/24):** the tiers count data subjects over 6
+  months.
 
   | Tier | Data subjects in 6 months |
   |---|---|
@@ -155,34 +211,38 @@ with the NDPC (s.28(2)) is not expected. **DECIDE:** the lawyer confirms this.
   | EHL | more than 1,000 |
   | UHL | more than 5,000 |
 
-  A pilot with more than 200 users in 6 months probably reaches OHL: register, and renew every year. EHL and UHL
-  also file annual compliance audit returns through a licensed DPCO. **DECIDE:** registration before the pilot
-  exceeds 200 users.
-* **Record of processing activities** (GAID Art. 13 semi-annual report). Entry:
+  A pilot with more than 200 users in 6 months probably reaches OHL: register, and renew every year. **DECIDE:**
+  register before then.
+* **Record of processing activities** (GAID semi-annual report). Entry:
 
   | Field | Entry |
   |---|---|
   | Activity | Voice-note donation for speech-recognition testing |
-  | Data subjects | Adult users who opt in |
-  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record |
-  | Basis | Consent (s.25(1)(a), s.30(1)(a)) |
+  | Data subjects | Adult users who opt in (chat, web, tester form) |
+  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source) |
+  | Basis | Consent (s.25, s.30 explicit consent) |
   | Recipients | Named reviewers and transcribers under written confidentiality |
-  | Transfers | None by design (see §5) |
+  | Transfers | Outside Nigeria during the pilot: our server, and Meta and Cloudflare in transit. Basis: informed consent (s.43) |
   | Retention | 12 months |
   | Security | §4 |
 
-* **Note on GAID article numbers:** check them against the official GAID 2025 text before filing. Secondary sources
-  disagree on the numbering from Art. 19 onwards.
+## 10. Enabling, and sign-off
+To switch the feature on:
+1. Sign below.
+2. Have native speakers review the ha/yo/ig texts and the local command words. Until then only the English
+   commands are certain to be understood (N4).
+3. Confirm the forwarded-voice-note flag (§2).
+4. Restrict file permissions (§4).
+5. Set `KUDIGUARD_VOICE_DONATION=true` and restart.
 
-## 10. Sign-off
 | Role | Name | Date | Decision |
 |---|---|---|---|
 | Operator (controller) | | | |
 | Privacy contact / DPO | | | |
 | Legal review (Nigerian data-protection counsel) | | | |
 
-Review this assessment when the purpose, the retention period, the listeners, the server location or the offer text
-changes. Bump `DONATION_VERSION` whenever the offer text changes.
+Review this assessment, and bump `DONATION_VERSION`, when the purpose, the retention period, the listeners, the
+server location or the offer text changes.
 
 Sources:
 * NDPA 2023, section by section: <https://www.lawglobalhub.com/?p=66857>. Definitions in s.65:
@@ -191,7 +251,6 @@ Sources:
 * GAID 2025:
   * <https://www.aelex.com/the-nigeria-data-protection-act-general-application-and-implementation-directive-2025/>
   * <https://www.doa-law.com/wp-content/uploads/2025/10/Gaid-Serie-1.pdf>
-  * <https://blog.lawpavilion.com/ndp-act-2023-gaid-2025-a-comprehensive-guide-to-nigerias-new-data-protection-landscape>
 * Registration tiers:
   * <https://www.michalsons.com/blog/nigeria-data-protection-act-ndpa-controller-and-processor-registration/77465>
   * <https://ndpc.gov.ng/Files/registration.pdf>
@@ -201,3 +260,5 @@ Sources:
 * CBN circular, not applicable:
   * <https://techeconomy.ng/cbn-orders-banks-fintechs-to-store-payment-data-in-nigeria-by-january-2027/>
   * <https://digitalpolicyalert.org/event/40846-circular-introducing-systemic-oversight-measures-in-payments-system-including-data-localisation-obligations-enters-into-force>
+* Meta, audio message fields (`voice`):
+  <https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples>.

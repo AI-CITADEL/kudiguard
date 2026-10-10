@@ -17,13 +17,33 @@ business number and the app in Live mode. Replies are free within 24 h of the us
 `.\scripts\setup_named_tunnel.ps1` (browser login for the domain; default `kudiguard.theaicitadel.com`), then
 `.\scripts\watchdog.ps1 -Named`. It keeps its own certificate and config, so other tunnels on this PC are untouched.
 
-**Voice-note donation** (opt-in; docs/DPIA_VOICE.md): encrypted audio lives in `var/voice/` (or
-`KUDIGUARD_VOICE_DIR`, which must belong to the same database), is purged after 12 months by the server and by
-`kudiguard purge`, and is erased by STOP DONATING / DELETE. Back up `var/` without `.env` (the key comes from
-`KUDIGUARD_HASH_SECRET`). Requests by email: `kudiguard voice access|erase --user <number | web:<session>>`.
+**Where data is stored** (shown to every user): `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (the default; this PC)
+or `nigeria` once the server really is in Nigeria. Moving abroad again needs a new `CONSENT_VERSION`.
 
-**Incident** (personal-data breach): contain, assess, notify the NDPC within 72 hours when people's rights are at
-risk, tell affected users when the risk is high, record it (docs/DPIA_VOICE.md §8).
+**Restrict files to the service account** (Windows ignores POSIX modes). Run in an elevated prompt, with the
+account that runs the watchdog:
+
+    icacls var /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F" "SYSTEM:(OI)(CI)F"
+    icacls .env /inheritance:r /grant:r "%USERNAME%:F" "SYSTEM:F"
+
+**Voice-note donation** (opt-in; docs/DPIA_VOICE.md). This is **off** until the DPIA is signed off.
+* *Before enabling:* send one real *forwarded* voice note to the live number and check the log line
+  `voice message: recorded=… forwarded=…`. Record in the DPIA whether Meta marks it.
+* *Turning it on:* `KUDIGUARD_VOICE_DONATION=true`, then restart.
+* *Storage:* encrypted audio lives in `var/voice/` (`KUDIGUARD_VOICE_DIR`). A `.vault` marker ties it to its
+  database, so never point it at another database's folder.
+* *Deletion:* audio is purged after 12 months by the server and by `kudiguard purge`. STOP DONATING, STOP and DELETE
+  erase it at once.
+* *Backups:* back up `var/` without `.env`, so the copy cannot be decrypted.
+* *Key rotation:* `kudiguard voice wipe --all`, then change `KUDIGUARD_VOICE_KEY` (or the hash secret), then restart.
+* *Requests by email:* `kudiguard voice access|erase --user <number | web:<donation code>>`. Confirm the requester
+  first (DPIA §6).
+* *Flagged samples* (a child's voice, someone else's voice, or credentials read out):
+  `kudiguard voice remove <id> ...`.
+* *Tester sign-up form:* see docs/TESTER_SIGNUP.md.
+
+**Incident** (personal-data breach): contain; assess; notify the NDPC within 72 hours when people's rights are at
+risk; tell affected people immediately when the risk to them is high; record it (docs/DPIA_VOICE.md §8).
 
 ## In the cloud (later)
 * **Container**: `docker build -t kudiguard .` then run with the same env vars and a volume for `/app/var`.

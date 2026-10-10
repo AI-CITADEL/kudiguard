@@ -130,8 +130,44 @@ async def test_build_services_with_whatsapp(tmp_path: Path, monkeypatch: pytest.
         assert services.conversation is not None and services.whatsapp is not None
         assert services.donations is not None and services.conversation._donations is services.donations
         assert services.donations.directory == Settings().voice_dir  # isolated per test (conftest)
+        assert not services.conversation._collecting  # off until the DPIA is signed off
     finally:
         await services.aclose()
+    services = await build_services(
+        base_settings(tmp_path, whatsapp_enabled=True, packs=("kudiguard-core",), voice_donation=True,
+                      storage_location="nigeria")
+    )  # fmt: skip
+    try:
+        assert services.conversation is not None and services.conversation._collecting
+        assert services.conversation._storage == "nigeria"
+    finally:
+        await services.aclose()
+
+
+def test_voice_donation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import ValidationError
+
+    from kudiguard.hosting import StorageLocation
+
+    defaults = Settings(_env_file=None, hash_secret=SECRET)  # type: ignore[call-arg]
+    assert defaults.voice_donation is False and defaults.voice_retention_days == 365
+    assert defaults.storage_location is StorageLocation.OUTSIDE_NIGERIA  # never "in Nigeria" by default
+    assert defaults.voice_secret() == SECRET.encode()
+    own_key = Settings(_env_file=None, hash_secret=SECRET, voice_key="k" * 40)  # type: ignore[call-arg]
+    assert own_key.voice_secret() == b"k" * 40
+    blank_key = Settings(_env_file=None, hash_secret=SECRET, voice_key="")  # type: ignore[call-arg]
+    assert blank_key.voice_secret() == SECRET.encode()  # KUDIGUARD_VOICE_KEY= as in .env.example
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, voice_retention_days=366)  # type: ignore[call-arg]
+    monkeypatch.setenv("KUDIGUARD_STORAGE_LOCATION", "nigeria")
+    assert Settings(_env_file=None).storage_location is StorageLocation.NIGERIA  # type: ignore[call-arg]
+    monkeypatch.setenv("KUDIGUARD_STORAGE_LOCATION", "lagos")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+    assert (
+        StorageLocation.NIGERIA.english == "in Nigeria"
+        and "outside" in StorageLocation.OUTSIDE_NIGERIA.english
+    )
 
 
 async def test_purge_loop_expires_donated_voice_notes_on_their_own_clock() -> None:
