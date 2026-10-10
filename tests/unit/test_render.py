@@ -4,7 +4,14 @@ from kudiguard.domain import Verdict
 from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.models import Contact, ContactKind
 from kudiguard.languages import LanguageRegistry
-from kudiguard.render import MAX_TRANSCRIPT_CHARS, WHATSAPP_MAX_CHARS, render_check_reply, render_warning
+from kudiguard.render import (
+    MAX_TRANSCRIPT_CHARS,
+    WHATSAPP_MAX_CHARS,
+    render_check_reply,
+    render_report,
+    render_steps,
+    render_warning,
+)
 
 BANK = Contact(
     label="Your own bank",
@@ -132,4 +139,84 @@ def test_plain_text_strips_whatsapp_markup() -> None:
     assert (
         plain_text("🔴 *This looks like a SCAM*\n_Guidance only._")
         == "🔴 This looks like a SCAM\nGuidance only."
+    )
+
+
+# --- exact limits, found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------
+
+
+def heard(text: str) -> str:
+    return next(line for line in text.splitlines() if line.startswith("🗣️"))
+
+
+def test_transcript_is_cut_to_exactly_280_characters(messages: Messages) -> None:
+    def shown(transcript: str) -> str:
+        reply = render_check_reply(messages, "en", verdict=Verdict.CAUTION, body="x", transcript=transcript)
+        return heard(reply).split("“", 1)[1].rsplit("”", 1)[0]
+
+    assert shown("a" * 280) == "a" * 280
+    assert shown("a" * 281) == "a" * 279 + "…"
+    assert shown("Xray *b* " * 2) == "Xray b Xray b"  # only WhatsApp markup is removed
+
+
+LANGUAGES = ("ha", "yo", "ig", "en")  # their fixed texts differ in length (odd and even budgets)
+
+
+def scam_reply(messages: Messages, body: str, language: str = "en") -> str:
+    return render_check_reply(
+        messages,
+        language,
+        verdict=Verdict.LIKELY_SCAM,
+        body=body,
+        transcript="they asked",
+        contacts=(BANK, EFCC),
+    )
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_a_long_body_fills_the_message_exactly(messages: Messages, language: str) -> None:
+    budget = 4096 - (
+        len(scam_reply(messages, "x", language)) - 1
+    )  # what the fixed sections leave for the body
+    fits = scam_reply(messages, "b" * budget, language)
+    assert len(fits) == 4096 and "b" * budget in fits
+    cut = scam_reply(messages, "b" * (budget + 1), language)
+    assert len(cut) == 4096 and "b" * (budget - 1) + "…" in cut and "b" * budget not in cut
+
+
+@pytest.mark.parametrize(
+    ("body", "kept"),
+    [
+        ("Line one\n" + "c" * 5000, "Line one…"),  # cut at the last line break
+        ("First sentence. " + "d" * 5000, "First sentence.…"),  # or after the last full stop
+        ("A\n" + "e" * 5000, "A…"),
+        ("Odd. " + "g" * 5000, "Odd.…"),  # a full stop at an odd position
+        ("Para.\nNext. " + "f" * 5000, "Para.\nNext.…"),  # whichever comes last
+    ],
+    ids=["line", "sentence", "line-at-1", "odd-stop", "last-wins"],
+)
+def test_a_long_body_is_cut_at_a_boundary(messages: Messages, body: str, kept: str) -> None:
+    text = scam_reply(messages, body)
+    assert f"\n\n{kept}\n\n*Where to report:*" in text
+
+
+def test_a_long_warning_fills_the_message_exactly(messages: Messages) -> None:
+    text = render_warning(messages, "en", "w" * 5000)
+    assert len(text) == 4096 and text.endswith(
+        "…\n\n_Shared from KudiGuard. Check suspicious messages for free on WhatsApp._"
+    )
+
+
+def test_steps_and_report_layout(messages: Messages) -> None:
+    steps = render_steps(messages, "en", "1. Call your bank.\n2. Block the card.")
+    assert (
+        steps
+        == "*What to do:*\n1. Call your bank.\n2. Block the card.\n\n_Guidance only, not financial advice._"
+    )
+    for language in LANGUAGES:  # header and steps share a line, so a full message is 4096 - 1
+        long = render_steps(messages, language, "s" * 5000)
+        assert len(long) == 4095 and long.endswith(f"…\n\n{messages.text(language, Msg.DISCLAIMER)}")
+    report = render_report(messages, "en", (BANK, UNVERIFIED, EFCC))
+    assert report == (
+        "*Where to report:*\n• Your own bank: Call the number on the back of your card\n• EFCC: https://www.efcc.gov.ng"
     )

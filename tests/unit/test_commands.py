@@ -57,3 +57,32 @@ def test_punctuation_empty_or_long_messages_match_nothing(
     registry: LanguageRegistry, text: str | None
 ) -> None:
     assert CommandMatcher(registry).match(text) == Match()
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------
+
+
+def test_commands_up_to_sixty_characters(registry: LanguageRegistry) -> None:
+    matcher = CommandMatcher(registry)
+    assert matcher.match("STOP".ljust(60, "!")) == Match(command=Command.STOP)
+    assert matcher.match("STOP".ljust(61, "!")) == Match()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Hello", Match(greeting_language="en")),
+        ("thanks", Match(greeting_language="en")),
+        ("hi KudiGuard!", Match(greeting_language="en")),
+        ("KudiGuard", Match()),  # the name alone is not a greeting
+        ("hellothanks", Match()),  # greetings are whole words
+    ],
+)
+def test_greetings(registry: LanguageRegistry, text: str, expected: Match) -> None:
+    assert CommandMatcher(registry).match(text) == expected
+
+
+def test_a_phrase_for_delete_and_language_is_rejected(tmp_path: Path) -> None:
+    reg = registry_with(tmp_path, "  delete: ['menu']\n  language: ['Menu!']")
+    with pytest.raises(ValueError, match="two commands"):
+        CommandMatcher(reg)

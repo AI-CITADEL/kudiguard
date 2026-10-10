@@ -84,3 +84,62 @@ def test_message_key_hides_the_number_and_is_stable() -> None:
 def test_short_numeric_ids_are_not_treated_as_phones() -> None:
     hasher = UserHasher(SECRET)
     assert hasher.user_id("12345678") != hasher.user_id("1234-5678")
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------
+
+
+def test_ids_are_stable_across_releases() -> None:
+    """Golden values: changing a label or the format silently orphans every stored record (like a new secret)."""
+    hasher = UserHasher(b"k" * 32)
+    assert hasher.user_id("+2348031234567") == "785e6ef83a00ca7eb539e89b39c83ca1"
+    assert hasher.user_id("web:session-abc") == "5074925464c6e5f8e7b9ebffc8c3726b"
+    assert hasher.deletion_marker("abc") == "eeeadfee57cf90a171801d4ff40e2e5e"
+    assert hasher.message_key("whatsapp", "wamid.X") == "3431d237bd303086b2d26b65feb837d8"
+    assert hasher.review_id(42) == "R-0cfd0c7d6e"
+
+
+def test_secret_must_be_at_least_32_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValueError):
+        UserHasher(b"k" * 31)
+    UserHasher(b"k" * 32)
+    UserHasher(b"k" * 64)
+    for ok in ("s" * 32, "s" * 64):
+        monkeypatch.setenv("KUDIGUARD_HASH_SECRET", ok)
+        UserHasher.from_env()
+    monkeypatch.setenv("KUDIGUARD_HASH_SECRET", "s" * 31)
+    with pytest.raises(ValueError):
+        UserHasher.from_env()
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        ("whatsapp:+2348031234567", "+2348031234567"),  # channel prefix ignored
+        ("tel:08031234567", "2348031234567"),
+        ("803-123-4567", "8031234567"),  # ten digits, ten characters: a phone number
+        ("1-202-555-0147-12345", "+191755501471234 5"),  # twenty characters: still a phone number
+    ],
+)
+def test_phone_formats_merge(a: str, b: str) -> None:
+    hasher = UserHasher(SECRET)
+    assert hasher.user_id(a) == hasher.user_id(b)
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        ("803-123-456", "803 123 456"),  # nine digits: an id, hashed as typed
+        ("----------", "((((()))))"),  # no digits at all
+        ("08031234567abc", "08031234567"),  # trailing letters: an id
+        ("234tel:8031234567", "2348031234567"),  # "tel:" only counts as a prefix
+        ("1-202-555-0147-123456", "+1917555014712345 6"),  # over twenty characters
+    ],
+)
+def test_non_phones_never_merge_with_phones(a: str, b: str) -> None:
+    hasher = UserHasher(SECRET)
+    assert hasher.user_id(a) != hasher.user_id(b)
+
+
+def test_overlong_local_number_is_not_nigerianised() -> None:
+    assert normalise_phone("080312345678") == "080312345678"  # twelve digits: not a Nigerian mobile

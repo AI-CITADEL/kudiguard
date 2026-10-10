@@ -113,6 +113,11 @@ async def test_privacy_page_describes_donation_and_reviewers(api: Api) -> None:
     assert "Available now." in page and "same browser" in page and "donation code" in page
     assert "outside Nigeria (during the pilot)" in page and "s.43" in page and "Meta" in page
     assert "in Nigeria</strong>" not in page  # never claimed by default
+    # whole sentences: the location and the transfer risk read as one disclosure (mutation testing)
+    assert (
+        "stored on our server <strong>outside Nigeria (during the pilot)</strong>. Nigerian data-protection law may "
+        "not fully protect data held abroad, and you may find it harder to enforce your rights there. We tell you"
+    ) in " ".join(page.split())
 
 
 async def test_privacy_page_follows_the_storage_location_and_switch(registry: LanguageRegistry) -> None:
@@ -122,6 +127,10 @@ async def test_privacy_page_follows_the_storage_location_and_switch(registry: La
         assert "outside Nigeria (during the pilot)" not in page and "Cloudflare" in page
         assert "Data passing through Meta and Cloudflare may be processed abroad" in page
         assert "may not fully protect data held abroad" not in page
+        assert (
+            "<strong>in Nigeria</strong>. Data passing through Meta and Cloudflare may be processed abroad, where "
+            "Nigerian data-protection law may not fully apply and you may find it harder to enforce your rights. We"
+        ) in " ".join(page.split())
 
 
 async def test_privacy_page_states_the_transfer_risk_and_the_delete_marker(api: Api) -> None:

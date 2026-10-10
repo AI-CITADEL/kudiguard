@@ -249,3 +249,91 @@ build the eval engine with grounding on, as production: English grounded rate is
 Rules-only baseline (model down, measured 10 Oct): en-wrong-transfer, en-fake-alert-goods, en-french-otp,
 ha-otp-blocked, ha-fake-alert-goods, yo-job-fee and ig-investment-triple get no scam verdict; en-already-shared-otp
 gets "no red flags"; yo-otp-legit (genuine OTP) gets likely_scam. Rules gaps, recorded; lexicons unchanged.
+
+## G — Mutation testing of the safety-critical modules (10 Oct 2026, `scripts/mutation.py`)
+
+100% line and branch coverage only shows that code ran. Mutation testing makes one small change at a time (a mutant)
+and runs the module's tests: a mutant that still passes is behaviour that no test checks.
+
+**Method.** `python scripts/mutation.py [target ...]` (dev extra; set `KUDIGUARD_FFMPEG` and `KUDIGUARD_EMBEDDINGS_CACHE`
+as for the suite; results in `var/mutation/`). Two sources of mutants:
+
+* **cosmic-ray 8.7.0** (mutmut does not run on native Windows): comparison, arithmetic, boolean and unary operators,
+  numbers, `True`/`False`/`None`/`is`/`in`, exceptions, `break`/`continue`, zero-iteration loops. Run with its `http`
+  distributor: one worker per clone of the repository (16 here), so the checkout is never mutated. On Windows a venv's
+  `python.exe` is a launcher, so the script's workers kill the whole process tree on a timeout. Mutants inside type
+  annotations are skipped (`from __future__ import annotations`: never evaluated).
+* **String mutants** (cosmic-ray has none, yet regexes, hash/encryption labels and command words are strings): every
+  string/bytes literal except docstrings, exception and log messages is wrapped in `XX`; each regex literal also gets
+  every quantifier bound moved by one and every lookaround, anchor and `\b` removed (pure functions, unit-tested in
+  `tests/unit/test_mutation_script.py`). A control run of the `ast.unparse`d module must pass first.
+
+Each target runs only the tests that exercise it (`TARGETS` in the script), `-x`, with a per-mutant timeout of
+max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min** (16 workers, 32-core PC); `donation`
+(pipeline and API tests, ~12 min) dominates.
+
+**Kill rates, before → after the new tests** (killed + timed out / judged; cosmic-ray and string mutants together):
+
+| Module | Mutants | Before | After | Survivors left (all triaged below) |
+|---|---|---|---|---|
+| `safety/scam_rules.py` | 119 (+33 in annotations) | 86.6% | **95.0%** | 6 |
+| `safety/decision.py` | 116 (+11) | 76.7% | **93.1%** | 8 |
+| `text.py` (redact) | 99 | 55.6% | **88.9%** | 11 |
+| `privacy.py` | 80 | 65.0% | **93.8%** | 5 |
+| `donation.py` | 474 (+33) | 77.2% | **90.1%** | 47 |
+| `commands.py` | 80 (+11) | 70.0% | **85.0%** | 12 |
+| `hosting.py` | 42 | 73.8% | **81.0%** | 8 |
+| `render.py` | 233 (+11) | 50.2% | **97.9%** | 5 |
+| `review.py` | 712 (+66) | 85.5% | **93.4%** | 47 |
+| `patterns.py` | 79 (+11) | 67.1% | **86.1%** | 11 |
+| **All** | **2,034** | **75.3%** | **92.1%** | **160** |
+
+String mutants alone went from 62% to 90% killed (text 50% → 88%, privacy 29% → 84%). `donation`'s before figure used
+its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION` against `voice.html`) was added after.
+
+**Real gaps found and closed (tests only; no source change was needed)**, by area:
+
+* Verdict policy: each flag's weight, score and verdict alone and as a declared check (a 2→3 change to any strong
+  flag turned a "caution" into "likely scam" unnoticed); strong + amplifier reaching the threshold; flags ordered by
+  weight before declaration order; `has_check_intent` with `None` texts; an accented term whose folded form sorts after it.
+* Decision: lookup word and length limits (2 vs 3 words, 6 vs 7 tokens, 200 vs 201 chars); English input is never
+  "untranslated"; a language code sorting before `en` keeps the model's translation; `scam_check` intent alone makes a check.
+* Redaction (17 boundary cases): a card after `:`, 12- vs 8-digit groups, 2/4-digit first groups, a 5-digit inner
+  group, five groups, a stray leading digit, "in 12 345…" (not the naira sign), currency amounts and decimals kept,
+  10 vs 9 digits read out, 6 vs 5 bare digits, an account number followed by a word starting with "k" (was it an
+  amount in "k"?), `N 0803…` (amounts never start with 0); the email pattern's linear-time anchor; spelled-acronym
+  joins and Hausa letters/curly quotes in `fold`.
+* Pseudonymisation: golden ids for every label (`phone:`, `id:`, `deleted:`, `msg:`, `review:` — a changed label
+  orphans every stored record, like a new secret); the 32-byte secret bound in both directions; phone-shape limits
+  (10 digits, 10–20 chars, no digits at all, trailing letters, `tel:` only as a prefix); 12-digit `080…` numbers.
+* Donation: the file format as a known-answer test (HKDF info label, 12-byte nonce, `KGV1`+id as AAD, sizes); the
+  shortest valid and a truncated file; keys of 32 *or more* bytes; a newer unknown consent version refused; default
+  caps (20/day, 8 pending) by behaviour; the pending slot held by a cancelled, still-running write and released exactly
+  once; a withdrawal at the same instant as the consent; tombstones lasting one hour each (another donor's withdrawal
+  must not prune them); orphans ageing out after one hour; `.part` debris counted as audio (not claimed, reported by
+  `wipe`); the size cap counting stored samples only and inclusive; nested vault folders; erase and the orphan sweep
+  going on after a missing or locked file; the retention promise (365 days = config cap).
+* Commands: the 60-character limit; greetings (incl. "hi KudiGuard", the name alone, joined words); a phrase bound to
+  `delete` and `language`.
+* Rendering: transcript cut to exactly 280 chars; a long body, warning and steps filling a WhatsApp message exactly
+  (4,096; steps 4,095) in all four languages (odd and even budgets); cuts at the last line break or full stop.
+* /privacy: the location and transfer-risk sentences as whole sentences; review kit: full text and Markdown
+  scorecards, AC1 with a 1-to-2 split, accuracy gaps, language conflicts in either order, reviewer names in any order,
+  1–5 and y/n, short and blank CSV rows, semicolon sheets with commas in the notes, UTF-16 BE, a rewritten sheet
+  truncating the old file, the sheet's columns, `since` on the day itself and undated rows, samples over 256.
+
+**Equivalent or accepted survivors** (160): *identity-equivalent* — `is`/`==` on enums, interned literals and small
+ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`
+string order, counts that cannot exceed their cap, `len > 1` vs `!= 1` on non-empty lists, `-w` vs `~w` in a sort
+key, a regex `^`/`$` under `fullmatch`/`match`, `{9,20}` after a 10-digit lookahead, `rfind+1` vs `cut != 0`);
+*declarations* — `@dataclass(frozen=…, slots=…)` (mypy strict rejects writes) and `*`→`/` in signatures whose callers
+all use keywords; *platform* — POSIX file modes (tested by the POSIX-only tests) and `os.open` flag arithmetic on
+disjoint bits / `O_BINARY` (CPython writes bytes untranslated on Windows; a random 128-bit `.part` name never
+pre-exists, so dropping `O_EXCL` cannot show); *stricter* — a mutant that masks or deletes more (wider card/digit
+groups, dropped look-behinds in `redact`/`deidentify`, a one-letter TLD, a 20-digit card, `wipe` with −1 s grace);
+*unreachable* — `_fit` budgets ≤ 1, files whose age equals the grace to the nanosecond, `now % mtime` (= `now − mtime`
+while `now < 2·mtime`), TLDs of 23–25 letters, `^ 4` on warning budgets whose bit 2 is set in all four languages;
+*neutral strings* — internal enum values never stored or shown (`Command`, `CHECK`/`QUESTION`), `""` defaults
+that are never used or are stripped later, `XX` wraps of prose; *accepted* — `MAX_FOLDER_BYTES` (a sizing default with no
+spec beyond "before the disk fills"; the cap itself is tested), and the daily counter not resetting when the UTC date
+moves backwards (neither behaviour is wrong). Each target's list is in `var/mutation/<target>-survivors.txt`.

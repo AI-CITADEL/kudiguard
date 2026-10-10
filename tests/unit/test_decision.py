@@ -164,3 +164,42 @@ def test_lookup_check_is_fast_on_pathological_input() -> None:
 )
 def test_official_links_and_prize_reports(en: Lexicon, text: str, expected: Verdict) -> None:
     assert decide(text, Analysis(text, Intent.OTHER, ()), en).verdict is expected
+
+
+# --- boundaries and branches found by mutation testing (docs/SPIKES.md, G) ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "lookup"),
+    [
+        ("08031234567 who is", True),  # two words besides the number: still "check this number"
+        ("08031234567 who is this", False),  # three words: a sentence (the lexicon decides)
+        ("+234 803 123 4567 ? scam", True),  # six tokens
+        ("+234 803 123 4567 ? ? scam", False),  # seven tokens: too long to be a bare lookup
+    ],
+)
+def test_lookup_word_limits(text: str, lookup: bool) -> None:
+    assert is_lookup(text) is lookup
+
+
+def test_lookup_length_limit() -> None:
+    link = "https://example.com/"
+    assert is_lookup(link + "a" * (200 - len(link)))
+    assert not is_lookup(link + "a" * (201 - len(link)))
+
+
+def test_english_source_is_never_marked_untranslated() -> None:
+    failed = Analysis("", Intent.SCAM_CHECK, (Flag.UPFRONT_FEE,), untranslated=True)
+    resolved = resolve_analysis(failed, "pay the fee first", "".join(["e", "n"]))  # not an interned literal
+    assert (resolved.english, resolved.untranslated) == ("pay the fee first", False)
+
+
+def test_codes_sorting_before_the_pivot_keep_the_models_translation() -> None:
+    analysis = Analysis("Send the code", Intent.SCAM_CHECK, (Flag.ASKS_CREDENTIALS,))
+    assert resolve_analysis(analysis, "Efik text", "efi") == analysis  # Efik: "efi" < "en"
+
+
+def test_model_scam_check_intent_alone_makes_it_a_check(en: Lexicon) -> None:
+    text = "My friend wants to sell me his phone."
+    assert decide(text, Analysis(text, Intent.SCAM_CHECK, ()), en).verdict is Verdict.NO_FLAGS
+    assert decide(text, Analysis(text, Intent.OTHER, ()), en).verdict is Verdict.NOT_A_CHECK

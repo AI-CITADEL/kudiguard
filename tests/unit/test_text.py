@@ -1,6 +1,8 @@
+import time
+
 import pytest
 
-from kudiguard.text import redact, tokens
+from kudiguard.text import normalize, redact, tokens
 
 
 @pytest.mark.parametrize(
@@ -58,3 +60,52 @@ def test_redact_keeps_ussd_amounts() -> None:
 )
 def test_grouped_numbers_without_prefix_are_masked(raw: str, expected: str) -> None:
     assert redact(raw) == expected
+
+
+# --- found by mutation testing (docs/SPIKES.md, G): each case pins one boundary of a redaction pattern ------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Card:5399 8312 3456 7890", "Card:[number]"),  # after ':' only the card pattern applies
+        ("ref:5399 8312 3456", "ref:[number]"),  # 12 digits in fours
+        ("ref:5399 8312", "ref:5399 8312"),  # 8 digits: not a card
+        ("call 80 312 345 67 now", "call [number] now"),  # 2-digit first group
+        ("call 8031 2345 67 now", "call [number] now"),  # 4-digit first group
+        ("my number is 803 12345 67", "my number is [number]"),  # 5-digit inner group
+        ("pairs 12 34 56 78 90", "pairs [number]"),  # five groups
+        ("code 1 23 45 67 89 01", "code 1 [number]"),  # a stray digit does not hide the number
+        ("in 12 345 678 90", "in [number]"),  # "n " ending a word is not the naira sign
+        ("₦ 12 345 678 90 and $ 12 345 678 90", "₦ 12 345 678 90 and $ 12 345 678 90"),  # amounts
+        ("balance 12 345 678 90.50", "balance 12 345 678 90.50"),  # a decimal amount
+        ("BVN 2 2 3 1 5 6 7 8 9 0", "BVN [number]"),  # ten digits read out
+        ("PIN 2 2 3 1 5 6 7 8 9", "PIN 2 2 3 1 5 6 7 8 9"),  # nine: kept
+        ("acct 123456 ok", "acct [number] ok"),  # six digits: masked
+        ("code 12345 ok", "code 12345 ok"),  # five: kept
+        ("acct 1234567890 kindly", "acct [number] kindly"),  # "k" starting a word is no amount
+        ("N 0803123456", "N [number]"),  # amounts never start with 0: a phone number
+    ],
+)
+def test_redaction_boundaries(raw: str, expected: str) -> None:
+    assert redact(raw) == expected
+
+
+def test_email_pattern_stays_linear_on_long_words() -> None:
+    start = time.perf_counter()
+    assert redact("a" * 20_000 + "@") == "a" * 20_000 + "@"
+    assert time.perf_counter() - start < 0.5
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("ɓaƙo ƴa ‘x’ ʼy", "bako ya 'x' 'y"),  # noqa: RUF001 - Hausa hooked letters and curly quotes
+        ("e.g. i.e", "e.g. i.e"),  # one separator is not a spelled-out acronym
+        ("xo.t.p and o.t.pin", "xo.t.p and o.t.pin"),  # letters must stand alone
+        ("plan a b", "plan a b"),
+        ("xo t p and o t pin", "xo t p and o t pin"),
+    ],
+)
+def test_normalize_edges(raw: str, expected: str) -> None:
+    assert normalize(raw) == expected

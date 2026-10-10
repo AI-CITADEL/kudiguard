@@ -12,6 +12,7 @@ from test_pipeline import h as _harness_fixture
 
 from kudiguard.domain import Flag, Verdict
 from kudiguard.i18n import Msg
+from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import Purpose
 from kudiguard.patterns import MAX_PATTERN_CHARS, ScamPattern, deidentify
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
@@ -281,3 +282,36 @@ async def test_weeks_are_utc_even_for_local_clocks() -> None:
     await record_pattern(store, "whatsapp", answer, OTP_SCAM, datetime(2026, 10, 12, 0, 30, tzinfo=lagos))
     [row] = await store.export_patterns()
     assert row["week"] == "2026-10-05"
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("pay123456.ng", "[link: pay#.ng]"),  # six digits in a host: masked
+        ("shop12345.ng", "[link: shop12345.ng]"),  # five: kept
+        ("https://www.Scam.ng/a?u=1", "[link: scam.ng]"),  # www. dropped after a scheme too
+        (
+            "visit scam-site.com/x?id=1",
+            "visit [link: scam-site.com]",
+        ),  # bare hosts: first and last listed TLDs
+        ("free.ga/win", "[link: free.ga]"),
+    ],
+)
+def test_more_links(raw: str, expected: str) -> None:
+    assert deidentify(raw) == expected
+
+
+def test_length_caps() -> None:
+    assert deidentify("w" * 2000) == "w" * 2000 and deidentify("w" * 2001) == "w" * 2000
+    assert deidentify("a" + " " * 3000 + "b") == "a b"  # long whitespace runs do not eat the text
+    assert deidentify("a" + " " * 4500 + "b") == "a"  # input is cut at twice the cap before any regex runs
+
+
+def test_retention_and_channels_match_what_users_are_told(registry: LanguageRegistry) -> None:
+    from kudiguard.patterns import PATTERN_CHANNELS, PATTERN_RETENTION_DAYS
+
+    assert PATTERN_RETENTION_DAYS == 730 and "up to 2 years" in registry.get("en").strings[Msg.WELCOME]
+    assert {"whatsapp", "web"} == PATTERN_CHANNELS  # end users who consented, never API partners' users

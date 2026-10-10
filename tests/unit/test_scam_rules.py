@@ -4,7 +4,7 @@ import pytest
 
 from kudiguard.domain import Flag, Verdict
 from kudiguard.languages import LanguageRegistry
-from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess
+from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess, has_check_intent
 from kudiguard.text import normalize
 
 
@@ -49,6 +49,7 @@ def test_terms_match_whole_words_only() -> None:
         ("a|", "empty string"),
         ("(?:x)?", "empty string"),
         ("kíákíá", "kiakia"),
+        ("ά", "α"),  # noqa: RUF001 - Greek on purpose: its accent-free form sorts after it (mutation testing)
     ],
 )
 def test_bad_terms_rejected(term: str, message: str) -> None:
@@ -82,6 +83,8 @@ def test_unknown_extra_flag_raises(en: Lexicon) -> None:
 
 def test_none_and_empty_texts_are_ignored(en: Lexicon) -> None:
     assert assess([None, "", "  "], en).verdict is Verdict.NOT_A_CHECK
+    assert has_check_intent([None, "", "  "], en) is False
+    assert has_check_intent([None, "Is this a scam?"], en) is True
 
 
 def test_every_flag_has_weight_and_english_terms(en: Lexicon) -> None:
@@ -149,6 +152,44 @@ def test_flags_unique_and_ordered_by_weight(en: Lexicon) -> None:
     assert result.flags[0] is Flag.ASKS_CREDENTIALS
     assert result.flags[-1] is Flag.URGENCY
     assert result.score == 3 + 2 + 1
+
+
+# The weight policy, flag by flag: 3 = decisive alone, 2 = strong (caution alone), 1 = amplifier only.
+POLICY = {
+    Flag.ASKS_CREDENTIALS: 3,
+    Flag.REMOTE_ACCESS: 3,
+    Flag.GUARANTEED_RETURNS: 3,
+    Flag.WRONG_TRANSFER: 3,
+    Flag.ACCOUNT_THREAT: 2,
+    Flag.UPFRONT_FEE: 2,
+    Flag.PRIZE_LOTTERY: 2,
+    Flag.FAKE_PAYMENT: 2,
+    Flag.MONEY_REQUEST: 2,
+    Flag.SUSPICIOUS_LINK: 2,
+    Flag.IMPERSONATION: 1,
+    Flag.URGENCY: 1,
+    Flag.SECRECY: 1,
+}
+ALONE = {3: Verdict.LIKELY_SCAM, 2: Verdict.CAUTION, 1: Verdict.NOT_A_CHECK}
+
+
+@pytest.mark.parametrize("flag", list(Flag))
+def test_each_flag_alone_follows_the_weight_policy(en: Lexicon, flag: Flag) -> None:
+    result = assess(["hello"], en, extra_flags=[flag])
+    assert (result.flags, result.score, result.verdict) == ((flag,), POLICY[flag], ALONE[POLICY[flag]])
+    checked = assess(["hello"], en, extra_flags=[flag], is_check=True).verdict
+    assert checked is (Verdict.LIKELY_SCAM if POLICY[flag] == 3 else Verdict.CAUTION)
+
+
+def test_strong_plus_amplifier_reaches_the_scam_threshold(en: Lexicon) -> None:
+    result = assess(["hello"], en, extra_flags=[Flag.UPFRONT_FEE, Flag.URGENCY])
+    assert (result.score, result.verdict) == (3, Verdict.LIKELY_SCAM)
+
+
+def test_flags_ordered_by_weight_before_declaration_order(en: Lexicon) -> None:
+    # UPFRONT_FEE is declared before GUARANTEED_RETURNS but weighs less.
+    result = assess(["hello"], en, extra_flags=[Flag.UPFRONT_FEE, Flag.SECRECY, Flag.GUARANTEED_RETURNS])
+    assert result.flags == (Flag.GUARANTEED_RETURNS, Flag.UPFRONT_FEE, Flag.SECRECY)
 
 
 # --- detection quality on the shipped English pivot lexicon -------------------------------------------

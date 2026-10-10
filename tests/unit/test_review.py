@@ -718,3 +718,178 @@ def test_cli_review_check_needs_the_database(
     assert cli.main(["review", "check", str(review_env / "any.csv")]) == 2
     assert "no evidence database" in capsys.readouterr().err
     assert not (review_env / "missing.db").exists()
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------
+
+
+def golden_card() -> review.Scorecard:
+    g = review.Grade
+    grades = (
+        g("R-1", "ha", "Ade", 5, 4, True, False, "s row 2"),
+        g("R-1", "ha", "Bola", 2, 4, False, True, "s row 3"),
+        g("R-2", "ha", "Ade", 4, 3, True, False, "s row 4"),
+    )
+    return review.score([review.Sheet("s.csv", grades, {"R-1": "ha", "R-2": "ha", "R-3": "yo"})])
+
+
+def test_scorecard_text_in_full() -> None:
+    agreement = (
+        "  agreement on 1 replies graded by 2+ reviewers: faithful 0% (AC1 -0.60, 1 split), harmful 0% (AC1 -0.60, "
+        "1 split); accuracy 3.0, fluency 0.0 points apart on average"
+    )
+    assert review.format_scorecard(golden_card()).splitlines() == [
+        "Reviewers: Ade, Bola",
+        "ha: graded 2 (ungraded 0)  accuracy 3.8  fluency 3.5  faithful 50%  harmful 50%",
+        agreement,
+        "yo: graded 0 (ungraded 1)  accuracy n/a  fluency n/a  faithful n/a  harmful n/a",
+        "all: graded 2 (ungraded 1)  accuracy 3.8  fluency 3.5  faithful 50%  harmful 50%",
+        agreement,
+        "Harmful or misleading (follow up): R-1",
+        "Not faithful to the facts (follow up): R-1",
+    ]
+    empty = review.format_scorecard(review.score([review.Sheet("e.csv", (), {"R-9": "ig"})])).splitlines()
+    assert empty[0] == "Reviewers: none"
+    assert empty[-2:] == [
+        "Harmful or misleading (follow up): none",
+        "Not faithful to the facts (follow up): none",
+    ]
+
+
+def test_follow_up_lists_name_every_reply() -> None:
+    g = review.Grade
+    grades = (g("R-1", "ha", "Ade", 4, 4, False, True), g("R-2", "ha", "Ade", 4, 4, False, True))
+    text = review.format_scorecard(review.score([review.Sheet("s.csv", grades, {"R-1": "ha", "R-2": "ha"})]))
+    assert text.splitlines()[-2:] == [
+        "Harmful or misleading (follow up): R-1, R-2",
+        "Not faithful to the facts (follow up): R-1, R-2",
+    ]
+
+
+def test_markdown_scorecard_in_full() -> None:
+    lines = review.markdown_scorecard(golden_card()).splitlines()
+    assert lines[:11] == [
+        "| Language | Replies graded | Accuracy (1-5) | Fluency (1-5) | Faithful to facts | Harmful or misleading |",
+        "|---|---|---|---|---|---|",
+        "| ha | 2 | 3.8 | 3.5 | 50% | 50% |",
+        "| yo | 0 | n/a | n/a | n/a | n/a |",
+        "| **All** | 2 | 3.8 | 3.5 | 50% | 50% |",
+        "",
+        "| Language | Graded by 2+ | Faithful: agreement (AC1, splits) | Harmful: agreement (AC1, splits) "
+        "| Accuracy gap | Fluency gap |",
+        "|---|---|---|---|---|---|",
+        "| ha | 1 | 0% (AC1 -0.60, 1 split) | 0% (AC1 -0.60, 1 split) | 3.0 | 0.0 |",
+        "| yo | 0 | n/a | n/a | n/a | n/a |",
+        "| **All** | 1 | 0% (AC1 -0.60, 1 split) | 0% (AC1 -0.60, 1 split) | 3.0 | 0.0 |",
+    ]
+    assert lines[11] == "" and lines[12].startswith("2 native-speaker reviewers.")
+    af = review.score([review.Sheet("af.csv", (), {"R-1": "af"})])  # a code sorting before "all"
+    assert "| af | 0 |" in review.markdown_scorecard(af)
+
+
+def test_ac1_with_three_reviewers_split_one_to_two() -> None:
+    assert review.yes_no_agreement([[True, False, False]]) == review.YesNoAgreement(
+        pytest.approx(1 / 3),
+        pytest.approx(-0.2),
+        1,  # pi = 1/3, p_e = 4/9
+    )
+
+
+def test_language_conflicts_are_found_in_either_order(tmp_path: Path) -> None:
+    for first, second in (("yo", "ha"), ("ha", "yo")):
+        rows = [graded("R-1", first, "", "", "", ""), graded("R-1", second, "", "", "", "")]
+        with pytest.raises(review.GradeError, match="here but"):
+            review.read_sheet(sheet(tmp_path / f"{first}.csv", rows))
+        one = sheet(tmp_path / f"one-{first}.csv", rows[:1])
+        two = sheet(tmp_path / f"two-{first}.csv", rows[1:])
+        with pytest.raises(review.GradeError, match="in another sheet"):
+            review.score([review.read_sheet(one), review.read_sheet(two)])
+
+
+def test_two_reviewers_in_any_name_order_are_not_duplicates(tmp_path: Path) -> None:
+    shared = sheet(
+        tmp_path / "shared.csv",
+        [
+            graded("R-1", "ha", "4", "4", "yes", "no", reviewer="Zainab"),
+            graded("R-1", "ha", "4", "4", "yes", "no", reviewer="Ade"),
+        ],
+    )
+    assert review.score([review.read_sheet(shared)]).overall.agreement.items == 1
+
+
+def test_every_grade_value_and_reviewer_name_is_read(tmp_path: Path) -> None:
+    path = sheet(
+        tmp_path / "s.csv",
+        [
+            graded("R-1", "ha", "1", "5", "y", "n", reviewer="Xena"),  # the whole scale, short answers
+            graded("R-2", "ha", "5", "1", "n", "y", reviewer="Xena"),
+        ],
+    )
+    first, second = review.read_sheet(path).grades
+    assert (first.accuracy, first.fluency, first.faithful, first.harmful) == (1, 5, True, False)
+    assert (second.accuracy, second.fluency, second.faithful, second.harmful) == (5, 1, False, True)
+    assert first.reviewer == "Xena"  # only the spreadsheet text prefix (') is stripped
+
+
+def test_short_and_blank_rows(tmp_path: Path) -> None:
+    header = "language,review_id,accuracy,fluency,faithful,harmful_or_misleading,reviewer,notes"
+    path = write(tmp_path / "trimmed.csv", f"{header}\r\nha,R-1,4,4,yes,no\r\n\r\nyo,R-2\r\n")
+    parsed = review.read_sheet(path)
+    assert parsed.items == {"R-1": "ha", "R-2": "yo"}  # a blank line is no item
+    assert [g.reviewer for g in parsed.grades] == ["trimmed"]  # trailing empty cells left out: the file name
+    assert review.read_review_ids(path) == {"R-1", "R-2"}
+    short = "review_id,accuracy,fluency,faithful,harmful_or_misleading,language\r\nR-1\r\n"
+    assert review.read_sheet(write(tmp_path / "short.csv", short)).items == {"R-1": ""}
+
+
+def test_semicolon_sheet_with_commas_in_the_notes(tmp_path: Path) -> None:
+    cells = graded(
+        "R-1", "ha", "4", "4", "yes", "no", notes="wrong, " * 40
+    )  # more commas than semicolons in the whole file
+    text = ";".join(HEADER) + "\r\n" + ";".join(cells.get(c, "") for c in HEADER)
+    assert review.read_sheet(write(tmp_path / "semi.csv", text)).items == {"R-1": "ha"}
+
+
+def test_utf16_big_endian_sheet(tmp_path: Path) -> None:
+    text = "review_id\tlanguage\taccuracy\tfluency\tfaithful\tharmful_or_misleading\r\nR-1\tyo\t4\t4\tyes\tno\r\n"
+    path = write(tmp_path / "be.csv", b"\xfe\xff" + text.encode("utf-16-be"))
+    assert review.read_sheet(path).items == {"R-1": "yo"}
+
+
+def test_rewriting_a_sheet_replaces_a_longer_old_file(tmp_path: Path) -> None:
+    path = tmp_path / "s.csv"
+    path.write_text("x" * 10_000, encoding="utf-8")
+    review.write_sheet(path, [])
+    assert path.read_bytes() == ("﻿" + ",".join(f'"{c}"' for c in review.COLUMNS) + "\r\n").encode("utf-8")
+
+
+async def test_sheet_columns_and_context_cells(knowledge: KnowledgeBase, tmp_path: Path) -> None:
+    rows = await review.review_rows([row(1, transcript=None)], hasher=HASHER, knowledge=knowledge)
+    [path] = review.write_sheets(tmp_path, rows, stem="sample").values()
+    [cells] = read_cells(path)
+    assert list(cells) == [
+        "review_id", "language", "channel", "verdict", "user_message", "english_pivot", "reply", "facts_rederived",
+        "accuracy", "fluency", "faithful", "harmful_or_misleading", "reviewer", "notes",
+    ]  # fmt: skip
+    assert (cells["channel"], cells["verdict"], cells["user_message"]) == ("whatsapp", "likely_scam", "")
+    assert cells["english_pivot"] == "Send me your OTP code"
+
+
+def test_verdict_groups_and_language_order() -> None:
+    assert review.verdict_group("not_a_check") == review.QUESTION
+    assert {review.verdict_group(v) for v in ("likely_scam", "caution", "no_flags")} == {review.CHECK}
+    assert sorted(["ar", "en", "ig", "zu", "ha"], key=review.language_key) == ["ha", "ig", "en", "ar", "zu"]
+
+
+def test_since_keeps_that_day_and_drops_undated_rows() -> None:
+    since = date(2026, 10, 9)
+    undated = {k: v for k, v in row(3).items() if k != "created_at"}
+    assert [r["id"] for r in review.eligible([row(1), undated], since=since)] == [1]
+
+
+def test_large_samples() -> None:
+    rows = [
+        row(i, language=("ha", "yo")[i % 2], verdict=("caution", "not_a_check")[i // 2 % 2])
+        for i in range(400)
+    ]
+    assert len(review.stratified_sample(rows, 300, seed=1, languages=("ha", "yo"))) == 300
