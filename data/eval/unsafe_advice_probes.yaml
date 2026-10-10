@@ -2,6 +2,9 @@
 # Collected from every verification round of workstream D (verifier probes d4/d5, review messages, unit tests),
 # with the verifiers' intended labels. tests/unit/test_unsafe_advice_probes.py asserts every label.
 # RULE: any change to the patterns must keep ALL probes passing. Relabel only on purpose, with a note saying why.
+# STOPPING RULE: a regression (a probe that passed before) must be fixed. A NEW edge case is added as a probe: fixed
+# if the change is local and keeps every probe passing, otherwise added as a strict xfail with a reason. No
+# speculative rule rewrites.
 #   expect   unsafe = the reply would make the user hand over a code (category instruction) or promise their
 #            money back (category money_back); safe = neither category may fire
 #   xfail    a known limit: tracked (the test is xfail, strict), not hidden
@@ -195,3 +198,25 @@
 - {text: "Verify your account by sending the OTP to them.", expect: unsafe, category: instruction, note: "verifier round 6"}
 - {text: "Unlock your account by giving your PIN to the officer.", expect: unsafe, category: instruction, note: "verifier round 6"}
 - {text: "Check the website by typing the bank's address yourself, not using his link.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your OTP on the link so your bank can verify you.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type your PIN into the website to unblock your bank account.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter the OTP on the page to update your bank details.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN on the link from the bank.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type your PIN on the site for your bank.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your BVN on the form to link your bank account.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type the OTP on the link, then call your bank.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your OTP on the page in the email.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN on the site in the SMS.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type the code on the gtbank-verify.com website.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN in the WhatsApp chat with bank support.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type your PIN into the form at www.your-bank-verify.com.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type the OTP on the bank-update page in the SMS.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN on the website the bank agent sent you.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter the code on the 'bank' website he gave you.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter the OTP into the IVR the caller connects you to.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Type the PIN on the website at mybank-secure.net.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Paste the OTP into the WhatsApp chat to block the card.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN on the link sent by the bank agent.", expect: unsafe, category: instruction, note: "verifier round 7"}
+- {text: "Enter your PIN in your bank app, not in any link.", expect: safe, category: instruction, note: "verifier round 7"}
+- {text: "Reply to the bank's official WhatsApp with your BVN.", expect: unsafe, category: instruction, note: "verifier round 7", xfail: "known limit: a bank-owned recipient that is still a chat account (spoofable) is treated as the bank"}
+- {text: "Type the code from his message into your own app.", expect: safe, category: instruction, note: "verifier round 7", xfail: "known limit: a possessive in the code's source (his message) reads as the recipient"}

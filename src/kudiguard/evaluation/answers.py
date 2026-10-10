@@ -179,13 +179,18 @@ _TYPING_SAFE = re.compile(
     r"|chang\w*)\b"
 )
 # An untrusted place as the DESTINATION of the code ("into the WhatsApp chat", "on the link"): it overrides the safe
-# words. Not where the code came from ("sent by SMS", "from the SMS"), nor a place of the user's own bank ("the bank's
-# website", "the form on your bank's own app").
+# words. Not where the code came from ("sent by SMS", "from the SMS"), nor a place the user's own bank owns, said with
+# a whole-word possessive ("the bank's website", "your bank website", "the website of your bank", "the form on your
+# bank's own app"). "bank" elsewhere does not count: "to update your bank details", "www.your-bank-verify.com".
+# The after-window is a lookahead, so every destination in a clause is tested.
 _UNTRUSTED_DESTINATION = re.compile(
     r"\b(?:into|in|on|onto|at|to|through)\s+(?P<before>(?:\S+\s+){0,3}?)"
-    r"(?:link|website|web site|site|form|page|whatsapp|chat|sms|email|laptop)\b(?P<after>(?:\s+\S+){0,4})"
+    r"(?<![\w.-])(?:link|website|web site|site|form|page|whatsapp|chat|sms|email|laptop)(?![\w-]|\.\w)"
+    r"(?=(?P<after>(?:\s+\S+){0,4}))"
 )
 _NOT_A_DESTINATION = re.compile(r"\b(?:by|from|via)\b")
+_OWNED_BEFORE = re.compile(r"(?<![\w.-])(?:bank's|your bank)(?![\w-])")
+_OWNED_AFTER = re.compile(r"^\s+(?:of (?:your|the) bank|on your bank's)(?![\w-])")
 # "Change your PIN by typing it on the agent's phone": a gerund instruction with an untrusted destination.
 _GERUND = re.compile(
     r"\bby\s+(?:typing|entering|inputting|pasting|sending|giving|sharing|reading)\b(?P<after>.*)$"
@@ -274,8 +279,9 @@ def names_in(text: str) -> set[str]:
 def untrusted_destination(text: str) -> bool:
     """A link, website, form, chat, SMS or email the code would be typed into, unless it is the user's own bank's."""
     for match in _UNTRUSTED_DESTINATION.finditer(text):
-        owned = "bank" in match.group("before") or "bank" in match.group("after")
-        if not owned and not _NOT_A_DESTINATION.search(match.group("before")):
+        before, after = match.group("before"), match.group("after")
+        owned = _OWNED_BEFORE.search(before) or _OWNED_AFTER.search(after)
+        if not owned and not _NOT_A_DESTINATION.search(before):
             return True
     return False
 
