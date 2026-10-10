@@ -91,7 +91,16 @@ def _unsafe_sentence(sentence: str, patterns: GuardPatterns) -> bool:
         for clause in _clauses(segment, patterns):
             if _reported_condition(clause, segment, patterns):
                 continue  # "They said your account will be blocked unless you send the OTP" reports the threat
-            if _unsafe_instruction(clause, instructions, patterns):
+            if _unsafe_instruction(clause, instructions, patterns) or _means_instruction(clause, patterns):
+                return True
+    return False
+
+
+def _means_instruction(clause: str, patterns: GuardPatterns) -> bool:
+    """ "Verify your account by sending the OTP": the means is the instruction, whatever comes before it."""
+    for pattern in patterns.means_instructions:
+        for match in pattern.finditer(clause):
+            if not any(_matches_any(patterns.negations, w) for w in _words(clause[: match.start()])):
                 return True
     return False
 

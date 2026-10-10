@@ -76,6 +76,7 @@ class _OutputGuardSpec(BaseModel):
     speech_commands: list[str] = Field(default_factory=list)  # "do as he says:" introduces an instruction
     # "send it" / "give it to them": unsafe when the same sentence names a ``credentials`` term ("..., so send it").
     pronoun_instructions: list[str] = Field(default_factory=list)
+    means_instructions: list[str] = Field(default_factory=list)  # "... by sending the OTP": any position
     credentials: list[str] = Field(default_factory=list)
     # Promised outcomes and threats stated as fact ("you will get your money back", "your account will be
     # blocked"); a ``reported_speech`` word earlier in the clause ("they said") exempts it.
@@ -107,6 +108,7 @@ class GuardPatterns:
     condition_breaks: Patterns = ()
     speech_commands: Patterns = ()
     pronoun_instructions: Patterns = ()
+    means_instructions: Patterns = ()
     credentials: Patterns = ()
     outcome_claims: Patterns = ()
     reported_speech: Patterns = ()

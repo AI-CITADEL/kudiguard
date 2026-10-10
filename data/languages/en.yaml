@@ -29,13 +29,13 @@ output_guard:
     - 'no (?:scam|fraud)\w*(?: here)?'
     - 'no (?:risk|danger)(?!\W*free)'
     - 'nothing to (?:worry|fear)'
-    - '(?:safe|okay|ok|fine|alright) to (?:pay|send|share|click|invest|proceed|transfer)'
+    - '(?:safe|okay|ok|fine|alright) to (?:pay|send|share|click|invest|proceed|transfer)(?!\W+(?:this|the|our)\W+(?:message|warning|alert|information|tip)\w*|\W+this\W+(?:with|to)\b)'
     - 'go ahead (?:and )?(?:pay|send|share|invest|transfer|click)'
     - 'you can (?:trust (?:them|him|her|it|this)|go ahead)'
     - 'e dey real'
     - 'na correct'
     - 'nothing suspicious'
-    - 'feel free to (?:pay|send|share|transfer|invest)'
+    - 'feel free to (?:pay|send|share|transfer|invest)(?!\W+(?:this|the|our)\W+(?:message|warning|alert|information|tip)\w*|\W+this\W+(?:with|to)\b)'
     - '(?:perfectly )?fine for you to (?:pay|send|share|transfer|invest)'
     - '(?:don''t|do not|dont) (?:need|have) to worry'
   refusals:
@@ -45,21 +45,29 @@ output_guard:
   # Instructions that do what the scammer wants, per clause, after lead-in only (see safety/output_guard.py and the
   # probe set tests/fixtures/guard_probes.yaml: every probe must keep passing).
   unsafe_instructions:
-    - '(?:share|send|give|tell|forward|reveal|disclose|text|paste|dictate|provide|submit)\W+(?:(?:them|him|her|me|it|anyone|someone|the\W+[\w'']+(?:\W+[\w'']+)?)\W+)?(?:(?:your|the|that|this|their|any|a|my)\W+)?(?:\d+\W*digits?\W+|six\W+digit\W+|new\W+|secret\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details|card number|token|login details)(?!\W+(?:was|is|were|has|had|got|will)\b)(?!\W+only\W+(?:in|on|through|via|inside|to|with)\W+your)'
+    - '(?:share|send|give|tell|forward|reveal|disclose|text|paste|dictate|provide|submit)\W+(?:(?:them|him|her|me|it|anyone|someone|the\W+[\w'']+(?:\W+[\w'']+)?)\W+)?(?:(?:your|the|that|this|their|any|a|my)\W+)?(?:\d+\W*digits?\W+|six\W+digit\W+|new\W+|secret\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details|card number|token|login details)(?!\W+(?:was|is|were|has|had|got|will)\b(?!\W+\d))(?!\W+only\W+(?:in|on|through|via|inside|to|with)\W+your)'
     - 'read\W+(?:out\W+)?(?:(?:your|the|that|this|my)\W+)?(?:otp|pin|code|password|bvn)\W+(?:out\W+)?to\b'
     - 'read\W+out\W+(?:(?:your|the|that|this|my)\W+)?(?:otp|pin|code|password|bvn)'
     - '(?:here\W+is|here''s)\W+(?:my|the)\W+(?:pin|otp|code|password|bvn)'
     - '(?:my|our)\W+(?:pin|otp|code|password|bvn)\W+is\W+\d+'
-    - '(?:type|enter|input|put|paste|insert)\W+(?:(?:your|the|that|this|my)\W+)?(?:new\W+)?(?:otp|pin|bvn|password|passcode|code|cvv|card details|card number)\s+(?:[\w'']+\s+){0,4}?(?:in|on|into|at)\s+(?:the|their|this|that|his|her|its|(?:the\s+)?[\w'']+''s)\s+(?:[\w'']+\s+)?(?:link|page|site|website|form|phone|laptop|computer|machine|pos|device|chat|screen|app)(?!.*\byourself\b)'
-    - 'reply\W+(?:(?:to\W+)?(?:them|him|her)\W+)?with\W+(?:(?:your|the|that|this)\W+)?(?:otp|pin|bvn|password|code|cvv)'
-    - 'pay\W+(?:(?:the|a|an|this|that|their|his|her)\W+)?(?:(?:n|ngn)?\d[\d,.]*k?\W+)?(?:(?:processing|registration|clearance|activation|delivery|release|unlock(?:ing)?|verification|admin|service|upfront|insurance|membership|application|transfer|tax|customs|small)\W+)?(?:fees?|charges?)(?!\W+only\b)'
+    # a place someone else controls: their link/page/form/chat/email (any determiner) ...
+    - '(?:type|enter|input|put|paste|insert)\W+(?:(?:your|the|that|this|my)\W+)?(?:new\W+)?(?:otp|pin|bvn|password|passcode|code|cvv|card details|card number)\s+(?:[\w'']+\s+){0,4}?(?:in|on|into|at)\s+(?:the|their|this|that|his|her|its|(?:their|his|her|its|someone''s|(?:the\s+)?(?!bank''s)[\w''.-]+''s))\s+(?:[\w''.-]+\s+)?(?:link|page|site|website|form|chat|email|e-mail|sms|ivr)(?!.*\b(?:yourself|your own|own app|your bank''?s? app|the bank''?s? app|bank''s own)\b)'
+    # ... or a device that is someone else's ("his phone", "the agent's POS", "the machine he gives you"), not
+    # the user's own app/phone/ATM/keypad ("enter your PIN in the app", "on the ATM screen")
+    - '(?:type|enter|input|put|paste|insert)\W+(?:(?:your|the|that|this|my)\W+)?(?:new\W+)?(?:otp|pin|bvn|password|passcode|code|cvv|card details|card number)\s+(?:[\w'']+\s+){0,4}?(?:in|on|into|at)\s+(?:(?:their|his|her|its|someone''s|(?:the\s+)?(?!bank''s)[\w''.-]+''s)\s+(?:[\w''.-]+\s+)?(?:phone|laptop|computer|machine|pos|device|screen|app|keypad|atm)|the\s+(?:[\w''.-]+\s+)?(?:phone|laptop|computer|machine|pos|device)\s+(?:that|which|the|he|she|they|someone)\b)(?!.*\b(?:yourself|your own|own app|your bank''?s? app|the bank''?s? app|bank''s own)\b)'
+    - 'reply\W+(?:(?:to\W+)?(?:them|him|her|(?:his|her|their|the)\W+[\w'']+)\W+)?with\W+(?:(?:your|the|that|this)\W+)?(?:otp|pin|bvn|password|code|cvv)'
+    - 'pay\W+(?:(?:the|a|an|this|that|their|his|her)\W+)?(?:(?:n|ngn)?\d[\d,.]*k?\W+)?(?:(?:processing|registration|clearance|activation|delivery|release|unlock(?:ing)?|verification|admin|service|upfront|insurance|membership|application|transfer|tax|customs|small)\W+)?(?:fees?|charges?)(?!\W+only\W+(?:if|after|at|through|via|in|on|when|from)\b)'
     - '(?:pay|send|transfer)\W+(?:(?:them|him|her|the agent|the caller)\W+)?(?:n|ngn)?\d[\d,.]*k?'
-    - '(?:click|open|tap|follow|visit)\W+(?:on\W+)?(?:(?:the|this|that|their|any|his|her)\W+)?link(?!\W+only\b)'
+    - '(?:click|open|tap|follow|visit)\W+(?:on\W+)?(?:(?:the|this|that|their|any|his|her)\W+)?link(?!\W+only\W+(?:if|after|at|through|via|in|on|when|from)\b)'
     - '(?:install|download)\W+(?:(?:the|this|that|their)\W+)?(?:anydesk|teamviewer|[\w.]*apk)'
     - '(?:install|download)\W+(?:(?:the|this|that|their|an|a)\W+)?(?:[\w.]+\W+)?(?:app|software)(?!.*(?:play store|app store|google play|of your bank|your bank))'
     - '(?:send|transfer|pay|give|return)\W+(?:(?:the|their|that|this|his|her)\W+)?(?:money|funds|cash|it)\W+back'
     - 'refund\W+(?:it|them|the money)'
   # Everything before the verb must be made of these (phrases first: the longest match is consumed).
+  # "by sending the OTP" / "by typing it on his phone": an instruction wherever it sits ("Verify your account by ...").
+  means_instructions:
+    - 'by\W+(?:sending|giving|sharing|telling|forwarding|typing|entering|pasting|reading(?:\W+out)?|dictating)\W+(?:(?:them|him|her|me|the\W+[\w'']+)\W+)?(?:(?:your|the|that|this|their|my)\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details)'
+    - 'by\W+(?:typing|entering|pasting|putting)\W+it\W+(?:on|in|into)\W+(?:the|their|his|her|[\w'']+''s)\W+(?:[\w''.-]+\W+)?(?:link|page|site|website|form|chat|email|phone|laptop|machine|pos|device)'
   instruction_prefixes:
     - '(?:all you need to do is|your next step is to|the best thing is to|the only way is to|it(?:''s| is) important that you|(?:i|we) (?:recommend|suggest|advise)(?: that)?(?: you)?(?: to)?|it(?:''s| is) (?:best|okay|ok|fine|safe|alright|better|important) (?:that you|to)|(?:make|be) sure(?: that)?(?: you| to)?|remember to|try to|feel free to|go ahead and|you(?:''ll| will| may| could| might| would| should| can| must| are to| need to| have to)|unless you|as long as you|provided(?: that)? you|otherwise|right now|before anything|in this case|for verification|as (?:they|he|she|the [\w'']+) (?:said|says|asked|instructed)|do as (?:they|he|she|the [\w'']+) (?:said|says|asked))'
     - '(?:please|kindly|just|then|now|quickly|immediately|simply|also|first|definitely|safely|carefully|certainly|surely|only|yes|ok|okay|officially|actually|go|ahead|and|to|do|better|right|away|need|have|want|might|so)'
@@ -74,7 +82,7 @@ output_guard:
   speech_commands:
     - '(?:do|as|follow|just)'
   pronoun_instructions:
-    - '(?:send|share|give|forward|tell|read|dictate|paste|provide)\W+(?:(?:them|him|her|me)\W+)?it(?!.*\b(?:to|with)\W+(?:your\W+bank(?!\W*''?s?\W*(?:staff|agent|officer|official|man|worker))|(?:the\W+)?(?:bank|police|efcc|ncc|fccpc|cbn)\b))'
+    - '(?:send|share|give|forward|tell|read|dictate|paste|provide)\W+(?:(?:them|him|her|me)\W+)?it(?!.*\b(?:to|with)\W+(?:your\W+bank(?!\W*''?s?\W*(?:staff|agent|officer|official|man|worker))|(?:the\W+)?bank\b(?!\W*(?:''s\W*)?(?:staff|agent|officer|official|man|woman|worker|customer|rep\w*))|(?:the\W+)?(?:police|efcc|ncc|fccpc|cbn)\b))'
   credentials:
     - '(?:otp|pin|bvn|password|passcode|cvv|code)'
   outcome_claims:
@@ -88,7 +96,7 @@ output_guard:
   hedges_before:
     - '(?:no guarantee|not sure|maybe|may|might|could|if|unless|whether)'
   hedges_after:
-    - '(?:if you report\w*|not guaranteed|no guarantee|but (?:it is )?not (?:certain|guaranteed))'
+    - '(?:if you report\w*|not guaranteed|no guarantee|but (?:it is )?not (?:certain|guaranteed)|as long as|in a licensed bank)'
 
 lexicon:
   flags:

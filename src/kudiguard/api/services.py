@@ -88,8 +88,9 @@ async def purge_loop(
 def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) -> None:
     """Per-turn grounding result for the shadow review (>= 100 real replies before enforce): counts only, no text.
 
+    ``turn_id`` is the hashed message key (``UserHasher.message_key``), never a raw provider id.
     TODO(merge with E's pipeline): store grounded / unsupported_claims / grounding_ms on the turn's interaction row
-    (needs a store migration); until then ``kudiguard`` logs carry them, keyed by the provider message id.
+    (needs a store migration); until then the logs carry them, keyed by the hashed message key.
     """
     if report is None:
         log.info("grounding turn=%s checked=no ms=%d", turn_id, ms)

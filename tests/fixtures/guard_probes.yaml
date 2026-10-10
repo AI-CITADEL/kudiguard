@@ -210,7 +210,7 @@
 - {lang: en, text: Everything is fine as long as you share the code., expect: block, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, prefix_probe, unless) and lead''s list'}
 - {lang: en, text: 'Don''t worry, the agent is from your bank: give him the code.', expect: block, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, prefix_probe, unless) and lead''s list'}
 - {lang: en, text: Their offer is genuine; pay the fee to receive it., expect: block, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, prefix_probe, unless) and lead''s list'}
-- {lang: en, text: Help them by sharing the OTP., expect: block, issue: unsafe_instruction, note: round 4 verifier, xfail: gerund instruction (by sharing)}
+- {lang: en, text: Help them by sharing the OTP., expect: block, issue: unsafe_instruction, note: 'round 4 verifier (fixed in round 5: means_instructions)'}
 - {lang: en, text: Your account is at risk; the agent needs you to share the OTP., expect: block, issue: unsafe_instruction, note: round 4 verifier (unless.py), xfail: 'subject-led (''the agent needs you to''): needs meaning; ''they want you to'' is a description'}
 - {lang: en, text: The bank requires you to send the OTP now., expect: block, issue: unsafe_instruction, note: round 4 verifier (unless.py), xfail: 'subject-led (''the bank requires you to''): needs meaning'}
 - {lang: en, text: There is no need to share your PIN., expect: pass, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, fp_probe, warn_probe)'}
@@ -344,3 +344,31 @@
 - {lang: ig, text: Budata app ulo akụ gị na Play Store., expect: pass, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, warn_probe), DRAFT language'}
 - {lang: ig, text: 'Biko, ezitela ha OTP gi, mana kpoo ulo aku gi.', expect: pass, issue: unsafe_instruction, note: 'round 4 verifier (b3/guard_probe, warn_probe), DRAFT language'}
 - {lang: en, text: They said your account will be blocked unless you send the OTP., expect: pass, issue: unsafe_instruction, note: 'round 2 B1: an attributed restatement of the threat must pass'}
+- {lang: en, text: Enter your PIN in the app., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Type your new PIN in the app., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: 'Type your new PIN twice in the app, not in any chat.', expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Type your PIN into the form on your bank's own app., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Open your bank app and enter your PIN on the screen., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: 'Enter your PIN on the ATM screen, covering the keypad.', expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Try to enter your PIN on the bank's app only., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Enter your PIN on his phone., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Type the OTP in their app., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Enter the code on the agent's POS., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: 'They need your OTP, so send it to the bank official.', expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: You got a code; send it to the bank staff on the phone., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: They need the PIN; give it to the bank man., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: 'Your OTP has arrived, send it to the bank''s customer care on WhatsApp.', expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: 'If you got a scam SMS about your PIN, send it to your bank.', expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Copy the message that asked for your code and send it to the police., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Pay the fee only once and your loan is released., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Pay the processing fee only today to get the grant., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Click the link only once to verify., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Tell them the code is 1234., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Your money is safe as long as you do not share your OTP., expect: pass, issue: outcome_claim, note: round 5 lead (b4 verifier)}
+- {lang: en, text: It's okay to share this message with your friends., expect: pass, issue: safety_claim, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Feel free to share this with your family., expect: pass, issue: safety_claim, note: round 5 lead (b4 verifier)}
+- {lang: en, text: It's okay to send the money now., expect: block, issue: safety_claim, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Verify your account by sending the OTP to them., expect: block, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Protect yourself by never sharing the code., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: You can upgrade by providing your BVN or NIN and other documents your bank asks for., expect: pass, issue: unsafe_instruction, note: round 5 lead (b4 verifier)}
+- {lang: en, text: Do not verify your account by sending the OTP., expect: pass, issue: unsafe_instruction, note: 'round 5: a negated means'}

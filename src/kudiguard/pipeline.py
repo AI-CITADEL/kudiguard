@@ -531,7 +531,11 @@ class Conversation:
             turn.transcript = "\n".join(p for p in (turn.transcript, *extra) if p)
 
         answer = await self._engine.check(
-            turn.transcript, turn.language, deadline=turn.deadline, turn_id=turn.message.message_id
+            turn.transcript,
+            turn.language,
+            deadline=turn.deadline,
+            # hashed: a provider message id may embed the sender's number (privacy.UserHasher.message_key)
+            turn_id=self._hasher.message_key(turn.message.channel, turn.message.message_id),
         )
         if answer.kind is not AnswerKind.CHECK:
             await self._store.save_user(user)

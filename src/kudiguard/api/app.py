@@ -367,14 +367,16 @@ async def _check_in_slot(
         transcript = speech.transcript.text.strip()
         decode_ms, asr_ms = speech.decode_ms, speech.asr_ms
         text = transcript
-    answer = await services.engine.check(text or "", language, deadline=deadline)
+    message_id = uuid.uuid4().hex
+    turn_id = services.hasher.message_key(channel, message_id)  # same key scheme as WhatsApp turns
+    answer = await services.engine.check(text or "", language, deadline=deadline, turn_id=turn_id)
     created = utcnow()
     total_ms = int((time.perf_counter() - started) * 1000)
     try:  # evidence must never break the answer
         await services.store.add_interaction(
             Interaction(
                 channel=channel,
-                message_id=uuid.uuid4().hex,
+                message_id=message_id,
                 user_hash=services.hasher.user_id(user_key),
                 language=language,
                 kind=MessageKind.AUDIO if audio is not None else MessageKind.TEXT,

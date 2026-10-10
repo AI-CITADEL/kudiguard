@@ -33,7 +33,7 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
    you"); a negation there ("do not", "never", "kada") or after the verb ("to no one") cancels it. So "Don't worry,
    just send them the OTP" and "Your account will be blocked unless you send the OTP" are blocked; "Ask your bank if
    they can refund it" and "They said you should send the OTP" are not. A hit → one warmer retry, then fixed text.
-   The permanent probe set `tests/fixtures/guard_probes.yaml` (+ D's English set) pins ~470 labelled phrasings.
+   The permanent probe set `tests/fixtures/guard_probes.yaml` (+ D's English set) pins ~580 labelled phrasings.
    Promised outcomes and threats stated as fact ("you will get your money back", "your account will be blocked")
    are logged only (blocking in enforce mode). This is the deterministic safety net; ha/yo/ig patterns are DRAFT
    pending native review.
