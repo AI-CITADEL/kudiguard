@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -24,6 +25,7 @@ from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
+from kudiguard.safety.grounding import GroundingChecker
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.storage.base import Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
@@ -103,11 +105,14 @@ async def build_services(settings: Settings) -> Services:
             )
 
         knowledge = None
+        embedder = None
         if settings.embeddings:
             try:
                 from kudiguard.knowledge.embeddings import FastEmbedder
 
-                knowledge = knowledge_with(FastEmbedder(cache_dir=settings.embeddings_cache))
+                candidate = FastEmbedder(cache_dir=settings.embeddings_cache)
+                knowledge = knowledge_with(candidate)
+                embedder = candidate
             except KnowledgeConfigError:
                 raise  # a broken pack is a configuration error, not a missing model
             except Exception as exc:  # model not cached / not installed: keyword search still works
@@ -137,7 +142,40 @@ async def build_services(settings: Settings) -> Services:
                 )
                 if failed_models := await asr.preload(settings.preload_languages):
                     log.warning("speech models not preloaded: %s", failed_models)
-        engine = Engine(registry=registry, llm=llm, knowledge=knowledge, asr=asr, ffmpeg=ffmpeg)
+        grounding = None
+        if settings.grounding_check and embedder is not None:
+            # Live: English replies only, no extra model call (the knowledge-search model, already loaded).
+            grounding = GroundingChecker(
+                None,
+                embedder,
+                registry,
+                threshold=settings.grounding_threshold,
+                budget_s=settings.grounding_budget_ms / 1000,
+            )
+            # Pack facts are embedded once here, so a turn embeds only the reply (knowledge-index vectors are per
+            # entry, not per sentence, and cannot be reused). Partner API entries are cached on first use.
+            pack_texts = [
+                text
+                for source in knowledge.sources
+                for entry in getattr(source, "entries", ())
+                for text in (*entry.facts, *entry.actions)
+            ]
+            started = time.perf_counter()
+            try:
+                warmed = await asyncio.to_thread(grounding.warm, pack_texts)
+            except Exception as exc:  # not fatal: evidence is then embedded (and cached) on first use
+                log.warning("grounding evidence not pre-embedded: %s", exc)
+            else:
+                log.info(
+                    "grounding: %d evidence sentences embedded in %.1f s",
+                    warmed,
+                    time.perf_counter() - started,
+                )
+        elif settings.grounding_check:
+            log.warning("grounding check disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
+        engine = Engine(
+            registry=registry, llm=llm, knowledge=knowledge, asr=asr, ffmpeg=ffmpeg, grounding=grounding
+        )
 
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         store = await SQLiteStore.open(settings.db_path, hasher=hasher)

@@ -4,8 +4,9 @@ Stateless and channel-agnostic: WhatsApp, the web page, the public REST API and 
 the same engine. Conversation state, consent, commands and rendering live in ``kudiguard.pipeline``.
 
 Flow (PLAN §3): greeting/content-free shortcut → ANALYSE (N-ATLAS, JSON) → translate fallback → deterministic verdict
-policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → fixed
-fallback text. The model never decides the verdict and never writes contacts; it can only make the answer better.
+policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → grounding
+check (``safety.grounding``: each claim must be supported by the facts given; no retry) → fixed fallback text.
+The model never decides the verdict and never writes contacts; it can only make the answer better.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.models import Contact, KnowledgeResult, Query
 from kudiguard.knowledge.service import KnowledgeBase
 from kudiguard.languages import PIVOT, LanguageRegistry
-from kudiguard.llm.base import DEFAULT_TIMEOUTS, LLM, ChatRequest, Completion, LLMError
+from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_within
 from kudiguard.prompts import (
     MAX_ENTRIES,
     MAX_STEPS,
@@ -43,6 +44,7 @@ from kudiguard.prompts import (
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
+from kudiguard.safety.grounding import GroundingChecker, GroundingReport, evidence_for
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
 from kudiguard.speech.service import SpeechResult, transcribe_upload
@@ -54,6 +56,7 @@ RETRY_TEMPERATURE = 0.5  # a retry at the original 0.1 tends to repeat the block
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
 MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
+MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
 
 
 class AnswerKind(StrEnum):
@@ -77,6 +80,7 @@ class Answer:
     sources: tuple[str, ...] = ()  # knowledge entry ids used for grounding
     issues: tuple[OutputIssue, ...] = ()  # output-guard findings that forced a retry or fallback
     llm_ms: int = 0
+    grounding_ms: int = 0  # wall time the grounding check added (0 = not run), separate from model time
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +109,7 @@ class Engine:
         ffmpeg: str | None = None,
         temp_dir: Path | None = None,
         max_concurrent_transcriptions: int = 4,
+        grounding: GroundingChecker | None = None,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -117,6 +122,7 @@ class Engine:
         self._ffmpeg = ffmpeg
         self._temp_dir = temp_dir
         self._guard = OutputGuard(registry)
+        self.grounding = grounding
         self._matcher = CommandMatcher(registry)
 
     @property
@@ -174,6 +180,7 @@ class Engine:
         verdict = assessment.verdict
         contacts = tuple(c for c in knowledge.contacts if c.verified) if verdict in REPORT_VERDICTS else ()
         generation = _Generation(unavailable=model_down)
+        grounding_ms = 0
         if analysis.english and not model_down:
             request = compose_request(
                 language_name=self.registry.get(language).name,
@@ -183,6 +190,14 @@ class Engine:
                 knowledge=knowledge,
             )
             generation = await self._generate(request, language, deadline)
+            if generation.text is not None:
+                evidence = evidence_for(
+                    knowledge, verdict=verdict, flags=assessment.flags, message=analysis.english
+                )
+                report, grounding_ms = await self._ground(generation.text, language, evidence, deadline)
+                if report is not None and not report.grounded:
+                    generation.text = None
+                    generation.issues += (OutputIssue.UNGROUNDED,)
         body, outcome = generation.text, Outcome.ANSWERED
         if body is None:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
@@ -200,6 +215,7 @@ class Engine:
             sources=tuple(item.entry.id for item in knowledge.entries[:MAX_ENTRIES]),
             issues=generation.issues,
             llm_ms=ms + generation.ms,
+            grounding_ms=grounding_ms,
         )
 
     async def analyse(
@@ -232,13 +248,7 @@ class Engine:
 
     async def _complete(self, request: ChatRequest, deadline: float | None, minimum_s: float) -> Completion:
         """One model call capped to the time left; raises ``LLMError`` without calling when too little is left."""
-        if deadline is not None:
-            left = deadline - time.monotonic()
-            if left < minimum_s:
-                raise LLMError(f"{request.purpose}: skipped, {left:.1f}s left in the turn")
-            budget = min(request.timeout_s or DEFAULT_TIMEOUTS[request.purpose], left)
-            request = dataclasses.replace(request, timeout_s=budget)
-        return await self._llm.complete(request)
+        return await complete_within(self._llm, request, deadline, minimum_s)
 
     async def _generate(
         self, request: ChatRequest, language: LanguageCode, deadline: float | None = None
@@ -264,6 +274,37 @@ class Engine:
             result.issues += issues
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
+
+    async def _ground(
+        self, text: str, language: LanguageCode, evidence: Sequence[str], deadline: float | None
+    ) -> tuple[GroundingReport | None, int]:
+        """The grounding check and its wall time in ms; None when it is off, unsupported, out of time or failed.
+
+        Fails open: the reply already passed cleaning and the output guard, so a check that cannot run must not
+        replace a good answer. An ungrounded reply is not retried: the same facts tend to produce the same invention
+        (and a warmer retry invents more); the fixed text is safe and immediate.
+        """
+        if self.grounding is None or not self.grounding.supports(language):
+            return None, 0
+        if deadline is not None and deadline - time.monotonic() < MIN_GROUNDING_S:
+            log.warning("grounding check skipped: too little time left in the turn")
+            return None, 0
+        start = time.perf_counter()
+        report: GroundingReport | None = None
+        try:
+            report = await self.grounding.check(text, language, evidence, deadline=deadline)
+        except Exception as exc:  # optional step: any failure (incl. its time cap) sends the guarded reply
+            log.warning("grounding check failed, sending the guarded reply: %s", exc)
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        grounded = None if report is None else report.grounded
+        log.info("grounding_ms=%d language=%s grounded=%s", elapsed_ms, language, grounded)
+        if report is not None and not report.grounded:
+            log.info(
+                "reply not grounded (%d of %d claims): fixed text instead",
+                len(report.unsupported),
+                len(report.claims),
+            )
+        return report, elapsed_ms
 
     def _fallback_body(self, verdict: Verdict, language: LanguageCode) -> str:
         if verdict in REPORT_VERDICTS:

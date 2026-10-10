@@ -18,6 +18,7 @@ class OutputIssue(StrEnum):
     SAFETY_CLAIM = "safety_claim"
     REFUSAL = "refusal"
     EMPTY = "empty"
+    UNGROUNDED = "ungrounded"  # a claim not supported by the evidence (safety.grounding); fixed text instead
 
 
 class OutputGuard:

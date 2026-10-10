@@ -2,14 +2,14 @@
 
 import sys
 import types
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import ClassVar
 
 import numpy as np
 import pytest
 
-from kudiguard.knowledge.embeddings import DEFAULT_MODEL, DEFAULT_THREADS, FastEmbedder
+from kudiguard.knowledge.embeddings import DEFAULT_MODEL, DEFAULT_THREADS, CachedEmbedder, FastEmbedder
 
 
 class FakeTextEmbedding:
@@ -70,3 +70,55 @@ def test_query_is_a_normalised_vector() -> None:
     vector = FastEmbedder().embed_query("hello")
     assert vector.dtype == np.float32 and vector.shape == (2,)
     np.testing.assert_allclose(vector, [0.0, 1.0])
+
+
+# --- CachedEmbedder ---------------------------------------------------------------------------------------------
+
+
+class Counting:
+    """Embeds "a", "b", ... as distinct unit vectors and records each batch."""
+
+    def __init__(self) -> None:
+        self.batches: list[list[str]] = []
+
+    def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
+        self.batches.append(list(texts))
+        return np.stack([np.eye(8, dtype=np.float32)[ord(t[0]) - ord("a")] for t in texts])
+
+    def embed_query(self, text: str) -> np.ndarray:
+        return np.ones(8, dtype=np.float32)
+
+
+def test_cache_embeds_only_new_texts_once_and_keeps_order() -> None:
+    inner = Counting()
+    cached = CachedEmbedder(inner)
+    first = cached.embed_documents(["a", "b", "a"])
+    assert inner.batches == [["a", "b"]]  # deduplicated
+    np.testing.assert_array_equal(first, np.eye(8, dtype=np.float32)[[0, 1, 0]])
+    second = cached.embed_documents(["c", "b"])
+    assert inner.batches[-1] == ["c"] and second.dtype == np.float32
+    np.testing.assert_array_equal(second, np.eye(8, dtype=np.float32)[[2, 1]])
+    cached.embed_documents(["a", "b", "c"])
+    assert len(inner.batches) == 2  # all cached
+    np.testing.assert_array_equal(cached.embed_query("x"), np.ones(8))  # queries pass through
+
+
+def test_cache_evicts_least_recently_used() -> None:
+    inner = Counting()
+    cached = CachedEmbedder(inner, max_items=2)
+    cached.embed_documents(["a", "b"])
+    cached.embed_documents(["a"])  # a is now the most recent
+    cached.embed_documents(["c"])  # evicts b
+    cached.embed_documents(["a", "b"])
+    assert inner.batches == [["a", "b"], ["c"], ["b"]]
+    assert cached.embed_documents(["d", "e", "f"]).shape == (
+        3,
+        8,
+    )  # a batch larger than the cache still works
+
+
+def test_cache_edge_cases() -> None:
+    inner = Counting()
+    assert CachedEmbedder(inner).embed_documents([]).shape == (0, 0) and inner.batches == []
+    with pytest.raises(ValueError, match="max_items"):
+        CachedEmbedder(inner, max_items=0)

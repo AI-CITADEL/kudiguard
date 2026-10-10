@@ -178,3 +178,31 @@ lexicon with *separate* dev examples, then re-measure here once (recorded as a p
 **Retrieval, blind** (24 English queries): production path (rules flags + hybrid search) **67% top-1 / 96% top-3**
 (BM25 only: 67% / 79%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
 top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tuned on them).
+
+## S8 — Grounding check: embedder and threshold (10 Oct 2026, CPU only)
+
+Set: `data/eval/grounding_claims.yaml` (47 English claims: 28 paraphrases, 19 plausible inventions; 10 each in
+ha/yo/ig by a non-native author, native review pending). Claim vs best evidence sentence (pack facts + actions +
+framing). Live run: `pytest -m live tests/integration/test_grounding_quality.py`; comparison:
+`scripts/eval_grounding_embedders.py`.
+
+* **English, bge-small (shipped)**: paraphrases ≥ 0.765, inventions mostly < 0.75 → threshold **0.75** (below the
+  lowest paraphrase on purpose: a false flag replaces a good answer). Adding the specifics check (numbers and
+  agency names must appear in the evidence): **precision 100%, recall 89% (17/19), false flags 0/28**. Misses are
+  negations/near-advice ("you do not have to repay a loan app that harasses you", 0.81).
+* **Latency** (added per English reply, pack facts pre-embedded at startup, reply + user message embedded in one
+  batch off the event loop): **p50 12 ms, p95 15 ms** for 7 claims; startup warm-up 183 core sentences in 0.7 s.
+  ha/yo/ig: **0 ms live** (not checked).
+* **Cross-lingual (claims in ha/yo/ig vs English facts, no back-translation)**, best accuracy at a per-language
+  threshold (n=10 per language, so ±15 points):
+
+  | Model | Size | ha | yo | ig | 4 claims |
+  |---|---|---|---|---|---|
+  | bge-small-en-v1.5 (English only) | 67 MB | 70% | 60% | 70% | 20 ms |
+  | paraphrase-multilingual-MiniLM-L12-v2 | 235 MB | 80% | 60% | 60% | 25 ms |
+  | LaBSE int8 (ONNX, CLS + dense head) | 470 MB | 100% @0.55 | 90% @0.49 | 80% @0.67 | 27 ms |
+
+  LaBSE is fast enough (< 150 ms budget) and promising, but per-language thresholds differ by 0.18 on 10 unreviewed
+  examples each: not reliable enough to replace good answers with fixed text. **Decision: live check English only;**
+  ha/yo/ig via N-ATLAS back-translation offline (`GroundingChecker(llm, …)`, ~1–2 s per reply on the GPU).
+  Next step for live ha/yo/ig: ≥ 40 native-reviewed claims per language, then re-run LaBSE.

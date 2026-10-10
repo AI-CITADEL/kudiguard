@@ -293,8 +293,49 @@ async def test_build_services_with_embeddings_and_speech(
     services = await build_services(base_settings(tmp_path, embeddings=True, speech=True))
     try:
         assert services.engine.has_speech and "embedder" in created and "ha" in created["asr_models"]  # type: ignore[operator]
+        assert services.engine.grounding is not None  # on by default, reusing the search model
+        assert services.engine.grounding.threshold == services.settings.grounding_threshold
+        assert services.engine.grounding.budget_s == services.settings.grounding_budget_ms / 1000
     finally:
         await services.aclose()
+
+
+async def test_grounding_check_needs_embeddings_and_can_be_turned_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from fakes import BagOfWordsEmbedder
+    from kudiguard.knowledge import embeddings
+
+    with caplog.at_level("WARNING", logger="kudiguard.api.services"):
+        services = await build_services(base_settings(tmp_path, packs=("kudiguard-core",)))  # no embeddings
+    await services.aclose()
+    assert services.engine.grounding is None and "grounding check disabled" in caplog.text
+
+    monkeypatch.setattr(embeddings, "FastEmbedder", lambda cache_dir: BagOfWordsEmbedder())
+    caplog.set_level("INFO", logger="kudiguard.api.services")
+    for enabled in (True, False):
+        settings = base_settings(
+            tmp_path, embeddings=True, grounding_check=enabled, packs=("kudiguard-core",)
+        )
+        services = await build_services(settings)
+        await services.aclose()
+        assert (services.engine.grounding is not None) is enabled
+    assert "evidence sentences embedded" in caplog.text  # pack facts pre-embedded at startup
+
+
+def test_grounding_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from kudiguard.safety.grounding import DEFAULT_THRESHOLD
+
+    defaults = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert defaults.grounding_check and defaults.grounding_threshold == DEFAULT_THRESHOLD
+    assert defaults.grounding_budget_ms == 150
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_CHECK", "false")
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_THRESHOLD", "0.8")
+    tuned = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert not tuned.grounding_check and tuned.grounding_threshold == 0.8
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_THRESHOLD", "1.5")
+    with pytest.raises(ValueError, match="grounding_threshold"):
+        Settings(_env_file=None)  # type: ignore[call-arg]
 
 
 async def test_missing_ffmpeg_means_text_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
