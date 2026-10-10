@@ -10,9 +10,10 @@ from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import aware
 from kudiguard.text import redact
 
-# Cells starting with these are evaluated by spreadsheets (the full-width forms are folded to ASCII by some).
-FORMULA_PREFIXES = ("=", "+", "-", "@", "\uff1d", "\uff0b", "\uff0d", "\uff20")
-_LEADING_BLANKS = " \t\r\n\u3000"  # skipped by spreadsheets before a formula is recognised
+# Cells starting with these are evaluated by spreadsheets (the full-width forms are folded to ASCII by some;
+# "|" starts a DDE call in old Excel).
+FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "\uff1d", "\uff0b", "\uff0d", "\uff20")
+_LEADING_BLANKS = " \t\r\n\u00a0\u3000"  # skipped by spreadsheets before a formula is recognised
 
 
 def _redacted(value: str | None) -> str | None:

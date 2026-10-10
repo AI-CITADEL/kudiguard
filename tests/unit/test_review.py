@@ -272,7 +272,13 @@ async def test_no_identifier_reaches_any_cell(knowledge: KnowledgeBase, tmp_path
 
 
 def test_known_review_ids() -> None:
-    assert review.known_review_ids([row(1), row(2)], HASHER) == {HASHER.review_id(1), HASHER.review_id(2)}
+    assert review.known_review_ids([1, 2], HASHER) == {HASHER.review_id(1), HASHER.review_id(2)}
+
+
+def test_more_formula_prefixes() -> None:
+    risky = ("|cmd /C calc", "\u00a0=1+1", " \u00a0@SUM(A1)")
+    assert [spreadsheet_cell(v) for v in risky] == ["'" + v for v in risky]
+    assert spreadsheet_cell("\u00a0plain") == "\u00a0plain"
 
 
 # --- reading graded sheets -----------------------------------------------------------------------------------
@@ -384,6 +390,28 @@ def test_ac1_examples() -> None:
     assert perfect == review.YesNoAgreement(1.0, 1.0, 0)
     opposite = review.yes_no_agreement([[True, False], [False, True]])
     assert opposite == review.YesNoAgreement(0.0, -1.0, 2)
+
+
+def test_ac1_chance_term_uses_single_rated_replies_too() -> None:
+    # p_a from the double-rated reply only (0); pi over both replies: (1 + 1/2) / 2 = 0.75, p_e = 0.375
+    mixed = review.yes_no_agreement([[True], [True, False], []])
+    assert mixed == review.YesNoAgreement(0.0, pytest.approx(-0.6), 1)
+    restricted = review.yes_no_agreement([[True, False]])  # pi = 0.5, p_e = 0.5
+    assert restricted == review.YesNoAgreement(0.0, pytest.approx(-1.0), 1)
+    assert review.yes_no_agreement([[True], [False]]) is None
+
+
+def test_score_agreement_counts_single_rated_replies_in_chance(tmp_path: Path) -> None:
+    path = sheet(
+        tmp_path / "shared.csv",
+        [
+            graded("R-1", "ha", "4", "4", "yes", "no", reviewer="Ade"),
+            graded("R-1", "ha", "4", "4", "no", "no", reviewer="Bola"),
+            graded("R-2", "ha", "4", "4", "yes", "no", reviewer="Ade"),
+        ],
+    )
+    agreement = review.score([review.read_sheet(path)]).overall.agreement
+    assert agreement.items == 1 and agreement.faithful == review.YesNoAgreement(0.0, pytest.approx(-0.6), 1)
 
 
 def test_cp1252_and_utf16_sheets_are_read(tmp_path: Path) -> None:
@@ -597,7 +625,10 @@ def test_cli_review_export_score_and_check(review_env: Path, capsys: pytest.Capt
     assert cli.main(["review", "score", str(graded_path)]) == 0
     assert "Reviewers: Ade" in capsys.readouterr().out
 
-    assert cli.main(["review", "check", *map(str, paths)]) == 0
+    working = sheet(  # a half-graded working copy: check reads only the review ids
+        review_env / "ha-ade.csv", [{**rows[0], "accuracy": "4", "fluency": "", "faithful": "maybe"}]
+    )
+    assert cli.main(["review", "check", *map(str, paths), str(working)]) == 0
     assert "all 2 review ids are still in the database" in capsys.readouterr().out
 
     async def erase() -> None:  # the Hausa user sends DELETE during the review
@@ -606,7 +637,7 @@ def test_cli_review_export_score_and_check(review_env: Path, capsys: pytest.Capt
         await store.close()
 
     asyncio.run(erase())
-    assert cli.main(["review", "check", *map(str, paths)]) == 1
+    assert cli.main(["review", "check", *map(str, paths), str(working)]) == 1
     assert capsys.readouterr().out.splitlines()[1:] == [rows[0]["review_id"]]
 
 
@@ -643,3 +674,47 @@ def test_cli_review_warnings_and_errors(
     bad_sheet = sheet(review_env / "bad.csv", [graded("R-1", "ha", "9", "4", "yes", "no")])
     assert cli.main(["review", "score", str(bad_sheet)]) == 2
     assert "bad.csv row 2: accuracy" in capsys.readouterr().err
+
+
+def test_read_review_ids_only(tmp_path: Path) -> None:
+    path = write(tmp_path / "w.csv", "notes,review_id\nx,R-1\nonly-a-note\n,'R-2\n,\n")
+    assert review.read_review_ids(path) == {"R-1", "R-2"}
+    with pytest.raises(review.GradeError, match="no review_id column"):
+        review.read_review_ids(write(tmp_path / "x.csv", "id\n1\n"))
+    with pytest.raises(review.GradeError, match="no review_id column"):
+        review.read_review_ids(write(tmp_path / "e.csv", ""))
+
+
+def test_markdown_escapes_pipes_from_sheets(tmp_path: Path) -> None:
+    path = sheet(tmp_path / "p.csv", [graded("R-1", "h|a", "4", "4", "yes", "no")])
+    assert "| h\\|a | 1 |" in review.markdown_scorecard(review.score([review.read_sheet(path)]))
+
+
+def test_cli_output_survives_a_cp1252_console(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "load_env_file", lambda path: None)
+    console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")  # Windows, stdout redirected to a file
+    monkeypatch.setattr("sys.stdout", console)
+    monkeypatch.setattr("sys.stderr", io.StringIO())  # not reconfigurable: left alone
+    path = sheet(tmp_path / "s.csv", [graded("R-1", "yo", "4", "4", "yes", "no", reviewer="Ọlá Ɓala")])
+    assert cli.main(["review", "score", str(path), "--markdown"]) == 0
+    assert cli.main(["review", "score", str(path)]) == 0
+    console.flush()
+    assert "Reviewers: Ọlá Ɓala" in console.buffer.getvalue().decode("utf-8")
+
+
+def test_cli_review_io_errors_are_clean(review_env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    blocker = review_env / "file"
+    blocker.write_text("not a folder", encoding="utf-8")
+    assert cli.main(["review", "export", "--n", "1", "--out-dir", str(blocker / "sub")]) == 2
+    assert "error: cannot write review sheets to" in capsys.readouterr().err
+    assert cli.main(["review", "check", str(blocker)]) == 2  # not a sheet
+    assert "no review_id column" in capsys.readouterr().err
+
+
+def test_cli_review_check_needs_the_database(
+    review_env: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("KUDIGUARD_DB_PATH", str(review_env / "missing.db"))
+    assert cli.main(["review", "check", str(review_env / "any.csv")]) == 2
+    assert "no evidence database" in capsys.readouterr().err
+    assert not (review_env / "missing.db").exists()

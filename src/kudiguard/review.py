@@ -186,9 +186,9 @@ def write_sheets(directory: Path, rows: Sequence[Mapping[str, str]], *, stem: st
     return paths
 
 
-def known_review_ids(rows: Iterable[Mapping[str, Any]], hasher: UserHasher) -> frozenset[str]:
-    """Review ids of every interaction still stored (erased or expired ones are gone)."""
-    return frozenset(hasher.review_id(int(row["id"])) for row in rows)
+def known_review_ids(interaction_ids: Iterable[int], hasher: UserHasher) -> frozenset[str]:
+    """Review ids of every interaction still stored (``Store.interaction_ids``; erased or expired ones are gone)."""
+    return frozenset(hasher.review_id(i) for i in interaction_ids)
 
 
 # --- read graded sheets ---------------------------------------------------------------------------------------
@@ -321,13 +321,28 @@ def _grade(row: _Row, reviewer: str) -> Grade:
     )
 
 
-def read_sheet(path: Path) -> Sheet:
-    """Parse one graded sheet. Rows with no grades are ungraded; a partly graded or malformed row is an error."""
+def _read_records(path: Path) -> list[list[str]]:
     try:
         raw = path.read_bytes()
     except OSError as exc:
         raise GradeError(f"{path}: cannot read ({exc.strerror})") from exc
-    rows = _rows(_records(_decode(raw, path.name), path.name), path.name)
+    return _records(_decode(raw, path.name), path.name)
+
+
+def read_review_ids(path: Path) -> frozenset[str]:
+    """Only the review ids of a sheet (grades are not checked: a half-graded working copy is fine)."""
+    records = _read_records(path)
+    header = [cell.strip() for cell in records[0]] if records else []
+    if "review_id" not in header:
+        raise GradeError(f"{path.name}: not a review sheet (no review_id column)")
+    column = header.index("review_id")
+    ids = (record[column].strip().lstrip("'") for record in records[1:] if len(record) > column)
+    return frozenset(rid for rid in ids if rid)
+
+
+def read_sheet(path: Path) -> Sheet:
+    """Parse one graded sheet. Rows with no grades are ungraded; a partly graded or malformed row is an error."""
+    rows = _rows(_read_records(path), path.name)
     reviewers = _reviewer_for(rows, path.stem)
     grades: dict[tuple[str, str], Grade] = {}
     items: dict[str, str] = {}
@@ -397,15 +412,18 @@ def _mean(values: Sequence[float]) -> float | None:
 def yes_no_agreement(items: Iterable[Sequence[bool]]) -> YesNoAgreement | None:
     """Gwet's AC1 for two categories and any number of reviewers per reply (Gwet 2008, eq. for multiple raters).
 
-    p_a: per reply, agreeing ordered pairs / all ordered pairs, averaged; π: share of "yes" answers per reply,
-    averaged; chance agreement p_e = 2π(1-π) (at most 0.5, so AC1 is always defined); AC1 = (p_a-p_e)/(1-p_e)."""
-    multi = [votes for votes in items if len(votes) > 1]
+    ``items``: every graded reply's answers. p_a (observed): per reply graded by two or more, agreeing ordered pairs
+    / all ordered pairs, averaged over those replies; π: share of "yes" answers per reply, averaged over *all*
+    graded replies (single-rated ones too, as Gwet 2008/2014 specify); chance agreement p_e = 2π(1-π) (at most 0.5,
+    so AC1 is always defined); AC1 = (p_a-p_e)/(1-p_e). None when no reply has two answers."""
+    rated = [votes for votes in items if votes]
+    multi = [votes for votes in rated if len(votes) > 1]
     if not multi:
         return None
     observed = mean(
         sum(k * (k - 1) for k in (sum(v), len(v) - sum(v))) / (len(v) * (len(v) - 1)) for v in multi
     )
-    share = mean(sum(v) / len(v) for v in multi)
+    share = mean(sum(v) / len(v) for v in rated)
     chance = 2 * share * (1 - share)
     return YesNoAgreement(observed, (observed - chance) / (1 - chance), sum(len(set(v)) > 1 for v in multi))
 
@@ -415,8 +433,8 @@ def _agreement(by_item: Mapping[str, Sequence[Grade]]) -> Agreement:
     pairs = [pair for item in multi for pair in combinations(item, 2)]
     return Agreement(
         items=len(multi),
-        faithful=yes_no_agreement([g.faithful for g in item] for item in multi),
-        harmful=yes_no_agreement([g.harmful for g in item] for item in multi),
+        faithful=yes_no_agreement([g.faithful for g in item] for item in by_item.values()),
+        harmful=yes_no_agreement([g.harmful for g in item] for item in by_item.values()),
         accuracy_gap=_mean([abs(a.accuracy - b.accuracy) for a, b in pairs]),
         fluency_gap=_mean([abs(a.fluency - b.fluency) for a, b in pairs]),
     )
@@ -514,7 +532,7 @@ def format_scorecard(card: Scorecard) -> str:
 
 
 def _name(language: str) -> str:
-    return "**All**" if language == "all" else language
+    return "**All**" if language == "all" else language.replace("|", "\\|")  # codes come from the sheets
 
 
 def markdown_scorecard(card: Scorecard) -> str:

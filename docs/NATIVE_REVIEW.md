@@ -10,6 +10,8 @@ Each row is one real message someone sent KudiGuard and the reply they got. You 
 masked), its English translation, the reply, and the **facts** KudiGuard was given to write that reply. Read the
 reply as the person who sent the message would. Fill in all four grades for every row you do; leave a row completely
 empty if you cannot judge it, and add anything useful under `notes`. Put your name under `reviewer` (once is enough).
+A leading apostrophe in a cell (e.g. `'-5 naira`) is a safety mark that stops the spreadsheet running it as a
+formula: ignore it.
 
 | Grade | 1 | 3 | 5 |
 |---|---|---|---|
@@ -58,7 +60,8 @@ kudiguard review score ... --markdown        # tables for VALIDATION.md
 * **Several reviewers** per reply: scales are averaged across reviewers; a reply counts as unfaithful or harmful if
   *any* reviewer said so. Agreement is reported per language on replies graded by two or more people:
   * yes/no questions: the share of reviewer pairs giving the same answer, **Gwet's AC1** (the same corrected for
-    agreement expected by chance: 1 = perfect, 0 = no better than chance, below 0 = worse) and the number of
+    agreement expected by chance, estimated from all graded replies as Gwet specifies: 1 = perfect, 0 = no better
+    than chance, below 0 = worse) and the number of
     replies on which reviewers split. AC1 is used instead of Cohen's/Fleiss' kappa because almost every
     "harmful" answer will be "no", and kappa then collapses towards 0 even when reviewers almost always agree;
   * 1–5 scales: the average gap in points between reviewers (0 = identical; under 1 is good).

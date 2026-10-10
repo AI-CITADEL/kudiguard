@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import io
 import json
 import logging
 import sys
@@ -146,7 +147,10 @@ def cmd_review_export(settings: Settings, args: argparse.Namespace) -> int:
 
     sheet_rows, semantic = asyncio.run(sheet())
     out_dir = _review_dir(settings, args.out_dir)
-    paths = review.write_sheets(out_dir, sheet_rows, stem=f"review-{utcnow():%Y%m%d}")
+    try:
+        paths = review.write_sheets(out_dir, sheet_rows, stem=f"review-{utcnow():%Y%m%d}")
+    except OSError as exc:
+        raise ValueError(f"cannot write review sheets to {out_dir} ({exc.strerror})") from exc
     print(f"sampled {len(sample)} of {len(rows)} eligible replies")
     for language, path in paths.items():
         print(f"  {language}: {sum(r['language'] == language for r in sheet_rows)} replies -> {path}")
@@ -173,11 +177,21 @@ def cmd_review_score(settings: Settings, args: argparse.Namespace) -> int:
 
 def cmd_review_check(settings: Settings, args: argparse.Namespace) -> int:
     """Replies erased (DELETE) or expired since the export must be removed from every copy of the sheets."""
-    current = review.known_review_ids(asyncio.run(_rows(settings)), _hasher(settings))
-    sheets = [review.read_sheet(Path(path)) for path in args.files]
-    stale = sorted({rid for sheet in sheets for rid in sheet.items if rid not in current})
+
+    async def ids() -> frozenset[int]:
+        if not settings.db_path.is_file():
+            raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
+        store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
+        try:
+            return await store.interaction_ids()
+        finally:
+            await store.close()
+
+    current = review.known_review_ids(asyncio.run(ids()), _hasher(settings))
+    in_sheets = frozenset().union(*(review.read_review_ids(Path(path)) for path in args.files))
+    stale = sorted(in_sheets - current)
     if not stale:
-        print(f"all {len({rid for s in sheets for rid in s.items})} review ids are still in the database")
+        print(f"all {len(in_sheets)} review ids are still in the database")
         return 0
     print("no longer in the database (erased by the user or expired): delete these rows from every copy")
     print("\n".join(stale))
@@ -209,7 +223,15 @@ def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def utf8_output() -> None:
+    """Names and messages in Hausa/Yoruba/Igbo must not crash a redirected or piped Windows console (cp1252)."""
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    utf8_output()
     load_env_file(ROOT / ".env")  # WHATSAPP_* and other non-prefixed settings (real environment wins)
     parser = argparse.ArgumentParser(prog="kudiguard", description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)

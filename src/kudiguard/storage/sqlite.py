@@ -340,6 +340,10 @@ class SQLiteStore:
             export_row(_interaction(r), None if r["helpful"] is None else bool(r["helpful"])) for r in rows
         ]
 
+    async def interaction_ids(self) -> frozenset[int]:
+        rows = await self._run(lambda db: db.execute("SELECT id FROM interactions").fetchall())
+        return frozenset(int(r["id"]) for r in rows)
+
     async def close(self) -> None:
         def work() -> None:
             with self._lock:
