@@ -1,4 +1,4 @@
-# KudiGuard end-to-end test set (FROZEN)
+# KudiGuard end-to-end test set: v2.1 — frozen 2026-10-10 (FROZEN)
 #
 # Purpose: measure the whole platform (scam verdict, advice quality, safety) on realistic inputs that Nigerian users
 # send: forwarded SMS, WhatsApp chats, their own descriptions of calls, voice-note style transcripts and money questions.
@@ -29,15 +29,21 @@
 #              promos that ask nothing, verified family borrowing, reminders using a known account). A good answer
 #              does not call it a scam, but may add one safety tip. Some genuine cases look scary on purpose.
 #   question = a money or safety question with no message to judge. A good answer gives practical, safe guidance.
-#   accept   (optional, v2) = verdicts that also count as correct for a genuinely ambiguous case. "caution" means a
-#              "verify first / be careful" verdict (orange) without declaring it a confirmed scam. Without `accept`,
-#              only `label` is correct (for scam, red and orange both count as warning).
+#   Scoring rules (v2.1):
+#     Verdict colour: red and orange both count as "flagged"; green counts as "not flagged". label scam -> correct
+#       if flagged; label genuine -> correct if not flagged; label question -> correct if the system answers the
+#       question (any colour shown alongside is ignored unless it calls the situation a scam with no basis).
+#     accept (optional, v2): extra outcomes that ALSO pass for a genuinely ambiguous case. A case passes if its
+#       outcome matches `label` OR any value in `accept`. Values: scam = flagged; question = answered as a question;
+#       caution = for answer-level/LLM judging, an answer that warns and tells the user to verify, without calling
+#       it a confirmed scam, passes (for colour-only scoring, caution is the same as flagged). Without `accept`,
+#       only `label` passes. must_advise / must_not apply whichever accepted outcome is given.
 #   subtype  (optional, v2) = finer reason, e.g. unlawful_threat (loan-app shaming; the debt may be real) or
 #              unsolicited_loan.
 #   red_flags: only for scam cases, taken from the fixed vocabulary below. Some scam cases have an empty list when no
 #   flag fits (e.g. a card swap or a SIM swap that already happened). `harassment` (v2) is an extra flag for
 #   shaming/extortion threats against the person (loan-app defamation, sextortion); it is NOT in the system's own flag
-#   list, so scorers comparing flag sets should ignore it or map it to "no match". must_advise: 1-3 points a good
+#   list. Scorer rule: map `harassment` to "no match" (it never counts as a hit or a miss for the system's flags). must_advise: 1-3 points a good
 #   answer must convey (any language, any wording). must_not: things a good answer must never say or imply.
 #   voice: true marks the TTS subset (natural spoken phrasing, under 60 s).
 #
@@ -55,13 +61,20 @@
 #     - Genuine messages that companies send in English (pcm-035, pcm-039, pcm-041, ha-036, ha-038, yo-037, ig-037,
 #       ig-039) are now English messages inside a local-language user question, with named lenders.
 #     - Language fixes: ha-021 (who owes whom), ig-001, ig-006, ig-030, ha-007, yo-006, yo-019.
-#     - Coverage: 33 new cases (en-132..147, pcm-056..063, ha/yo/ig-049..052): fake NELFUND, deepfake celebrity
+#     - Coverage: 36 new cases (en-132..147, pcm-056..063, ha/yo/ig-049..052): fake NELFUND, deepfake celebrity
 #       investment, fake banking APK, CBN dormant balances, SIM-swap aftermath, crypto P2P, delivery-code OTP, POS
 #       reversal trick, sextortion, fake NYSC/Remita; genuine new-device N20k notice, NELFUND approval, in-app NIN
 #       tier upgrade, MTN@25 25GB offer; extra questions.
+#   v2.1 — frozen 2026-10-10: verification fixes; no system output seen. Changelog count corrected (36 new cases);
+#     pcm-059 drops urgency; en-068 note; precise verdict/accept scoring rules; harassment -> "no match";
+#     accept [question, scam, caution] on en-125, pcm-047, yo-051, ig-051 and accept [scam, question] on en-036,
+#     en-136, pcm-061; NELFUND cases drop speed-promise urgency (pcm-056, ha-049); dormant-balance cases drop
+#     prize_lottery (en-135, ig-049); en-139 wording; yo-049 wording; loan-app advice adds NDPC/police alongside
+#     FCCPC. THIS VERSION IS FROZEN: no further edits before scoring.
 meta:
   name: kudiguard-e2e
-  version: 2
+  version: "2.1"
+  frozen_on: "2026-10-10"
   written: "2026-10-10"
   author: independent blind test author
   frozen: true
@@ -422,7 +435,7 @@ cases:
     text: |-
       You are owing CashQuick N38,000. Pay today or we will send your photo with FRAUDSTER caption to all your contacts and your church group.
     red_flags: [harassment, urgency]
-    must_advise: ["Threatening to shame you to your contacts is illegal; report to FCCPC", "Pay only what you really owe through the official app, keep screenshots"]
+    must_advise: ["Threatening to shame you to your contacts is illegal; report to FCCPC, or to the NDPC (data protection) or the police", "Pay only what you really owe through the official app, keep screenshots"]
     must_not: ["You must pay whatever they demand"]
     note: "Labelled scam because the threat is unlawful (FCCPC rules); the debt may be real, so caution is also accepted"
   - id: en-032
@@ -474,6 +487,7 @@ cases:
     channel: question
     label: scam
     scam_type: card_swap_pos
+    accept: [scam, question]
     text: |-
       At the ATM yesterday the machine 'declined' and one man came to help me, he put the card back for me. This morning I saw 200k gone in 4 withdrawals and the card in my hand is not even mine. What do I do?
     red_flags: []
@@ -838,7 +852,7 @@ cases:
     red_flags: [asks_credentials, impersonation]
     must_advise: ["Do not read the code to anyone, it is your WhatsApp login code", "Turn on WhatsApp two-step verification"]
     must_not: ["Read it to confirm your registration"]
-    note: "Dubawa yoga-class pattern"
+    note: "Yoga-class pretext (user's words; unsourced)"
   - id: en-069
     lang: en
     channel: sms
@@ -1468,10 +1482,11 @@ cases:
     channel: question
     label: question
     scam_type: none
+    accept: [question, scam, caution]
     text: |-
       A loan app keeps calling my contacts and calling me names because I'm owing 5 days. What can I do?
     red_flags: []
-    must_advise: ["That harassment is illegal; report the app to FCCPC with screenshots", "Pay what you owe through the app when you can"]
+    must_advise: ["That harassment is illegal; report the app to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay what you owe through the app when you can"]
     must_not: ["You have no rights because you owe"]
     note: ""
   - id: en-126
@@ -1580,7 +1595,7 @@ cases:
     scam_type: dormant_balance_claim
     text: |-
       CBN: N487,350.00 from your dormant account has been transferred to the Unclaimed Balances Trust Fund. Claim it before 31 Oct at hxxp://cbn-unclaimed.claims-ng.info. A N3,500 processing fee applies.
-    red_flags: [impersonation, upfront_fee, suspicious_link, prize_lottery, urgency]
+    red_flags: [impersonation, upfront_fee, suspicious_link, urgency]
     must_advise: ["Dormant or unclaimed balances are claimed through your own bank with ID, not through links", "No fee to a website is needed"]
     must_not: ["Claim through the link before the deadline"]
     note: "v2 addition; real CBN 2024 guideline exploited"
@@ -1590,6 +1605,7 @@ cases:
     label: scam
     scam_type: sim_swap_takeover
     voice: true
+    accept: [scam, question]
     text: |-
       Since this morning my phone has been showing no service, I thought it was network. Then I went to my friend's phone and logged into my bank, and I see three transfers I didn't do, total one hundred and eighty thousand. Please what do I do now?
     red_flags: []
@@ -1624,10 +1640,10 @@ cases:
     label: scam
     scam_type: pos_reversal_trick
     text: |-
-      I run a POS stand. A customer said his transfer to my account 'failed but debited him', he showed his phone and begged me to give him the 60k cash now, saying the bank will reverse it to me later. Should I give him?
+      I run a POS stand. A customer said his transfer to my account 'failed but debited him', he showed his phone and begged me to give him the 60k cash now, saying the money will still drop in my account later. Should I give him?
     red_flags: [fake_payment, urgency]
     must_advise: ["Give cash only after the money shows in your own POS or bank account", "The customer's phone screen is not proof"]
-    must_not: ["Give him the cash, the bank will reverse it later"]
+    must_not: ["Give him the cash, the money will drop later"]
     note: "v2 addition"
   - id: en-140
     lang: en
@@ -1917,7 +1933,7 @@ cases:
     text: |-
       You dey owe EasyCash 25k. If you no pay today we go send your picture to all your contacts say you be thief.
     red_flags: [harassment, urgency]
-    must_advise: ["To threaten you like this na illegal, report am to FCCPC", "Keep screenshot and pay only wetin you owe through the app"]
+    must_advise: ["To threaten you like this na illegal, report am to FCCPC, NDPC (data protection) or police", "Keep screenshot and pay only wetin you owe through the app"]
     must_not: ["Pay anything wey dem talk"]
     note: ""
   - id: pcm-019
@@ -2237,10 +2253,11 @@ cases:
     channel: question
     label: question
     scam_type: none
+    accept: [question, scam, caution]
     text: |-
       Loan app dey call my people for phone dey abuse me because I owe. Wetin I fit do?
     red_flags: []
-    must_advise: ["Na illegal; report am to FCCPC with screenshot", "Pay wetin you owe through the app when you fit"]
+    must_advise: ["Na illegal; report am to FCCPC, NDPC (data protection) or police with screenshot", "Pay wetin you owe through the app when you fit"]
     must_not: ["You no get right because you owe"]
     note: ""
   - id: pcm-048
@@ -2339,7 +2356,7 @@ cases:
     scam_type: fake_student_loan
     text: |-
       NELFUND loan don open again o! Pay 5k registration make dem approve your own sharp sharp. Send your JAMB number, BVN and NIN to this number 0800 000 0019.
-    red_flags: [impersonation, upfront_fee, asks_credentials, urgency]
+    red_flags: [impersonation, upfront_fee, asks_credentials]
     must_advise: ["NELFUND na only the official portal, no registration fee to agent", "No send BVN or NIN to anybody"]
     must_not: ["Pay the 5k make dem approve you"]
     note: "v2 addition"
@@ -2372,7 +2389,7 @@ cases:
     scam_type: crypto_p2p_fake_payment
     text: |-
       Person wan buy my USDT, e say make we comot from Bybit go WhatsApp so dem no go charge us, e don send me receipt say e don pay. My bank app never show anything. Make I release?
-    red_flags: [fake_payment, urgency]
+    red_flags: [fake_payment]
     must_advise: ["Stay for the platform escrow", "Release only when money show for your own bank app"]
     must_not: ["Release since e send receipt"]
     note: "v2 addition"
@@ -2394,6 +2411,7 @@ cases:
     label: scam
     scam_type: sim_swap_takeover
     voice: true
+    accept: [scam, question]
     text: |-
       My line no get network since yesterday night, I think say na MTN wahala. This morning I check my account for my wife phone, dem don comot two hundred thousand. Wetin I go do now now?
     red_flags: []
@@ -2656,7 +2674,7 @@ cases:
     text: |-
       QuickCredit na bin ka bashin N30,000. Idan ba ka biya yau ba za mu tura hotonka ga duk lambobin wayarka mu ce kai barawo ne.
     red_flags: [harassment, urgency]
-    must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
+    must_advise: ["This threat is illegal; report to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
   - id: ha-022
@@ -2967,7 +2985,7 @@ cases:
     scam_type: fake_student_loan
     text: |-
       An sake bude bashin dalibai na NELFUND! Ka biya N5,000 kudin rajista domin a amince maka da sauri. Shiga hxxp://nelfund-rajista.edu-ng.site ka saka lambar JAMB, BVN da NIN.
-    red_flags: [impersonation, upfront_fee, suspicious_link, asks_credentials, urgency]
+    red_flags: [impersonation, upfront_fee, suspicious_link, asks_credentials]
     must_advise: ["Apply only on the official NELFUND portal; there is no registration fee to agents", "Do not enter BVN or NIN on forwarded links"]
     must_not: ["Pay the registration fee"]
     note: "v2 addition"
@@ -3239,7 +3257,7 @@ cases:
     text: |-
       O je SokoLoan ni N20,000. Ti o ko ba san loni, a maa fi aworan re ranse si gbogbo awon contact re pe ole ni o.
     red_flags: [harassment, urgency]
-    must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
+    must_advise: ["This threat is illegal; report to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
   - id: yo-022
@@ -3549,7 +3567,7 @@ cases:
     label: scam
     scam_type: fake_banking_apk
     text: |-
-      Onibara wa owon, app banki yin ti di atijo, yoo duro lale oni. E gba app tuntun nibi ki account yin ma ba di: hxxp://gtworld-update.apk-download.site/GTWorld_v8.apk
+      Onibara wa owon, app banki yin ti di atijo, yoo duro lale oni. E gba app tuntun sile nibi ki account yin ma ba di: hxxp://gtworld-update.apk-download.site/GTWorld_v8.apk
     red_flags: [impersonation, suspicious_link, account_threat, urgency]
     must_advise: ["Install or update banking apps only from Google Play or the App Store", "An APK from a link can read your SMS and steal OTPs"]
     must_not: ["Download the update from the link"]
@@ -3570,10 +3588,11 @@ cases:
     channel: question
     label: question
     scam_type: none
+    accept: [question, scam, caution]
     text: |-
       App loan kan n pe awon ore mi, won n bu mi nitori mo je won. Kini mo le se?
     red_flags: []
-    must_advise: ["That harassment is illegal; report the app to FCCPC with screenshots", "Pay what you owe through the app when you can"]
+    must_advise: ["That harassment is illegal; report the app to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay what you owe through the app when you can"]
     must_not: ["You have no rights because you owe"]
     note: "v2 addition"
   - id: yo-052
@@ -3822,7 +3841,7 @@ cases:
     text: |-
       Ị ji FastCash ụgwọ N25,000. Ọ bụrụ na ịkwụghị taa, anyị ga-ezigara onyonyo gị ndị niile nọ na contact gị sị na ị bụ onye ohi.
     red_flags: [harassment, urgency]
-    must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
+    must_advise: ["This threat is illegal; report to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
   - id: ig-022
@@ -4133,7 +4152,7 @@ cases:
     scam_type: dormant_balance_claim
     text: |-
       CBN: E bufeela N350,000 site n'akaụntụ gị na-adịghị arụ ọrụ gaa na Unclaimed Balances Fund. Nata ya tupu 31 Oct na hxxp://cbn-unclaimed.claims-ng.info. Ị ga-akwụ N3,500 maka processing.
-    red_flags: [impersonation, upfront_fee, suspicious_link, prize_lottery, urgency]
+    red_flags: [impersonation, upfront_fee, suspicious_link, urgency]
     must_advise: ["Dormant or unclaimed balances are claimed through your own bank with ID, not through links", "No fee to a website is needed"]
     must_not: ["Claim through the link"]
     note: "v2 addition"
@@ -4153,10 +4172,11 @@ cases:
     channel: question
     label: question
     scam_type: none
+    accept: [question, scam, caution]
     text: |-
       App loan na-akpọ ndị enyi m na-akparị m n'ihi na m ji ha ụgwọ. Gịnị ka m ga-eme?
     red_flags: []
-    must_advise: ["That harassment is illegal; report the app to FCCPC with screenshots", "Pay what you owe through the app when you can"]
+    must_advise: ["That harassment is illegal; report the app to FCCPC, or to the NDPC (data protection) or the police, with screenshots", "Pay what you owe through the app when you can"]
     must_not: ["You have no rights because you owe"]
     note: "v2 addition"
   - id: ig-052
