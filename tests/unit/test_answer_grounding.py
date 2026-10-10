@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -227,6 +228,7 @@ async def test_run_case_grounds_on_what_the_model_saw(
     assert [e.entry.id for e in grounding.knowledge[0].entries][:1] == ["flag-asks-credentials"]
     assert result.observation.english == "Your bank never asks for the OTP." and result.observation.evidence
     assert result.score.grounded is True and result.grounding_ms == 7 and result.seconds >= 0
+    assert result.evidence_mismatch is False  # the rebuilt search found the entries the answer used
     assert result.score.covered[0] is True
 
 
@@ -251,7 +253,7 @@ async def test_run_case_fixed_text_is_not_grounded(
     fallback = FakeLLM(analyse=analysis("x", "question"), compose=LLMError("down"))
     result = await run_case(engine(registry, knowledge, fallback), knowledge, grounding, scorer, case())
     assert result.answer.outcome is Outcome.FALLBACK and result.answer.body
-    assert result.score.grounded is None and result.score.coverage == 0.0
+    assert result.score.grounded is None and result.score.coverage == 0.0 and result.evidence_mismatch is None
     # Model down + a bare number: "no red flags" with an empty body.
     silent = FakeLLM(analyse=LLMError("down"))
     empty = await run_case(
@@ -260,3 +262,49 @@ async def test_run_case_fixed_text_is_not_grounded(
     assert empty.answer.body == "" and empty.observation.verdict is Verdict.NO_FLAGS
     assert empty.score.grounded is None and empty.score.coverage == 0.0
     assert grounding.calls == []
+
+
+class EmptyKnowledge:
+    """A search that finds nothing: the rebuilt evidence differs from what the engine used."""
+
+    async def search(self, query: Any) -> KnowledgeResult:
+        return KnowledgeResult()
+
+
+async def test_run_case_flags_rebuilt_evidence_that_differs(
+    registry: LanguageRegistry, knowledge: KnowledgeBase
+) -> None:
+    llm = FakeLLM(
+        analyse=analysis("A caller wants my OTP", flags=["asks_credentials"]), compose="Never share it."
+    )
+    scorer = AnswerScorer(WordEmbedder(), registry)
+    result = await run_case(
+        engine(registry, knowledge, llm),
+        EmptyKnowledge(),
+        StubGrounding(),
+        scorer,
+        case(),  # type: ignore[arg-type]
+    )
+    assert result.answer.sources and result.evidence_mismatch is True
+
+
+async def test_workstream_b_contract(registry: LanguageRegistry) -> None:
+    """Runs once kudiguard.safety.grounding exists: the adapter must fit B's real module."""
+    b = pytest.importorskip(GROUNDING_MODULE)
+    parameters = inspect.signature(b.evidence_for).parameters
+    assert next(iter(parameters)) == "knowledge" and {"verdict", "flags", "message"} <= parameters.keys()
+    assert {"text", "support", "supported", "unmatched"} <= set(b.Claim.__dataclass_fields__)
+    assert {"english", "claims", "ms"} <= set(b.GroundingReport.__dataclass_fields__)
+    embedder = WordEmbedder()
+    adapter = make_grounding(FakeLLM(translate="Never share your OTP code with anyone."), embedder, registry)
+    assert isinstance(adapter, CheckerGrounding)
+    evidence = adapter.evidence(knowledge_result(), verdict=Verdict.LIKELY_SCAM, flags=(), message="m")
+    assert "Fact one." in evidence
+    english = await adapter.ground(
+        "Never share your OTP code with anyone.", "en", ["Never share your OTP code with anyone."]
+    )
+    assert english.english.startswith("Never share") and english.claims
+    hausa = await adapter.ground("Kada ka ba kowa OTP.", "ha", ["Never share your OTP code with anyone."])
+    assert hausa.english == "Never share your OTP code with anyone."
+    names, numbers = text_specifics()
+    assert names is b.names_in and numbers is b.numbers_in

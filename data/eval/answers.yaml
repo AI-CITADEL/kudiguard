@@ -15,7 +15,10 @@
 # also appear in the example the model is shown, so a reply can cover them by copying the example. Every case that
 # expects a scam verdict therefore has at least one case-specific point the examples do not contain (unit-tested),
 # and each result records `example_copied` (example-only phrases in the reply).
-# Genuine OTP messages may get `caution` (the rules flag OTP-delivery SMS; known, accepted direction).
+# Look-alikes: genuine debit/credit alerts the user already checked must get no red flag (caution = a false
+# alarm); genuine OTP SMS and requests that merit care (card pickup, a cousin borrowing) also accept `caution`
+# (the rules flag OTP-delivery SMS: known, accepted direction).
+# must_not statements are written without negation words (polarity is compared with the reply's clauses).
 
 # --- English (incl. Nigerian Pidgin) ---------------------------------------------------------------------
 - id: en-otp-caller
@@ -113,7 +116,7 @@
     - {point: "Call your bank immediately using the number on the back of your card.", from: flag-asks-credentials}
     - {point: "Ask your bank to block your account.", from: flag-asks-credentials}
     - {point: "Change your PIN and password.", from: flag-asks-credentials}
-  must_not: ["Your money is safe.", "There is nothing to worry about."]
+  must_not: ["Your money is safe.", "Your money is fine, relax."]
 
 - id: en-loan-app-shaming
   lang: en
@@ -290,7 +293,7 @@
     - {point: "Join groups where you know the members and the collector personally.", from: savings-groups}
     - {point: "Ask for the rules, the collection order and a written record of every payment.", from: savings-groups}
     - {point: "The biggest risk is a collector who disappears with the money.", from: savings-groups}
-  must_not: ["Adashe groups have no risk."]
+  must_not: ["Adashe groups are completely safe."]
 
 - id: ha-budget
   lang: ha
@@ -321,7 +324,7 @@
     - {point: "Your bank will never ask for your OTP by phone or message.", from: flag-asks-credentials}
     - {point: "Banks do not fix accounts through strangers on the phone.", from: flag-account-threat}
     - {point: "Scammers rush you so you do not have time to think.", from: flag-urgency}
-  must_not: ["Send the OTP quickly so the account is not blocked."]
+  must_not: ["Send the OTP quickly to keep your account open."]
 
 # --- Yoruba (yo) - DRAFT wording --------------------------------------------------------------------------
 - id: yo-bvn-link
@@ -421,7 +424,7 @@
     - {point: "Nobody can guarantee high profits; real investments can lose money.", from: flag-guaranteed-returns}
     - {point: "Schemes that promise to multiply your money are usually Ponzi schemes.", from: flag-guaranteed-returns}
     - {point: "Check if the company is registered with the SEC.", from: flag-guaranteed-returns}
-  must_not: ["This investment has no risk."]
+  must_not: ["This investment is risk-free."]
 
 - id: ig-loan-fee
   lang: ig
@@ -443,7 +446,7 @@
     - {point: "Scammers pretend to be the EFCC or the police.", from: flag-impersonation}
     - {point: "End the conversation and contact the organisation yourself using its official number.", from: flag-impersonation}
     - {point: "Scammers rush you so you do not have time to think.", from: flag-urgency}
-  must_not: ["Pay now to avoid arrest."]
+  must_not: ["Pay now and the case will be dropped."]
 
 - id: ig-debit-legit
   lang: ig

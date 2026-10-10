@@ -10,13 +10,14 @@ grounded rate is ~100% by construction and the measure that matters is the other
 from __future__ import annotations
 
 import importlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Protocol
 
 import numpy as np
 
+from kudiguard import prompts
 from kudiguard.domain import Flag, LanguageCode, Verdict
 from kudiguard.evaluation.answers import Specifics, names_in, numbers_in, split_sentences, words_in
 from kudiguard.knowledge.embeddings import Embedder
@@ -25,8 +26,10 @@ from kudiguard.languages import PIVOT, LanguageRegistry
 from kudiguard.llm.base import LLM, LLMError
 from kudiguard.prompts import FLAG_TEXT, clean_translation, translate_request
 
-# Single import point for the facts the model sees (workstream C renames ``_facts_block`` to ``facts_block``).
-from kudiguard.prompts import _facts_block as facts_block
+# The facts the model sees. Workstreams B and C rename ``_facts_block`` to ``facts_block`` (no alias): either works.
+facts_block: Callable[[KnowledgeResult], tuple[list[str], list[str]]] = (
+    getattr(prompts, "facts_block", None) or getattr(prompts, "_facts_block")  # noqa: B009 - absent after the rename
+)
 
 GROUNDING_MODULE = "kudiguard.safety.grounding"  # workstream B
 DEFAULT_SUPPORT_THRESHOLD = 0.75  # B's DEFAULT_THRESHOLD

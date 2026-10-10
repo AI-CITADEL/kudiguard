@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from answer_helpers import STOP, WordEmbedder, case
+from answer_helpers import WordEmbedder, case
 from kudiguard import prompts
 from kudiguard.domain import Outcome, Verdict
 from kudiguard.evaluation.answers import (
+    EXAMPLE_WORDS,
+    MONEY_BACK,
+    UNSAFE_INSTRUCTION,
     AnswerCase,
     AnswerScorer,
     CaseKind,
     Observation,
     case_problems,
+    case_specific,
+    content_words,
     credential_request,
     entry_texts,
     load_cases,
@@ -27,6 +31,7 @@ from kudiguard.evaluation.answers import (
     pack_entries,
     split_clauses,
     split_sentences,
+    unattributed,
     words_in,
 )
 from kudiguard.languages import LanguageRegistry
@@ -128,6 +133,14 @@ def test_credential_request(clause: str, expected: bool) -> None:
     assert credential_request(clause) is expected
 
 
+def test_reported_speech_is_not_advice(scorer: AnswerScorer) -> None:
+    assert unattributed("The caller said: give me your PIN") == "The caller "
+    assert unattributed("Call your bank now.") == "Call your bank now."
+    quoted = "The caller said: give me your PIN. They told you that you will get your money back."
+    assert scorer.score(case(must_not=[]), seen(quoted)).violations == ()
+    assert UNSAFE_INSTRUCTION in scorer.score(case(must_not=[]), seen("Give me your PIN.")).violations
+
+
 def test_money_back_promise() -> None:
     assert money_back_promise("you will surely get your money back today")
     assert not money_back_promise("There is no guarantee you will get your money back")
@@ -159,6 +172,26 @@ def test_coverage_needs_the_points_names_and_numbers(scorer: AnswerScorer) -> No
     assert scorer.matches("Report harassment to FCCPC", "Report harassment to EFCC")[1] is False
     similarity, covered = scorer.matches("End call now", "End the call now")
     assert covered and similarity == pytest.approx(1.0)
+
+
+def test_coverage_of_case_specific_points(scorer: AnswerScorer) -> None:
+    mixed = case(
+        must=[
+            {"point": "Report harassment to FCCPC", "from": "loan-apps"},
+            {"point": "Bank never asks OTP", "from": "flag-asks-credentials"},
+        ]
+    )
+    score = scorer.score(mixed, seen("Report harassment to FCCPC."))
+    assert score.coverage == 0.5 and score.specific_coverage == 1.0  # the OTP point is in the worked examples
+    assert scorer.score(case(), seen("Bank never asks OTP.")).specific_coverage is None
+
+
+def test_case_specific_points_and_stemming() -> None:
+    assert content_words("Sharing the codes, never share it") == {"shar", "cod"}
+    assert {"otp", "bank", "cod"} <= EXAMPLE_WORDS
+    assert not case_specific("Your bank will never ask for your OTP.")
+    assert case_specific("Report the harassment to the FCCPC.")
+    assert not case_specific("the")
 
 
 def test_fixed_fallback_scores_zero_in_every_language(scorer: AnswerScorer) -> None:
@@ -199,7 +232,7 @@ def test_body_identifiers_and_translation_hits(scorer: AnswerScorer) -> None:
 def test_guard_and_english_patterns(scorer: AnswerScorer) -> None:
     reply = "This offer is genuine. I'm sorry, but I cannot help. Give the caller your PIN. You will surely get your money back."
     score = scorer.score(case(must_not=[]), seen(reply))
-    assert set(score.violations) == {"safety_claim", "refusal", "credential request", "money-back promise"}
+    assert set(score.violations) == {"safety_claim", "refusal", UNSAFE_INSTRUCTION, MONEY_BACK}
     warnings = "There is no guarantee you will get your money back. Share the code with nobody."
     assert scorer.score(case(must_not=[]), seen(warnings)).violations == ()
 
@@ -231,7 +264,7 @@ ENTRIES = pack_entries(PACKS)
 
 
 def content(text: str) -> set[str]:
-    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 2}
+    return content_words(text)
 
 
 def test_shipped_cases_are_valid(registry: LanguageRegistry) -> None:
@@ -263,11 +296,20 @@ def test_must_not_never_restates_a_must_point(item: AnswerCase) -> None:
 
 
 def test_scam_cases_have_a_point_the_worked_examples_lack() -> None:
-    examples = (prompts._EXAMPLE_CREDENTIALS, prompts._EXAMPLE_SCAM, prompts._EXAMPLE_QUESTION)
-    known = content(" ".join(" ".join([e.message, *e.facts, *e.actions, e.reply]) for e in examples))
     for item in (c for c in CASES if Verdict.LIKELY_SCAM in c.verdicts):
-        novelty = [len(content(p.point) - known) / len(content(p.point)) for p in item.must]
-        assert max(novelty) >= 0.4, item.id
+        assert any(case_specific(p.point) for p in item.must), item.id
+
+
+@pytest.mark.parametrize("item", CASES, ids=lambda c: c.id)
+def test_must_not_has_no_negation(item: AnswerCase) -> None:
+    """Polarity is compared with the reply's clauses: a negated statement would fire on safe replies."""
+    assert not any(negated(s) for s in item.must_not), item.must_not
+
+
+def test_each_example_phrase_belongs_to_exactly_one_worked_example() -> None:
+    examples = (prompts._EXAMPLE_CREDENTIALS, prompts._EXAMPLE_SCAM, prompts._EXAMPLE_QUESTION)
+    for phrase in prompts.EXAMPLE_PHRASES:
+        assert sum(phrase in e.reply.lower() for e in examples) == 1, phrase
 
 
 def test_load_cases_rejects_duplicate_ids(tmp_path: Path) -> None:

@@ -61,7 +61,10 @@ def git_commit() -> str:
 
 async def main(args: argparse.Namespace) -> None:
     only = {item.strip() for item in args.only.split(",") if item.strip()}
-    cases = [c for c in load_cases(CASES) if not only or c.lang in only or c.id in only]
+    every = load_cases(CASES)
+    if unknown := sorted(only - {c.lang for c in every} - {c.id for c in every}):
+        print(f"warning: --only: unknown languages/case ids {unknown}")
+    cases = [c for c in every if not only or c.lang in only or c.id in only]
     if not cases:
         sys.exit(f"--only {args.only!r} matches no case (use languages and/or case ids)")
     registry = LanguageRegistry.load(ROOT / "data" / "languages")
@@ -109,7 +112,7 @@ async def main(args: argparse.Namespace) -> None:
         finally:
             writer.close()
     print(f"\nAnswer quality ({args.label}: {meta['sampling']}) on {CASES.relative_to(ROOT)}")
-    print(format_summary(records))
+    print(format_summary(records, meta))
     print(f"per-item results: {out}")
 
 
@@ -124,8 +127,8 @@ def status(must: Sequence[KeyPoint], record: Record) -> str:
 
 
 def compare(a: Path, b: Path) -> None:
-    settings = (str(read_meta(a).get("sampling", "")), str(read_meta(b).get("sampling", "")))
-    print(format_comparison(read_records(a), read_records(b), (a.stem, b.stem), settings))
+    metas = (read_meta(a), read_meta(b))
+    print(format_comparison(read_records(a), read_records(b), (a.stem, b.stem), metas))
 
 
 if __name__ == "__main__":

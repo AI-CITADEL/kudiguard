@@ -13,6 +13,7 @@ from kudiguard.knowledge.models import Query
 from kudiguard.knowledge.service import KnowledgeBase
 from kudiguard.languages import PIVOT
 from kudiguard.pipeline import REPLY_RESERVE_S, Limits
+from kudiguard.prompts import MAX_ENTRIES
 
 TURN_DEADLINE_S = Limits().turn_deadline_s  # production default (Settings.turn_deadline_s)
 
@@ -29,6 +30,8 @@ class CaseResult:
     score: Score
     seconds: float  # engine time only (excludes back-translation and scoring)
     grounding_ms: int | None = None
+    # The rebuilt search returned other entries than the answer used (evidence may not be what the model saw).
+    evidence_mismatch: bool | None = None  # None: not rebuilt (fixed text)
 
 
 async def run_case(
@@ -48,8 +51,10 @@ async def run_case(
     unsupported: tuple[str, ...] | None = None
     evidence: tuple[str, ...] = ()
     grounding_ms: int | None = None
+    mismatch: bool | None = None
     if answer.outcome is Outcome.ANSWERED and answer.body.strip():
         found = await knowledge.search(Query(text=answer.english, flags=answer.flags, language=case.lang))
+        mismatch = tuple(item.entry.id for item in found.entries[:MAX_ENTRIES]) != answer.sources
         evidence = tuple(
             grounding.evidence(found, verdict=answer.verdict, flags=answer.flags, message=answer.english)
         )
@@ -60,4 +65,5 @@ async def run_case(
         else:
             english, unsupported, grounding_ms = report.english, report.unsupported, report.ms
     observation = Observation(answer.verdict, answer.outcome, answer.body, english, evidence, unsupported)
-    return CaseResult(answer, observation, scorer.score(case, observation), seconds, grounding_ms)
+    score = scorer.score(case, observation)
+    return CaseResult(answer, observation, score, seconds, grounding_ms, mismatch)

@@ -19,7 +19,7 @@
 - {point: "Dial *565*0# from the phone number you registered with.", sentence: "Dial *565*0# on the phone line linked to your BVN.", match: true}
 - {point: "Ask your network provider to block the SIM.", sentence: "Call your network provider and ask them to block the SIM card.", match: true}
 - {point: "Report to your bank and the EFCC instead of paying anyone.", sentence: "Do not pay him; report it to your bank and to the EFCC.", match: true}
-- {point: "Most failed transfers are reversed automatically.", sentence: "The money usually returns on its own.", match: true, note: "review: missed paraphrase (0.685)"}
+- {point: "Most failed transfers are reversed automatically.", sentence: "The money usually returns on its own.", match: true, note: "review: missed paraphrase (0.684 here)"}
 
 # --- related but different (should not match) -------------------------------------------------------------
 - {point: "Your bank will never ask for your OTP.", sentence: "Change your PIN and password.", match: false}
@@ -29,9 +29,9 @@
 - {point: "Keep the transaction reference.", sentence: "Report to your bank first.", match: false}
 - {point: "You cannot win a promo you did not enter.", sentence: "Fake promos use the names of banks and telecom companies.", match: false}
 - {point: "Most failed transfers are reversed automatically.", sentence: "Your bank cannot take money back from another account without consent.", match: false}
-- {point: "Report the harassment to the FCCPC.", sentence: "Report the harassment to the EFCC.", match: false, note: "review: EFCC vs FCCPC (0.748)"}
+- {point: "Report the harassment to the FCCPC.", sentence: "Report the harassment to the EFCC.", match: false, note: "review: EFCC vs FCCPC (0.897 on this pair; 0.748 on the review's wording)"}
 - {point: "Ask your network provider to block the SIM.", sentence: "Ask your bank to block your account.", match: false, note: "review: block account vs block SIM (0.787)"}
-- {point: "Move a fixed amount into savings as soon as you receive your salary.", sentence: "Write down what you earn and what you spend each month.", match: false, note: "review: save monthly vs write down earnings (0.769)"}
+- {point: "Move a fixed amount into savings as soon as you receive your salary.", sentence: "Write down what you earn and what you spend each month.", match: false, note: "review: save monthly vs write down earnings (0.696 here; 0.769 on the review's wording)"}
 - {point: "Change your PIN and password.", sentence: "Cover your hand when you type your PIN.", match: false, note: "review: change PIN vs cover hand (0.815)"}
 - {point: "Check if the company is registered with the SEC.", sentence: "Check if the lender is approved by the FCCPC.", match: false}
 - {point: "Dial *565*0# from the phone number you registered with.", sentence: "Dial *346# from the phone number linked to your NIN.", match: false}
