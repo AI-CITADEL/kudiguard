@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 from collections.abc import AsyncIterator
 
@@ -6,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from kudiguard.llm.base import ChatRequest, LLMError, Purpose
+from kudiguard.llm.base import DEFAULT_SEED, ChatRequest, LLMError, Purpose
 from kudiguard.llm.openai_compat import OpenAICompatLLM, ServerKind
 
 BASE = "http://llm.test"
@@ -40,7 +41,7 @@ async def test_completion_payload_and_parsing(client: httpx.AsyncClient) -> None
     completion = await llm.complete(request(Purpose.COMPOSE))
     body = json.loads(route.calls[0].request.content)
     assert body["model"] == "n-atlas"
-    assert body["temperature"] == pytest.approx(0.1)
+    assert body["temperature"] == 0.0 and body["seed"] == DEFAULT_SEED  # greedy and reproducible
     assert body["cache_prompt"] is True and body["id_slot"] == 1
     assert completion.text == "Do not share it."
     assert completion.truncated
@@ -57,6 +58,9 @@ async def test_unmapped_purpose_gets_no_slot_and_generic_server_no_extras(client
     await generic.complete(request())
     body = json.loads(route.calls[1].request.content)
     assert "cache_prompt" not in body and "repeat_penalty" not in body
+    assert (
+        body["seed"] == DEFAULT_SEED and body["temperature"] == 0.0
+    )  # OpenAI-compatible servers take a seed
     assert route.calls[1].request.headers["Authorization"] == "Bearer k"
 
 
@@ -279,3 +283,16 @@ async def test_complete_within_caps_the_budget_to_the_deadline() -> None:
     with pytest.raises(LLMError, match="skipped"):
         await complete_within(llm, request(), time.monotonic() + 1, 3.0)
     assert len(llm.requests) == 2
+
+
+@pytest.mark.parametrize("server", list(ServerKind))
+def test_no_seed_is_omitted_for_every_server(client: httpx.AsyncClient, server: ServerKind) -> None:
+    llm = OpenAICompatLLM(BASE, client=client, server=server)
+    body = llm.build_body(dataclasses.replace(request(), seed=None))
+    assert "seed" not in body
+
+
+def test_prompt_cache_can_be_disabled_for_bit_exact_runs(client: httpx.AsyncClient) -> None:
+    assert OpenAICompatLLM(BASE, client=client).build_body(request())["cache_prompt"] is True
+    exact = OpenAICompatLLM(BASE, client=client, cache_prompt=False)
+    assert exact.build_body(request())["cache_prompt"] is False

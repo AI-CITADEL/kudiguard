@@ -1,9 +1,11 @@
 import json
+from collections.abc import Callable
 
 import pytest
 
 from kudiguard.domain import Flag, Verdict
 from kudiguard.knowledge.models import Contact, ContactKind, Entry, KnowledgeResult, PackKind, SourcedEntry
+from kudiguard.llm.base import DEFAULT_SEED, DEFAULT_TEMPERATURE, ChatRequest
 from kudiguard.prompts import (
     ANALYSIS_SCHEMA,
     COMPOSE_STOP,
@@ -16,6 +18,7 @@ from kudiguard.prompts import (
     compose_request,
     parse_analysis,
     select_flags,
+    steps_request,
     translate_request,
     warn_family_request,
 )
@@ -68,7 +71,7 @@ def compose(
 def test_analyse_request_shape() -> None:
     req = analyse_request("An toshe BVN dina, sun ce in tura OTP", "Hausa")
     assert req.json_schema == ANALYSIS_SCHEMA
-    assert req.temperature == pytest.approx(0.1)
+    assert req.temperature == 0.0 and req.seed == DEFAULT_SEED
     assert req.repeat_penalty == pytest.approx(1.12)
     system, user = req.messages
     assert system["role"] == "system" and "Hausa" in system["content"]
@@ -360,3 +363,22 @@ def test_braced_but_invalid_json_is_rejected(raw: str) -> None:
 )
 def test_truncated_reply_that_ends_a_sentence_is_kept_whole(text: str) -> None:
     assert clean_reply(text, truncated=True) == clean_reply(text) == text.rstrip()
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: analyse_request("x", "Hausa"),
+        lambda: translate_request("x", "Hausa"),
+        lambda: compose_request(
+            language_name="Hausa", english="x", verdict=Verdict.CAUTION, flags=(), knowledge=KnowledgeResult()
+        ),
+        lambda: steps_request(language_name="Hausa", actions=("Call your bank.",)),
+        lambda: warn_family_request(language_name="Hausa", english="x", flags=(Flag.ASKS_CREDENTIALS,)),
+    ],
+    ids=["analyse", "translate", "compose", "steps", "warn"],
+)
+def test_every_request_is_greedy_and_seeded(build: Callable[[], ChatRequest]) -> None:
+    req = build()
+    assert (req.temperature, req.seed) == (DEFAULT_TEMPERATURE, DEFAULT_SEED)
+    assert req.payload()["seed"] == DEFAULT_SEED
