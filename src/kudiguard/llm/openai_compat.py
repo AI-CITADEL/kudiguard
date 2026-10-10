@@ -46,6 +46,7 @@ class OpenAICompatLLM:
         slots: Mapping[Purpose, int] | None = None,
         retries: int = 1,
         retry_delay_s: float = 0.5,
+        cache_prompt: bool = True,  # llama.cpp prompt cache: ~150 ms/call faster, not bit-exact (evals may disable)
     ) -> None:
         url = base_url.rstrip("/")
         self.base_url = url[:-3] if url.lower().endswith("/v1") else url
@@ -59,13 +60,14 @@ class OpenAICompatLLM:
         self._slots = dict(slots or {})
         self._retries = retries
         self._retry_delay_s = retry_delay_s
+        self._cache_prompt = cache_prompt
 
     def build_body(self, request: ChatRequest) -> dict[str, Any]:
         """The exact JSON body sent for ``request`` (public for benchmarks and debugging)."""
         body = request.payload()
         body["model"] = self._model
         if self._server is ServerKind.LLAMACPP:
-            body["cache_prompt"] = True
+            body["cache_prompt"] = self._cache_prompt
             if (slot := self._slots.get(request.purpose)) is not None:
                 body["id_slot"] = slot
         else:
