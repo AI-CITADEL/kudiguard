@@ -182,30 +182,43 @@ top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tu
 ## E5 — Answer quality metric (10 Oct 2026, `scripts/eval_answers.py`; live numbers pending)
 
 The other evals score verdicts, retrieval and objective prompt properties; this one scores what the user reads.
-`data/eval/answers.yaml`: 40 graded cases (en 19 incl. Pidgin, ha/yo/ig 7 each; scams, genuine look-alikes, core and
-money-skills questions, follow-ups, injection, French, a long rambling voice-like message). Written from the pack facts,
-not from the prompt examples; a **dev set** (not frozen, ha/yo/ig wording draft). Each case: allowed `verdicts`,
-1–3 `must` points (each tied to a pack entry with `from:`; a unit test checks the ids exist) and `must_not` statements.
+`data/eval/answers.yaml`: 45 graded cases (en 21 incl. Pidgin, ha/yo/ig 8 each; scams, genuine look-alikes, core and
+money-skills questions, follow-ups, injection, French, Hausa/English code-switching, Yoruba with tone marks, a long
+rambling voice-like message). Written from the pack facts, not from the prompt examples; a **dev set** (not frozen,
+ha/yo/ig wording draft). Each case: allowed `verdicts`, 1–3 `must` points (each tied to a pack entry with `from:`;
+unit tests check the ids exist and that each point restates its entry) and `must_not` statements. Every case that
+expects a scam verdict has a point the prompt's worked examples do not contain, so copying the example cannot cover it.
 
-The model-composed body is back-translated to English and scored (`kudiguard.evaluation.answers`):
+The model-composed body is back-translated to English and scored (`kudiguard.evaluation`):
 
 | Metric | How |
 |---|---|
 | verdict | engine verdict in the allowed set |
-| coverage | share of `must` points with cosine ≥ 0.72 (bge-small, symmetric) to a reply sentence or the whole reply |
-| violating | any `must_not` said (per clause, same polarity, cosine ≥ 0.85) or a fixed pattern: phone/account number, link or USSD code not in the packs, output-guard "safe" claim or refusal, "share/send … OTP/PIN", "you will get your money back" |
-| grounded | every sentence supported by the facts of the answer's sources (workstream B's grounding check; until merged a stand-in: back-translation + cosine ≥ 0.72 to a fact). Model-composed answers only |
-| fallback | fixed fallback text instead of a model reply (coverage counts as missed) |
+| coverage | share of `must` points with cosine ≥ 0.72 (bge-small, symmetric) to a reply sentence or the whole reply, **and** the point's names/numbers (FCCPC, SEC, EFCC, SIM, `*565*0#`, …) in that sentence. Fixed fallback text scores 0 in every language; a failed back-translation leaves the answer out of the mean |
+| violating | a `must_not` said (any clause with the same polarity and cosine ≥ 0.85; "avoid/refuse/stop/beware/instead of/only after" count as negative) or a fixed pattern: in the body, links/numbers/USSD codes not in the packs (incl. the `[link removed]`/`[number]` markers the reply cleaner leaves; official domains not in the packs count too); in the English, output-guard "safe" claims or refusals, an instruction to hand a code/PIN to someone, "you will get your money back". Hits only in the back-translation are listed separately (`translation_hits`), not counted |
+| grounded | every claim supported by what the model saw (`facts_block` facts and actions, verdict line, red flags, the message), via workstream B's `GroundingChecker`; until B merges a stand-in (back-translation + cosine ≥ 0.75 + names/numbers in the evidence). Model-composed answers only; fixed text and empty bodies are "not measured" |
+| fallback | fixed fallback text instead of a model reply |
+| copied | a phrase unique to a worked example (`*346#`, "code sent to your phone", …) not in the evidence |
+| same | cases whose reply text is identical in every run (reproducibility; per language) |
 
-Calibration (bge-small, hand-written pairs): paraphrases of a fact 0.72–0.84, related-but-different advice 0.48–0.71,
-off-topic 0.40–0.55 → coverage threshold 0.72 (thin margin: use the metric to compare runs, not as an absolute).
-Negated statements score as high as the statement (0.73–0.86) and same-topic advice reaches 0.83 ("tell him to contact
-his bank" vs "send the money back to him") → `must_not` matching is per clause, same polarity, 0.85: conservative by
-design; the fixed patterns catch the dangerous cases.
+Calibration (`data/eval/answer_calibration.yaml`, 31 labelled point/sentence pairs incl. the review's;
+`tests/integration/test_answer_calibration.py -m live`): at 0.72, **28/31 (90%)** with the names/numbers check,
+81% on meaning alone. Meaning alone cannot separate "report to the FCCPC" from "report to the EFCC" (0.897) or "block
+the SIM" from "block your account" (0.787); the specifics check does. Remaining errors: "change your PIN" vs "cover
+your hand when you type your PIN" (0.815, counted as covered) and two loose paraphrases below the threshold (0.715,
+0.684). So coverage compares runs; it is not an absolute grade. Negated statements score like the statement
+(0.73–0.89) and same-topic advice reaches 0.83, hence the polarity rule and 0.85 for `must_not`.
 
 ```
-python scripts/eval_answers.py --label t01 --runs 3        # data/eval/results/answers-t01.jsonl + summary
-python scripts/eval_answers.py --label t0 --runs 3 --only ha,en-otp-caller
-python scripts/eval_answers.py --compare data/eval/results/answers-t01.jsonl data/eval/results/answers-t0.jsonl
+python scripts/eval_answers.py --runs 3 --temperature 0.1 --no-seed --label t01   # the old sampling
+python scripts/eval_answers.py --runs 3 --label t0seed                             # production (greedy + seed)
+python scripts/eval_answers.py --compare data/eval/results/answers-t01.jsonl data/eval/results/answers-t0seed.jsonl
 ```
-The summary also reports the share of cases whose reply is identical in every run (temperature 0.1 vs 0 + seed).
+Sampling options apply to the engine only; back-translation uses the plain backend so translator noise stays out of
+the A/B. Each results file starts with a meta line (sampling, grounding, thresholds, commit, url, time); `--compare`
+prints both settings, compares only the cases both files contain (one-sided ids listed), adds a delta row per language
+and lists verdict, score and reply-text changes. The engine runs with the pipeline's turn deadline. Once B merges,
+build the eval engine with grounding on, as production: English grounded rate is then ~100% by construction.
+Rules-only baseline (model down, measured 10 Oct): en-wrong-transfer, en-fake-alert-goods, en-french-otp,
+ha-otp-blocked, ha-fake-alert-goods, yo-job-fee and ig-investment-triple get no scam verdict; en-already-shared-otp
+gets "no red flags"; yo-otp-legit (genuine OTP) gets likely_scam. Rules gaps, recorded; lexicons unchanged.

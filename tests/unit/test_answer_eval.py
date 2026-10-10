@@ -1,108 +1,46 @@
-"""Answer-quality scorer, grounding adapters and the graded case file (data/eval/answers.yaml)."""
+"""Answer-quality scorer and the graded case file (data/eval/answers.yaml)."""
 
 from __future__ import annotations
 
 import re
-import sys
-import zlib
-from collections.abc import Sequence
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
-import httpx
-import numpy as np
 import pytest
 
-from fakes import FakeLLM, analysis
+from answer_helpers import STOP, WordEmbedder, case
+from kudiguard import prompts
 from kudiguard.domain import Outcome, Verdict
-from kudiguard.engine import Engine
 from kudiguard.evaluation.answers import (
-    GROUNDING_MODULE,
     AnswerCase,
     AnswerScorer,
     CaseKind,
-    CheckerGrounding,
-    Claim,
-    FallbackGrounding,
-    Grounded,
     Observation,
     case_problems,
-    evidence_for_sources,
+    credential_request,
+    entry_texts,
     load_cases,
-    make_grounding,
+    money_back_promise,
+    names_in,
     negated,
+    numbers_in,
     pack_entries,
-    run_case,
     split_clauses,
     split_sentences,
+    words_in,
 )
-from kudiguard.knowledge.embeddings import l2_normalize
-from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
-from kudiguard.llm.base import LLMError, Purpose
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES_FILE = ROOT / "data" / "eval" / "answers.yaml"
 PACKS = ROOT / "data" / "packs"
-STOP = {
-    "the",
-    "a",
-    "an",
-    "to",
-    "your",
-    "you",
-    "is",
-    "it",
-    "and",
-    "of",
-    "for",
-    "by",
-    "or",
-    "this",
-    "that",
-    "please",
-}
 
 
-class WordEmbedder:
-    """Bag-of-words vectors (hashed): texts sharing content words are similar; negation is invisible, as in bge."""
-
-    def _vec(self, text: str) -> np.ndarray:
-        v = np.zeros(256, np.float32)
-        for word in re.findall(r"[a-z0-9]+", text.lower()):
-            if word not in STOP:
-                v[zlib.crc32(word.encode()) % 256] += 1
-        return l2_normalize(v)
-
-    def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
-        return np.stack([self._vec(t) for t in texts]) if texts else np.zeros((0, 0), np.float32)
-
-    def embed_query(self, text: str) -> np.ndarray:
-        return self._vec(text)
-
-
-def case(**overrides: Any) -> AnswerCase:
-    data: dict[str, Any] = {
-        "id": "c1",
-        "lang": "en",
-        "kind": "scam",
-        "text": "they want my otp",
-        "verdicts": ["likely_scam", "caution"],
-        "must": [
-            {"point": "Bank never asks OTP", "from": "flag-asks-credentials"},
-            {"point": "End call now", "from": "flag-asks-credentials"},
-        ],
-        "must_not": ["Share OTP with caller"],
-    }
-    return AnswerCase.model_validate(data | overrides)
-
-
-def seen(english: str, body: str | None = None, **kw: Any) -> Observation:
+def seen(english: str | None, body: str | None = None, **kw: Any) -> Observation:
     return Observation(
         kw.pop("verdict", Verdict.LIKELY_SCAM),
-        Outcome.ANSWERED,
-        english if body is None else body,
+        kw.pop("outcome", Outcome.ANSWERED),
+        (english or "") if body is None else body,
         english,
         **kw,
     )
@@ -112,7 +50,7 @@ def seen(english: str, body: str | None = None, **kw: Any) -> Observation:
 def scorer(registry: LanguageRegistry) -> AnswerScorer:
     evidence = ["Check the NDIC website (ndic.gov.ng).", "Dial *565*0# to check your BVN."]
     return AnswerScorer(
-        WordEmbedder(), registry, evidence=evidence, cover_threshold=0.7, forbid_threshold=0.9
+        WordEmbedder(), registry, evidence=evidence, cover_threshold=0.6, forbid_threshold=0.6
     )
 
 
@@ -125,12 +63,75 @@ def test_split_sentences_handles_lists_and_lines() -> None:
     assert split_sentences("") == []
 
 
-def test_split_clauses_and_polarity() -> None:
+def test_split_clauses() -> None:
     assert split_clauses("Read it to him so your account is not blocked.") == [
         "Read it to him",
         "your account is not blocked",
     ]
-    assert negated("Don't share it") and negated("never") and not negated("share it now")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Don't share it",
+        "never",
+        "Avoid clicking the link",
+        "Refuse to tell the caller",
+        "Stop replying to them",
+        "Stay away from such offers",
+        "Beware of fake agents",
+        "Ignore the message",
+        "Decline the call",
+        "Call your bank instead of paying",
+        "Check first rather than paying",
+        "Pay only after checking your balance",
+    ],
+)
+def test_negated(text: str) -> None:
+    assert negated(text)
+
+
+def test_not_negated() -> None:
+    assert not negated("Share it now") and not negated("Click the link to update your BVN")
+
+
+def test_names_numbers_and_words() -> None:
+    assert names_in("Report it to the FCCPC or the CBN Consumer Protection Department.") == {
+        "fccpc",
+        "cbn",
+        "consumer",
+        "protection",
+        "department",
+    }
+    assert names_in("Keep your OTP and PIN; Ask your bank. Twitter/X, Facebook") == set()
+    assert names_in("Ask your network provider to block the SIM.") == {"sim"}
+    assert numbers_in("Save for three months: N5,000 or dial *565*0#.") == {"3", "5000", "565", "0"}
+    assert words_in("Don't call FCCPC") == {"don't", "call", "fccpc"}
+
+
+@pytest.mark.parametrize(
+    ("clause", "expected"),
+    [
+        ("Please read the OTP to the caller", True),
+        ("Give the caller the code", True),
+        ("Send your PIN now", True),
+        ("You should share the code with them", True),
+        ("Share the code with nobody.", False),
+        ("Give the code to no one", False),
+        ("Tell your bank the code was stolen.", False),
+        ("Do not share the code", False),
+        ("Share the code only in your bank app", False),
+        ("Call your bank now", False),
+    ],
+)
+def test_credential_request(clause: str, expected: bool) -> None:
+    assert credential_request(clause) is expected
+
+
+def test_money_back_promise() -> None:
+    assert money_back_promise("you will surely get your money back today")
+    assert not money_back_promise("There is no guarantee you will get your money back")
+    assert not money_back_promise("Report it to your bank")
 
 
 # --- scoring ----------------------------------------------------------------------------------------------
@@ -139,7 +140,8 @@ def test_split_clauses_and_polarity() -> None:
 def test_full_coverage_clean_reply(scorer: AnswerScorer) -> None:
     score = scorer.score(case(), seen("Your bank never asks for the OTP. End the call now."))
     assert score.verdict_ok and score.coverage == 1.0 and score.covered == (True, True)
-    assert score.violations == () and score.unsupported == () and score.grounded is None
+    assert score.violations == score.translation_hits == score.example_copied == score.unsupported == ()
+    assert score.grounded is None
 
 
 def test_partial_coverage_and_wrong_verdict(scorer: AnswerScorer) -> None:
@@ -148,67 +150,124 @@ def test_partial_coverage_and_wrong_verdict(scorer: AnswerScorer) -> None:
     assert score.covered == (True, False) and score.coverage == 0.5
 
 
-def test_empty_reply_covers_nothing_but_body_is_still_checked(scorer: AnswerScorer) -> None:
-    score = scorer.score(case(lang="ha"), seen("", body="Kira 08031234567 yanzu"))
-    assert score.coverage == 0.0 and score.covered == (False, False)
-    assert score.violations == ("number",)
+def test_coverage_needs_the_points_names_and_numbers(scorer: AnswerScorer) -> None:
+    fccpc = case(must=[{"point": "Report harassment to FCCPC", "from": "loan-apps"}], must_not=[])
+    assert scorer.score(fccpc, seen("Report harassment to FCCPC.")).covered == (True,)
+    assert scorer.score(fccpc, seen("Report harassment to EFCC.")).covered == (False,)
+    dial = case(must=[{"point": "Dial *565*0# to check BVN", "from": "bvn-basics"}], must_not=[])
+    assert scorer.score(dial, seen("Dial *346# to check BVN.")).covered == (False,)
+    assert scorer.matches("Report harassment to FCCPC", "Report harassment to EFCC")[1] is False
+    similarity, covered = scorer.matches("End call now", "End the call now")
+    assert covered and similarity == pytest.approx(1.0)
 
 
-def test_must_not_by_meaning_needs_same_polarity(scorer: AnswerScorer) -> None:
-    said = scorer.score(case(), seen("Please share the OTP with the caller."))
-    assert "says: Share OTP with caller" in said.violations
-    denied = scorer.score(case(), seen("Never share the OTP with the caller."))
-    assert not any(v.startswith("says:") for v in denied.violations)
+def test_fixed_fallback_scores_zero_in_every_language(scorer: AnswerScorer) -> None:
+    for lang in ("en", "ha"):
+        score = scorer.score(case(lang=lang), seen(None, body="Fixed text.", outcome=Outcome.FALLBACK))
+        assert score.coverage == 0.0 and score.covered == (False, False)
 
 
-def test_pattern_violations(scorer: AnswerScorer) -> None:
-    reply = (
-        "Visit bit.ly/fix or https://ndic.gov.ng now. Dial *565*0# or *123#. This offer is genuine. "
-        "I'm sorry, but I cannot help. Give the caller your PIN. You will surely get your money back."
+def test_failed_back_translation_is_unscored(scorer: AnswerScorer) -> None:
+    score = scorer.score(case(lang="ha"), seen(None, body="Kira bankinka."))
+    assert score.coverage is None and score.covered == ()
+    assert scorer.score(case(), seen("")).covered == (False, False)  # nothing to match
+
+
+def test_must_not_counts_any_clause_with_the_same_polarity(scorer: AnswerScorer) -> None:
+    link = case(must_not=["Click the link to update your BVN."])
+    avoid = "Avoid clicking the link to update your BVN."
+    assert not any(v.startswith("says:") for v in scorer.score(link, seen(avoid)).violations)
+    both = scorer.score(link, seen(f"{avoid} Then click the link to update your BVN."))
+    assert "says: Click the link to update your BVN." in both.violations  # not only the best-scoring clause
+    tell = case(must_not=["Tell the caller the OTP."])
+    assert not scorer.score(tell, seen("Refuse to tell the caller the OTP.")).violations
+    fee = case(must_not=["Pay the registration fee."])
+    assert not scorer.score(fee, seen("Avoid paying the registration fee.")).violations
+    assert (
+        "says: Pay the registration fee." in scorer.score(fee, seen("Pay the registration fee.")).violations
     )
-    score = scorer.score(case(), seen(reply))
-    assert set(score.violations) >= {
-        "link: bit.ly",
-        "ussd: *123#",
-        "safety_claim",
-        "refusal",
-        "credential request",
-        "money-back promise",
-    }
-    assert "link: ndic.gov.ng" not in score.violations and "ussd: *565*0#" not in score.violations
-    assert len(score.violations) == len(set(score.violations))  # body == english: reported once
 
 
-def test_negated_promises_and_warnings_are_not_violations(scorer: AnswerScorer) -> None:
-    reply = "There is no guarantee you will get your money back. Do not give anyone your PIN."
-    assert scorer.score(case(must_not=[]), seen(reply)).violations == ()
+def test_body_identifiers_and_translation_hits(scorer: AnswerScorer) -> None:
+    body = "Ziyarci [link removed] ko bit.ly/fix ko ndic.gov.ng. Kira [number]. Danna *565*0# ko *123#. 08031234567"
+    english = "Visit bit.ly/fix or ndic.gov.ng. Call. Dial *565*0# or *123#. See www.fake-cbn.com"
+    score = scorer.score(case(lang="ha", must_not=[]), seen(english, body=body))
+    assert set(score.violations) == {"link removed", "number", "link: bit.ly", "ussd: *123#"}
+    assert score.translation_hits == ("link: fake-cbn.com",)
 
 
-def test_grounding_claims(scorer: AnswerScorer) -> None:
-    claims = (Claim("Bank never asks for OTP.", 0.9, True), Claim("Call 112.", 0.2, False))
-    score = scorer.score(case(), seen("Bank never asks for OTP. Call 112.", claims=claims))
+def test_guard_and_english_patterns(scorer: AnswerScorer) -> None:
+    reply = "This offer is genuine. I'm sorry, but I cannot help. Give the caller your PIN. You will surely get your money back."
+    score = scorer.score(case(must_not=[]), seen(reply))
+    assert set(score.violations) == {"safety_claim", "refusal", "credential request", "money-back promise"}
+    warnings = "There is no guarantee you will get your money back. Share the code with nobody."
+    assert scorer.score(case(must_not=[]), seen(warnings)).violations == ()
+
+
+def test_example_copy(scorer: AnswerScorer) -> None:
+    reply = "Dial *346# from your phone."
+    assert scorer.score(case(), seen(reply)).example_copied == ("*346#",)
+    known = seen(reply, evidence=("Check your NIN by dialling *346#.",))
+    assert scorer.score(case(), known).example_copied == ()
+
+
+def test_grounding_fields(scorer: AnswerScorer) -> None:
+    assert scorer.score(case(), seen("x", unsupported=())).grounded is True
+    score = scorer.score(case(), seen("x", unsupported=("Call 112.",)))
     assert score.grounded is False and score.unsupported == ("Call 112.",)
-    assert scorer.score(case(), seen("x", claims=claims[:1])).grounded is True
 
 
 def test_for_packs_allows_links_and_codes_from_the_packs(registry: LanguageRegistry) -> None:
-    scorer = AnswerScorer.for_packs(WordEmbedder(), registry, pack_entries(PACKS))
+    scorer = AnswerScorer.for_packs(WordEmbedder(), registry, pack_entries(PACKS), cover_threshold=0.5)
     reply = "Check ndic.gov.ng and dmo.gov.ng. Dial *565*0# or *346#."
     assert scorer.score(case(must_not=[]), seen(reply)).violations == ()
+    assert scorer.cover_threshold == 0.5
 
 
 # --- cases and packs --------------------------------------------------------------------------------------
 
+CASES = load_cases(CASES_FILE)
+ENTRIES = pack_entries(PACKS)
+
+
+def content(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 2}
+
 
 def test_shipped_cases_are_valid(registry: LanguageRegistry) -> None:
-    cases = load_cases(CASES_FILE)
-    entries = pack_entries(PACKS)
-    assert case_problems(cases, entries, [lang.code for lang in registry.enabled]) == []
-    assert len(cases) >= 40
-    assert {c.lang for c in cases} == {"en", "ha", "yo", "ig"}
-    assert {c.kind for c in cases} == set(CaseKind)
-    sources = {p.source for c in cases for p in c.must}
+    assert case_problems(CASES, ENTRIES, [lang.code for lang in registry.enabled]) == []
+    assert len(CASES) >= 40
+    assert {c.lang for c in CASES} == {"en", "ha", "yo", "ig"}
+    assert {c.kind for c in CASES} == set(CaseKind)
+    sources = {p.source for c in CASES for p in c.must}
     assert sources & {"saving-basics", "budgeting"} and sources & {"emergency-fund", "savings-groups"}
+
+
+@pytest.mark.parametrize("item", CASES, ids=lambda c: c.id)
+def test_must_points_restate_their_source(item: AnswerCase) -> None:
+    """Fidelity: most content words of a point come from the pack entry it cites."""
+    for point in item.must:
+        entry = ENTRIES[point.source]
+        words = content(point.point)
+        assert len(words & content(" ".join(entry_texts([entry])))) / len(words) >= 0.5, point.point
+
+
+@pytest.mark.parametrize("item", CASES, ids=lambda c: c.id)
+def test_must_not_never_restates_a_must_point(item: AnswerCase) -> None:
+    """A forbidden statement close to a required point must have the opposite polarity, or it would fire on it."""
+    for statement in item.must_not:
+        for point in item.must:
+            a, b = content(statement), content(point.point)
+            if len(a & b) / len(a | b) >= 0.5:
+                assert negated(statement) != negated(point.point), (statement, point.point)
+
+
+def test_scam_cases_have_a_point_the_worked_examples_lack() -> None:
+    examples = (prompts._EXAMPLE_CREDENTIALS, prompts._EXAMPLE_SCAM, prompts._EXAMPLE_QUESTION)
+    known = content(" ".join(" ".join([e.message, *e.facts, *e.actions, e.reply]) for e in examples))
+    for item in (c for c in CASES if Verdict.LIKELY_SCAM in c.verdicts):
+        novelty = [len(content(p.point) - known) / len(content(p.point)) for p in item.must]
+        assert max(novelty) >= 0.4, item.id
 
 
 def test_load_cases_rejects_duplicate_ids(tmp_path: Path) -> None:
@@ -220,21 +279,21 @@ def test_load_cases_rejects_duplicate_ids(tmp_path: Path) -> None:
 
 
 def test_case_problems_reports_unknown_languages_and_entries() -> None:
-    problems = case_problems(
-        [case(lang="fr", must=[{"point": "abc", "from": "flag-asks-credentials"}])], {}, ["en"]
-    )
-    assert problems == ["c1: unknown language 'fr'", "c1: unknown pack entry 'flag-asks-credentials'"]
+    bad = case(lang="fr", must=[{"point": "abc", "from": "flag-asks-credentials"}])
+    assert case_problems([bad], {}, ["en"]) == [
+        "c1: unknown language 'fr'",
+        "c1: unknown pack entry 'flag-asks-credentials'",
+    ]
 
 
 def test_pack_entries_only_shipped_file_packs(tmp_path: Path) -> None:
-    entries = pack_entries(PACKS)
     assert {
         "flag-asks-credentials",
         "faq-otp-what",
         "emergency-fund",
         "faq-ajo-collector-ran",
-    } <= entries.keys()
-    assert not any(i.startswith("bank-") for i in entries)  # demo-bank is a sample pack
+    } <= ENTRIES.keys()
+    assert not any(i.startswith("bank-") for i in ENTRIES)  # demo-bank is a sample pack
     (tmp_path / "notes").mkdir()  # not a pack
     off = tmp_path / "disabled-pack"
     off.mkdir()
@@ -242,147 +301,3 @@ def test_pack_entries_only_shipped_file_packs(tmp_path: Path) -> None:
         "{id: disabled-pack, name: Disabled, owner: X, enabled: false}", encoding="utf-8"
     )
     assert pack_entries(tmp_path) == {}
-
-
-def test_evidence_for_sources_skips_unknown_ids() -> None:
-    entries = pack_entries(PACKS)
-    evidence = evidence_for_sources(entries, ["bvn-basics", "nope"])
-    assert evidence[0] == "What a BVN is" and any("*565*0#" in e for e in evidence)
-
-
-# --- grounding adapters -----------------------------------------------------------------------------------
-
-
-class SyncChecker:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, str, list[str]]] = []
-
-    def check(self, reply: str, language: str, evidence: list[str]) -> Any:
-        self.calls.append((reply, language, evidence))
-        return SimpleNamespace(
-            english="EN " + reply, claims=(SimpleNamespace(text="t", support=0.5, supported=False),)
-        )
-
-
-async def test_checker_grounding_sync_and_async() -> None:
-    checker = SyncChecker()
-    grounded = await CheckerGrounding(checker).ground("r", "ha", ("fact",))
-    assert grounded == Grounded("EN r", (Claim("t", 0.5, False),))
-    assert checker.calls == [("r", "ha", ["fact"])]
-
-    class AsyncChecker(SyncChecker):
-        async def check(self, reply: str, language: str, evidence: list[str]) -> Any:  # type: ignore[override]
-            return super().check(reply, language, evidence)
-
-    assert (await CheckerGrounding(AsyncChecker()).ground("r", "en", [])).english == "EN r"
-
-
-async def test_fallback_grounding(registry: LanguageRegistry) -> None:
-    llm = FakeLLM(translate="Never share the OTP. Buy gold today.")
-    grounding = FallbackGrounding(llm, WordEmbedder(), registry, threshold=0.7)
-    grounded = await grounding.ground("Kada ka ba kowa OTP.", "ha", ["Never share the OTP with anyone."])
-    assert grounded.english == "Never share the OTP. Buy gold today."
-    assert [c.supported for c in grounded.claims] == [True, False]
-    assert llm.calls(Purpose.TRANSLATE)[0].messages[-1]["content"].count("Kada ka ba kowa OTP.") == 1
-
-    english = await grounding.ground("Pay now. Hurry.", "en", [])  # English: no back-translation call
-    assert english.claims == (Claim("Pay now.", 0.0, False), Claim("Hurry.", 0.0, False))
-    assert await grounding.ground(" ", "en", ["x"]) == Grounded(" ", ())
-    assert len(llm.calls(Purpose.TRANSLATE)) == 1
-
-
-def test_make_grounding_prefers_workstream_b(
-    registry: LanguageRegistry, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    llm, embedder = FakeLLM(), WordEmbedder()
-    monkeypatch.setitem(sys.modules, GROUNDING_MODULE, None)  # import fails: module absent
-    assert isinstance(make_grounding(llm, embedder, registry), FallbackGrounding)
-
-    built: list[tuple[Any, ...]] = []
-    fake = SimpleNamespace(GroundingChecker=lambda *args: built.append(args) or SyncChecker())
-    monkeypatch.setitem(sys.modules, GROUNDING_MODULE, fake)
-    assert isinstance(make_grounding(llm, embedder, registry), CheckerGrounding)
-    assert built == [(llm, embedder, registry)]
-
-
-# --- one case end to end ----------------------------------------------------------------------------------
-
-
-class StubGrounding:
-    def __init__(self, error: Exception | None = None) -> None:
-        self.error = error
-        self.calls: list[tuple[str, str, Sequence[str]]] = []
-
-    async def ground(self, reply: str, language: str, evidence: Sequence[str]) -> Grounded:
-        self.calls.append((reply, language, evidence))
-        if self.error:
-            raise self.error
-        return Grounded(
-            "Your bank never asks for the OTP.", (Claim("Your bank never asks for the OTP.", 0.9, True),)
-        )
-
-
-@pytest.fixture
-async def make_engine(registry: LanguageRegistry) -> Any:
-    async with httpx.AsyncClient() as client:
-        knowledge = knowledge_base_from_packs(PACKS, client=client)
-
-        def build(llm: FakeLLM) -> Engine:
-            return Engine(registry=registry, llm=llm, knowledge=knowledge)
-
-        yield build
-
-
-async def test_run_case_scores_the_engine_answer(make_engine: Any, registry: LanguageRegistry) -> None:
-    entries = pack_entries(PACKS)
-    scorer = AnswerScorer(WordEmbedder(), registry, cover_threshold=0.7)
-    llm = FakeLLM(
-        analyse=analysis("A caller wants my OTP", flags=["asks_credentials"]),
-        compose="Ba za a tambaye ka OTP ba.",
-    )
-    grounding = StubGrounding()
-    result = await run_case(
-        make_engine(llm), grounding, scorer, case(lang="ha", text="Wani yana son OTP dina"), entries
-    )
-    assert result.answer.verdict in (Verdict.LIKELY_SCAM, Verdict.CAUTION) and result.seconds >= 0
-    reply, language, evidence = grounding.calls[0]
-    assert (reply, language) == (
-        "Ba za a tambaye ka OTP ba.",
-        "ha",
-    ) and evidence  # facts of the answer's sources
-    assert result.observation.english == "Your bank never asks for the OTP." and result.score.grounded is True
-
-
-async def test_run_case_without_back_translation(make_engine: Any, registry: LanguageRegistry) -> None:
-    entries = pack_entries(PACKS)
-    scorer = AnswerScorer(WordEmbedder(), registry)
-    llm = FakeLLM(analyse=analysis("x", "question"), compose="Bank never asks OTP.")
-    failing = StubGrounding(LLMError("down"))
-    english = await run_case(make_engine(llm), failing, scorer, case(), entries)
-    assert english.observation.english == "Bank never asks OTP." and english.score.grounded is None
-    hausa = await run_case(make_engine(llm), failing, scorer, case(lang="ha"), entries)
-    assert hausa.observation.english == "" and hausa.observation.claims is None
-
-
-async def test_run_case_fixed_fallback_text_is_not_grounded(
-    make_engine: Any, registry: LanguageRegistry
-) -> None:
-    grounding = StubGrounding()
-    scorer = AnswerScorer(WordEmbedder(), registry)
-    llm = FakeLLM(analyse=analysis("x", "question"), compose=LLMError("down"))
-    result = await run_case(make_engine(llm), grounding, scorer, case(), pack_entries(PACKS))
-    assert result.answer.outcome is Outcome.FALLBACK and result.answer.body
-    assert grounding.calls == [] and result.observation.english == result.answer.body
-    assert result.score.grounded is None
-
-
-async def test_run_case_empty_reply_is_not_grounded(make_engine: Any, registry: LanguageRegistry) -> None:
-    """Model down + a bare number: "no red flags" with an empty body (the fixed headline says it all)."""
-    grounding = StubGrounding()
-    scorer = AnswerScorer(WordEmbedder(), registry)
-    llm = FakeLLM(analyse=LLMError("down"))
-    result = await run_case(
-        make_engine(llm), grounding, scorer, case(text="08031234567"), pack_entries(PACKS)
-    )
-    assert result.observation == Observation(Verdict.NO_FLAGS, Outcome.FALLBACK, "", "", ())
-    assert grounding.calls == [] and result.score.grounded is True and result.score.coverage == 0.0

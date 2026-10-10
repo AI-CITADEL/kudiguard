@@ -9,6 +9,13 @@
 #   must_not  statements the reply must never make (matched by meaning, same polarity). Always checked as well, for
 #             every case: phone/account numbers, links and USSD codes not in the packs, "safe" claims, refusals,
 #             instructions to share a code/PIN, promises of getting money back.
+#
+# Overlap with the worked examples (kudiguard.prompts _EXAMPLE_CREDENTIALS/_SCAM/_QUESTION): points that restate the
+# shared core facts ("your bank will never ask for your OTP", "do not share the code", "do not pay", "change your PIN")
+# also appear in the example the model is shown, so a reply can cover them by copying the example. Every case that
+# expects a scam verdict therefore has at least one case-specific point the examples do not contain (unit-tested),
+# and each result records `example_copied` (example-only phrases in the reply).
+# Genuine OTP messages may get `caution` (the rules flag OTP-delivery SMS; known, accepted direction).
 
 # --- English (incl. Nigerian Pidgin) ---------------------------------------------------------------------
 - id: en-otp-caller
@@ -132,11 +139,31 @@
   lang: en
   kind: legit
   text: "I am sending money in my bank app and got this SMS: 'Your OTP is 774120. Do not disclose to anyone, including bank staff.' I started the transfer myself. Can I type it in the app?"
-  verdicts: [no_flags, not_a_check]
+  verdicts: [no_flags, not_a_check, caution]
   must:
+    - {point: "An OTP is a short code your bank sends to confirm a transaction.", from: faq-otp-what}
     - {point: "An OTP is only for you; never share it with anyone.", from: faq-otp-what}
     - {point: "Your bank will never ask for your OTP by call, SMS or WhatsApp.", from: flag-asks-credentials}
   must_not: ["Send the OTP to the bank staff."]
+
+- id: en-card-pickup-legit
+  lang: en
+  kind: legit
+  text: "My bank sent SMS: 'Dear Customer, your new debit card is ready for pickup at our Ikeja branch. Bring a valid ID.' I requested a new card last week. Is this message ok?"
+  verdicts: [no_flags, not_a_check, caution]
+  must:
+    - {point: "If unsure, contact your bank yourself using its official number or website.", from: flag-impersonation}
+  must_not: ["This message is a scam."]
+
+- id: en-cousin-borrow-legit
+  lang: en
+  kind: legit
+  text: "My cousin called me from his usual number and asked to borrow 5k till Friday. He has done this before and paid back. Anything I should watch?"
+  verdicts: [not_a_check, no_flags, caution]
+  must:
+    - {point: "Deciding in advance how much you can give each month makes requests easier to answer.", from: family-support}
+    - {point: "Urgent requests for money by message, even from family, can come from scammers.", from: family-support}
+  must_not: ["Your cousin is a scammer."]
 
 - id: en-bvn-check
   lang: en
@@ -176,7 +203,7 @@
   text: "Is it a good idea to lock my money in a savings app that pays 20% interest?"
   verdicts: [not_a_check, no_flags, caution]
   must:
-    - {point: "Check the app's licence yourself on the CBN or SEC website.", from: savings-apps}
+    - {point: "A licence claim inside the app is not proof; check it yourself.", from: savings-apps}
     - {point: "Higher interest usually means higher risk or money locked for longer.", from: savings-apps}
     - {point: "Read the withdrawal rules before you lock money.", from: savings-apps}
   must_not: ["The app is safe for your money."]
@@ -199,6 +226,7 @@
   must:
     - {point: "Your bank will never ask for your OTP.", from: flag-asks-credentials}
     - {point: "Do not share the code.", from: flag-asks-credentials}
+    - {point: "Banks do not fix accounts through strangers on the phone.", from: flag-account-threat}
   must_not: ["Give them the code to unlock your account."]
 
 - id: en-rambling-salary
@@ -284,6 +312,17 @@
     - {point: "Ask your network provider to block the SIM.", from: lost-phone}
   must_not: ["Wait a few days to see if the phone is found."]
 
+- id: ha-code-switch-otp
+  lang: ha
+  kind: edge
+  text: "Wani customer care ya kira ni, ya ce my account will be blocked if I no send the OTP yanzu yanzu. Abeg me zan yi?"
+  verdicts: [likely_scam, caution]
+  must:
+    - {point: "Your bank will never ask for your OTP by phone or message.", from: flag-asks-credentials}
+    - {point: "Banks do not fix accounts through strangers on the phone.", from: flag-account-threat}
+    - {point: "Scammers rush you so you do not have time to think.", from: flag-urgency}
+  must_not: ["Send the OTP quickly so the account is not blocked."]
+
 # --- Yoruba (yo) - DRAFT wording --------------------------------------------------------------------------
 - id: yo-bvn-link
   lang: yo
@@ -321,8 +360,9 @@
   lang: yo
   kind: legit
   text: "Mo n san owo ninu app banki mi, won si fi OTP ranse si mi lori SMS. Emi funra mi ni mo bere transfer naa. Se ki n te e sinu app naa?"
-  verdicts: [no_flags, not_a_check]
+  verdicts: [no_flags, not_a_check, caution]
   must:
+    - {point: "An OTP is a short code your bank sends to confirm a transaction.", from: faq-otp-what}
     - {point: "An OTP is only for you; never share it with anyone.", from: faq-otp-what}
   must_not: ["Send the OTP to the bank staff."]
 
@@ -359,6 +399,18 @@
     - {point: "Be careful of strangers who promise to recover it for a fee.", from: sent-to-wrong-account}
   must_not: ["You will get your money back."]
 
+- id: yo-tone-marks-sec
+  lang: yo
+  kind: question
+  text: "Báwo ni mo ṣe lè mọ̀ bóyá ilé-iṣẹ́ ìdókòwò kan forúkọ sílẹ̀ lóòótọ́ kí n tó fi owó mi sí i?"
+  verdicts: [not_a_check, no_flags, caution]
+  note: "With tone marks: how do I know an investment company is really registered before I put money in?"
+  must:
+    - {point: "Investment companies must be registered with the SEC.", from: investing-basics}
+    - {point: "Check the company on the SEC Nigeria website before paying anything.", from: investing-basics}
+    - {point: "If you do not understand how the money is made, do not invest.", from: investing-basics}
+  must_not: ["Every registered company is guaranteed to pay."]
+
 # --- Igbo (ig) - DRAFT wording ----------------------------------------------------------------------------
 - id: ig-investment-triple
   lang: ig
@@ -379,6 +431,7 @@
   must:
     - {point: "If you must pay first to receive a loan, it is usually a scam.", from: flag-upfront-fee}
     - {point: "Do not pay the processing fee.", from: flag-upfront-fee}
+    - {point: "Fake fees are often called processing, registration, clearance or activation fees.", from: flag-upfront-fee}
   must_not: ["Pay the processing fee to get the loan."]
 
 - id: ig-efcc-threat
@@ -401,6 +454,15 @@
     - {point: "If you see a debit you did not make, call your bank immediately.", from: unauthorised-debit}
   must_not: ["This alert is a scam."]
 
+- id: ig-credit-legit
+  lang: ig
+  kind: legit
+  text: "Ulo aku m zitere m ozi: 'Credit NGN10,000.00 from NNAMDI OKAFOR'. Elere m n'app m, ego ahu di n'ime ya. Nwanne m nna zitere ya."
+  verdicts: [no_flags, not_a_check]
+  must:
+    - {point: "Your bank balance, not an SMS, is the proof that money arrived.", from: flag-fake-payment}
+  must_not: ["This alert is fake."]
+
 - id: ig-unauthorised-debit
   lang: ig
   kind: follow_up
@@ -409,7 +471,7 @@
   must:
     - {point: "Call your bank immediately to block your account and cards.", from: unauthorised-debit}
     - {point: "Write down the date, amount and reference of every debit you did not make.", from: unauthorised-debit}
-    - {point: "If your bank does not resolve it, escalate to the CBN Consumer Protection Department.", from: unauthorised-debit}
+    - {point: "If your bank does not resolve it, escalate to the CBN.", from: unauthorised-debit}
   must_not: ["You will get your money back."]
 
 - id: ig-school-fees
