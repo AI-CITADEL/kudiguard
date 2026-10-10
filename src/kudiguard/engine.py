@@ -5,7 +5,8 @@ the same engine. Conversation state, consent, commands and rendering live in ``k
 
 Flow (PLAN §3): greeting/content-free shortcut → ANALYSE (N-ATLAS, JSON) → translate fallback → deterministic verdict
 policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → grounding
-check (``safety.grounding``; shadow: recorded only; enforce: unsupported steps dropped or fixed text, no retry).
+check (``safety.grounding``; shadow: run after the reply, logged; enforce: unsupported steps dropped or fixed
+text, no retry).
 The model never decides the verdict and never writes contacts; it can only make the answer better.
 """
 
@@ -15,7 +16,7 @@ import asyncio
 import dataclasses
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -57,11 +58,14 @@ from kudiguard.speech.service import SpeechResult, transcribe_upload
 
 log = logging.getLogger(__name__)
 
+GroundingHook = Callable[[str | None, GroundingReport | None, int], None]
+
 RETRY_TEMPERATURE = 0.5  # a retry at the base temperature (0, greedy) would repeat the blocked output exactly
 # Minimum time left in the turn to start a model step (else: skip it and use the deterministic/fixed path).
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
 MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
+SHADOW_DRAIN_S = 1.0  # shutdown wait for shadow checks when the checker has no budget
 MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
 
 
@@ -119,6 +123,7 @@ class Engine:
         max_concurrent_transcriptions: int = 4,
         grounding: GroundingChecker | None = None,
         grounding_mode: GroundingMode = GroundingMode.SHADOW,
+        on_grounding: GroundingHook | None = None,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -133,6 +138,10 @@ class Engine:
         self._guard = OutputGuard(registry)
         self.grounding = grounding if grounding_mode is not GroundingMode.OFF else None
         self.grounding_mode = grounding_mode
+        # Hook for persisting results (e.g. onto the stored interaction): called with (turn_id, report, ms) after
+        # every check, also the shadow checks that finish after the reply was sent.
+        self.on_grounding = on_grounding
+        self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
 
     @property
@@ -167,7 +176,9 @@ class Engine:
 
     # --- check --------------------------------------------------------------------------------------------
 
-    async def check(self, text: str, language: LanguageCode, *, deadline: float | None = None) -> Answer:
+    async def check(
+        self, text: str, language: LanguageCode, *, deadline: float | None = None, turn_id: str | None = None
+    ) -> Answer:
         """``deadline`` (``time.monotonic()`` seconds): model steps that no longer fit are skipped, so the
         deterministic verdict with fixed text is always delivered in time."""
         lexicon = self.registry.lexicon_for(language)
@@ -203,9 +214,12 @@ class Engine:
             generation = await self._generate(request, language, deadline)
             if generation.text is not None:
                 evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
-                report, grounding_ms = await self._ground(
-                    generation.text, language, evidence, analysis.english, deadline
-                )
+                if self.grounding_mode is GroundingMode.SHADOW:
+                    self._ground_in_background(generation.text, language, evidence, analysis.english, turn_id)
+                else:
+                    report, grounding_ms = await self._ground(
+                        generation.text, language, evidence, analysis.english, deadline, turn_id
+                    )
                 if (
                     report is not None
                     and not report.grounded
@@ -288,15 +302,46 @@ class Engine:
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(completion.text, truncated=completion.truncated)
             issues = self._guard.check(text, language)
-            if not issues:
+            if not any(self._blocks(i) for i in issues):
+                if issues:  # outcome claims outside enforce mode: recorded, not blocking (yet)
+                    log.info("%s outcome claim (log only): %s", request.purpose, issues)
+                    result.issues += issues
                 result.text = text
                 return result
             result.issues += issues
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
 
+    def _ground_in_background(
+        self, text: str, language: LanguageCode, evidence: Sequence[str], message: str, turn_id: str | None
+    ) -> None:
+        """Shadow mode: the check runs after the reply is sent, so it adds no time to the turn."""
+        if self.grounding is None or not self.grounding.supports(language):
+            return
+
+        async def run() -> None:
+            await self._ground(text, language, evidence, message, None, turn_id)
+
+        task = asyncio.create_task(run())
+        self._shadow.add(task)
+        task.add_done_callback(self._shadow.discard)
+
+    async def aclose(self) -> None:
+        """Let running shadow checks finish (bounded by the check's budget) before the checker shuts down."""
+        if self._shadow:
+            budget = getattr(self.grounding, "budget_s", None) or SHADOW_DRAIN_S
+            _, pending = await asyncio.wait(set(self._shadow), timeout=budget)
+            for task in pending:  # shutting down: a check past its budget is not worth waiting for
+                task.cancel()
+
     async def _ground(
-        self, text: str, language: LanguageCode, evidence: Sequence[str], message: str, deadline: float | None
+        self,
+        text: str,
+        language: LanguageCode,
+        evidence: Sequence[str],
+        message: str,
+        deadline: float | None,
+        turn_id: str | None = None,
     ) -> tuple[GroundingReport | None, int]:
         """The grounding check and its wall time in ms; None when it is off, unsupported, out of time or failed.
 
@@ -326,7 +371,15 @@ class Engine:
             0 if report is None else len(report.claims),
             min((c.support for c in report.claims), default=1.0) if report else 0.0,
         )
+        if self.on_grounding is not None:
+            try:
+                self.on_grounding(turn_id, report, elapsed_ms)
+            except Exception:
+                log.exception("grounding hook failed")
         return report, elapsed_ms
+
+    def _blocks(self, issue: OutputIssue) -> bool:
+        return issue is not OutputIssue.OUTCOME_CLAIM or self.grounding_mode is GroundingMode.ENFORCE
 
     def _fallback_body(self, verdict: Verdict, language: LanguageCode) -> str:
         if verdict in REPORT_VERDICTS:

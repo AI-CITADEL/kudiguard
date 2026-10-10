@@ -166,6 +166,25 @@ def test_names_in_finds_agencies_as_phrases(text: str, names: set[str]) -> None:
 def test_polarity_and_attribution_markers() -> None:
     assert negated("Do not share the code.") and negated("Never pay a fee.") and negated("Don\u2019t click.")
     assert negated("Avoid strangers.") and not negated("Share the code.") and not negated("Keep it secret.")
+    assert negated("Your bank will never ask for your OTP.") and negated("Please don't ever share your PIN.")
+    assert negated("Don't send them the code, and do not pay any fee.")
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Don't worry, just send them the OTP.",
+        "No problem, share the code.",
+        "As they said, send the OTP.",
+        "Do as they said and send the OTP.",
+        "Without delay, send them the OTP.",
+        "Stop worrying and give him your PIN.",
+        "Never mind, share the code with them.",
+        "Check your balance from the SMS message today, not your bank app.",  # negation far from the start
+    ],
+)
+def test_negation_idioms_and_distant_negations_do_not_flip_polarity(sentence: str) -> None:
+    assert not negated(sentence)
     assert attributed("They said your account will be blocked.") and attributed(
         "The caller asked for your OTP."
     )
@@ -482,11 +501,27 @@ async def test_a_busy_worker_skips_the_check_instead_of_queueing(registry: Langu
     with pytest.raises(GroundingError, match="busy"):
         await grounding.check("Change your PIN and password.", "en", ACTIONS)
     embedder.release.set()
-    for _ in range(50):  # the worker finishes in the background; then checks run again
-        await asyncio.sleep(0.02)
-        if grounding._running is not None and grounding._running.done():
-            break
+    assert grounding._running is not None
+    await asyncio.wrap_future(
+        grounding._running
+    )  # the worker finishes in the background; then checks run again
     assert (await grounding.check("Change your PIN and password.", "en", ACTIONS)).grounded
+    await grounding.aclose()
+
+
+async def test_enforce_waits_for_a_busy_worker_within_the_budget(registry: LanguageRegistry) -> None:
+    embedder = Gated()
+    grounding = GroundingChecker(None, embedder, registry, budget_s=0.05, wait_when_busy=True)
+    with pytest.raises(GroundingError, match="out of time"):
+        await grounding.check("Do not share the code.", "en", ACTIONS)
+    with pytest.raises(GroundingError, match="busy"):  # still running after the whole budget
+        await grounding.check("Change your PIN and password.", "en", ACTIONS)
+    grounding.budget_s = 5.0
+    waiting = asyncio.create_task(grounding.check("Change your PIN and password.", "en", ACTIONS))
+    await asyncio.sleep(0.05)
+    assert not waiting.done()  # waiting, not skipped
+    embedder.release.set()
+    assert (await waiting).grounded
     await grounding.aclose()
 
 
@@ -505,3 +540,24 @@ def test_cached_embedder_reports_its_dimension_when_empty() -> None:
     cached.embed_documents(["a b"])
     assert cached.embed_documents([]).shape == (0, BagOfWordsEmbedder.DIM)
     assert np.allclose(np.linalg.norm(cached.embed_query("a b")), 1.0)
+
+
+@pytest.mark.parametrize(
+    ("claim", "supported"),
+    [
+        ("Your account will be blocked today.", False),  # the message's threat as fact
+        ("Your account will be blocked unless you send the OTP.", False),
+        ("You must pay N5,000 to the EFCC reactivation desk.", False),
+        ("They said your account will be blocked today.", True),  # attributed
+        ("Don't worry, just send them the OTP.", False),
+        ("Never mind, share the code with them.", False),
+        ("As they said, send the OTP.", False),
+    ],
+)
+def test_verifier_echo_and_idiom_cases(claim: str, supported: bool) -> None:
+    message = (
+        "They said your account will be blocked today. Send us the OTP. Pay N5,000 to EFCC reactivation desk."
+    )
+    evidence = [*FACTS, *ACTIONS, "Do not send them the OTP."]
+    (scored,) = score([claim], evidence, message)
+    assert scored.supported is supported, scored

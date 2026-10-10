@@ -42,18 +42,38 @@ output_guard:
     - 'i\W*(?:can''t|cannot|can not|am unable to|''m unable to|won''t be able to)\W+(?:help|assist|provide)'
     - 'as an ai'
     - 'i''m sorry,? but i'
-  # Imperatives that do what the scammer wants (matched on folded text; "to share" is reported speech, not advice).
+  # Imperatives that do what the scammer wants, per clause, verb first (see safety/output_guard.py).
   unsafe_instructions:
-    - '(?<!to )(?:share|send|give|tell|read(?: out)?|forward|reveal|disclose)\W+(?:(?:them|him|her|it|the caller|the agent|the person|anyone|someone)\W+)?(?:(?:your|the|that|this|their|any|a)\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details|card number|token|login details)'
-    - '(?<!to )pay\W+(?:(?:the|their|this|that|any|a|an)\W+)?(?:[\w,.]+\W+){0,3}?(?:fee|charge|deposit)'
-    - '(?<!to )(?:click|open|tap|follow|visit)\W+(?:on\W+)?(?:(?:the|this|that|their|any)\W+)?link'
-    - '(?<!to )(?:install|download)\W+(?:(?:the|this|that|their|an|a)\W+)?(?:[\w.]+\W+)?(?:app|apk|anydesk|teamviewer|software)(?!\W+(?:only\W+)?from\W+(?:the\W+)?(?:official|play store|app store|google play))'
-    - '(?<!to )(?:send|transfer|pay|give|return)\W+(?:(?:the|their|that|this|his|her)\W+)?(?:money|funds|cash|it)\W+back'
-    - '(?<!to )refund\W+(?:it|them|the money)'
-  # Also reported speech: "they said your account is blocked unless you send the OTP" describes the scam.
+    - '(?:share|send|give|tell|read(?: out)?|forward|reveal|disclose|text)\W+(?:(?:them|him|her|it|the caller|the agent|the person|anyone|someone)\W+)?(?:(?:your|the|that|this|their|any|a)\W+)?(?:\d+\W*digits?\W+|new\W+|secret\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details|card number|token|login details)'
+    - 'pay\W+(?:(?:the|a|an|this|that|their|his|her)\W+)?(?:(?:n|ngn)?\d[\d,.]*k?\W+)?(?:(?:processing|registration|clearance|activation|delivery|release|unlock(?:ing)?|verification|admin|service|upfront|insurance|membership|application|transfer|tax|customs|small)\W+)?(?:fees?|charges?)'
+    - '(?:pay|send|transfer)\W+(?:(?:them|him|her|the agent|the caller)\W+)?(?:n|ngn)?\d[\d,.]*k?'
+    - '(?:click|open|tap|follow|visit)\W+(?:on\W+)?(?:(?:the|this|that|their|any)\W+)?link'
+    - '(?:install|download)\W+(?:(?:the|this|that|their)\W+)?(?:anydesk|teamviewer|[\w.]*apk)'
+    - '(?:install|download)\W+(?:(?:the|this|that|their|an|a)\W+)?(?:[\w.]+\W+)?(?:app|software)(?!.*(?:play store|app store|google play|of your bank|your bank))'
+    - '(?:send|transfer|pay|give|return)\W+(?:(?:the|their|that|this|his|her)\W+)?(?:money|funds|cash|it)\W+back'
+    - 'refund\W+(?:it|them|the money)'
+    - 'reply\W+(?:(?:to\W+)?(?:them|him|her)\W+)?with\W+(?:(?:your|the|that|this)\W+)?(?:otp|pin|bvn|password|code|cvv)'
+    - '(?:type|enter|input|put)\W+(?:(?:your|the|that|this)\W+)?(?:otp|pin|bvn|password|code|cvv|card details|card number)\W+(?:in|on|into)\W+(?:the|their|this|that)\W+(?:link|page|site|website|form)'
+  pronoun_instructions:
+    - '(?:send|share|give|forward|tell|read)\W+(?:(?:them|him|her)\W+)?it'
+  credentials:
+    - '(?:otp|pin|bvn|password|passcode|cvv|code)'
+  instruction_prefixes:
+    - '(?:please|kindly|just|then|now|quickly|immediately|simply|also|first|go|ahead|and|you|should|can|must|need|to|have|do|better|right|away)'
   negations:
-    - '(?:not|no|never|\w+n''t|dont|cannot|nobody|nothing|without|avoid|stop|ignore|refuse|nor|neither)'
-    - '(?:said|says|told|tells|asked|asks|want|wants|wanted|claim|claims|claimed|threaten\w*|promise[sd]?|demand\w*|pretend\w*)'
+    - '(?:not|no|never|ever|\w+n''t|dont|cannot|avoid|refuse|neither|nor)'
+  negations_after:
+    - '(?:no one|nobody|noone|no-one)'
+  clause_breaks:
+    - '(?:and|but|just|so|then)'
+  outcome_claims:
+    - '(?:you will|you''ll|you are going to)\W+(?:surely\W+|definitely\W+|certainly\W+)?(?:get|receive|recover)\W+(?:all\W+)?(?:of\W+)?(?:your\W+)?(?:money|funds|cash)\W+back'
+    - '(?:money|funds|cash)\W+will\W+be\W+(?:refunded|returned|reversed|recovered)'
+    - '(?:is|are)\W+(?:now\W+)?safe\W+now'
+    - '(?:account|bvn|nin|sim|card)\W+will\W+be\W+(?:blocked|suspended|closed|deactivated)'
+  reported_speech:
+    - '(?:said|says|saying|say|claim\w*|told|tell|tells|threaten\w*|pretend\w*|warn\w*|ask\w*)'
+    - '(?:no guarantee|not sure|maybe|may|might|could|if|unless|whether)'  # hedged, not promised
 
 lexicon:
   flags:

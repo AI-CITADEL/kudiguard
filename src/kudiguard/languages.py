@@ -6,6 +6,7 @@ translated into, so its lexicon is always merged with the user's language lexico
 
 from __future__ import annotations
 
+import dataclasses
 import string
 import unicodedata
 from dataclasses import dataclass
@@ -60,10 +61,22 @@ class _OutputGuardSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     safety_claims: list[str] = Field(default_factory=list)  # "this is safe / not a scam" in this language
     refusals: list[str] = Field(default_factory=list)  # "I can't help" in this language
-    # Instructions that hand a scammer what they want ("share the code", "pay the fee", "click the link"), as
-    # imperatives. A hit is ignored when a ``negations`` term comes earlier in the same sentence ("do not share").
+    # Instructions that hand a scammer what they want ("share the code", "pay the fee", "click the link"). Matched
+    # per clause (split at punctuation and ``clause_breaks``) and only as an imperative: at the clause start, after
+    # at most a few ``instruction_prefixes`` words ("please", "you should"). A ``negations`` word among those
+    # ("do not", "never", "kada") or a ``negations_after`` phrase later in the clause ("to no one") cancels the hit.
     unsafe_instructions: list[str] = Field(default_factory=list)
+    instruction_prefixes: list[str] = Field(default_factory=list)
     negations: list[str] = Field(default_factory=list)
+    negations_after: list[str] = Field(default_factory=list)
+    clause_breaks: list[str] = Field(default_factory=list)
+    # "send it" / "give it to them": unsafe when the same sentence names a ``credentials`` term ("..., so send it").
+    pronoun_instructions: list[str] = Field(default_factory=list)
+    credentials: list[str] = Field(default_factory=list)
+    # Promised outcomes and threats stated as fact ("you will get your money back", "your account will be
+    # blocked"); a ``reported_speech`` word earlier in the clause ("they said") exempts it.
+    outcome_claims: list[str] = Field(default_factory=list)
+    reported_speech: list[str] = Field(default_factory=list)
 
 
 class _CommandsSpec(BaseModel):
@@ -81,7 +94,14 @@ class GuardPatterns:
     safety_claims: Patterns
     refusals: Patterns
     unsafe_instructions: Patterns = ()
+    instruction_prefixes: Patterns = ()
     negations: Patterns = ()
+    negations_after: Patterns = ()
+    clause_breaks: Patterns = ()
+    pronoun_instructions: Patterns = ()
+    credentials: Patterns = ()
+    outcome_claims: Patterns = ()
+    reported_speech: Patterns = ()
 
 
 def _ui_length(text: str) -> int:
@@ -134,10 +154,10 @@ class LanguageRegistry:
                 lang = LanguageConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
                 lexicons[lang.code] = Lexicon.from_terms(lang.lexicon.flags, lang.lexicon.check_intent)
                 guards[lang.code] = GuardPatterns(
-                    tuple(compile_term(t) for t in lang.output_guard.safety_claims),
-                    tuple(compile_term(t) for t in lang.output_guard.refusals),
-                    tuple(compile_term(t) for t in lang.output_guard.unsafe_instructions),
-                    tuple(compile_term(t) for t in lang.output_guard.negations),
+                    **{
+                        f.name: tuple(compile_term(t) for t in getattr(lang.output_guard, f.name))
+                        for f in dataclasses.fields(GuardPatterns)
+                    }
                 )
             except (ValidationError, ValueError, yaml.YAMLError) as exc:
                 raise LanguageConfigError(f"{path.name}: {exc}") from exc
@@ -191,10 +211,10 @@ class LanguageRegistry:
             return own
         pivot = self._own_guards.get(PIVOT, GuardPatterns((), ()))
         return GuardPatterns(
-            pivot.safety_claims + own.safety_claims,
-            pivot.refusals + own.refusals,
-            pivot.unsafe_instructions + own.unsafe_instructions,
-            pivot.negations + own.negations,
+            **{
+                f.name: getattr(pivot, f.name) + getattr(own, f.name)
+                for f in dataclasses.fields(GuardPatterns)
+            }
         )
 
     def asr_models(self) -> dict[LanguageCode, str]:

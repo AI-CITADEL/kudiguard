@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # after >= 100 held-out real N-ATLAS English replies show <= 5% false replacements (docs/SPIKES.md S8).
     grounding_mode: Literal["off", "shadow", "enforce"] = "shadow"
     grounding_threshold: float = Field(
-        default=0.73, gt=0, lt=1
+        default=0.75, gt=0, lt=1
     )  # = grounding.DEFAULT_THRESHOLD (bge-small cosine)
     grounding_budget_ms: int = Field(
         default=150, gt=0

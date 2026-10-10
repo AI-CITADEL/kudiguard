@@ -6,7 +6,7 @@ flags, generic framing that is always acceptable (empathy, "ask your bank", the 
 A claim is supported when
 
 * its best match **of the same polarity** reaches the threshold ("share the code" is not supported by "do not share
-  the code"; negation is detected from markers such as not/never/don't/avoid), and
+  the code"; a clause opening with not/never/don't/avoid; idioms like "don't worry" aside), and
 * its specifics appear in the evidence or in the user's message: numbers (days, hours, amounts, normalised: "50k",
   "N50,000" and "fifty thousand" are the same) and names (acronyms such as EFCC, multi-word names as phrases, and
   known single-word agencies such as Police).
@@ -28,6 +28,7 @@ verbatim, and translated steps and family warnings could only be checked through
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -52,9 +53,9 @@ from kudiguard.text import fold
 log = logging.getLogger(__name__)
 
 # bge-small-en-v1.5 cosine, claim vs best same-polarity evidence sentence. Chosen on the dev split of
-# data/eval/grounding_claims.yaml only (docs/SPIKES.md S8), below the lowest supported paraphrase on purpose: a false
-# flag replaces a good answer, and N-ATLAS paraphrases more loosely than the set.
-DEFAULT_THRESHOLD = 0.73
+# data/eval/grounding_claims.yaml only (docs/SPIKES.md S8): the highest with no false flags (0.76) minus a 0.01 margin,
+# because a false flag replaces a good answer and N-ATLAS paraphrases more loosely than the set.
+DEFAULT_THRESHOLD = 0.75
 DEFAULT_BUDGET_S = 0.15  # live cap on scoring (the check fails open past it)
 MIN_CLAIM_WORDS = 3  # "Stay calm." / "Be careful!" carry no checkable fact
 MIN_TRANSLATE_S = 2.0  # back-translation is a full model call
@@ -165,6 +166,13 @@ _UNITS = frozenset(
 _NEGATION = re.compile(
     r"\b(?:not|no|never|\w+n't|dont|cannot|nobody|nothing|none|without|avoid|stop|ignore|refuse|neither|nor)\b"
 )
+# Negation idioms that do not negate what follows ("Don't worry, just send them the OTP").
+_NEGATION_IDIOM = re.compile(
+    r"\b(?:do not worry|don't worry|dont worry|not to worry|no problem|never mind|without delay|stop worrying|"
+    r"no wahala)\b"
+)
+_CLAUSE = re.compile(r"[;:]|\b(?:and|but|just|so|then)\b")
+NEGATION_WINDOW = 6  # words from the clause start: "your bank will never ask", "do not share"
 _ATTRIBUTION = re.compile(
     r"\b(?:they|he|she|the (?:caller|sender|message|person|man|woman|text|sms|scammers?)|someone|scammers?)\b"
     r"[^.]{0,40}\b(?:said|says|say|claim|claims|claimed|told|tells|asked|asks|want|wants|wanted|promise|promises|"
@@ -301,7 +309,12 @@ def split_claims(english: str) -> list[str]:
 
 
 def negated(sentence: str) -> bool:
-    return bool(_NEGATION.search(fold(sentence)))
+    """A clause opens with a negation (within ``NEGATION_WINDOW`` words), idioms such as "don't worry" aside."""
+    text = _NEGATION_IDIOM.sub(" ", fold(sentence))
+    return any(
+        _NEGATION.search(" ".join(_LETTER_WORD.findall(clause)[:NEGATION_WINDOW]))
+        for clause in _CLAUSE.split(text)
+    )
 
 
 def attributed(sentence: str) -> bool:
@@ -466,6 +479,7 @@ class GroundingChecker:
         threshold: float = DEFAULT_THRESHOLD,
         translator: Translator | None = None,
         budget_s: float | None = None,
+        wait_when_busy: bool = False,
     ) -> None:
         if not 0 < threshold < 1:
             raise ValueError(f"threshold must be between 0 and 1, got {threshold}")
@@ -473,6 +487,7 @@ class GroundingChecker:
             raise ValueError(f"budget_s must be positive, got {budget_s}")
         self.threshold = threshold
         self.budget_s = budget_s
+        self.wait_when_busy = wait_when_busy  # enforce: wait (within the budget) instead of skipping
         self._embedder = embedder if isinstance(embedder, CachedEmbedder) else CachedEmbedder(embedder)
         if translator is None and llm is not None:
             translator = LLMTranslator(llm, registry)
@@ -481,6 +496,16 @@ class GroundingChecker:
         self.framing: tuple[str, ...] = (*GENERIC_FRAMING, *(messages.text(PIVOT, m) for m in FIXED_ADVICE))
         self._worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="grounding")
         self._running: Future[tuple[Claim, ...]] | None = None
+
+    async def _wait_until_idle(self, until: float | None) -> None:
+        """Raise ``GroundingError`` when a previous check is still running (or, with ``wait_when_busy``, still
+        running at ``until``). Never queues work behind it."""
+        while self._running is not None and not self._running.done():
+            remaining = None if until is None else until - time.monotonic()
+            if not self.wait_when_busy or (remaining is not None and remaining <= 0):
+                raise GroundingError("busy: a previous check is still running")
+            with contextlib.suppress(Exception):  # its own caller handles its outcome
+                await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(self._running)), remaining)
 
     def supports(self, language: LanguageCode) -> bool:
         return language == PIVOT or self._translator is not None
@@ -514,8 +539,10 @@ class GroundingChecker:
             raise GroundingError(f"no translator for {language!r}: only English replies can be checked")
         else:
             english = await self._translator.to_english(reply, language, deadline=deadline)
-        if self._running is not None and not self._running.done():
-            raise GroundingError("busy: a previous check is still running")
+        left = None if deadline is None else deadline - time.monotonic()
+        limit = min([s for s in (self.budget_s, left) if s is not None], default=None)
+        until = None if limit is None else time.monotonic() + limit
+        await self._wait_until_idle(until)
         claims = split_claims(english)
         self._running = self._worker.submit(
             score_claims,
@@ -525,10 +552,9 @@ class GroundingChecker:
             threshold=self.threshold,
             message=message,
         )
-        left = None if deadline is None else deadline - time.monotonic()
-        limits = [s for s in (self.budget_s, left) if s is not None]
         try:  # on timeout the worker finishes in the background; checks are skipped until it does
-            scored = await asyncio.wait_for(asyncio.wrap_future(self._running), min(limits, default=None))
+            remaining = None if until is None else until - time.monotonic()
+            scored = await asyncio.wait_for(asyncio.wrap_future(self._running), remaining)
         except TimeoutError as exc:
             raise GroundingError("out of time for the grounding check") from exc
         report = GroundingReport(english, scored, int((time.perf_counter() - start) * 1000))

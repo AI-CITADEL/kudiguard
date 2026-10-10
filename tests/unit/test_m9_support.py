@@ -318,6 +318,10 @@ async def test_grounding_check_needs_embeddings_and_can_be_turned_off(
         services = await build_services(settings)
         await services.aclose()
         assert (services.engine.grounding is not None) is (mode != "off")
+        if services.engine.grounding is not None:  # shadow checks drain before the checker's worker stops
+            closers = services.closers
+            assert closers.index(services.engine.aclose) > closers.index(services.engine.grounding.aclose)
+            assert services.engine.grounding.wait_when_busy is (mode == "enforce")
         assert services.engine.grounding_mode == mode
     assert "evidence sentences embedded" in caplog.text  # pack facts pre-embedded at startup
 

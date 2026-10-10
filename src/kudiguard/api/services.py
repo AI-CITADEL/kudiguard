@@ -104,6 +104,7 @@ async def build_grounding(
         registry,
         threshold=settings.grounding_threshold,
         budget_s=settings.grounding_budget_ms / 1000,
+        wait_when_busy=GroundingMode(settings.grounding_mode) is GroundingMode.ENFORCE,
     )
     texts = [
         text
@@ -192,6 +193,7 @@ async def build_services(settings: Settings) -> Services:
             grounding=grounding,
             grounding_mode=GroundingMode(settings.grounding_mode),
         )
+        closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         store = await SQLiteStore.open(settings.db_path, hasher=hasher)

@@ -79,26 +79,90 @@ def scam_llm(compose: object) -> FakeLLM:
     return FakeLLM(analyse=analysis("x", "scam_check", ["asks_credentials"]), compose=compose)  # type: ignore[arg-type]
 
 
-async def test_grounded_reply_is_sent_and_recorded(
+async def test_enforce_checks_inline_and_records_on_the_answer(
     registry: LanguageRegistry, knowledge: KnowledgeBase
 ) -> None:
-    for mode in (GroundingMode.SHADOW, ENFORCE):
-        answer = await engine(registry, knowledge, scam_llm(GROUNDED), real_checker(registry), mode).check(
-            OTP_SCAM, "en"
-        )
-        assert answer.outcome is Outcome.ANSWERED and answer.body == GROUNDED and answer.issues == ()
-        assert answer.grounded is True and answer.unsupported_claims == 0 and answer.grounding_ms >= 0
+    answer = await engine(registry, knowledge, scam_llm(GROUNDED), real_checker(registry), ENFORCE).check(
+        OTP_SCAM, "en"
+    )
+    assert answer.outcome is Outcome.ANSWERED and answer.body == GROUNDED and answer.issues == ()
+    assert answer.grounded is True and answer.unsupported_claims == 0 and answer.grounding_ms >= 0
 
 
-async def test_shadow_mode_records_but_never_changes_the_reply(
+async def test_shadow_mode_checks_after_the_reply_and_never_changes_it(
     registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
 ) -> None:
-    llm = scam_llm(INVENTED_PROSE)
+    results: list[tuple[str | None, GroundingReport | None, int]] = []
+    turn = Engine(
+        registry=registry,
+        llm=scam_llm(INVENTED_PROSE),
+        knowledge=knowledge,
+        grounding=real_checker(registry),
+        on_grounding=lambda *result: results.append(result),
+    )
     with caplog.at_level(logging.INFO, logger="kudiguard.engine"):
-        answer = await engine(registry, knowledge, llm, real_checker(registry)).check(OTP_SCAM, "en")
-    assert answer.outcome is Outcome.ANSWERED and answer.body == INVENTED_PROSE and answer.issues == ()
-    assert answer.grounded is False and answer.unsupported_claims == 1
+        answer = await turn.check(OTP_SCAM, "en", turn_id="wamid.1")
+        assert answer.outcome is Outcome.ANSWERED and answer.body == INVENTED_PROSE and answer.issues == ()
+        assert answer.grounded is None and answer.grounding_ms == 0  # the result arrives later, via the hook
+        await turn.aclose()
+    ((turn_id, report, ms),) = results
+    assert turn_id == "wamid.1" and report is not None and not report.grounded and ms >= 0
     assert "mode=shadow grounded=False unsupported=1/2" in caplog.text and "EFCC" not in caplog.text
+
+
+class Slow(Recording):
+    def __init__(self, delay_s: float, **kwargs: object) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self.delay_s = delay_s
+        self.finished = asyncio.Event()
+
+    async def check(self, *args: object, **kwargs: object) -> GroundingReport:
+        await asyncio.sleep(self.delay_s)
+        report = await super().check(*args, **kwargs)  # type: ignore[arg-type]
+        self.finished.set()
+        return report
+
+
+async def test_shadow_adds_no_wait_to_the_turn(registry: LanguageRegistry, knowledge: KnowledgeBase) -> None:
+    grounding = Slow(0.5)
+    turn = engine(registry, knowledge, scam_llm(GROUNDED), grounding)
+    answer = await turn.check(OTP_SCAM, "en")
+    assert (
+        answer.outcome is Outcome.ANSWERED and not grounding.finished.is_set()
+    )  # returned before the check ended
+    grounding.budget_s = 2.0  # type: ignore[attr-defined]
+    await turn.aclose()  # drains within the checker's budget
+    assert grounding.finished.is_set()
+
+
+async def test_aclose_bounds_the_drain_and_survives_a_failing_hook(
+    registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken(*result: object) -> None:
+        raise RuntimeError("store closed")
+
+    grounding = Slow(5.0)
+    turn = Engine(
+        registry=registry,
+        llm=scam_llm(GROUNDED),
+        knowledge=knowledge,
+        grounding=grounding,
+        on_grounding=broken,
+    )  # type: ignore[arg-type]
+    await turn.check(OTP_SCAM, "en")
+    start = time.perf_counter()
+    grounding.budget_s = 0.05  # type: ignore[attr-defined]
+    await turn.aclose()  # does not wait for the slow check
+    assert time.perf_counter() - start < 1.0
+    await turn.aclose()  # idempotent
+    fast = Recording()
+    turn = Engine(
+        registry=registry, llm=scam_llm(GROUNDED), knowledge=knowledge, grounding=fast, on_grounding=broken
+    )  # type: ignore[arg-type]
+    with caplog.at_level(logging.ERROR, logger="kudiguard.engine"):
+        await turn.check(OTP_SCAM, "en")
+        await turn.aclose()  # no budget attribute: default drain
+    assert fast.calls and "grounding hook failed" in caplog.text
 
 
 async def test_enforce_drops_only_the_unsupported_step(
@@ -167,7 +231,7 @@ async def test_checker_gets_the_reply_evidence_and_message(
 ) -> None:
     grounding = Recording()
     deadline = time.monotonic() + 60
-    turn = engine(registry, knowledge, scam_llm(GROUNDED), grounding)
+    turn = engine(registry, knowledge, scam_llm(GROUNDED), grounding, ENFORCE)
     answer = await turn.check(OTP_SCAM, "en", deadline=deadline)
     ((reply, language, evidence, message, passed_deadline),) = grounding.calls
     assert (reply, language, message, passed_deadline) == (GROUNDED, "en", OTP_SCAM, deadline)
@@ -179,18 +243,13 @@ async def test_checker_gets_the_reply_evidence_and_message(
 async def test_grounding_time_is_logged_and_reported_apart_from_model_time(
     registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
 ) -> None:
-    class Slow(Recording):
-        async def check(self, *args: object, **kwargs: object) -> GroundingReport:
-            await asyncio.sleep(0.03)
-            return await super().check(*args, **kwargs)  # type: ignore[arg-type]
-
     llm = FakeLLM(analyse=analysis("x", "scam_check"), compose=GROUNDED)
     with caplog.at_level(logging.INFO, logger="kudiguard.engine"):
-        answer = await engine(registry, knowledge, llm, Slow()).check(OTP_SCAM, "en")
-    assert answer.grounding_ms >= 25 and answer.llm_ms == 200
-    assert f"grounding_ms={answer.grounding_ms} language=en mode=shadow grounded=True" in caplog.text
+        answer = await engine(registry, knowledge, llm, Slow(0.03), ENFORCE).check(OTP_SCAM, "en")
+    assert answer.grounding_ms > 0 and answer.llm_ms == 200
+    assert f"grounding_ms={answer.grounding_ms} language=en mode=enforce grounded=True" in caplog.text
     llm = FakeLLM(analyse=analysis("x"), translate="x", compose="Kada.")
-    hausa = await engine(registry, knowledge, llm, Slow()).check("Sun ce in ba su OTP", "ha")
+    hausa = await engine(registry, knowledge, llm, Slow(0.03), ENFORCE).check("Sun ce in ba su OTP", "ha")
     assert hausa.grounding_ms == 0 and hausa.grounded is None  # not checked live
 
 
@@ -215,7 +274,7 @@ async def test_no_time_left_skips_the_check(
 
     grounding = Recording()
     llm = FakeLLM(analyse=analysis("x", "scam_check"), compose=GROUNDED)
-    turn = engine(registry, knowledge, llm, grounding)
+    turn = engine(registry, knowledge, llm, grounding, ENFORCE)
     deadline = time.monotonic() + 10
     real_complete = turn._complete
 
@@ -273,3 +332,17 @@ async def test_off_mode_or_no_checker_changes_nothing(
             answer.outcome is Outcome.ANSWERED and answer.body == INVENTED_PROSE and answer.grounded is None
         )
     assert grounding.calls == []
+
+
+async def test_outcome_claims_are_log_only_unless_enforced(
+    registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
+) -> None:
+    promise = "This looks like a scam.\n1. Do not share the code.\n2. You will get your money back."
+    with caplog.at_level(logging.INFO, logger="kudiguard.engine"):
+        shadow = await engine(registry, knowledge, scam_llm(promise), None).check(OTP_SCAM, "en")
+    assert shadow.outcome is Outcome.ANSWERED and shadow.body == promise
+    assert shadow.issues == (OutputIssue.OUTCOME_CLAIM,) and "outcome claim (log only)" in caplog.text
+    llm = scam_llm([promise, GROUNDED])
+    enforced = await engine(registry, knowledge, llm, None, ENFORCE).check(OTP_SCAM, "en")
+    assert enforced.body == GROUNDED and enforced.issues == (OutputIssue.OUTCOME_CLAIM,)
+    assert len(llm.calls(Purpose.COMPOSE)) == 2  # the warmer retry
