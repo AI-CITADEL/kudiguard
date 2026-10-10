@@ -54,7 +54,13 @@ TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
     "decision": ("src/kudiguard/safety/decision.py", ("test_decision.py", "test_engine.py")),
     "text": (
         "src/kudiguard/text.py",
-        ("test_text.py", "test_scam_rules.py", "test_patterns.py", "test_commands.py"),
+        (
+            "test_text.py",
+            "test_scam_rules.py",
+            "test_patterns.py",
+            "test_commands.py",
+            "test_redaction_paths.py",
+        ),
     ),
     "privacy": ("src/kudiguard/privacy.py", ("test_privacy.py", "test_review.py", "test_sqlite_store.py")),
     "donation": (
@@ -74,7 +80,10 @@ TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "render": ("src/kudiguard/render.py", ("test_render.py", "test_pipeline.py")),
     "review": ("src/kudiguard/review.py", ("test_review.py",)),
-    "patterns": ("src/kudiguard/patterns.py", ("test_patterns.py", "test_m9_support.py", "test_donation.py")),
+    "patterns": (
+        "src/kudiguard/patterns.py",
+        ("test_patterns.py", "test_m9_support.py", "test_donation.py", "test_redaction_paths.py"),
+    ),
 }
 
 

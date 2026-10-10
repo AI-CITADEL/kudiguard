@@ -101,6 +101,6 @@ class ScamPattern:
             "channel": self.channel,
             "verdict": self.verdict.value,
             "flags": [f.value for f in self.flags],
-            "text": self.text,
-            "english": self.english,
+            "text": redact(self.text),  # again on export: examples stored before a redaction fix
+            "english": redact(self.english) if self.english else self.english,
         }

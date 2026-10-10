@@ -278,20 +278,21 @@ max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min**
 |---|---|---|---|---|
 | `safety/scam_rules.py` | 119 (+33 in annotations) | 86.6% | **95.0%** | 6 |
 | `safety/decision.py` | 116 (+11) | 76.7% | **93.1%** | 8 |
-| `text.py` (redact) | 99 | 55.6% | **88.9%** | 11 |
+| `text.py` (redact) | 99 → 167 ¹ | 55.6% | **97.6%** | 4 |
 | `privacy.py` | 80 | 65.0% | **93.8%** | 5 |
 | `donation.py` | 474 (+33) | 77.2% | **90.1%** | 47 |
 | `commands.py` | 80 (+11) | 70.0% | **85.0%** | 12 |
 | `hosting.py` | 42 | 73.8% | **81.0%** | 8 |
 | `render.py` | 233 (+11) | 50.2% | **97.9%** | 5 |
 | `review.py` | 712 (+66) | 85.5% | **93.4%** | 47 |
-| `patterns.py` | 79 (+11) | 67.1% | **86.1%** | 11 |
-| **All** | **2,034** | **75.3%** | **92.1%** | **160** |
+| `patterns.py` | 79 → 80 (+11) ¹ | 67.1% | **86.3%** | 11 |
+| **All** | **2,034 → 2,103** | **75.3%** | **92.7%** | **153** |
 
-String mutants alone went from 62% to 90% killed (text 50% → 88%, privacy 29% → 84%). `donation`'s before figure used
+¹ After the redaction fix below (new code, so more mutants). String mutants alone went from 62% to 92% killed (text
+50% → 96%, privacy 29% → 84%). `donation`'s before figure used
 its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION` against `voice.html`) was added after.
 
-**Real gaps found and closed (tests only; no source change was needed)**, by area:
+**Real gaps found and closed**, by area (tests only, except the two redaction leaks below):
 
 * Verdict policy: each flag's weight, score and verdict alone and as a declared check (a 2→3 change to any strong
   flag turned a "caution" into "likely scam" unnoticed); strong + amplifier reaching the threshold; flags ordered by
@@ -322,15 +323,34 @@ its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION`
   1–5 and y/n, short and blank CSV rows, semicolon sheets with commas in the notes, UTF-16 BE, a rewritten sheet
   truncating the old file, the sheet's columns, `since` on the day itself and undated rows, samples over 256.
 
-**Equivalent or accepted survivors** (160): *identity-equivalent* — `is`/`==` on enums, interned literals and small
+**Two privacy leaks fixed in `redact`** (found while triaging the survivors). (1) A number split after a single digit
+("8 031 234 567", "+234 8 031 234 567", "0 803 123 4567") or with dots ("0803.123.4567") was left in clear: the old
+patterns needed 2–4-digit first groups and spaces or dashes. (2) A 20-digit card in groups of four was masked only up
+to 16 digits, leaving the rest. Now one pattern masks any run of >= 10 digits in groups of any size joined by single
+spaces, dots or dashes (cards of 13–19 digits and longer runs included), starting only where a number starts and
+taken whole (never from the middle of a run); the phone pattern (brackets) also matches whole numbers only. Amounts,
+dates and times are kept by looking at the whole run: after `₦`/`N`/`$` or before `naira`/`kobo`/`k`, plain digits
+or thousands in threes (`₦ 5 000 000 000`, `N12500000000.50`, `5 000 000 000 naira`); runs made only of valid dates
+and times (`12-05-2024 10.30`, `2026-10-08 2026-10-09`). Thousands without a currency sign or unit are masked
+(`8 031 234 567` is exactly such a split). Because stored text from before the fix was redacted with the old
+patterns, exports redact again on the way out (`export_row`: evidence export and review sheets; `ScamPattern.as_row`;
+the voice-export manifest); `redact` is idempotent. Tests: 17 spellings, amount/date/time boundaries, seeded
+property tests (3,000 random Nigerian mobiles, international numbers, NUBAN/BVN, 13–19-digit cards and 20–31-digit
+runs split into random 1–4-digit groups with random separators: no digit left; 3,000 random amounts, dates and times:
+unchanged), idempotence and speed, and `tests/unit/test_redaction_paths.py` (both stores, the pattern library, rows
+written before the fix, review sheets, voice export). A 200,000-case fuzz run left only splits that are genuinely
+amounts (an identifier written exactly as "₦ 1 237 648 798" or "… 529 naira").
+
+**Equivalent or accepted survivors** (153): *identity-equivalent* — `is`/`==` on enums, interned literals and small
 ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`
 string order, counts that cannot exceed their cap, `len > 1` vs `!= 1` on non-empty lists, `-w` vs `~w` in a sort
 key, a regex `^`/`$` under `fullmatch`/`match`, `{9,20}` after a 10-digit lookahead, `rfind+1` vs `cut != 0`);
 *declarations* — `@dataclass(frozen=…, slots=…)` (mypy strict rejects writes) and `*`→`/` in signatures whose callers
 all use keywords; *platform* — POSIX file modes (tested by the POSIX-only tests) and `os.open` flag arithmetic on
 disjoint bits / `O_BINARY` (CPython writes bytes untranslated on Windows; a random 128-bit `.part` name never
-pre-exists, so dropping `O_EXCL` cannot show); *stricter* — a mutant that masks or deletes more (wider card/digit
-groups, dropped look-behinds in `redact`/`deidentify`, a one-letter TLD, a 20-digit card, `wipe` with −1 s grace);
+pre-exists, so dropping `O_EXCL` cannot show); *stricter* — a mutant that masks or deletes more (dropped look-behinds
+in `deidentify`, a one-letter TLD, `wipe` with −1 s grace); in `redact` only the phone pattern's length bound (every
+bracket-free spelling is also caught by the digit-run pattern) and an empty decimal tail (a run never ends in `.`);
 *unreachable* — `_fit` budgets ≤ 1, files whose age equals the grace to the nanosecond, `now % mtime` (= `now − mtime`
 while `now < 2·mtime`), TLDs of 23–25 letters, `^ 4` on warning budgets whose bit 2 is set in all four languages;
 *neutral strings* — internal enum values never stored or shown (`Command`, `CHECK`/`QUESTION`), `""` defaults
