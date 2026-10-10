@@ -249,3 +249,24 @@ build the eval engine with grounding on, as production: English grounded rate is
 Rules-only baseline (model down, measured 10 Oct): en-wrong-transfer, en-fake-alert-goods, en-french-otp,
 ha-otp-blocked, ha-fake-alert-goods, yo-job-fee and ig-investment-triple get no scam verdict; en-already-shared-otp
 gets "no red flags"; yo-otp-legit (genuine OTP) gets likely_scam. Rules gaps, recorded; lexicons unchanged.
+
+## A — Greedy + seeded decoding, live before/after (10 Oct 2026)
+`scripts/eval_answers.py --runs 3`, 45 graded cases (en/ha/yo/ig), N-ATLAS Q4_K_M on the RTX 4070 Laptop, prompt cache on,
+commit b4f96f8; `--label t01 --temperature 0.1 --no-seed` vs `--label t0seed` (production). Results:
+`data/eval/results/answers-t01.jsonl`, `answers-t0seed.jsonl`. Other agents ran CPU tests during both runs (latency is
+noisy; both runs saw the same load).
+
+| all languages | t=0.1, no seed | **t=0 + seed 42** |
+|---|---|---|
+| identical reply in all 3 runs | 9% | **100%** |
+| verdict in the allowed set | 88% | 89% |
+| key-point coverage (mean) | 0.53 | 0.51 |
+| replies with a safety violation | 5% | 4% |
+| fallback to fixed text | 0% | 0% |
+| latency p50 / p95 | 3.3 s / 5.6 s | 3.4 s / 6.4 s |
+
+* At t=0.1 the **verdict itself varied between runs** for 5 cases (e.g. yo-bvn-link caution/likely_scam); greedy
+  decoding removed that. Quality is flat within noise.
+* Per-language coverage (t=0): en 0.66, ha 0.52, yo 0.35, ig 0.25; 62% of Igbo replies copy the worked example →
+  workstream H (Yoruba/Igbo parity; English-first then translate).
+* The grounding column of this run used the scorer's stand-in, not workstream B's checker: not reported.
