@@ -77,6 +77,8 @@ class _OutputGuardSpec(BaseModel):
     # "send it" / "give it to them": unsafe when the same sentence names a ``credentials`` term ("..., so send it").
     pronoun_instructions: list[str] = Field(default_factory=list)
     means_instructions: list[str] = Field(default_factory=list)  # "... by sending the OTP": any position
+    # matched on the whole sentence segment, lead-in required in its own clause ("pay ... in your bank app so ...")
+    segment_instructions: list[str] = Field(default_factory=list)
     credentials: list[str] = Field(default_factory=list)
     # Promised outcomes and threats stated as fact ("you will get your money back", "your account will be
     # blocked"); a ``reported_speech`` word earlier in the clause ("they said") exempts it.
@@ -109,6 +111,7 @@ class GuardPatterns:
     speech_commands: Patterns = ()
     pronoun_instructions: Patterns = ()
     means_instructions: Patterns = ()
+    segment_instructions: Patterns = ()
     credentials: Patterns = ()
     outcome_claims: Patterns = ()
     reported_speech: Patterns = ()

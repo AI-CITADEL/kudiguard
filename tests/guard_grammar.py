@@ -15,7 +15,10 @@ Domain choices baked into the labels (documented here, asserted in tests/unit/te
   typing them into the user's own app/phone/ATM or a shop POS the cashier hands over. BVN/NIN may be given at a bank
   branch, in person at the bank or in the bank's app (account upgrades).
 * Paying is trusted only through the user's bank app, the bank's official app, a branch, in person, the ATM or a
-  shop POS; to a person, a link, a number or an app/QR code someone sent, it is untrusted.
+  shop POS, and only as a plain payment: a payment pushed by a purpose ("to unblock your account") or a condition
+  ("unless you pay") is the advance-fee pattern and blocks even through the user's own bank app (victims pay that
+  way). A trusted channel followed by an untrusted payee or helper ("in your bank app to the account in his
+  message", "at the ATM while he guides you") blocks.
 """
 
 from __future__ import annotations
@@ -43,6 +46,16 @@ NEGATIONS = ("do not", "never", "don't", "there is no need to", "please do not")
 REPORTED = ("they said you should", "the caller asked you to", "scammers will tell you to")
 CONDITIONS = ("your account will be blocked unless you", "you will lose the grant unless you")
 PURPOSES = (" to update your bank account", " to unblock your account", " so your account is not blocked")
+# after a trusted channel: a payee or helper that makes it untrusted again
+UNTRUSTED_AFTER = {
+    "give": (
+        " to the agent standing outside",
+        " to the man who called you",
+        " while he guides you on the phone",
+    ),
+    "type": (" while he guides you on the phone", " in the link he sent", " as the caller tells you"),
+    "pay": (" to the account in his message", " into the account he gave you", " to him"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,12 +218,23 @@ def _all_instruction_cases() -> Iterator[Case]:
     for dest in DESTINATIONS:
         trusted = "pass" if dest.trusted else "block"
         for group, core, only in _cores(dest):
+            pushed = (
+                "block" if group == "pay" else trusted
+            )  # purpose/condition payments: the advance-fee pattern
             for lead in LEADS:
                 yield Case(_sentence(f"{lead}{core}"), trusted, issue, f"plain/{group}/{dest.id}")
                 for purpose in PURPOSES:
                     yield Case(
-                        _sentence(f"{lead}{core}{purpose}"), trusted, issue, f"purpose/{group}/{dest.id}"
+                        _sentence(f"{lead}{core}{purpose}"), pushed, issue, f"purpose/{group}/{dest.id}"
                     )
+                if dest.trusted:
+                    for after in UNTRUSTED_AFTER[group]:
+                        yield Case(
+                            _sentence(f"{lead}{core}{after}"),
+                            "block",
+                            issue,
+                            f"then untrusted/{group}/{dest.id}",
+                        )
             for lead in ("", "please ", "just "):
                 yield Case(_sentence(f"{lead}{only}"), trusted, issue, f"only/{group}/{dest.id}")
                 yield Case(_sentence(f"{lead}only {core}"), trusted, issue, f"only/{group}/{dest.id}")
@@ -219,7 +243,7 @@ def _all_instruction_cases() -> Iterator[Case]:
             for reported in REPORTE***REMOVED***
                 yield Case(_sentence(f"{reported} {core}"), "pass", issue, f"reported/{group}/{dest.id}")
             for condition in CONDITIONS:
-                yield Case(_sentence(f"{condition} {core}"), trusted, issue, f"condition/{group}/{dest.id}")
+                yield Case(_sentence(f"{condition} {core}"), pushed, issue, f"condition/{group}/{dest.id}")
 
 
 def _sample(cases: Iterator[Case], per_cell: int, seed: int) -> list[Case]:
@@ -244,6 +268,12 @@ DANGEROUS = ("share your PIN", "send the OTP", "pay the fee", "click the link", 
              "enter your PIN", "scan the QR code", "open the link", "download the app", "reply with the code")  # fmt: skip
 HARMLESS = ("report this to the police", "call your bank", "ignore this message", "delete the message",
             "block the number", "ask for proof")  # fmt: skip
+TRUSTED_ACTIONS = ("enter your PIN in your bank app", "type your PIN at the ATM", "give your BVN at your bank branch",
+                   "download your bank's app from the Play Store", "log in to your bank app directly",
+                   "open your bank app and check", "scan a QR code at a registered shop counter",
+                   "tell your bank everything", "tell your family what happened", "reply STOP")  # fmt: skip
+PUSHED_PAYMENTS = ("pay the fee in your bank app", "pay the release fee at a bank branch",
+                   "transfer N5,000 in your bank app to unblock your account")  # fmt: skip
 TRUSTED_RECIPIENTS = ("your bank", "the police", "your family", "the EFCC", "your bank's fraud desk")
 UNTRUSTED_RECIPIENTS = ("him", "the caller", "the agent", "them", "your account officer")
 
@@ -275,6 +305,28 @@ def _all_safety_cases() -> Iterator[Case]:
         for recipient in UNTRUSTED_RECIPIENTS:
             yield Case(_sentence(f"{subject} {adjective} to send this to {recipient}"), "block", issue,
                        "send this: untrusted")  # fmt: skip
+        for action in TRUSTED_ACTIONS:
+            yield Case(
+                _sentence(f"{subject} {adjective} to {action}"),
+                "pass",
+                issue,
+                "dangerous verb, trusted place",
+            )
+        for action in PUSHED_PAYMENTS:
+            yield Case(
+                _sentence(f"{subject} {adjective} to {action}"), "block", issue, "payment, trusted channel"
+            )
+        for action in DANGEROUS:
+            yield Case(f"Is it {adjective} to {action}? No, never.", "pass", issue, "question")
+            yield Case(
+                _sentence(f"never assume {subject} {adjective} to {action}"), "pass", issue, "negated earlier"
+            )
+            yield Case(
+                _sentence(f"{subject} only {adjective} to {action} in your own bank app"),
+                "pass",
+                issue,
+                "only safe",
+            )
 
 
 def safety_cases(per_cell: int = 40, seed: int = SEED) -> list[Case]:

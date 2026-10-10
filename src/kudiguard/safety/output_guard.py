@@ -53,11 +53,11 @@ class OutputGuard:
             return (OutputIssue.EMPTY,)
         patterns = self._registry.guard_patterns(language)
         issues = []
-        if any(p.search(folded) for p in patterns.safety_claims):
+        sentences = [(m.group(1), m.group(2).startswith("?")) for m in _SENTENCE.finditer(folded)]
+        if any(_safety_claim(s, patterns) for s, question in sentences if not question):
             issues.append(OutputIssue.SAFETY_CLAIM)
         if any(p.search(folded) for p in patterns.refusals):
             issues.append(OutputIssue.REFUSAL)
-        sentences = [(m.group(1), m.group(2).startswith("?")) for m in _SENTENCE.finditer(folded)]
         if any(_unsafe_sentence(s, patterns) for s, question in sentences if not question):
             issues.append(OutputIssue.UNSAFE_INSTRUCTION)
         if any(_outcome_claim(s, patterns) for s, _ in sentences):
@@ -88,12 +88,38 @@ def _unsafe_sentence(sentence: str, patterns: GuardPatterns) -> bool:
     for index, segment in enumerate(segments):
         if index and _quoted_or_negated(segments[index - 1], patterns):
             continue
-        if _means_instruction(segment, patterns):
+        if _means_instruction(segment, patterns) or _segment_instruction(segment, patterns):
             return True
         for clause in _clauses(segment, patterns):
             if _reported_condition(clause, segment, patterns):
                 continue  # "They said your account will be blocked unless you send the OTP" reports the threat
             if _unsafe_instruction(clause, instructions, patterns):
+                return True
+    return False
+
+
+def _safety_claim(sentence: str, patterns: GuardPatterns) -> bool:
+    """A claim that something is safe, unless a negation opens its window ("Never assume it's safe to pay")."""
+    for pattern in patterns.safety_claims:
+        for match in pattern.finditer(sentence):
+            # its own clause only: "Don't worry, this is safe" is still a claim
+            before = _words(_CLAUSE_BREAK.split(sentence[: match.start()])[-1])[-NEGATION_WINDOW:]
+            if not any(_matches_any(patterns.negations, w) for w in before):
+                return True
+    return False
+
+
+def _segment_instruction(segment: str, patterns: GuardPatterns) -> bool:
+    """Instructions whose tell-tale part may sit past a clause break ("pay the fee in your bank app so your account
+    is not blocked"): matched on the segment, but the lead-in rule applies to the clause the verb starts in."""
+    for pattern in patterns.segment_instructions:
+        for match in pattern.finditer(segment):
+            own_clause = (_clauses(segment[: match.start()], patterns) or [""])[-1]
+            if own_clause and _reported_condition(own_clause, segment, patterns):
+                continue
+            if _is_lead_in(own_clause, patterns) and not any(
+                _matches_any(patterns.negations, w) for w in _words(own_clause)
+            ):
                 return True
     return False
 
