@@ -213,6 +213,34 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence). ha/yo/ig: not checked live.
   8 simultaneous checks: one runs, seven are skipped (busy, fail open), ~37 ms total: no queueing (enforce instead
   waits within its budget). Warm-up at startup: ~3–4 s for every default pack (2.8 s measured for 297 sentences).
+* **Guard, round 10: learned second layer** (`safety/guard_classifier.py`, `scripts/train_guard_classifier.py`,
+  artefact `data/guard/en_classifier.npz` + `.json`). Logistic regression (numpy, deterministic full-batch gradient
+  descent; scikit-learn is not installed) on the bge-small embedding (the already-loaded knowledge model, reply text
+  never cached) + 7 lexical cues (secret, payment, stranger, trusted place/recipient, negation, reported, imperative).
+  It scores reply sentences and clauses (`OutputGuard.units`) and may block only units the regex helpers do not gate
+  (questions, negated openings, reported speech, subordinate clauses, descriptions such as "you send them the code
+  and they ...", text around a colon, fragments) and that carry a cue and no trusted-recipient tail ("... to your
+  bank / the police"). Data (2,047 sentences): our probes (English), D's probe file, a 2-per-cell grammar sample
+  (weight 0.5), `data/guard/natural_en.yaml` (548 hand-written English/Pidgin sentences: synonyms, passive, lists,
+  gift cards, crypto, "safe accounts", payee-only payments; weight 4), negatives from every pack fact/action, the
+  safe-advice fixture and the English fixed strings. Dev = 20% by text hash; L2 (1e-4) and the natural weight were
+  chosen on dev, so dev is not strictly blind. Threshold 0.65 = the lowest at which the shipped decision (regex OR
+  classifier) keeps dev false positives <= 2%.
+
+  | dev (398) | precision | recall | false positives |
+  |---|---|---|---|
+  | regex alone | 99.4% | 78.2% | 0.5% |
+  | classifier alone (sentences, ungated) | 95.9% | 89.1% | 4.3% |
+  | **regex OR classifier (shipped)** | **98.6%** | **97.6%** | **1.6%** |
+  | ... natural sentences only (97) | 98.2% | 91.5% | 2.6% |
+
+  On the (mostly in-sample) suites the combined layer keeps: our probes 358/362 (4 false positives / 160, e.g. "Pay
+  through the agent at your bank branch"), D's set 190/192 (2/91), grammar 2,801/2,808 (7/1,280). Latency (CPU,
+  only cue units are embedded): p50 13 ms / p95 17 ms for a typical reply, p50 29 ms for a reply with 8 cue
+  sentences; budget 100 ms, then the regex verdict stands. Recommendation: **shadow for the pilot** (default) - dev
+  numbers are strong but the data are ours; switch to enforce after the independent held-out set and a review of
+  the shadow logs. **ha/yo/ig**: LaBSE transfer (train on English, test on our draft sentences) gives AUC 0.67 / 0.72
+  / 0.62 and recall <= 21% at the English threshold: not shipped (regex only for those languages).
 * **Guard, round 9: generated grammar** (`tests/guard_grammar.py`, `tests/unit/test_guard_grammar.py`). Labels by
   construction: 13 verbs x 8 credentials / 3 payment objects x 26 destinations (17 untrusted: people, links, numbers,
   "the official app he sent you", "the QR code he sent", ...; 7 trusted: your bank app, own phone, the bank's official

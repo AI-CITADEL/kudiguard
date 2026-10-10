@@ -27,6 +27,8 @@ from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
 from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
+from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
+from kudiguard.safety.output_guard import OutputGuard
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.storage.base import Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
@@ -97,6 +99,32 @@ def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) 
     else:
         log.info("grounding turn=%s grounded=%s unsupported_claims=%d claims=%d ms=%d", turn_id, report.grounded,
                  len(report.unsupported), len(report.claims), ms)  # fmt: skip
+
+
+def build_guard_classifier(
+    settings: Settings, registry: LanguageRegistry, embedder: Embedder | None
+) -> UnsafeAdviceClassifier | None:
+    """The learned second guard layer (English), reusing the knowledge-search embedder; None when off/unavailable."""
+    if ClassifierMode(settings.guard_classifier_mode) is ClassifierMode.OFF:
+        return None
+    if embedder is None:
+        log.warning("guard classifier disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
+        return None
+    try:
+        model = ClassifierModel.load(settings.guard_classifier_path)
+    except (OSError, ValueError, KeyError) as exc:
+        log.warning(
+            "guard classifier disabled: no usable artefact at %s (%s)", settings.guard_classifier_path, exc
+        )
+        return None
+    log.info("guard classifier (%s): version %s", settings.guard_classifier_mode, model.version)
+    return UnsafeAdviceClassifier(
+        model,
+        embedder,
+        OutputGuard(registry),
+        threshold=settings.guard_classifier_threshold,
+        budget_s=settings.guard_classifier_budget_ms / 1000,
+    )
 
 
 async def build_grounding(
@@ -198,6 +226,9 @@ async def build_services(settings: Settings) -> Services:
         grounding = await build_grounding(settings, registry, embedder, knowledge)
         if grounding is not None:
             closers.append(grounding.aclose)
+        classifier = build_guard_classifier(settings, registry, embedder)
+        if classifier is not None:
+            closers.append(classifier.aclose)
         engine = Engine(
             registry=registry,
             llm=llm,
@@ -207,6 +238,8 @@ async def build_services(settings: Settings) -> Services:
             grounding=grounding,
             grounding_mode=GroundingMode(settings.grounding_mode),
             on_grounding=log_grounding,
+            classifier=classifier,
+            classifier_mode=ClassifierMode(settings.guard_classifier_mode),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

@@ -52,6 +52,7 @@ from kudiguard.safety.grounding import (
     evidence_for,
     without_unsupported_steps,
 )
+from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
 from kudiguard.speech.service import SpeechResult, transcribe_upload
@@ -124,6 +125,8 @@ class Engine:
         grounding: GroundingChecker | None = None,
         grounding_mode: GroundingMode = GroundingMode.SHADOW,
         on_grounding: GroundingHook | None = None,
+        classifier: UnsafeAdviceClassifier | None = None,
+        classifier_mode: ClassifierMode = ClassifierMode.SHADOW,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -141,6 +144,8 @@ class Engine:
         # Hook for persisting results (e.g. onto the stored interaction): called with (turn_id, report, ms) after
         # every check, also the shadow checks that finish after the reply was sent.
         self.on_grounding = on_grounding
+        self.classifier = classifier if classifier_mode is not ClassifierMode.OFF else None
+        self.classifier_mode = classifier_mode
         self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
 
@@ -214,6 +219,7 @@ class Engine:
             generation = await self._generate(request, language, deadline)
             if generation.text is not None:
                 evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
+                self._classify_in_background(generation.text, language, turn_id)
                 if self.grounding_mode is GroundingMode.SHADOW:
                     self._ground_in_background(generation.text, language, evidence, analysis.english, turn_id)
                 else:
@@ -302,6 +308,8 @@ class Engine:
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(completion.text, truncated=completion.truncated)
             issues = self._guard.check(text, language)
+            if not any(self._blocks(i) for i in issues) and await self._classified_unsafe(text, language):
+                issues += (OutputIssue.CLASSIFIED_UNSAFE,)
             if not any(self._blocks(i) for i in issues):
                 if issues:  # outcome claims outside enforce mode: recorded, not blocking (yet)
                     log.info("%s outcome claim (log only): %s", request.purpose, issues)
@@ -311,6 +319,46 @@ class Engine:
             result.issues += issues
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
+
+    async def _classified_unsafe(self, text: str, language: LanguageCode) -> bool:
+        """Enforce mode only: the learned layer's verdict on a reply the regex guard let through. Fails open."""
+        if (
+            self.classifier is None
+            or self.classifier_mode is not ClassifierMode.ENFORCE
+            or not self.classifier.supports(language)
+        ):
+            return False
+        try:
+            verdict = await self.classifier.check(text, language)
+        except Exception as exc:  # optional layer: the regex verdict stands
+            log.warning("guard classifier not run, regex verdict only: %s", exc)
+            return False
+        log.info("guard_classifier mode=enforce flagged=%s p=%.2f ms=%d", verdict.flagged, verdict.probability,
+                 verdict.ms)  # fmt: skip
+        return verdict.flagged
+
+    def _classify_in_background(self, text: str, language: LanguageCode, turn_id: str | None) -> None:
+        """Shadow mode: score the sent reply after the fact and log it (counts only, never the text)."""
+        classifier = self.classifier
+        if (
+            classifier is None
+            or self.classifier_mode is not ClassifierMode.SHADOW
+            or not classifier.supports(language)
+        ):
+            return
+
+        async def run() -> None:
+            try:
+                verdict = await classifier.check(text, language)
+            except Exception as exc:
+                log.warning("guard classifier not run (shadow): %s", exc)
+                return
+            log.info("guard_classifier turn=%s mode=shadow flagged=%s p=%.2f ms=%d", turn_id, verdict.flagged,
+                     verdict.probability, verdict.ms)  # fmt: skip
+
+        task = asyncio.create_task(run())
+        self._shadow.add(task)
+        task.add_done_callback(self._shadow.discard)
 
     def _ground_in_background(
         self, text: str, language: LanguageCode, evidence: Sequence[str], message: str, turn_id: str | None
@@ -329,7 +377,8 @@ class Engine:
     async def aclose(self) -> None:
         """Let running shadow checks finish (bounded by the check's budget) before the checker shuts down."""
         if self._shadow:
-            budget = getattr(self.grounding, "budget_s", None) or SHADOW_DRAIN_S
+            budgets = [getattr(self.grounding, "budget_s", None), getattr(self.classifier, "budget_s", None)]
+            budget = max((b for b in budgets if b), default=SHADOW_DRAIN_S)
             _, pending = await asyncio.wait(set(self._shadow), timeout=budget)
             for task in pending:  # shutting down: a check past its budget is not worth waiting for
                 task.cancel()

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import itertools
 import re
+from dataclasses import dataclass
 from enum import StrEnum
 
 from kudiguard.domain import LanguageCode
@@ -38,6 +39,9 @@ class OutputIssue(StrEnum):
     SAFETY_CLAIM = "safety_claim"
     UNSAFE_INSTRUCTION = "unsafe_instruction"
     OUTCOME_CLAIM = "outcome_claim"  # blocking only in enforce mode (see engine)
+    CLASSIFIED_UNSAFE = (
+        "classified_unsafe"  # the learned second layer (safety.guard_classifier), enforce mode
+    )
     REFUSAL = "refusal"
     EMPTY = "empty"
     UNGROUNDED = "ungrounded"  # a claim not supported by the evidence (safety.grounding)
@@ -63,6 +67,61 @@ class OutputGuard:
         if any(_outcome_claim(s, patterns) for s, _ in sentences):
             issues.append(OutputIssue.OUTCOME_CLAIM)
         return tuple(issues)
+
+    def units(self, text: str, language: LanguageCode) -> list[Unit]:
+        """The sentences of a reply and, when a sentence has several, its clauses, for a second (learned) layer.
+        ``gated`` marks units a classifier must not block on its own: questions, units negated in their opening
+        window, reported speech, subordinate clauses ("if they ask you to ..."), descriptions ("you send them the
+        code and they ..."), fragments under three words, text before a colon and quoted or negated scripts after
+        one ("Scammers often say: ...", "Tell him: no, ...")."""
+        patterns = self._registry.guard_patterns(language)
+        units: list[Unit] = []
+        for match in _SENTENCE.finditer(normalize(text)):
+            sentence, question = match.group(1).strip(), match.group(2).startswith("?")
+            if not sentence:
+                continue
+            units.append(Unit(sentence, question or ":" in sentence or _gated(sentence, sentence, patterns)))
+            segments = sentence.split(":")
+            clauses: list[tuple[str, bool]] = []
+            for index, segment in enumerate(segments):
+                script = bool(index) and _quoted_or_negated(segments[index - 1], patterns)
+                intro = index < len(segments) - 1  # "tell him:" introduces what follows
+                clauses += [(c, script or intro) for c in _clauses(segment, patterns)]
+            if len(clauses) > 1:
+                units.extend(Unit(c, question or off or _gated(c, sentence, patterns)) for c, off in clauses)
+        return units
+
+
+@dataclass(frozen=True, slots=True)
+class Unit:
+    text: str  # folded (``text.normalize``)
+    gated: bool  # question, negated or reported: not an instruction on its own
+
+
+def _gated(unit: str, sentence: str, patterns: GuardPatterns) -> bool:
+    words = _words(unit)
+    if len(words) < 3 or _SUBORDINATE_OR_DESCRIPTION.match(unit):
+        return True
+    opening = words[:NEGATION_WINDOW]
+    if any(_matches_any(patterns.negations, w) for w in opening):
+        return True
+    if _reported_condition(unit, sentence, patterns):
+        return True
+    return bool(_REPORTED_START.match(unit))
+
+
+# "if they ask you to share the code", "once you send it", "you send them the code and they ...": a condition or a
+# description of what happens, not an instruction (English)
+_SUBORDINATE_OR_DESCRIPTION = re.compile(
+    r"(?:if|once|when|whenever|after|before|as soon as|the moment|until|because|since)\b"
+    r"|you\s+(?:send|share|give|tell|pay|transfer|enter|type|click|install|reply|\w+ed)\b"
+)
+# "they said ...", "the caller asked you to ...", "scammers will tell you to ...": reported, not advice (English)
+_REPORTED_START = re.compile(
+    r"(?:they|he|she|someone|scammers?|fraudsters?|the\s+[\w']+)\s+(?:[\w']+\s+)?"
+    r"(?:said|say|says|told|tell|tells|asked|ask|asks|want|wants|wanted|claim\w*|promise[sd]?|threaten\w*|warn\w*"
+    r"|will\s+(?:say|tell|ask|want))\b"
+)
 
 
 _SENTENCE = re.compile(r"([^\n]*?)([.!?]+['\"\u201d\u2019)]*(?=\s|$)|\n|$)")

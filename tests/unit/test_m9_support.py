@@ -441,3 +441,31 @@ def test_log_grounding_records_counts_per_turn(caplog: pytest.LogCaptureFixture)
         log_grounding("wamid.2", None, 150)
     assert "grounding turn=wamid.1 grounded=False unsupported_claims=1 claims=2 ms=31" in caplog.text
     assert "grounding turn=wamid.2 checked=no ms=150" in caplog.text and "NFIU" not in caplog.text
+
+
+def test_guard_classifier_wiring(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    from fakes import BagOfWordsEmbedder
+    from kudiguard.api.services import build_guard_classifier
+    from kudiguard.languages import LanguageRegistry
+    from kudiguard.safety.guard_classifier import DEFAULT_BUDGET_S
+
+    registry = LanguageRegistry.load(Path(__file__).resolve().parents[2] / "data" / "languages")
+    embedder = BagOfWordsEmbedder()
+    defaults = base_settings(tmp_path)
+    assert defaults.guard_classifier_mode == "shadow" and defaults.guard_classifier_threshold is None
+    assert defaults.guard_classifier_budget_ms == DEFAULT_BUDGET_S * 1000
+    built = build_guard_classifier(defaults, registry, embedder)
+    assert built is not None and built.threshold == built.model.threshold and built.budget_s == 0.1
+    tuned = build_guard_classifier(
+        base_settings(tmp_path, guard_classifier_threshold=0.9), registry, embedder
+    )
+    assert tuned is not None and tuned.threshold == 0.9
+    assert (
+        build_guard_classifier(base_settings(tmp_path, guard_classifier_mode="off"), registry, embedder)
+        is None
+    )
+    with caplog.at_level("WARNING", logger="kudiguard.api.services"):
+        assert build_guard_classifier(defaults, registry, None) is None
+        missing = base_settings(tmp_path, guard_classifier_path=tmp_path / "none.npz")
+        assert build_guard_classifier(missing, registry, embedder) is None
+    assert "needs the embedding model" in caplog.text and "no usable artefact" in caplog.text

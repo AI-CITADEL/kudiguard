@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     grounding_budget_ms: int = Field(
         default=150, gt=0
     )  # = grounding.DEFAULT_BUDGET_S; past it: send the reply
+    # Second guard layer: a learned classifier for unsafe advice in English replies (safety/guard_classifier.py;
+    # needs ``embeddings``). shadow = score after sending, log only; enforce = a flagged reply is retried, then fixed
+    # text. Threshold: empty = the artefact's (chosen on dev). Past the budget: the regex verdict alone.
+    guard_classifier_mode: Literal["off", "shadow", "enforce"] = "shadow"
+    guard_classifier_path: Path = ROOT / "data" / "guard" / "en_classifier.npz"
+    guard_classifier_threshold: float | None = Field(default=None, gt=0, lt=1)
+    guard_classifier_budget_ms: int = Field(default=100, gt=0)  # = guard_classifier.DEFAULT_BUDGET_S
     speech: bool = True
     preload_languages: Annotated[tuple[str, ...], NoDecode] = ("ha", "en")  # warm speech models at startup
     ffmpeg: str | None = None
