@@ -454,6 +454,7 @@ def test_a_promise_counts_once_but_other_outcome_claims_count(scorer: AnswerScor
         ("Your account is safe now; you will surely get your money back.", {MONEY_BACK, "outcome_claim"}),
         ("Your money will be refunded, and your account will be blocked.", {"outcome_claim"}),
         ("Your money is\nsafe now.", {"outcome_claim"}),  # no single clause shows it: kept, never dropped
+        ("You will get your money back and your account is safe now.", {MONEY_BACK, "outcome_claim"}),
     ],
 )
 def test_outcome_claims_are_deduplicated_per_clause(

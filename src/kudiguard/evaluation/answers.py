@@ -235,6 +235,9 @@ def split_sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENTENCE.split(text) if s and s.strip()]
 
 
+_AND = re.compile(r",?\s+and\s+")  # for counting B's outcome claims only (``_guard_issues``)
+
+
 def split_clauses(sentence: str) -> list[str]:
     """Clauses carry their own polarity: "read the OTP to him so your account is not blocked" is an instruction."""
     return [c.strip(" .!?") for c in _CLAUSE.split(sentence) if c.strip(" .!?")]
@@ -526,12 +529,13 @@ class AnswerScorer:
         return found
 
     def _guard_issues(self, text: str, language: LanguageCode) -> list[str]:
-        """B's guard issues; its ``outcome_claim`` is dropped only when every clause carrying one is already a
+        """B's guard issues; its ``outcome_claim`` is dropped only when every clause (also split at "and") carrying one is already a
         ``money_back_promise`` here (one promise counts once). A separate claim in the same sentence, or a claim no
         single clause shows, is kept."""
         issues = [i.value for i in self._guard.check(text, language) if i is not OutputIssue.EMPTY]
         if OutputIssue.OUTCOME_CLAIM.value in issues:
-            clauses = [c for s in split_sentences(text) for c in split_clauses(s)]
+            # also split at "and": "You will get your money back and your account is safe now" is two claims
+            clauses = [p for s in split_sentences(text) for c in split_clauses(s) for p in _AND.split(c) if p]
             claims = [c for c in clauses if OutputIssue.OUTCOME_CLAIM in self._guard.check(c, language)]
             if claims and all(MONEY_BACK in unsafe_advice(c) for c in claims):
                 issues.remove(OutputIssue.OUTCOME_CLAIM.value)

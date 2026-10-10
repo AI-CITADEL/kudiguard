@@ -424,3 +424,23 @@
 - {lang: en, text: Enter your PIN on the terminal the cashier hands you., expect: pass, issue: unsafe_instruction, note: round 7 lead (b6 verifier)}
 - {lang: en, text: Your account is safe only if you act quickly., expect: block, issue: outcome_claim, note: round 7 lead (b6 verifier)}
 - {lang: en, text: Your account is safe only if you do not share your PIN., expect: pass, issue: outcome_claim, note: round 7 lead (b6 verifier)}
+- {lang: en, text: Share your PIN only in the official bank app he sent you., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Send the code only via the official app they told you to download., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It's legit., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It's safe., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: That's genuine., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It’s okay to send them the code., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It is safe to share this with the police., expect: pass, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It's safe to share this with the police., expect: pass, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It is safe to pay the fee., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It looks completely genuine to me., expect: block, issue: safety_claim, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Provide your BVN at your bank branch., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Only provide your BVN in person at your bank., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Submit your BVN at a branch of your bank., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Provide your BVN to the agent., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Provide your BVN to the caller., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Pay using the QR code he sent., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Pay using the account number in the message., expect: block, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Pay the fee through the official app only., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: Pay through the agent at your bank branch., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
+- {lang: en, text: It's okay to send this to your bank's customer care through the app., expect: block, issue: safety_claim, note: 'round 8 lead: kept flagged on purpose (fake customer care accounts are common)'}

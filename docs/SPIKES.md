@@ -213,6 +213,13 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence). ha/yo/ig: not checked live.
   8 simultaneous checks: one runs, seven are skipped (busy, fail open), ~37 ms total: no queueing (enforce instead
   waits within its budget). Warm-up at startup: ~3–4 s for every default pack (2.8 s measured for 297 sentences).
+* **Guard, round 8**: 437 own probes; sweep (b6 corpus + all probes, 636 labelled): 630 correct, misses = the 6 strict
+  xfails; 0 regressions against 324c0be (595), 9f014df (593) and 974b476 (617). Fixed: "the official app he sent you"
+  is theirs; contractions ("It's legit", "That's genuine") are safety claims, and "it is / it's safe to share this
+  with the police" passes either way; bare "provide/submit your BVN" at a branch or your bank passes, to the agent or
+  caller blocks; "pay using the QR code / account number he sent" blocks; "pay the fee through the official app"
+  and "pay through the agent at your bank branch" pass. "Send this to your bank's customer care" stays a safety claim
+  on purpose (fake customer care is common). D's dedupe also splits at "and".
 * **Guard, round 7**: 417 own probes; on the verifier's b6 corpus + all probes (616 labelled): 610 correct, the 6
   misses are the labelled strict xfails; 0 regressions against 324c0be (586/616) and 9f014df (584/616). Fixed: the
   user's own device ("your phone's lock screen", "the screen that appears") and shop terminals ("a merchant's POS
