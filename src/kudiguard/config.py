@@ -7,12 +7,10 @@ misconfigured deployment fails fast instead of half-working.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-
-from kudiguard.safety.grounding import DEFAULT_BUDGET_S, DEFAULT_THRESHOLD
 
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
 
@@ -35,15 +33,16 @@ class Settings(BaseSettings):
     model_cache: Path = ROOT / "models"  # converted CTranslate2 speech models (scripts/prepare_asr.py)
     embeddings: bool = True  # hybrid retrieval (fastembed, CPU); False = BM25 only
     embeddings_cache: Path = ROOT / "models" / "fastembed"
-    # Check English replies claim by claim against their facts (needs ``embeddings``; ~tens of ms on CPU, fails open).
-    # Unsupported claims -> fixed fallback text. Other languages: offline evaluation only (back-translation).
-    grounding_check: bool = True
+    # Check English replies claim by claim against their facts (needs ``embeddings``; CPU, fails open; see
+    # safety/grounding.py). shadow = record only; enforce = drop unsupported steps or send fixed text. Enforce only
+    # after >= 100 held-out real N-ATLAS English replies show <= 5% false replacements (docs/SPIKES.md S8).
+    grounding_mode: Literal["off", "shadow", "enforce"] = "shadow"
     grounding_threshold: float = Field(
-        default=DEFAULT_THRESHOLD, gt=0, lt=1
-    )  # bge-small cosine; see grounding.py
+        default=0.73, gt=0, lt=1
+    )  # = grounding.DEFAULT_THRESHOLD (bge-small cosine)
     grounding_budget_ms: int = Field(
-        default=int(DEFAULT_BUDGET_S * 1000), gt=0
-    )  # hard cap; past it: send the reply
+        default=150, gt=0
+    )  # = grounding.DEFAULT_BUDGET_S; past it: send the reply
     speech: bool = True
     preload_languages: Annotated[tuple[str, ...], NoDecode] = ("ha", "en")  # warm speech models at startup
     ffmpeg: str | None = None

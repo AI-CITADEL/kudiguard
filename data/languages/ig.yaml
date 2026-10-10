@@ -23,6 +23,15 @@ output_guard:
     - 'enweghi ihe ize ndu'
   refusals:
     - 'enweghi m ike inyere'
+  # DRAFT, native review pending. Positive imperatives only: negative ones are different words ("enyela", "akwula").
+  unsafe_instructions:
+    - '(?:zite|ziga|nye|gwa)\W+(?:(?:ha|ya|onye)\W+)?(?:\w+\W+)?(?:otp|pin|bvn|koodu|okwuntughe|code)'
+    - 'kwuo\W+(?:\w+\W+)?(?:fee|ugwo nhazi|ugwo ndebanye)'
+    - '(?:pia|meghe)\W+(?:\w+\W+)?link'
+    - '(?:budata|wunye)\W+(?:\w+\W+)?(?:app|apk|anydesk|teamviewer)'
+    - '(?:zighachi|weghachi|nyeghachi)\W+(?:\w+\W+)?ego'
+  negations:
+    - '(?:ekwela|agaghi|ebula)'
 
 lexicon:
   flags:

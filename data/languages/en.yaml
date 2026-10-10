@@ -42,6 +42,18 @@ output_guard:
     - 'i\W*(?:can''t|cannot|can not|am unable to|''m unable to|won''t be able to)\W+(?:help|assist|provide)'
     - 'as an ai'
     - 'i''m sorry,? but i'
+  # Imperatives that do what the scammer wants (matched on folded text; "to share" is reported speech, not advice).
+  unsafe_instructions:
+    - '(?<!to )(?:share|send|give|tell|read(?: out)?|forward|reveal|disclose)\W+(?:(?:them|him|her|it|the caller|the agent|the person|anyone|someone)\W+)?(?:(?:your|the|that|this|their|any|a)\W+)?(?:otp|pin|bvn|password|passcode|cvv|code|card details|card number|token|login details)'
+    - '(?<!to )pay\W+(?:(?:the|their|this|that|any|a|an)\W+)?(?:[\w,.]+\W+){0,3}?(?:fee|charge|deposit)'
+    - '(?<!to )(?:click|open|tap|follow|visit)\W+(?:on\W+)?(?:(?:the|this|that|their|any)\W+)?link'
+    - '(?<!to )(?:install|download)\W+(?:(?:the|this|that|their|an|a)\W+)?(?:[\w.]+\W+)?(?:app|apk|anydesk|teamviewer|software)(?!\W+(?:only\W+)?from\W+(?:the\W+)?(?:official|play store|app store|google play))'
+    - '(?<!to )(?:send|transfer|pay|give|return)\W+(?:(?:the|their|that|this|his|her)\W+)?(?:money|funds|cash|it)\W+back'
+    - '(?<!to )refund\W+(?:it|them|the money)'
+  # Also reported speech: "they said your account is blocked unless you send the OTP" describes the scam.
+  negations:
+    - '(?:not|no|never|\w+n''t|dont|cannot|nobody|nothing|without|avoid|stop|ignore|refuse|nor|neither)'
+    - '(?:said|says|told|tells|asked|asks|want|wants|wanted|claim|claims|claimed|threaten\w*|promise[sd]?|demand\w*|pretend\w*)'
 
 lexicon:
   flags:

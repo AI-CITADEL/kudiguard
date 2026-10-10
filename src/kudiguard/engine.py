@@ -5,7 +5,7 @@ the same engine. Conversation state, consent, commands and rendering live in ``k
 
 Flow (PLAN §3): greeting/content-free shortcut → ANALYSE (N-ATLAS, JSON) → translate fallback → deterministic verdict
 policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → grounding
-check (``safety.grounding``: each claim must be supported by the facts given; no retry) → fixed fallback text.
+check (``safety.grounding``; shadow: recorded only; enforce: unsupported steps dropped or fixed text, no retry).
 The model never decides the verdict and never writes contacts; it can only make the answer better.
 """
 
@@ -44,7 +44,13 @@ from kudiguard.prompts import (
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
-from kudiguard.safety.grounding import GroundingChecker, GroundingReport, evidence_for
+from kudiguard.safety.grounding import (
+    GroundingChecker,
+    GroundingMode,
+    GroundingReport,
+    evidence_for,
+    without_unsupported_steps,
+)
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
 from kudiguard.speech.service import SpeechResult, transcribe_upload
@@ -81,6 +87,8 @@ class Answer:
     issues: tuple[OutputIssue, ...] = ()  # output-guard findings that forced a retry or fallback
     llm_ms: int = 0
     grounding_ms: int = 0  # wall time the grounding check added (0 = not run), separate from model time
+    grounded: bool | None = None  # grounding verdict on the composed reply (None = not checked)
+    unsupported_claims: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +118,7 @@ class Engine:
         temp_dir: Path | None = None,
         max_concurrent_transcriptions: int = 4,
         grounding: GroundingChecker | None = None,
+        grounding_mode: GroundingMode = GroundingMode.SHADOW,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -122,7 +131,8 @@ class Engine:
         self._ffmpeg = ffmpeg
         self._temp_dir = temp_dir
         self._guard = OutputGuard(registry)
-        self.grounding = grounding
+        self.grounding = grounding if grounding_mode is not GroundingMode.OFF else None
+        self.grounding_mode = grounding_mode
         self._matcher = CommandMatcher(registry)
 
     @property
@@ -180,6 +190,7 @@ class Engine:
         verdict = assessment.verdict
         contacts = tuple(c for c in knowledge.contacts if c.verified) if verdict in REPORT_VERDICTS else ()
         generation = _Generation(unavailable=model_down)
+        report: GroundingReport | None = None
         grounding_ms = 0
         if analysis.english and not model_down:
             request = compose_request(
@@ -191,13 +202,20 @@ class Engine:
             )
             generation = await self._generate(request, language, deadline)
             if generation.text is not None:
-                evidence = evidence_for(
-                    knowledge, verdict=verdict, flags=assessment.flags, message=analysis.english
+                evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
+                report, grounding_ms = await self._ground(
+                    generation.text, language, evidence, analysis.english, deadline
                 )
-                report, grounding_ms = await self._ground(generation.text, language, evidence, deadline)
-                if report is not None and not report.grounded:
-                    generation.text = None
+                if (
+                    report is not None
+                    and not report.grounded
+                    and self.grounding_mode is GroundingMode.ENFORCE
+                ):
                     generation.issues += (OutputIssue.UNGROUNDED,)
+                    trimmed = (
+                        without_unsupported_steps(generation.text, report) if language == PIVOT else None
+                    )
+                    generation.text = trimmed  # None: fixed fallback text
         body, outcome = generation.text, Outcome.ANSWERED
         if body is None:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
@@ -216,6 +234,8 @@ class Engine:
             issues=generation.issues,
             llm_ms=ms + generation.ms,
             grounding_ms=grounding_ms,
+            grounded=None if report is None else report.grounded,
+            unsupported_claims=0 if report is None else len(report.unsupported),
         )
 
     async def analyse(
@@ -276,7 +296,7 @@ class Engine:
         return result
 
     async def _ground(
-        self, text: str, language: LanguageCode, evidence: Sequence[str], deadline: float | None
+        self, text: str, language: LanguageCode, evidence: Sequence[str], message: str, deadline: float | None
     ) -> tuple[GroundingReport | None, int]:
         """The grounding check and its wall time in ms; None when it is off, unsupported, out of time or failed.
 
@@ -292,18 +312,20 @@ class Engine:
         start = time.perf_counter()
         report: GroundingReport | None = None
         try:
-            report = await self.grounding.check(text, language, evidence, deadline=deadline)
+            report = await self.grounding.check(text, language, evidence, message=message, deadline=deadline)
         except Exception as exc:  # optional step: any failure (incl. its time cap) sends the guarded reply
             log.warning("grounding check failed, sending the guarded reply: %s", exc)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
-        grounded = None if report is None else report.grounded
-        log.info("grounding_ms=%d language=%s grounded=%s", elapsed_ms, language, grounded)
-        if report is not None and not report.grounded:
-            log.info(
-                "reply not grounded (%d of %d claims): fixed text instead",
-                len(report.unsupported),
-                len(report.claims),
-            )
+        log.info(
+            "grounding_ms=%d language=%s mode=%s grounded=%s unsupported=%d/%d min_support=%.2f",
+            elapsed_ms,
+            language,
+            self.grounding_mode,
+            None if report is None else report.grounded,
+            0 if report is None else len(report.unsupported),
+            0 if report is None else len(report.claims),
+            min((c.support for c in report.claims), default=1.0) if report else 0.0,
+        )
         return report, elapsed_ms
 
     def _fallback_body(self, verdict: Verdict, language: LanguageCode) -> str:

@@ -313,26 +313,29 @@ async def test_grounding_check_needs_embeddings_and_can_be_turned_off(
 
     monkeypatch.setattr(embeddings, "FastEmbedder", lambda cache_dir: BagOfWordsEmbedder())
     caplog.set_level("INFO", logger="kudiguard.api.services")
-    for enabled in (True, False):
-        settings = base_settings(
-            tmp_path, embeddings=True, grounding_check=enabled, packs=("kudiguard-core",)
-        )
+    for mode in ("shadow", "enforce", "off"):
+        settings = base_settings(tmp_path, embeddings=True, grounding_mode=mode, packs=("kudiguard-core",))
         services = await build_services(settings)
         await services.aclose()
-        assert (services.engine.grounding is not None) is enabled
+        assert (services.engine.grounding is not None) is (mode != "off")
+        assert services.engine.grounding_mode == mode
     assert "evidence sentences embedded" in caplog.text  # pack facts pre-embedded at startup
 
 
 def test_grounding_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    from kudiguard.safety.grounding import DEFAULT_THRESHOLD
+    from kudiguard.safety.grounding import DEFAULT_BUDGET_S, DEFAULT_THRESHOLD
 
     defaults = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert defaults.grounding_check and defaults.grounding_threshold == DEFAULT_THRESHOLD
-    assert defaults.grounding_budget_ms == 150
-    monkeypatch.setenv("KUDIGUARD_GROUNDING_CHECK", "false")
+    assert defaults.grounding_mode == "shadow" and defaults.grounding_threshold == DEFAULT_THRESHOLD
+    assert defaults.grounding_budget_ms == DEFAULT_BUDGET_S * 1000  # config.py keeps literal copies
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_MODE", "enforce")
     monkeypatch.setenv("KUDIGUARD_GROUNDING_THRESHOLD", "0.8")
     tuned = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert not tuned.grounding_check and tuned.grounding_threshold == 0.8
+    assert tuned.grounding_mode == "enforce" and tuned.grounding_threshold == 0.8
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_MODE", "on")
+    with pytest.raises(ValueError, match="grounding_mode"):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+    monkeypatch.setenv("KUDIGUARD_GROUNDING_MODE", "shadow")
     monkeypatch.setenv("KUDIGUARD_GROUNDING_THRESHOLD", "1.5")
     with pytest.raises(ValueError, match="grounding_threshold"):
         Settings(_env_file=None)  # type: ignore[call-arg]

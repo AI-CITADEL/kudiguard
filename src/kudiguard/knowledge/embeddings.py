@@ -23,6 +23,8 @@ DEFAULT_THREADS = 4  # leave CPU for speech recognition, which also runs on CPU
 
 
 class Embedder(Protocol):
+    """Rows are L2-normalised (unit) vectors, so a dot product is cosine similarity."""
+
     def embed_documents(self, texts: Sequence[str]) -> Matrix: ...
 
     def embed_query(self, text: str) -> Matrix: ...
@@ -36,7 +38,8 @@ def l2_normalize(matrix: Matrix) -> Matrix:
 class CachedEmbedder:
     """Remembers document vectors (pack facts repeat on every turn); queries pass straight through.
 
-    Bounded LRU, safe to share between worker threads.
+    Bounded LRU, safe to share between worker threads. Cache only shared content (pack facts, fixed text), never user
+    messages or replies: embed those with ``inner`` directly.
     """
 
     def __init__(self, embedder: Embedder, max_items: int = 4096) -> None:
@@ -47,9 +50,15 @@ class CachedEmbedder:
         self._vectors: OrderedDict[str, Matrix] = OrderedDict()
         self._lock = threading.Lock()
 
+    @property
+    def inner(self) -> Embedder:
+        return self._embedder
+
     def embed_documents(self, texts: Sequence[str]) -> Matrix:
         if not texts:
-            return np.zeros((0, 0), dtype=np.float32)
+            with self._lock:
+                dim = next((len(v) for v in self._vectors.values()), 0)
+            return np.zeros((0, dim), dtype=np.float32)
         with self._lock:
             found = {t: self._vectors[t] for t in texts if t in self._vectors}
             for text in found:

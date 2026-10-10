@@ -24,6 +24,16 @@ output_guard:
     - 'ko si ewu'
   refusals:
     - 'mi o le ran'
+  # DRAFT, native review pending. "e"/"o" + verb; "ma se"/"ma"/"ko" earlier in the sentence negates.
+  unsafe_instructions:
+    - '(?:e|o)\W+fi\W+(?:\w+\W+){0,2}?(?:koodu|otp|pin|bvn|oro asina|code)\W+(?:\w+\W+)?ranse'
+    - '(?:e|o)\W+fun\W+(?:won|un|oun|enikeni)\W+ni\W+(?:\w+\W+)?(?:koodu|otp|pin|bvn|oro asina|code)'
+    - '(?:e|o)\W+san\W+(?:\w+\W+){0,3}?fee'
+    - '(?:e|o)\W+(?:te|si)\W+(?:ori\W+)?(?:\w+\W+)?link'
+    - '(?:e|o)\W+(?:download|gba|ko)\W+(?:\w+\W+)?(?:app|apk|anydesk|teamviewer)'
+    - '(?:e|o)\W+(?:da|fi)\W+(?:\w+\W+){0,2}?owo\W+(?:naa\W+)?pada'
+  negations:
+    - '(?:ma se|mase|ma|ko|kii|ki i)'
 
 lexicon:
   flags:

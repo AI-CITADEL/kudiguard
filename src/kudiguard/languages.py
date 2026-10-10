@@ -60,6 +60,10 @@ class _OutputGuardSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     safety_claims: list[str] = Field(default_factory=list)  # "this is safe / not a scam" in this language
     refusals: list[str] = Field(default_factory=list)  # "I can't help" in this language
+    # Instructions that hand a scammer what they want ("share the code", "pay the fee", "click the link"), as
+    # imperatives. A hit is ignored when a ``negations`` term comes earlier in the same sentence ("do not share").
+    unsafe_instructions: list[str] = Field(default_factory=list)
+    negations: list[str] = Field(default_factory=list)
 
 
 class _CommandsSpec(BaseModel):
@@ -76,6 +80,8 @@ class _CommandsSpec(BaseModel):
 class GuardPatterns:
     safety_claims: Patterns
     refusals: Patterns
+    unsafe_instructions: Patterns = ()
+    negations: Patterns = ()
 
 
 def _ui_length(text: str) -> int:
@@ -130,6 +136,8 @@ class LanguageRegistry:
                 guards[lang.code] = GuardPatterns(
                     tuple(compile_term(t) for t in lang.output_guard.safety_claims),
                     tuple(compile_term(t) for t in lang.output_guard.refusals),
+                    tuple(compile_term(t) for t in lang.output_guard.unsafe_instructions),
+                    tuple(compile_term(t) for t in lang.output_guard.negations),
                 )
             except (ValidationError, ValueError, yaml.YAMLError) as exc:
                 raise LanguageConfigError(f"{path.name}: {exc}") from exc
@@ -182,7 +190,12 @@ class LanguageRegistry:
         if code == PIVOT:
             return own
         pivot = self._own_guards.get(PIVOT, GuardPatterns((), ()))
-        return GuardPatterns(pivot.safety_claims + own.safety_claims, pivot.refusals + own.refusals)
+        return GuardPatterns(
+            pivot.safety_claims + own.safety_claims,
+            pivot.refusals + own.refusals,
+            pivot.unsafe_instructions + own.unsafe_instructions,
+            pivot.negations + own.negations,
+        )
 
     def asr_models(self) -> dict[LanguageCode, str]:
         """Language code -> speech model repo, for enabled languages."""

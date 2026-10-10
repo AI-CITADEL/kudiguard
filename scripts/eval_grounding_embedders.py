@@ -6,9 +6,13 @@
 Claims are compared directly with the English evidence (no back-translation), so for ha/yo/ig this measures whether a
 cross-lingual model could check replies live. Prints, per language, the best achievable accuracy and its threshold,
 the score range of supported vs invented claims, and embedding latency. Results: docs/SPIKES.md (S8).
+Evidence is the live evidence (facts, actions, verdict line, framing and fixed advice, as sentences); the polarity and
+specifics checks are not applied: this compares embedding models only.
 
 LaBSE is not in fastembed: download ``Xenova/LaBSE`` (onnx/model_int8.onnx + tokenizer.json, ~470 MB) and
 ``sentence-transformers/LaBSE`` 2_Dense/model.safetensors into ``<cache>/Xenova-LaBSE`` (``st/2_Dense``) first.
+It also needs ``safetensors`` (not a project dependency: ``pip install safetensors``); onnxruntime and tokenizers
+come with fastembed.
 """
 
 from __future__ import annotations
@@ -21,13 +25,17 @@ from pathlib import Path
 import numpy as np
 import yaml
 
+from kudiguard.domain import Verdict
 from kudiguard.knowledge.embeddings import FastEmbedder, Matrix, l2_normalize
 from kudiguard.knowledge.file_pack import FilePackSource
 from kudiguard.knowledge.models import KnowledgeResult, SourcedEntry
-from kudiguard.safety.grounding import GENERIC_FRAMING, evidence_for, evidence_units
+from kudiguard.languages import LanguageRegistry
+from kudiguard.safety.grounding import GroundingChecker, evidence_for, evidence_units
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES = yaml.safe_load((ROOT / "data" / "eval" / "grounding_claims.yaml").read_text(encoding="utf-8"))
+CASES = yaml.safe_load((ROOT / "data" / "eval" / "grounding_claims.yaml").read_text(encoding="utf-8"))[
+    "claims"
+]
 
 
 class LaBSE:
@@ -78,13 +86,17 @@ def main() -> None:
     parser.add_argument("--cache", type=Path, default=ROOT / "models" / "fastembed")
     args = parser.parse_args()
     core = {e.id: e for e in FilePackSource.load(ROOT / "data" / "packs" / "kudiguard-core").entries}
+    registry = LanguageRegistry.load(ROOT / "data" / "languages")
+    framing = GroundingChecker(None, FastEmbedder(cache_dir=args.cache), registry).framing
     for name in args.model or ["bge-small"]:
         embedder = MODELS[name](args.cache)
         print(f"== {name}")
         by_language: dict[str, list[tuple[float, bool]]] = {}
         for case in CASES:
             entries = tuple(SourcedEntry(core[i], "kudiguard-core", "KudiGuard") for i in case["entries"])
-            evidence = evidence_units([*evidence_for(KnowledgeResult(entries=entries)), *GENERIC_FRAMING])
+            verdict = Verdict(case["verdict"]) if "verdict" in case else None
+            facts = evidence_for(KnowledgeResult(entries=entries), verdict=verdict)
+            evidence = evidence_units([*facts, *framing])
             claim = embedder.embed_documents([case["claim"]])  # type: ignore[attr-defined]
             score = float((embedder.embed_documents(evidence) @ claim.T).max())  # type: ignore[attr-defined]
             by_language.setdefault(case["lang"], []).append((score, case["supported"]))

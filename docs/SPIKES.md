@@ -179,30 +179,45 @@ lexicon with *separate* dev examples, then re-measure here once (recorded as a p
 (BM25 only: 67% / 79%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
 top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tuned on them).
 
-## S8 — Grounding check: embedder and threshold (10 Oct 2026, CPU only)
+## S8 — Grounding check: embedder, threshold, polarity, latency (10 Oct 2026, CPU only)
 
-Set: `data/eval/grounding_claims.yaml` (47 English claims: 28 paraphrases, 19 plausible inventions; 10 each in
-ha/yo/ig by a non-native author, native review pending). Claim vs best evidence sentence (pack facts + actions +
-framing). Live run: `pytest -m live tests/integration/test_grounding_quality.py`; comparison:
-`scripts/eval_grounding_embedders.py`.
+Set: `data/eval/grounding_claims.yaml`. **Dev** (threshold chosen here only): 47 English claims (28 paraphrases,
+19 inventions) + 10 each in ha/yo/ig. **Test** (held out, written after the threshold was fixed): 30 English claims
+(14 paraphrases, 16 inventions incl. 6 polarity inversions) + 26 whole replies (the reviewer's 13 realistic replies
+and 13 replies that repeat the scam or invert the advice). All written by us, not N-ATLAS: real replies come from
+workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_grounding_quality.py`.
 
-* **English, bge-small (shipped)**: paraphrases ≥ 0.765, inventions mostly < 0.75 → threshold **0.75** (below the
-  lowest paraphrase on purpose: a false flag replaces a good answer). Adding the specifics check (numbers and
-  agency names must appear in the evidence): **precision 100%, recall 89% (17/19), false flags 0/28**. Misses are
-  negations/near-advice ("you do not have to repay a loan app that harasses you", 0.81).
-* **Latency** (added per English reply, pack facts pre-embedded at startup, reply + user message embedded in one
-  batch off the event loop): **p50 12 ms, p95 15 ms** for 7 claims; startup warm-up 183 core sentences in 0.7 s.
-  ha/yo/ig: **0 ms live** (not checked).
-* **Cross-lingual (claims in ha/yo/ig vs English facts, no back-translation)**, best accuracy at a per-language
-  threshold (n=10 per language, so ±15 points):
+* **Threshold**: highest with no false flags on dev → **0.73** (bge-small, polarity-aware). Polarity-aware support
+  costs one dev false flag at 0.75 (so 0.75 → 0.73) but catches more inversions at any threshold:
+
+  | | dev caught / false flags | test caught / false flags |
+  |---|---|---|
+  | polarity, 0.73 (shipped) | 16/19 · 0/28 | **9/16 · 0/14** |
+  | polarity, 0.75 | 17/19 · 1/28 | 11/16 · 0/14 |
+  | no polarity, 0.75 (previous) | 17/19 · 0/28 | 9/16 · 0/14 |
+
+  Held-out recall is **56%** (dev 84% is in-sample). Precision 100% on both. Meaning similarity misses advice that
+  sits close to real advice; the output guard covers the dangerous cases deterministically.
+* **Replies (held out)**: all 13 scam-echo / inverted replies are blocked by the guard or the check (the guard alone
+  catches 12). The attributed restatement ("They said your account will be blocked unless you send the OTP") passes
+  both. Of the 13 realistic replies, **6 would be replaced in enforce mode** (general advice not in the retrieved
+  facts: "Report it to the police and the EFCC", "Only lend what you can afford to lose") → default **shadow**.
+* **Latency** (added per English reply, pack facts cached; the reply's sentences embedded uncached each turn; the
+  message embedded only when a claim is attributed), 8-sentence reply: p50 31–35 ms on an idle CPU, 49–58 ms with
+  other work on the machine; p95 34–68 ms; flat for messages of 80 / 500 / 1,000 / 2,000 chars (before the fix:
+  344 ms at 967 chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence; 8 sentences raw:
+  31 ms). ha/yo/ig: 0 ms live. 8 simultaneous turns: one checked, seven skipped (busy, fail open), 34–59 ms total:
+  no queueing. Warm-up at startup: ~3–4 s for every
+  default pack (2.8 s measured for 297 sentences), not per turn.
+* **Cross-lingual (claims in ha/yo/ig vs English facts, no back-translation)**: best accuracy at a per-language
+  threshold (n=10 per language, so ±15 points; `scripts/eval_grounding_embedders.py`):
 
   | Model | Size | ha | yo | ig | 4 claims |
   |---|---|---|---|---|---|
-  | bge-small-en-v1.5 (English only) | 67 MB | 70% | 60% | 70% | 20 ms |
+  | bge-small-en-v1.5 (English only) | 67 MB | 60% | 60% | 70% | 31 ms |
   | paraphrase-multilingual-MiniLM-L12-v2 | 235 MB | 80% | 60% | 60% | 25 ms |
-  | LaBSE int8 (ONNX, CLS + dense head) | 470 MB | 100% @0.55 | 90% @0.49 | 80% @0.67 | 27 ms |
+  | LaBSE int8 (ONNX, CLS + dense head) | 470 MB | 100% @0.54 | 80% @0.57 | 80% @0.68 | 45 ms |
 
-  LaBSE is fast enough (< 150 ms budget) and promising, but per-language thresholds differ by 0.18 on 10 unreviewed
-  examples each: not reliable enough to replace good answers with fixed text. **Decision: live check English only;**
-  ha/yo/ig via N-ATLAS back-translation offline (`GroundingChecker(llm, …)`, ~1–2 s per reply on the GPU).
-  Next step for live ha/yo/ig: ≥ 40 native-reviewed claims per language, then re-run LaBSE.
+  LaBSE is fast enough and promising, but its per-language thresholds differ by 0.14 on 10 unreviewed examples each.
+  **Decision: live check English only**; ha/yo/ig via N-ATLAS back-translation offline. Next: ≥ 40 native-reviewed
+  claims per language, then re-run LaBSE.

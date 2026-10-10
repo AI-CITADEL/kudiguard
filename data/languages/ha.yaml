@@ -25,6 +25,15 @@ output_guard:
     - '(?:yana|ya) da (?:aminci|tsaro)'
   refusals:
     - 'ba zan iya taimaka'
+  # DRAFT, native review pending. Imperatives (ku/ka/ki + verb); "kada"/"kar" earlier in the sentence negates.
+  unsafe_instructions:
+    - '(?:ku|ka|ki)\W+(?:tura|aika|bayar da|ba)\W+(?:(?:su|shi|ta|masu|musu|masa|mata)\W+)?(?:(?:da|wannan|wata|wani)\W+)?(?:lambar|lamba|otp|pin|bvn|kalmar sirri|code|kod)'
+    - '(?:ku|ka|ki)\W+biya\W+(?:\w+\W+)?(?:kudin|kudi|caji)'
+    - '(?:ku|ka|ki)\W+(?:danna|bude|latsa)\W+(?:\w+\W+)?(?:link|mahada|mahadar|hanyar)'
+    - '(?:ku|ka|ki)\W+(?:sauke|saukar da|shigar da|sanya|zazzage)\W+(?:\w+\W+)?(?:app|manhaja|manhajar|anydesk|teamviewer|apk)'
+    - '(?:ku|ka|ki)\W+(?:mayar|maida|maido)\W+(?:musu\W+|masa\W+|mata\W+)?(?:da\W+)?(?:kudin|kudi)'
+  negations:
+    - '(?:kada|kar)'
 
 lexicon:
   flags:
