@@ -526,15 +526,15 @@ class AnswerScorer:
         return found
 
     def _guard_issues(self, text: str, language: LanguageCode) -> list[str]:
-        """B's guard issues; its ``outcome_claim`` is dropped when every such sentence is already a
-        ``money_back_promise`` here, so one promise counts once."""
+        """B's guard issues; its ``outcome_claim`` is dropped only when every clause carrying one is already a
+        ``money_back_promise`` here (one promise counts once). A separate claim in the same sentence, or a claim no
+        single clause shows, is kept."""
         issues = [i.value for i in self._guard.check(text, language) if i is not OutputIssue.EMPTY]
-        if OutputIssue.OUTCOME_CLAIM.value in issues and all(
-            MONEY_BACK in unsafe_advice(s)
-            for s in split_sentences(text)
-            if OutputIssue.OUTCOME_CLAIM in self._guard.check(s, language)
-        ):
-            issues.remove(OutputIssue.OUTCOME_CLAIM.value)
+        if OutputIssue.OUTCOME_CLAIM.value in issues:
+            clauses = [c for s in split_sentences(text) for c in split_clauses(s)]
+            claims = [c for c in clauses if OutputIssue.OUTCOME_CLAIM in self._guard.check(c, language)]
+            if claims and all(MONEY_BACK in unsafe_advice(c) for c in claims):
+                issues.remove(OutputIssue.OUTCOME_CLAIM.value)
         return issues
 
     def _identifiers(self, text: str) -> list[str]:

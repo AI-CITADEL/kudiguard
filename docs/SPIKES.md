@@ -213,6 +213,13 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence). ha/yo/ig: not checked live.
   8 simultaneous checks: one runs, seven are skipped (busy, fail open), ~37 ms total: no queueing (enforce instead
   waits within its budget). Warm-up at startup: ~3–4 s for every default pack (2.8 s measured for 297 sentences).
+* **Guard, round 7**: 417 own probes; on the verifier's b6 corpus + all probes (616 labelled): 610 correct, the 6
+  misses are the labelled strict xfails; 0 regressions against 324c0be (586/616) and 9f014df (584/616). Fixed: the
+  user's own device ("your phone's lock screen", "the screen that appears") and shop terminals ("a merchant's POS
+  terminal", "the terminal the cashier hands you") are not foreign; a reported threat that contains a means ("They said
+  ... unless you verify by sending the OTP") passes; BVN at a branch passes, BVN "to the agent" blocks (an agent may be
+  the scammer; "your bank's agent" passes); "share this with your bank / the police" is not a safety claim; "pay via
+  the link" blocks; "safe only if you act quickly" is an outcome claim. D's dedupe works per clause.
 * **Guard, round 6**: 387 own probes, all correct except the same 2 strict xfails; D's 214: 210 correct. Fixed: a
   device someone shows or holds ("the screen he shows you", "the POS terminal the agent holds", "a stranger's phone");
   "only with/to your ..." exempts the user's own app/phone or the bank itself, never its officer/agent/manager;

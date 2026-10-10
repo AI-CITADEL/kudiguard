@@ -105,6 +105,8 @@ def _means_instruction(segment: str, patterns: GuardPatterns) -> bool:
     for pattern in patterns.means_instructions:
         for match in pattern.finditer(segment):
             own_clause = (_clauses(segment[: match.start()], patterns) or [""])[-1]
+            if own_clause and _reported_condition(own_clause, segment, patterns):
+                continue  # "They said ... unless you verify by sending the OTP" reports the threat
             if not any(_matches_any(patterns.negations, w) for w in _words(own_clause)):
                 return True
     return False
