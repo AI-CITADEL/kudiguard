@@ -52,6 +52,8 @@ Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The
 | ha / yo / ig / en | _n_ | _x_ | _x_ | _x_ |
 
 ## Known limitations
+* A language tap within 5 s of the welcome gets "please read the message above" once, because consent must
+  come after the notice could be read (docs/DEPLOY.md).
 * Genuine bank OTP SMS can be flagged 🟠 "be careful" (safe direction; fix pending separate examples).
 * Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review.
 * Speech accuracy measured on read speech; real voice notes from the pilot will be added.

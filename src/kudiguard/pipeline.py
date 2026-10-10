@@ -56,8 +56,9 @@ FAILURE_DEADLINE_S = (
 )
 ACK_DEADLINE_S = 3.0
 DONATION_DEADLINE_S = 60.0  # the background donation step (write or offer) after a turn
-# A message counts as consent only if sent at least this long after the welcome was delivered: nobody reads the
-# notice faster, and it absorbs clock skew between the provider's timestamp and this server (keep NTP on).
+# A message counts as consent only if sent at least this long after the welcome was sent (accepted by WhatsApp):
+# nobody reads the notice faster, and it protects against this server's clock running up to this much *behind*
+# the provider's (a clock ahead only delays when a reply counts). Keep the clock synced (docs/DEPLOY.md).
 WELCOME_READ_S = 5.0
 MAX_COALESCED = 5  # quick successive notes/texts merged into one check (people split one story over messages)
 
@@ -453,7 +454,8 @@ class Conversation:
         welcome first, whatever they sent.
         """
         now = self._clock()
-        # Shown = this text's welcome was delivered at a known time (a row without the time is welcomed again).
+        # Shown = this text's welcome was sent (accepted by WhatsApp) at a known time; a row without the time is
+        # welcomed again.
         welcomed = (
             user is not None and user.welcome_version == CONSENT_VERSION and user.welcome_at is not None
         )
@@ -490,7 +492,7 @@ class Conversation:
         # The welcome's language is kept provisionally (no consent yet) so a reply in it is understood. Donation
         # consent is separate and survives a new main consent text, but never a STOP: a stopped user who comes back
         # starts without it (a fresh yes is required); the "offered" marks stay.
-        # welcome_version stays unset until the welcome was actually delivered (a failed send is not "shown").
+        # welcome_version stays unset until the welcome was sent (accepted by WhatsApp): a failed send is not "shown".
         state = UserState(turn.user_hash, language=turn.language, created_at=user.created_at if user else now,
                           last_seen_at=now)  # fmt: skip
         if user is not None:
@@ -989,9 +991,10 @@ async def record_pattern(store: Store, channel: str, answer: Answer, text: str, 
 
 def _before_welcome(message: InboundMessage, user: UserState | None) -> bool:
     """Sent before the user could have read the welcome (e.g. a second message queued behind the first): such a
-    message is not consent. Compared on absolute time with a reading margin (``WELCOME_READ_S``), which also absorbs
-    clock skew: comparing with the triggering message's own timestamp would accept any later message sent before the
-    welcome arrived, which is exactly the race to close."""
+    message is not consent. Compared on absolute time (provider timestamp vs. when we sent the welcome) with a
+    reading margin (``WELCOME_READ_S``) that also covers our clock running behind the provider's. Comparing with the
+    triggering message's own timestamp would accept any later message sent before the welcome arrived, which is
+    exactly the race to close."""
     if message.sent_at is None or user is None or user.welcome_at is None:
         return False
     return message.sent_at < user.welcome_at.timestamp() + WELCOME_READ_S

@@ -44,9 +44,8 @@ class UserState:
     # The CONSENT_VERSION of the welcome last *shown* (None = never welcomed, e.g. a row created by the sign-up form
     # import): main consent is recorded only after the current welcome was shown.
     welcome_version: str | None = None
-    welcome_at: datetime | None = (
-        None  # when that welcome was delivered (consent: only messages sent after it)
-    )
+    # When that welcome was sent (accepted by WhatsApp); consent comes only from messages sent after it.
+    welcome_at: datetime | None = None
     # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
     # text the user accepted together with the 18+ and own-voice confirmations (the chat's "Yes, I am 18+" button or
     # the sign-up form's ticked boxes); None = not donating. It survives a change of the main consent text; only

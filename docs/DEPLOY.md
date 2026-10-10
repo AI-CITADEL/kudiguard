@@ -20,9 +20,26 @@ business number and the app in Live mode. Replies are free within 24 h of the us
 **Where data is stored** (shown to every user): `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (the default; this PC)
 or `nigeria` once the server really is in Nigeria. Moving abroad again needs a new `CONSENT_VERSION`.
 
-**Keep the clock synced** (Windows: Settings > Time > "Set time automatically", or `w32tm /resync`).
-Consent is taken only from a message the user sent at least 5 s after the welcome was delivered, compared with
-WhatsApp's timestamp. A clock more than 5 s fast would treat a quick early message as consent.
+**Keep the clock synced.** Consent is taken only from a message the user sent at least 5 s after the welcome was
+sent (accepted by WhatsApp). That compares WhatsApp's timestamp with this PC's clock.
+* A clock more than 5 s **slow** (behind Meta) would treat a quick early message as consent.
+* A **fast** clock only makes users wait longer before their reply counts, by up to the skew. STOP and DELETE always
+  work.
+* Windows: turn on Settings > Time > "Set time automatically". Then shorten the sync interval in an elevated prompt:
+
+      w32tm /config /manualpeerlist:"time.windows.com,0x9" /syncfromflags:manual /update
+      reg add HKLM\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient /v SpecialPollInterval /t REG_DWORD /d 900 /f
+      w32tm /resync
+
+  Alternatively, add a scheduled task that runs `w32tm /resync` every 15 minutes.
+* **Before going live,** check the drift: `w32tm /stripchart /computer:time.windows.com /samples:5 /dataonly` must
+  stay well under 5 s.
+
+**Keep the server on during the pilot.** Retention purges run every 6 hours while it runs. If the PC sleeps or is off
+for days, purges run late, so DELETE markers and expired data can outlive their limits until the next run.
+
+**Known friction:** the language menu arrives with the welcome. A user who taps a language within 5 s gets "please
+read the message above" once, and their next tap counts.
 
 **Restrict files to the service account** (Windows ignores POSIX modes). Run in an elevated prompt, with the
 account that runs the watchdog:

@@ -28,9 +28,10 @@ against the gazetted text before filing.
     * Imported testers are not asked again in the chat.
     * An import never implies main consent: the tester's first message, whatever it is, gets the welcome, which
       carries the retention, reviewer and transfer notice. Main consent is recorded only after the current welcome
-      was *delivered* (`welcome_version`, `welcome_at`).
-    * Consent comes only from a message sent at least 5 s after that delivery, judged by WhatsApp's timestamp. A
-      message sent earlier gets a pointer to the notice and is not processed.
+      was *sent (accepted by WhatsApp)* (`welcome_version`, `welcome_at`).
+    * Consent comes only from a message sent at least 5 s after that, judged by WhatsApp's timestamp. A message sent
+      earlier gets a pointer to the notice and is not processed.
+    * The server clock must stay synced; DEPLOY.md gives the drift check.
     * The import itself is a compare-and-set: it writes nothing if the chat changed the row after the import read
       it.
 * **What we keep (s.24, minimisation):**

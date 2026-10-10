@@ -336,9 +336,9 @@ async def test_a_message_sent_before_the_welcome_arrived_is_not_consent(d: Harne
     assert (await user(d)).consent_version == CONSENT_VERSION and d.t(Msg.READ_WELCOME) not in texts
 
 
-async def test_the_reading_margin_absorbs_a_fast_server_clock(d: Harness) -> None:
-    """Our clock may run a few seconds ahead of Meta's: a message stamped up to WELCOME_READ_S after our delivery
-    time is still treated as sent before the welcome."""
+async def test_the_reading_margin_covers_a_server_clock_running_behind(d: Harness) -> None:
+    """If our clock runs up to WELCOME_READ_S behind Meta's, a message the user sent before the welcome can carry a
+    timestamp just after our recorded send time: anything within the margin is still not consent."""
     import time
 
     from kudiguard.pipeline import WELCOME_READ_S

@@ -32,9 +32,8 @@ from kudiguard.storage.sqlite import SQLiteStore
 log = logging.getLogger(__name__)
 
 PURGE_INTERVAL_S = 6 * 3600
-PURGE_MARGIN = timedelta(
-    hours=1
-)  # a pass may run late (sleep drift, slow disk); markers expire this much earlier
+# A pass may run late (sleep drift, slow disk): DELETE markers expire this much earlier.
+PURGE_MARGIN = timedelta(hours=1)
 
 
 @dataclass
