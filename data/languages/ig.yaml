@@ -116,3 +116,5 @@ strings:
   where_nigeria: "na Naịjirịa"
   risk_outside: "Iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị echedo data dị na mba ofesi kpamkpam."
   risk_nigeria: "Data na-agafe na Meta na Cloudflare nwere ike ịbụ nke a na-ahazi na mba ofesi, ebe iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị arụ ọrụ kpamkpam."
+  # Sent before the welcome reached the user: not taken as consent. DRAFT.
+  read_welcome: "☝️ Biko gụọ ozi dị n'elu, wee zaa iji gaa n'ihu."

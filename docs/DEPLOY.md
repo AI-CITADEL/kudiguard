@@ -20,6 +20,10 @@ business number and the app in Live mode. Replies are free within 24 h of the us
 **Where data is stored** (shown to every user): `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (the default; this PC)
 or `nigeria` once the server really is in Nigeria. Moving abroad again needs a new `CONSENT_VERSION`.
 
+**Keep the clock synced** (Windows: Settings > Time > "Set time automatically", or `w32tm /resync`).
+Consent is taken only from a message the user sent at least 5 s after the welcome was delivered, compared with
+WhatsApp's timestamp. A clock more than 5 s fast would treat a quick early message as consent.
+
 **Restrict files to the service account** (Windows ignores POSIX modes). Run in an elevated prompt, with the
 account that runs the watchdog:
 

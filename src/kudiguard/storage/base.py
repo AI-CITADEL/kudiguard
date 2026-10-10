@@ -44,6 +44,9 @@ class UserState:
     # The CONSENT_VERSION of the welcome last *shown* (None = never welcomed, e.g. a row created by the sign-up form
     # import): main consent is recorded only after the current welcome was shown.
     welcome_version: str | None = None
+    welcome_at: datetime | None = (
+        None  # when that welcome was delivered (consent: only messages sent after it)
+    )
     # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
     # text the user accepted together with the 18+ and own-voice confirmations (the chat's "Yes, I am 18+" button or
     # the sign-up form's ticked boxes); None = not donating. It survives a change of the main consent text; only
@@ -112,6 +115,12 @@ class Store(Protocol):
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
         their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Leaves only
         a coded DELETE marker (``deleted_at``). Returns rows removed (the marker is not counted)."""
+        ...
+
+    async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
+        """Compare-and-set for the sign-up import: store ``state``'s donation consent (version, time, source and the
+        offer marks) only if the user row is still exactly as read (``expected``; None = no row yet), never stopped,
+        withdrawn or offered meanwhile. Touches no other field. Returns whether it was recorded."""
         ...
 
     async def deleted_at(self, user_hash: str) -> datetime | None:

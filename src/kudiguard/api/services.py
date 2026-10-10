@@ -32,6 +32,9 @@ from kudiguard.storage.sqlite import SQLiteStore
 log = logging.getLogger(__name__)
 
 PURGE_INTERVAL_S = 6 * 3600
+PURGE_MARGIN = timedelta(
+    hours=1
+)  # a pass may run late (sleep drift, slow disk); markers expire this much earlier
 
 
 @dataclass
@@ -98,8 +101,9 @@ async def _purge_once(
     voice_retention_days: int,
 ) -> int:
     """One retention pass; each step on its own, so one failing never skips the others."""
-    # DELETE markers are dropped one interval early, so none ever outlives DELETION_MARKER_DAYS (/privacy).
-    marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s)
+    # DELETE markers are dropped one interval (plus a margin for slow passes) early, so none ever outlives
+    # DELETION_MARKER_DAYS (/privacy), while still outliving every importable form answer (29 days).
+    marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s) + PURGE_MARGIN
     steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
         ("evidence", lambda: store.purge_before(now - timedelta(days=retention_days))),
         (

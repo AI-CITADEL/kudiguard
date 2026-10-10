@@ -100,6 +100,7 @@ MIGRATIONS: Sequence[str] = (
     ALTER TABLE users ADD COLUMN donation_offered_version TEXT;
     ALTER TABLE users ADD COLUMN donation_withdrawn_at TEXT;
     ALTER TABLE users ADD COLUMN welcome_version TEXT;
+    ALTER TABLE users ADD COLUMN welcome_at TEXT;
     CREATE TABLE deletion_markers (marker TEXT PRIMARY KEY, deleted_at TEXT NOT NULL) WITHOUT ROWID;
     CREATE INDEX ix_deletion_markers_time ON deletion_markers (deleted_at);
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
@@ -121,8 +122,21 @@ MIGRATIONS: Sequence[str] = (
 _USER_COLUMNS = (
     "user_hash, language, consented_at, consent_version, stopped, last_interaction_id, created_at, last_seen_at, "
     "donation_version, donation_at, donation_source, donation_offered_at, donation_offered_version, "
-    "donation_withdrawn_at, welcome_version"
+    "donation_withdrawn_at, welcome_version, welcome_at"
 )
+_USER_SLOTS = ", ".join("?" * len(_USER_COLUMNS.split(",")))
+
+
+def _user_values(state: UserState) -> tuple[object, ...]:
+    """A users row in ``_USER_COLUMNS`` order."""
+    return (
+        state.user_hash, state.language, _ts(state.consented_at) if state.consented_at else None,
+        state.consent_version, int(state.stopped), state.last_interaction_id, _ts(state.created_at),
+        _ts(state.last_seen_at), state.donation_version, _ts(state.donation_at) if state.donation_at else None,
+        state.donation_source, _ts(state.donation_offered_at) if state.donation_offered_at else None,
+        state.donation_offered_version, _ts(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
+        state.welcome_version, _ts(state.welcome_at) if state.welcome_at else None,
+    )  # fmt: skip
 
 
 def _ts(value: datetime) -> str:
@@ -195,29 +209,14 @@ class SQLiteStore:
             donation_offered_version=row["donation_offered_version"],
             donation_withdrawn_at=_dt(row["donation_withdrawn_at"]),
             welcome_version=row["welcome_version"],
+            welcome_at=_dt(row["welcome_at"]),
         )
 
     async def save_user(self, state: UserState) -> None:
-        values = (
-            state.user_hash,
-            state.language,
-            _ts(state.consented_at) if state.consented_at else None,
-            state.consent_version,
-            int(state.stopped),
-            state.last_interaction_id,
-            _ts(state.created_at),
-            _ts(state.last_seen_at),
-            state.donation_version,
-            _ts(state.donation_at) if state.donation_at else None,
-            state.donation_source,
-            _ts(state.donation_offered_at) if state.donation_offered_at else None,
-            state.donation_offered_version,
-            _ts(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
-            state.welcome_version,
-        )
+        values = _user_values(state)
         await self._run(
             lambda db: db.execute(
-                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES ({_USER_SLOTS})
                    ON CONFLICT (user_hash) DO UPDATE SET language = excluded.language,
                      consented_at = excluded.consented_at, consent_version = excluded.consent_version,
                      stopped = excluded.stopped, last_interaction_id = excluded.last_interaction_id,
@@ -226,10 +225,36 @@ class SQLiteStore:
                      donation_offered_at = excluded.donation_offered_at,
                      donation_offered_version = excluded.donation_offered_version,
                      donation_withdrawn_at = excluded.donation_withdrawn_at,
-                     welcome_version = excluded.welcome_version""",
+                     welcome_version = excluded.welcome_version, welcome_at = excluded.welcome_at""",
                 values,
             )
         )
+
+    async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
+        if expected is None:
+            values = _user_values(state)
+            cursor = await self._run(
+                lambda db: db.execute(
+                    f"INSERT INTO users ({_USER_COLUMNS}) VALUES ({_USER_SLOTS}) ON CONFLICT (user_hash) DO NOTHING",
+                    values,
+                )
+            )
+            return int(cursor.rowcount) == 1
+        params = (
+            state.donation_version, _ts(state.donation_at) if state.donation_at else None, state.donation_source,
+            _ts(state.donation_offered_at) if state.donation_offered_at else None, state.donation_offered_version,
+            state.user_hash, _ts(expected.last_seen_at),
+        )  # fmt: skip
+        cursor = await self._run(
+            lambda db: db.execute(
+                """UPDATE users SET donation_version = ?, donation_at = ?, donation_source = ?,
+                     donation_offered_at = ?, donation_offered_version = ?
+                   WHERE user_hash = ? AND last_seen_at = ? AND stopped = 0 AND donation_version IS NULL
+                     AND donation_withdrawn_at IS NULL AND donation_offered_version IS NULL""",
+                params,
+            )
+        )
+        return int(cursor.rowcount) == 1
 
     # --- messages and interactions --------------------------------------------------------------------
 

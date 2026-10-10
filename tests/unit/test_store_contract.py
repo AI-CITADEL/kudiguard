@@ -1,6 +1,7 @@
 """One behavioural contract, run against every Store implementation (SQLite for production, memory for tests)."""
 
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterator
 from datetime import date, timedelta
 from pathlib import Path
@@ -328,6 +329,32 @@ async def test_delete_leaves_only_a_coded_marker_that_expires(store: Store, tmp_
     assert await store.purge_deletion_markers(utcnow() - timedelta(days=1)) == 0
     assert await store.purge_deletion_markers(utcnow() + timedelta(seconds=1)) == 1
     assert await store.deleted_at("u1") is None
+
+
+async def test_form_consent_is_a_compare_and_set(store: Store) -> None:
+    long_ago = utcnow() - timedelta(days=2)
+    form = UserState("u1", created_at=long_ago, last_seen_at=long_ago, donation_version="2026-10-10",
+                     donation_at=long_ago, donation_source="form", donation_offered_at=long_ago,
+                     donation_offered_version="2026-10-10")  # fmt: skip
+    assert await store.record_form_consent(form, None)  # a new row
+    assert not await store.record_form_consent(form, None)  # it exists now: never overwritten
+    read = UserState("u2", language="ha", created_at=long_ago, last_seen_at=long_ago, consented_at=long_ago)
+    await store.save_user(read)
+    changed = dataclasses.replace(
+        read, last_seen_at=utcnow()
+    )  # a message arrived after the import read the row
+    await store.save_user(changed)
+    assert not await store.record_form_consent(dataclasses.replace(form, user_hash="u2"), read)
+    assert await store.record_form_consent(dataclasses.replace(form, user_hash="u2"), changed)
+    stored = await store.get_user("u2")
+    assert stored is not None and stored.donation_source == "form" and stored.language == "ha"
+    assert stored.consented_at == long_ago  # nothing but the donation fields was touched
+    for blocker in ({"stopped": True}, {"donation_withdrawn_at": long_ago}, {"donation_offered_version": "x"},
+                    {"donation_version": "x"}):  # fmt: skip
+        state = UserState("u3", created_at=long_ago, last_seen_at=long_ago, **blocker)  # type: ignore[arg-type]
+        await store.save_user(state)
+        assert not await store.record_form_consent(dataclasses.replace(form, user_hash="u3"), state), blocker
+    assert not await store.record_form_consent(dataclasses.replace(form, user_hash="gone"), read)  # no row
 
 
 async def test_sample_ids_are_unique(store: Store) -> None:

@@ -462,18 +462,53 @@ def test_a_delete_during_the_import_wins(
 ) -> None:
     """The server handles DELETE in another process: if it lands between the import's check and its save, the
     re-check after the save erases the row again."""
-    original = SQLiteStore.save_user
+    original = SQLiteStore.record_form_consent
 
-    async def save_then_deleted(self: SQLiteStore, state: UserState) -> None:
-        await original(self, state)
+    async def save_then_deleted(self: SQLiteStore, state: UserState, expected: UserState | None) -> bool:
+        recorded = await original(self, state, expected)
         await self.delete_user(state.user_hash)  # the tester's DELETE arrives right now
+        return recorded
 
-    monkeypatch.setattr(SQLiteStore, "save_user", save_then_deleted)
+    monkeypatch.setattr(SQLiteStore, "record_form_consent", save_then_deleted)
     assert preconsent(env, f"0809 999 9999,yes,yes,yes,{recently(2)}") == 0
     printed = capsys.readouterr().out
     assert "for 0 testers" in printed and "1 deleted" in printed
     monkeypatch.undo()
     assert stored_user(env, "+2348099999999") is None
+
+
+@pytest.mark.parametrize("change", ["stop", "stop donating", "a message", "a new row"])
+def test_a_change_in_the_chat_during_the_import_wins(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    """The import reads a row, then the server (another process) handles STOP, STOP DONATING or a message before
+    the import saves: the compare-and-set writes nothing, so the later choice stands."""
+    hasher = UserHasher(SECRET.encode())
+    form = datetime.now(UTC) - timedelta(days=3)
+    before = form - timedelta(days=1)
+    known = "+2348011111111" if change != "a new row" else "+2348022222222"
+    if change != "a new row":
+        save_user(env, UserState(hasher.user_id(known), created_at=before, last_seen_at=before))
+    original = SQLiteStore.record_form_consent
+
+    async def server_acts_first(self: SQLiteStore, state: UserState, expected: UserState | None) -> bool:
+        now = datetime.now(UTC)
+        meanwhile = UserState(state.user_hash, created_at=before, last_seen_at=now)
+        if change == "stop":
+            meanwhile.stopped = True
+        elif change == "stop donating":
+            meanwhile.donation_withdrawn_at = now
+            meanwhile.donation_offered_version = DONATION_VERSION
+        await self.save_user(meanwhile)
+        return await original(self, state, expected)
+
+    monkeypatch.setattr(SQLiteStore, "record_form_consent", server_acts_first)
+    assert preconsent(env, f"{known},yes,yes,yes,{form.isoformat()}") == 0
+    assert "1 changed during the import" in capsys.readouterr().out
+    monkeypatch.undo()
+    state = stored_user(env, known)
+    assert state is not None and state.donation_version is None
+    assert state.stopped is (change == "stop")
 
 
 def test_a_number_listed_twice_keeps_its_most_recent_answer(

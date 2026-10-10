@@ -224,3 +224,5 @@ strings:
   where_nigeria: "in Nigeria"
   risk_outside: "Nigerian data-protection law may not fully protect data held abroad."
   risk_nigeria: "Data passing through Meta and Cloudflare may be processed abroad, where Nigerian data-protection law may not fully apply."
+  # Sent before the welcome reached the user: not taken as consent.
+  read_welcome: "☝️ Please read the message above, then reply to continue."

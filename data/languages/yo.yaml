@@ -118,3 +118,5 @@ strings:
   where_nigeria: "ní Nàìjíríà"
   risk_outside: "Òfin ààbò dátà Nàìjíríà lè má dáàbò bo dátà tí ó wà lókè òkun pátápátá."
   risk_nigeria: "Dátà tí ó ń kọjá láàárín Meta àti Cloudflare lè jẹ́ ṣíṣe lókè òkun, níbi tí òfin ààbò dátà Nàìjíríà lè má ṣiṣẹ́ pátápátá."
+  # Sent before the welcome reached the user: not taken as consent. DRAFT.
+  read_welcome: "☝️ Ẹ jọ̀ọ́ ẹ ka ọ̀rọ̀ tí ó wà lókè, lẹ́yìn náà ẹ fèsì láti tẹ̀síwájú."

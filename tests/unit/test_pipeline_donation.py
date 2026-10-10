@@ -16,6 +16,7 @@ from kudiguard.domain import InboundMessage, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Sealer, VoiceVault
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Msg
+from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import Purpose
 from kudiguard.pipeline import (
     CONSENT_VERSION,
@@ -305,6 +306,61 @@ async def test_a_form_tester_gets_the_welcome_before_anything_is_processed(d: Ha
     assert agreed.consent_version == CONSENT_VERSION and agreed.consented_at is not None
     texts = await voice(d)
     assert d.t(Msg.DONATION_OFFER) not in texts and len(await samples(d)) == 1
+
+
+async def send_at(h: Harness, sent_at: float, text: str | None = None, **kwargs: object) -> list[str]:
+    """A message with a WhatsApp-style provider timestamp (when the user sent it)."""
+    h.messenger.clear()
+    await h.conversation.handle(dataclasses.replace(h.msg(text, **kwargs), sent_at=sent_at))  # type: ignore[arg-type]
+    return h.messenger.texts
+
+
+@pytest.mark.parametrize("second", ["text", "button"])
+async def test_a_message_sent_before_the_welcome_arrived_is_not_consent(d: Harness, second: str) -> None:
+    """Two quick messages: the second was sent before the welcome reached the user, so it is not "continuing after
+    the welcome"; it gets a short pointer to the notice and is not processed. Only a later message counts."""
+    import time
+
+    t0 = time.time()
+    assert (await send_at(d, t0, "hello"))[0] == d.t(Msg.WELCOME)
+    welcomed = await user(d)
+    assert welcomed.welcome_at is not None and welcomed.welcome_at.timestamp() >= t0 - 1
+    early = {"button": "lang:en"} if second == "button" else {}
+    texts = await send_at(d, t0 + 1, None if early else QUESTION, button=early.get("button"))
+    assert texts == [d.t(Msg.READ_WELCOME)]
+    state = await user(d)
+    assert state.consented_at is None and state.language == "en" and await interactions(d) == []
+    assert d.llm.requests == []
+    later = time.time() + 30  # sent after reading the welcome
+    texts = await send_at(d, later, None if early else QUESTION, button=early.get("button"))
+    assert (await user(d)).consent_version == CONSENT_VERSION and d.t(Msg.READ_WELCOME) not in texts
+
+
+async def test_the_reading_margin_absorbs_a_fast_server_clock(d: Harness) -> None:
+    """Our clock may run a few seconds ahead of Meta's: a message stamped up to WELCOME_READ_S after our delivery
+    time is still treated as sent before the welcome."""
+    import time
+
+    from kudiguard.pipeline import WELCOME_READ_S
+
+    await send_at(d, time.time(), "hello")
+    delivered = (await user(d)).welcome_at
+    assert delivered is not None
+    assert await send_at(d, delivered.timestamp() + WELCOME_READ_S - 0.5, QUESTION) == [d.t(Msg.READ_WELCOME)]
+    assert (await user(d)).consented_at is None
+    await send_at(d, delivered.timestamp() + WELCOME_READ_S + 0.5, QUESTION)
+    assert (await user(d)).consented_at is not None
+
+
+def test_the_pointer_comes_in_every_language(registry: LanguageRegistry) -> None:
+    for language in COMMANDS:
+        assert registry.get(language).strings["read_welcome"].startswith("☝️")
+
+
+async def test_a_welcome_recorded_without_its_time_is_shown_again(d: Harness) -> None:
+    await d.say("hello")
+    await d.store.save_user(dataclasses.replace(await user(d), welcome_at=None))
+    assert (await d.say(QUESTION))[0] == d.t(Msg.WELCOME) and (await user(d)).consented_at is None
 
 
 async def test_a_welcome_that_could_not_be_sent_does_not_count_as_shown(d: Harness) -> None:

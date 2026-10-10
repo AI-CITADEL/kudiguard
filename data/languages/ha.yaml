@@ -125,3 +125,5 @@ strings:
   where_nigeria: "a Najeriya"
   risk_outside: "Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba."
   risk_nigeria: "Bayanan da ke wucewa ta Meta da Cloudflare ana iya sarrafa su a ƙasashen waje, inda dokar kare bayanai ta Najeriya ba za ta yi aiki gaba ɗaya ba."
+  # Sent before the welcome reached the user: not taken as consent. DRAFT.
+  read_welcome: "☝️ Don Allah ku karanta saƙon da ke sama, sannan ku amsa don ci gaba."

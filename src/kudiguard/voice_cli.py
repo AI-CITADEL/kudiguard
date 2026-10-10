@@ -442,11 +442,14 @@ def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
     """Record sign-up-form consent as if the tester had tapped "Yes, I am 18+" (source=form; not asked again).
 
     Never resurrects consent: rows whose user deleted their data, stopped, withdrew, declined, was offered or was
-    active after the form are skipped (those testers are asked in the chat instead). A DELETE leaves only a coded
-    marker for ``PRECONSENT_MAX_AGE_DAYS``, the same limit as the form's age, so a deleted tester is never re-enrolled.
-    Rows never imply main consent: the tester still gets the welcome in the chat. A number listed twice counts once,
-    with its most recent answer. A DELETE that lands while a row is being saved wins: the row is re-checked after the
-    save and erased again."""
+    active after the form are skipped. A DELETE leaves a coded marker for up to ``DELETION_MARKER_DAYS`` (30) and form
+    answers older than ``PRECONSENT_MAX_AGE_DAYS`` (29) are skipped, so a deleted tester is never re-enrolled. Rows
+    never imply main consent: the tester still gets the welcome in the chat. A number listed twice counts once, with
+    its most recent answer.
+
+    The server runs in another process, so the save is a compare-and-set (``Store.record_form_consent``): if the row
+    changed after we read it (STOP, STOP DONATING, an offer, any message), nothing is written. A DELETE that lands
+    after the save wins too: the row is re-checked and erased again."""
     freshest: dict[str, datetime] = {}
     rows = read_preconsents(Path(args.csv), args.version)
     for number, at in rows:
@@ -467,12 +470,13 @@ def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
                     skipped[reason] += 1
                     continue
                 base = user or UserState(user_hash, created_at=at, last_seen_at=at)
-                await store.save_user(
-                    dataclasses.replace(
-                        base, donation_version=args.version, donation_at=at, donation_source="form",
-                        donation_offered_at=at, donation_offered_version=args.version,
-                    )
+                form = dataclasses.replace(
+                    base, donation_version=args.version, donation_at=at, donation_source="form",
+                    donation_offered_at=at, donation_offered_version=args.version,
                 )  # fmt: skip
+                if not await store.record_form_consent(form, user):
+                    skipped["changed during the import"] += 1
+                    continue
                 deleted = await store.deleted_at(user_hash)  # a DELETE between our check and our save wins
                 if deleted is not None and deleted >= at:
                     await store.delete_user(user_hash)

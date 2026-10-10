@@ -42,6 +42,7 @@ class MemoryStore:
             consented_at=aware(state.consented_at) if state.consented_at else None,
             donation_at=aware(state.donation_at) if state.donation_at else None,
             donation_withdrawn_at=aware(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
+            welcome_at=aware(state.welcome_at) if state.welcome_at else None,
             donation_offered_at=aware(state.donation_offered_at) if state.donation_offered_at else None,
             created_at=aware(state.created_at),
             last_seen_at=aware(state.last_seen_at),
@@ -123,6 +124,29 @@ class MemoryStore:
             del self._interactions[interaction_id]
             removed += 1 + int(self._feedback.pop(interaction_id, None) is not None)
         return removed + len(await self.delete_voice_samples(user_hash))
+
+    async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
+        self._ensure_open()
+        current = self._users.get(state.user_hash)
+        if expected is None:
+            if current is not None:
+                return False
+            await self.save_user(state)
+            return True
+        if (
+            current is None or current.last_seen_at != aware(expected.last_seen_at) or current.stopped
+            or current.donation_version is not None or current.donation_withdrawn_at is not None
+            or current.donation_offered_version is not None
+        ):  # fmt: skip
+            return False
+        await self.save_user(
+            dataclasses.replace(
+                current, donation_version=state.donation_version, donation_at=state.donation_at,
+                donation_source=state.donation_source, donation_offered_at=state.donation_offered_at,
+                donation_offered_version=state.donation_offered_version,
+            )
+        )  # fmt: skip
+        return True
 
     async def deleted_at(self, user_hash: str) -> datetime | None:
         self._ensure_open()

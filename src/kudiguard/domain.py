@@ -34,6 +34,9 @@ class InboundMessage:
     # (``context.forwarded``, documented for other types): a forwarded note is usually someone else's voice.
     voice_note: bool = False
     forwarded: bool = False
+    # When the user sent it (provider clock, Unix seconds). Consent is taken only from a message sent after the
+    # welcome was delivered; channels without one (None) cannot race with the welcome.
+    sent_at: float | None = None
 
 
 class Flag(StrEnum):

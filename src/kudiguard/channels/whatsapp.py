@@ -238,7 +238,7 @@ def _parse_message(raw: Any, now: float, max_age_s: float) -> tuple[int, Inbound
         return None
 
     def make(kind_: MessageKind, **fields: Any) -> tuple[int, InboundMessage]:
-        return sent_at, InboundMessage(CHANNEL, message_id, sender, kind_, **fields)
+        return sent_at, InboundMessage(CHANNEL, message_id, sender, kind_, sent_at=float(sent_at), **fields)
 
     section = raw.get(kind)
     body: dict[str, Any] = section if isinstance(section, dict) else {}

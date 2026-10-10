@@ -96,8 +96,9 @@ Two placeholders follow `KUDIGUARD_STORAGE_LOCATION`, using the same strings as 
      with its most recent answer.
    * What happens to skipped testers:
      * Those never offered donation in the chat get the offer there later, as usual.
-     * Those who were offered, declined, withdrew or stopped are not asked again. That is deliberate, to avoid
-       nagging. They can opt in any time by sending **Donate voice**.
+     * Those already offered (including those who declined or withdrew) are not asked again. That is deliberate,
+       to avoid nagging. They can opt in any time by sending **Donate voice**.
+     * Testers who stopped but were never offered get the offer when they come back.
    * Import each export once, promptly. Answers older than 29 days are skipped, because DELETE markers last 30
      days.
 3. Delete the CSV and the form export. They hold phone numbers. KudiGuard stores only the keyed hashes, with

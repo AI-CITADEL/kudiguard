@@ -56,6 +56,9 @@ FAILURE_DEADLINE_S = (
 )
 ACK_DEADLINE_S = 3.0
 DONATION_DEADLINE_S = 60.0  # the background donation step (write or offer) after a turn
+# A message counts as consent only if sent at least this long after the welcome was delivered: nobody reads the
+# notice faster, and it absorbs clock skew between the provider's timestamp and this server (keep NTP on).
+WELCOME_READ_S = 5.0
 MAX_COALESCED = 5  # quick successive notes/texts merged into one check (people split one story over messages)
 
 
@@ -450,7 +453,19 @@ class Conversation:
         welcome first, whatever they sent.
         """
         now = self._clock()
-        welcomed = user is not None and user.welcome_version == CONSENT_VERSION
+        # Shown = this text's welcome was delivered at a known time (a row without the time is welcomed again).
+        welcomed = (
+            user is not None and user.welcome_version == CONSENT_VERSION and user.welcome_at is not None
+        )
+        if (
+            welcomed
+            and (chosen or turn.message.kind is MessageKind.TEXT)
+            and _before_welcome(turn.message, user)
+        ):
+            await self._send(
+                turn, self._messages.text(turn.language, Msg.READ_WELCOME)
+            )  # not consent: not seen yet
+            return None
         if chosen and welcomed:
             assert user is not None
             await self._set_language(turn, user, chosen)
@@ -495,9 +510,10 @@ class Conversation:
         if self._privacy_url:
             welcome += "\n" + self._messages.text(turn.language, Msg.PRIVACY_LINK, url=self._privacy_url)
         await self._send(turn, welcome)
-        await self._store.save_user(
-            dataclasses.replace(state, welcome_version=CONSENT_VERSION)
-        )  # now it was shown
+        delivered = dataclasses.replace(
+            state, welcome_version=CONSENT_VERSION, welcome_at=utcnow()
+        )  # now shown
+        await self._store.save_user(delivered)
         await self._messenger.send(turn.message.user_id, self._language_menu(turn.language))
         return None
 
@@ -969,6 +985,16 @@ async def record_pattern(store: Store, channel: str, answer: Answer, text: str, 
         )  # fmt: skip
     except Exception:
         log.exception("could not record a scam pattern")
+
+
+def _before_welcome(message: InboundMessage, user: UserState | None) -> bool:
+    """Sent before the user could have read the welcome (e.g. a second message queued behind the first): such a
+    message is not consent. Compared on absolute time with a reading margin (``WELCOME_READ_S``), which also absorbs
+    clock skew: comparing with the triggering message's own timestamp would accept any later message sent before the
+    welcome arrived, which is exactly the race to close."""
+    if message.sent_at is None or user is None or user.welcome_at is None:
+        return False
+    return message.sent_at < user.welcome_at.timestamp() + WELCOME_READ_S
 
 
 def _offer_due(user: UserState) -> bool:

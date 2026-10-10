@@ -43,9 +43,11 @@ class Stack:
     media_lookup: respx.Route
     counter: int = 0
 
-    async def deliver(self, kind: str, body: dict[str, Any]) -> None:
+    async def deliver(self, kind: str, body: dict[str, Any], *, read_s: int = 0) -> None:
+        """``read_s``: the user sends this that many seconds from now (e.g. after reading the welcome)."""
         self.counter += 1
-        message = {"from": USER, "id": f"wamid.E2E{self.counter}", "timestamp": str(int(time.time())), "type": kind,
+        sent = str(int(time.time()) + read_s)
+        message = {"from": USER, "id": f"wamid.E2E{self.counter}", "timestamp": sent, "type": kind,
                    kind: body}  # fmt: skip
         payload = {"object": "whatsapp_business_account", "entry": [{"id": "W", "changes": [{"field": "messages",
                    "value": {"metadata": {"phone_number_id": "PNID123"}, "messages": [message]}}]}]}  # fmt: skip
@@ -101,11 +103,13 @@ async def stack(registry: LanguageRegistry, tmp_path: Path) -> AsyncIterator[Sta
 
 async def test_voice_note_end_to_end(stack: Stack) -> None:
     await stack.deliver("text", {"body": "Hello"})  # first contact: welcome + language menu
-    await stack.deliver(
-        "interactive", {"type": "list_reply", "list_reply": {"id": "lang:en", "title": "English"}}
+    await stack.deliver(  # chosen after reading the welcome
+        "interactive", {"type": "list_reply", "list_reply": {"id": "lang:en", "title": "English"}}, read_s=30
     )
     before = len(stack.outbound())
-    await stack.deliver("audio", {"id": "MEDIA1", "mime_type": "audio/ogg; codecs=opus", "voice": True})
+    await stack.deliver(
+        "audio", {"id": "MEDIA1", "mime_type": "audio/ogg; codecs=opus", "voice": True}, read_s=60
+    )
 
     out = stack.outbound()[before:]
     receipt = next(p for p in out if p.get("status") == "read")
