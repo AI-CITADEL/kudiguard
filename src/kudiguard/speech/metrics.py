@@ -9,7 +9,7 @@ which over-weights short clips.
 from __future__ import annotations
 
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 
 def _normalise(text: str, *, tone_sensitive: bool) -> str:
@@ -56,3 +56,11 @@ def char_errors(reference: str, hypothesis: str, *, tone_sensitive: bool = False
     ref = _normalise(reference, tone_sensitive=tone_sensitive)
     hyp = _normalise(hypothesis, tone_sensitive=tone_sensitive)
     return _edit_distance(list(ref), list(hyp)), len(ref)
+
+
+# The reported metrics, shared by scripts/eval_asr.py and ``kudiguard voice wer``: name -> (counter, tone-sensitive).
+POOLED_METRICS: dict[str, tuple[Callable[..., tuple[int, int]], bool]] = {
+    "wer": (word_errors, False),  # diacritics folded
+    "wer_diacritics": (word_errors, True),
+    "cer": (char_errors, False),
+}

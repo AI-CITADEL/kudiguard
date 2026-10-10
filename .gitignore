@@ -12,6 +12,10 @@ exports/
 tools/
 deploy/cloudflared/kudiguard.yml
 var/
+# Donated voice notes (encrypted) and decrypted transcription/access exports: never commit.
+var/voice/
+var/voice-export/
+exports/voice/
 deploy/cloudflared/cert.pem
 deploy/cloudflared/*.json
 .coverage*

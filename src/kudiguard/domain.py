@@ -30,6 +30,8 @@ class InboundMessage:
     audio_mime: str | None = None
     button_id: str | None = None
     media_id: str | None = None  # provider media reference; fetched lazily (after consent) via the channel
+    # WhatsApp marks forwarded messages: a forwarded voice note is usually someone else's voice (never donated).
+    forwarded: bool = False
 
 
 class Flag(StrEnum):

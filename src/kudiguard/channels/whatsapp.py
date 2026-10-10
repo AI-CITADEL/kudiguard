@@ -211,6 +211,14 @@ def _timestamp(raw: Any, now: float) -> int:
     return value if 0 < value < now + 86400 else int(now)
 
 
+def _forwarded(raw: dict[str, Any]) -> bool:
+    """``context.forwarded`` / ``context.frequently_forwarded`` (Cloud API): the sender did not record it."""
+    context = raw.get("context")
+    return isinstance(context, dict) and (
+        context.get("forwarded") is True or context.get("frequently_forwarded") is True
+    )
+
+
 def _parse_message(raw: Any, now: float, max_age_s: float) -> tuple[int, InboundMessage] | None:
     if not isinstance(raw, dict):
         return None
@@ -237,7 +245,7 @@ def _parse_message(raw: Any, now: float, max_age_s: float) -> tuple[int, Inbound
         return make(MessageKind.TEXT, text=body["body"])
     if kind == "audio" and isinstance(body.get("id"), str):
         mime = body.get("mime_type") if isinstance(body.get("mime_type"), str) else None
-        return make(MessageKind.AUDIO, media_id=body["id"], audio_mime=mime)
+        return make(MessageKind.AUDIO, media_id=body["id"], audio_mime=mime, forwarded=_forwarded(raw))
     if kind == "interactive":
         reply = body.get("button_reply") or body.get("list_reply")
         if isinstance(reply, dict) and isinstance(reply.get("id"), str):

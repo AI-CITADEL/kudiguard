@@ -3,7 +3,8 @@
     kudiguard serve [--host 127.0.0.1] [--port 8000]
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
-    kudiguard purge [--days 90]
+    kudiguard purge [--days 90]          (also donated voice notes past KUDIGUARD_VOICE_RETENTION_DAYS)
+    kudiguard voice export|wer|stats|access|erase|remove   (kudiguard.voice_cli)
 
 Exports contain no phone numbers or provider ids (pseudonymous user hashes, redacted text).
 """
@@ -19,7 +20,9 @@ from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 
+from kudiguard import voice_cli
 from kudiguard.config import ROOT, Settings
+from kudiguard.donation import Sealer, VoiceVault
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
@@ -86,14 +89,22 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
-    async def run() -> int:
+    async def run() -> tuple[int, int]:
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
         try:
-            return await store.purge_before(utcnow() - timedelta(days=args.days))
+            vault = VoiceVault(
+                settings.voice_dir, store, Sealer(settings.hash_secret.get_secret_value().encode())
+            )
+            voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
+            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice
         finally:
             await store.close()
 
-    print(f"removed {asyncio.run(run())} rows older than {args.days} days")
+    rows, voice = asyncio.run(run())
+    print(
+        f"removed {rows} rows older than {args.days} days; "
+        f"{voice} donated voice samples older than {settings.voice_retention_days} days"
+    )
     return 0
 
 
@@ -152,6 +163,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     purge = commands.add_parser("purge", help="delete evidence older than the retention period")
     purge.add_argument("--days", type=int, default=None)
     purge.set_defaults(func=cmd_purge)
+
+    voice_cli.add_commands(commands)
 
     args = parser.parse_args(argv)
     settings = Settings()

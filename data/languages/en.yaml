@@ -18,6 +18,8 @@ commands:
   stop: [stop, unsubscribe, stop messages]
   delete: [delete, delete my data, erase my data, delete everything]
   language: [language, change language, languages]
+  donate: [donate voice, donate my voice, voice donation]
+  stop_donating: [stop donating, stop voice donation, stop donation]
   greetings: [hi, hello, hey, hiya, good morning, good afternoon, good evening, good day, thanks, thank you,
     thank you so much, thanks a lot, ok, okay, ok thanks, okay thank you, alright, nice, great, cool]
 
@@ -158,7 +160,7 @@ strings:
 
     Send me a *voice note* or a message, or forward a message you are unsure about.
 
-    🔒 We keep your messages for up to 90 days to improve the service. Your phone number is stored only in coded form, and voice notes are deleted after they are transcribed. Send *DELETE* at any time to erase your messages, or *STOP* to stop. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard; DELETE also removes those taken from your recent messages. By continuing, you agree to this.
+    🔒 We keep your messages for up to 90 days to improve the service. A few trusted reviewers (our team or native speakers under written confidentiality) may read a sample of messages and replies, with numbers masked and without your phone number or any id, to check quality and safety; their copies are deleted after the check. Your phone number is stored only in coded form, and voice notes are deleted after they are transcribed unless you choose to donate them (we ask separately). Send *DELETE* at any time to erase your messages, or *STOP* to stop. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard; DELETE also removes those taken from your recent messages. By continuing, you agree to this.
     ℹ️ This is guidance, not financial advice.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: "Which language should I use?"
@@ -190,7 +192,7 @@ strings:
   rate_limited: "⏳ You have sent many messages. Please wait a little and try again."
   error_retry: "😔 Sorry, something went wrong on my side. Please try again in a moment."
   stopped: "You will not get messages from KudiGuard anymore. Send any message to start again."
-  deleted: "🗑️ Your messages have been deleted."
+  deleted: "🗑️ Your messages and any voice notes you donated have been deleted."
   fallback_scam: "Do not send money and do not share any code, PIN or password. Stop all contact and call your bank on the number printed on your card."
   fallback_answer: "I could not prepare a full answer right now. Please try again in a moment, or ask your bank directly."
   fallback_steps: |-
@@ -201,3 +203,17 @@ strings:
   at_capacity: "😔 KudiGuard is full right now. Please try again in a few days."
   busy: "⏳ Many people are asking right now. Please try again in a minute."
   privacy_link: "🔐 Privacy notice: {url}"
+  # Voice-note donation (kudiguard.donation): separate opt-in consent; keep in step with DONATION_VERSION.
+  donation_offer: |-
+    🎙️ *Optional: help KudiGuard understand Nigerian voices*
+    May we keep the voice notes you send from now on, to test and improve our speech recognition?
+    • Only if you are *18 or older*, and only voice notes in *your own voice*. Please do not send recordings of other people; forwarded voice notes are never kept.
+    • A few trusted reviewers and transcribers, under written confidentiality, listen to them and write down what was said. We never use your voice to identify you, and we never sell or publish it.
+    • Kept encrypted on KudiGuard's own server for up to 12 months, without your phone number.
+    • Send *STOP DONATING* at any time to stop and delete them (*DELETE* also deletes them).
+    KudiGuard works the same whether you say yes or no.
+  btn_donate_yes: "✅ Yes, I am 18+"
+  btn_donate_no: "No, thanks"
+  donation_on: "✅ Thank you! From now on we keep the voice notes you send in your own voice (never forwarded ones) for up to 12 months to improve speech recognition. Send *STOP DONATING* at any time to stop and delete them."
+  donation_off: "🗑️ Voice donation is off. Any voice notes you donated have been deleted, and new ones will not be kept."
+  donation_declined: "👍 No problem. Your voice notes will not be kept: they are deleted after they are transcribed."

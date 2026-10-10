@@ -21,7 +21,7 @@ from typing import Any, TypeVar
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
+from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -91,6 +91,28 @@ MIGRATIONS: Sequence[str] = (
     ) WITHOUT ROWID;
     CREATE INDEX ix_patterns_week ON scam_patterns (week, text);
     """,
+    # 3: opt-in voice-note donation: consent record per user, one row per donated sample (audio in encrypted files)
+    """
+    ALTER TABLE users ADD COLUMN donation_version TEXT;
+    ALTER TABLE users ADD COLUMN donation_at TEXT;
+    ALTER TABLE users ADD COLUMN donation_offered_at TEXT;
+    CREATE TABLE voice_samples (
+        id TEXT PRIMARY KEY,
+        user_hash TEXT NOT NULL,
+        week TEXT NOT NULL,
+        language TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        consent_version TEXT NOT NULL,
+        hypothesis TEXT NOT NULL,
+        duration_s REAL
+    ) WITHOUT ROWID;
+    CREATE INDEX ix_voice_user ON voice_samples (user_hash);
+    CREATE INDEX ix_voice_week ON voice_samples (week);
+    """,
+)
+_USER_COLUMNS = (
+    "user_hash, language, consented_at, consent_version, stopped, last_interaction_id, created_at, last_seen_at, "
+    "donation_version, donation_at, donation_offered_at"
 )
 
 
@@ -157,6 +179,9 @@ class SQLiteStore:
             last_interaction_id=row["last_interaction_id"],
             created_at=_dt_required(row["created_at"]),
             last_seen_at=_dt_required(row["last_seen_at"]),
+            donation_version=row["donation_version"],
+            donation_at=_dt(row["donation_at"]),
+            donation_offered_at=_dt(row["donation_offered_at"]),
         )
 
     async def save_user(self, state: UserState) -> None:
@@ -169,14 +194,18 @@ class SQLiteStore:
             state.last_interaction_id,
             _ts(state.created_at),
             _ts(state.last_seen_at),
+            state.donation_version,
+            _ts(state.donation_at) if state.donation_at else None,
+            _ts(state.donation_offered_at) if state.donation_offered_at else None,
         )
         await self._run(
             lambda db: db.execute(
-                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (user_hash) DO UPDATE SET language = excluded.language,
                      consented_at = excluded.consented_at, consent_version = excluded.consent_version,
                      stopped = excluded.stopped, last_interaction_id = excluded.last_interaction_id,
-                     last_seen_at = excluded.last_seen_at""",
+                     last_seen_at = excluded.last_seen_at, donation_version = excluded.donation_version,
+                     donation_at = excluded.donation_at, donation_offered_at = excluded.donation_offered_at""",
                 values,
             )
         )
@@ -278,8 +307,42 @@ class SQLiteStore:
                 ).rowcount
                 turns = db.execute("DELETE FROM interactions WHERE user_hash = ?", (user_hash,)).rowcount
                 users = db.execute("DELETE FROM users WHERE user_hash = ?", (user_hash,)).rowcount
+                voice = db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,)).rowcount
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # erased pages must not linger in the WAL file
-            return patterns + feedback + turns + users
+            return patterns + feedback + turns + users + voice
+
+        return await self._run(work)
+
+    async def delete_voice_samples(self, user_hash: str) -> list[str]:
+        def work(db: sqlite3.Connection) -> list[str]:
+            with _transaction(db):
+                ids = [
+                    r[0] for r in db.execute("SELECT id FROM voice_samples WHERE user_hash = ?", (user_hash,))
+                ]
+                db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,))
+            if ids:
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            return sorted(ids)
+
+        return await self._run(work)
+
+    async def delete_voice_sample(self, sample_id: str) -> bool:
+        def work(db: sqlite3.Connection) -> bool:
+            removed = db.execute("DELETE FROM voice_samples WHERE id = ?", (sample_id,)).rowcount == 1
+            if removed:
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            return removed
+
+        return await self._run(work)
+
+    async def purge_voice_samples(self, cutoff: date) -> list[str]:
+        stamp = cutoff.isoformat()
+
+        def work(db: sqlite3.Connection) -> list[str]:
+            with _transaction(db):
+                ids = [r[0] for r in db.execute("SELECT id FROM voice_samples WHERE week <= ?", (stamp,))]
+                db.execute("DELETE FROM voice_samples WHERE week <= ?", (stamp,))
+            return sorted(ids)
 
         return await self._run(work)
 
@@ -293,7 +356,10 @@ class SQLiteStore:
                     (stamp,),
                 ).rowcount
                 turns = db.execute("DELETE FROM interactions WHERE created_at < ?", (stamp,)).rowcount
-                users = db.execute("DELETE FROM users WHERE last_seen_at < ?", (stamp,)).rowcount
+                users = db.execute(  # a donor's row is their consent record: kept while samples exist
+                    "DELETE FROM users WHERE last_seen_at < ? AND user_hash NOT IN (SELECT user_hash FROM voice_samples)",
+                    (stamp,),
+                ).rowcount
                 claims = db.execute("DELETE FROM processed_messages WHERE claimed_at < ?", (stamp,)).rowcount
             return feedback + turns + users + claims
 
@@ -339,6 +405,30 @@ class SQLiteStore:
         return [
             export_row(_interaction(r), None if r["helpful"] is None else bool(r["helpful"])) for r in rows
         ]
+
+    async def add_voice_sample(self, sample: VoiceSample) -> None:
+        values = (
+            sample.id, sample.user_hash, week_of(sample.week).isoformat(), sample.language, sample.channel,
+            sample.consent_version, redact(sample.hypothesis), sample.duration_s,
+        )  # fmt: skip
+        await self._run(
+            lambda db: db.execute("INSERT INTO voice_samples VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
+        )
+
+    async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
+        query = "SELECT * FROM voice_samples"
+        params: tuple[str, ...] = ()
+        if user_hash is not None:
+            query, params = query + " WHERE user_hash = ?", (user_hash,)
+        rows = await self._run(lambda db: db.execute(query + " ORDER BY week, id", params).fetchall())
+        return [
+            VoiceSample(
+                id=r["id"], user_hash=r["user_hash"], week=date.fromisoformat(r["week"]), language=r["language"],
+                channel=r["channel"], consent_version=r["consent_version"], hypothesis=r["hypothesis"],
+                duration_s=r["duration_s"],
+            )
+            for r in rows
+        ]  # fmt: skip
 
     async def close(self) -> None:
         def work() -> None:

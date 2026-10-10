@@ -55,6 +55,12 @@ class Msg(StrEnum):
     AT_CAPACITY = "at_capacity"
     BUSY = "busy"
     PRIVACY_LINK = "privacy_link"
+    DONATION_OFFER = "donation_offer"
+    BTN_DONATE_YES = "btn_donate_yes"
+    BTN_DONATE_NO = "btn_donate_no"
+    DONATION_ON = "donation_on"
+    DONATION_OFF = "donation_off"
+    DONATION_DECLINED = "donation_declined"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

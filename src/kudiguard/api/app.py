@@ -25,7 +25,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -36,6 +36,7 @@ from kudiguard.api.ratelimit import RateLimiter
 from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
 from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
+from kudiguard.donation import DONATION_VERSION, Donation
 from kudiguard.engine import Answer, AnswerKind
 from kudiguard.envfile import load_env_file
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
@@ -584,16 +585,27 @@ def _web_router() -> APIRouter:
                 if years and not rest
                 else f"{settings.pattern_retention_days} days"
             ),
+            "VOICE_RETENTION": (
+                "12 months"
+                if settings.voice_retention_days == 365
+                else f"{settings.voice_retention_days} days"
+            ),
         }
         page = (STATIC / "privacy.html").read_text(encoding="utf-8")
         # One pass: a value can never introduce another placeholder.
         return HTMLResponse(re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page))
 
     @router.post("/web/check")
-    async def web_check(request: Request, services: ServicesDep) -> CheckResponse:
+    async def web_check(
+        request: Request, services: ServicesDep, background: BackgroundTasks
+    ) -> CheckResponse:
         # Consent, session and rate limit come in headers so they are checked before any upload is read.
         if request.headers.get("x-kudiguard-consent") != CONSENT_VERSION:  # consent to the current text only
             raise HTTPException(403, "consent is required")
+        # Voice donation: a separate, optional box with its own version; absent = no donation.
+        donating = request.headers.get("x-kudiguard-donation", "")
+        if donating and donating != DONATION_VERSION:
+            raise HTTPException(403, "voice donation consent is out of date: reload the page")
         session = request.headers.get("x-kudiguard-session", "")
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
@@ -611,10 +623,32 @@ def _web_router() -> APIRouter:
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
             )  # fmt: skip
+            if (
+                donating and audio is not None and services.donations is not None
+            ):  # after the response is sent
+                background.add_task(
+                    services.donations.donate,
+                    Donation(
+                        user_hash=services.hasher.user_id(f"web:{session}"), channel="web", language=answer.language,
+                        audio=audio, hypothesis=transcript or "", consent_version=donating,
+                    ),
+                )  # fmt: skip
             return _check_response(services, answer, transcript, ms)
         finally:
             if admitted:
                 pending.discard(session)  # now counted from the evidence log (or never served)
+
+    @router.post("/web/donation/withdraw")
+    async def withdraw_donation(request: Request, services: ServicesDep) -> dict[str, int]:
+        """Unticking the donation box: stop and delete this browser session's donated voice notes (NDPA s.35:
+        as easy as giving it). Needs only the session id the page keeps; never rate-limited or consent-gated."""
+        session = request.headers.get("x-kudiguard-session", "")
+        if not re.fullmatch(SESSION_PATTERN, session):
+            raise HTTPException(422, "invalid session id")
+        user_hash = services.hasher.user_id(f"web:{session}")
+        if services.donations is not None:
+            return {"deleted": await services.donations.erase(user_hash)}
+        return {"deleted": len(await services.store.delete_voice_samples(user_hash))}
 
     return router
 

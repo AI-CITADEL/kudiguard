@@ -39,6 +39,34 @@ async def test_data_survives_restart_and_migrations_run_once(tmp_path: Path) -> 
     db.close()
 
 
+async def test_existing_database_migrates_to_voice_donation(tmp_path: Path) -> None:
+    """A production database at schema 2 (before donation) keeps its users and gains the new columns/table."""
+    path = tmp_path / "kg.db"
+    db = sqlite3.connect(path)
+    for number, script in enumerate(MIGRATIONS[:2], start=1):
+        db.executescript(f"BEGIN; {script}; PRAGMA user_version={number}; COMMIT;")
+    db.execute(
+        "INSERT INTO users VALUES ('u1', 'ig', ?, '2026-10-08', 0, 7, ?, ?)",
+        (_ts(datetime(2026, 10, 9, tzinfo=UTC)),) * 3,
+    )
+    db.commit()
+    db.close()
+
+    store = await SQLiteStore.open(path, hasher=HASHER)
+    user = await store.get_user("u1")
+    assert user is not None and user.language == "ig" and user.last_interaction_id == 7
+    assert (user.donation_version, user.donation_at, user.donation_offered_at) == (None, None, None)
+    user.donation_version, user.donation_at = "2026-10-10", datetime(2026, 10, 10, tzinfo=UTC)
+    await store.save_user(user)
+    reloaded = await store.get_user("u1")
+    assert reloaded is not None and reloaded.donation_version == "2026-10-10"
+    assert await store.voice_samples() == []
+    await store.close()
+    check = sqlite3.connect(path)
+    assert check.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS) == 3
+    check.close()
+
+
 async def test_concurrent_writes_all_land(tmp_path: Path) -> None:
     store = await SQLiteStore.open(tmp_path / "kg.db", hasher=HASHER)
     ids = await asyncio.gather(*(store.add_interaction(turn(n)) for n in range(200)))

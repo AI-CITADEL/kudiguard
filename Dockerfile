@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir ".[semantic,speech]" \
 USER kudiguard
 ENV KUDIGUARD_DATA_DIR=/app/data \
     KUDIGUARD_DB_PATH=/app/var/kudiguard.db \
+    KUDIGUARD_VOICE_DIR=/app/var/voice \
     KUDIGUARD_MODEL_CACHE=/models \
     KUDIGUARD_EMBEDDINGS_CACHE=/models/fastembed \
     HF_HUB_OFFLINE=1 \

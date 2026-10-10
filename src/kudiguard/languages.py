@@ -69,6 +69,8 @@ class _CommandsSpec(BaseModel):
     stop: list[str] = Field(default_factory=list)  # stop receiving messages
     delete: list[str] = Field(default_factory=list)  # erase my data
     language: list[str] = Field(default_factory=list)  # show the language menu
+    donate: list[str] = Field(default_factory=list)  # offer voice-note donation (kudiguard.donation)
+    stop_donating: list[str] = Field(default_factory=list)  # withdraw it and delete donated voice notes
     greetings: list[str] = Field(default_factory=list)  # greetings and thanks: fixed reply, no model call
 
 

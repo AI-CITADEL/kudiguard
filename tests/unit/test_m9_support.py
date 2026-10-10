@@ -128,8 +128,37 @@ async def test_build_services_with_whatsapp(tmp_path: Path, monkeypatch: pytest.
     services = await build_services(base_settings(tmp_path, whatsapp_enabled=True, packs=("kudiguard-core",)))
     try:
         assert services.conversation is not None and services.whatsapp is not None
+        assert services.donations is not None and services.conversation._donations is services.donations
+        assert services.donations.directory == Settings().voice_dir  # isolated per test (conftest)
     finally:
         await services.aclose()
+
+
+async def test_purge_loop_expires_donated_voice_notes_on_their_own_clock() -> None:
+    from datetime import date, timedelta
+
+    from kudiguard.storage.base import utcnow
+
+    cutoffs: list[date] = []
+
+    class Store:
+        async def purge_before(self, cutoff: object) -> int:
+            return 0
+
+        async def purge_patterns_before(self, cutoff: object) -> int:
+            return 0
+
+    class Vault:
+        async def purge(self, cutoff: date) -> int:
+            cutoffs.append(cutoff)
+            return 2
+
+    task = asyncio.create_task(
+        purge_loop(Store(), 90, interval_s=0.01, donations=Vault(), voice_retention_days=365)  # type: ignore[arg-type]
+    )
+    await asyncio.sleep(0.03)
+    task.cancel()
+    assert cutoffs and cutoffs[0] == (utcnow() - timedelta(days=365)).date()
 
 
 async def test_build_services_without_whatsapp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

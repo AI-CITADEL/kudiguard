@@ -99,6 +99,23 @@ def test_parse_mixed_payload_in_time_order() -> None:
     assert all(m.channel == "whatsapp" for m in messages)
 
 
+@pytest.mark.parametrize(
+    ("context", "forwarded"),
+    [(None, False), ({"forwarded": True}, True), ({"frequently_forwarded": True}, True),
+     ({"from": "2348000000002", "id": "wamid.QUOTED"}, False), ({"forwarded": "yes"}, False), ("junk", False)],
+)  # fmt: skip
+def test_forwarded_voice_notes_are_marked(context: Any, forwarded: bool) -> None:
+    """Cloud API ``context.forwarded``: a forwarded voice note is not the sender's voice (never donated)."""
+    payload = fixture("inbound_mixed.json")
+    value = payload["entry"][0]["changes"][0]["value"]
+    audio = next(m for m in value["messages"] if m["type"] == "audio")
+    if context is not None:
+        audio["context"] = context
+    value["messages"] = [audio]
+    [message] = parse_webhook(payload, phone_number_id="PNID123", now=NOW)
+    assert message.kind is MessageKind.AUDIO and message.forwarded is forwarded
+
+
 def test_statuses_produce_no_messages() -> None:
     assert parse_webhook(fixture("statuses_only.json"), now=NOW) == []
 

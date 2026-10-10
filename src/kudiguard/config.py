@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     hash_secret: SecretStr = SecretStr("")  # >= 32 bytes; pseudonymous user ids (privacy.UserHasher)
     retention_days: int = Field(default=90, ge=1)
     pattern_retention_days: int = Field(default=730, ge=1)  # de-identified scam examples (kudiguard.patterns)
+    voice_dir: Path = ROOT / "var" / "voice"  # donated voice notes, encrypted (kudiguard.donation)
+    voice_retention_days: int = Field(default=365, ge=1)  # 12 months, stated in the donation offer
     allow_sample_packs: bool = False  # fictional demo packs (never in production)
     packs: Annotated[tuple[str, ...], NoDecode] = ()  # empty = every enabled pack
 

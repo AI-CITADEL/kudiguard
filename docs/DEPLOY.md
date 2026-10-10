@@ -17,6 +17,14 @@ business number and the app in Live mode. Replies are free within 24 h of the us
 `.\scripts\setup_named_tunnel.ps1` (browser login for the domain; default `kudiguard.theaicitadel.com`), then
 `.\scripts\watchdog.ps1 -Named`. It keeps its own certificate and config, so other tunnels on this PC are untouched.
 
+**Voice-note donation** (opt-in; docs/DPIA_VOICE.md): encrypted audio lives in `var/voice/` (or
+`KUDIGUARD_VOICE_DIR`, which must belong to the same database), is purged after 12 months by the server and by
+`kudiguard purge`, and is erased by STOP DONATING / DELETE. Back up `var/` without `.env` (the key comes from
+`KUDIGUARD_HASH_SECRET`). Requests by email: `kudiguard voice access|erase --user <number | web:<session>>`.
+
+**Incident** (personal-data breach): contain, assess, notify the NDPC within 72 hours when people's rights are at
+risk, tell affected users when the risk is high, record it (docs/DPIA_VOICE.md §8).
+
 ## In the cloud (later)
 * **Container**: `docker build -t kudiguard .` then run with the same env vars and a volume for `/app/var`.
 * **N-ATLAS**: any GPU host running llama.cpp (or vLLM) with the same GGUF; set `KUDIGUARD_LLM_URL`.

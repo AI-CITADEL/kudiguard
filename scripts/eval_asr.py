@@ -26,7 +26,7 @@ from kudiguard.envfile import load_env_file
 from kudiguard.languages import LanguageRegistry
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.speech.base import ASRError, AudioError
-from kudiguard.speech.metrics import char_errors, word_errors
+from kudiguard.speech.metrics import POOLED_METRICS
 from kudiguard.speech.natlas_asr import NatlasASR, ct2_loader
 from kudiguard.speech.service import transcribe_upload
 
@@ -56,11 +56,7 @@ class Tally:
         return edits / max(total, 1)
 
 
-METRICS = {
-    "wer": (word_errors, False),  # diacritics folded
-    "wer_diacritics": (word_errors, True),
-    "cer": (char_errors, False),
-}
+METRICS = POOLED_METRICS
 
 
 async def evaluate(

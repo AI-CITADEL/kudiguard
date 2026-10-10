@@ -40,6 +40,29 @@ class UserState:
     last_interaction_id: int | None = None  # for button follow-ups ("What should I do?", "Warn my family")
     created_at: datetime = field(default_factory=utcnow)
     last_seen_at: datetime = field(default_factory=utcnow)
+    # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
+    # text the user accepted with its "Yes, I am 18+" button (so it records the age confirmation too); None = not
+    # donating. Kept while the user has donated samples, as proof of consent (NDPA s.26(1)).
+    donation_version: str | None = None
+    donation_at: datetime | None = None
+    donation_offered_at: datetime | None = None  # the offer is made at most once
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceSample:
+    """One donated voice note's record (the audio itself is an encrypted file named by ``id``).
+
+    Minimised: a random id, the donor's pseudonymous hash (for withdrawal, erasure and access requests), the week
+    (Monday) instead of a timestamp, and the speech-recognition hypothesis, redacted by every Store."""
+
+    id: str
+    user_hash: str
+    week: date
+    language: LanguageCode
+    channel: str
+    consent_version: str  # the donation text the donor accepted (per-sample proof of consent)
+    hypothesis: str
+    duration_s: float | None = None
 
 
 class StoreClosedError(RuntimeError):
@@ -77,11 +100,13 @@ class Store(Protocol):
 
     async def delete_user(self, user_hash: str) -> int:
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
-        their stored messages. Returns rows removed."""
+        their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Returns
+        rows removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:
-        """Retention: atomically remove data older than ``cutoff``. Returns rows removed."""
+        """Retention: atomically remove data older than ``cutoff``. Returns rows removed. A user row is kept while
+        the user has donated voice samples (it holds their donation consent record)."""
         ...
 
     async def add_pattern(self, pattern: ScamPattern) -> None:
@@ -98,6 +123,28 @@ class Store(Protocol):
 
     async def export_interactions(self) -> list[dict[str, Any]]:
         """Rows for validation reporting (pseudonymous ids, redacted text, verdicts, latencies, feedback)."""
+        ...
+
+    async def add_voice_sample(self, sample: VoiceSample) -> None:
+        """Record a donated voice note (the hypothesis is redacted). The audio file is the caller's
+        (``donation.VoiceVault``)."""
+        ...
+
+    async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
+        """Donated samples, all or one donor's, ordered by week then id (never by insertion order)."""
+        ...
+
+    async def delete_voice_samples(self, user_hash: str) -> list[str]:
+        """Withdrawal/erasure: remove a donor's sample rows; returns their ids so the files can be deleted."""
+        ...
+
+    async def delete_voice_sample(self, sample_id: str) -> bool:
+        """Remove one sample row (a reviewer found a child's or another person's voice). False if unknown."""
+        ...
+
+    async def purge_voice_samples(self, cutoff: date) -> list[str]:
+        """Retention: remove samples from weeks starting on or before ``cutoff`` (so none outlives its period);
+        returns their ids."""
         ...
 
     async def close(self) -> None: ...

@@ -193,6 +193,19 @@ def test_web_consent_version_matches_the_pipeline() -> None:
     assert f'const CONSENT_VERSION = "{CONSENT_VERSION}";' in page
 
 
+def test_web_donation_version_matches_the_server() -> None:
+    from kudiguard.donation import DONATION_VERSION
+
+    page = (Path(__file__).resolve().parents[2] / "src/kudiguard/api/static/voice.html").read_text(
+        encoding="utf-8"
+    )
+    assert f'const DONATION_VERSION = "{DONATION_VERSION}";' in page
+    assert '<input type="checkbox" id="donate">' in page  # unticked by default
+    assert '"X-KudiGuard-Donation": DONATION_VERSION' in page and "/web/donation/withdraw" in page
+    assert page.count("donate: ") == 4 and page.count("donationOff: ") == 4  # en, ha, yo, ig
+    assert "18 or older" in page and "only my own voice" in page and "12 months" in page
+
+
 async def test_delete_user_removes_matching_patterns_in_both_stores(store) -> None:  # type: ignore[no-untyped-def]
     from datetime import UTC, datetime
 

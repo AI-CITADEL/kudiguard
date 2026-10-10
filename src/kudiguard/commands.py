@@ -23,6 +23,8 @@ class Command(StrEnum):
     STOP = "stop"
     DELETE = "delete"
     LANGUAGE_MENU = "language"
+    DONATE = "donate"  # offer voice-note donation (consent needs the offer's "Yes, I am 18+" button)
+    STOP_DONATING = "stop_donating"  # withdraw donation consent and delete donated voice notes
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +49,8 @@ class CommandMatcher:
                 (Command.STOP, spec.stop),
                 (Command.DELETE, spec.delete),
                 (Command.LANGUAGE_MENU, spec.language),
+                (Command.DONATE, spec.donate),
+                (Command.STOP_DONATING, spec.stop_donating),
             ):
                 for phrase in phrases:
                     key = canonical(phrase)

@@ -15,6 +15,7 @@ from datetime import timedelta
 import httpx
 
 from kudiguard.config import Settings
+from kudiguard.donation import VOICE_RETENTION_DAYS, Sealer, VoiceVault
 from kudiguard.engine import Engine
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
@@ -43,6 +44,7 @@ class Services:
     llm: LLM
     conversation: Conversation | None = None  # present when a chat channel (WhatsApp) is configured
     whatsapp: object | None = None  # channels.whatsapp.WhatsAppConfig when configured
+    donations: VoiceVault | None = None  # opt-in voice-note donation (WhatsApp and the web page)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     background: list[asyncio.Task[None]] = field(default_factory=list)
 
@@ -66,8 +68,11 @@ async def purge_loop(
     retention_days: int,
     interval_s: float = PURGE_INTERVAL_S,
     pattern_retention_days: int = PATTERN_RETENTION_DAYS,
+    donations: VoiceVault | None = None,
+    voice_retention_days: int = VOICE_RETENTION_DAYS,
 ) -> None:
-    """Delete evidence (and, on their own clock, scam examples) older than their retention periods (NDPA)."""
+    """Delete evidence (and, on their own clocks, scam examples and donated voice notes) older than their retention
+    periods (NDPA s.24)."""
     while True:
         try:
             now = utcnow()
@@ -75,6 +80,8 @@ async def purge_loop(
             removed += await store.purge_patterns_before(
                 (now - timedelta(days=pattern_retention_days)).date()
             )
+            if donations is not None:
+                removed += await donations.purge((now - timedelta(days=voice_retention_days)).date())
             if removed:
                 log.info("retention purge removed %d rows", removed)
         except Exception:
@@ -144,6 +151,9 @@ async def build_services(settings: Settings) -> Services:
         closers.append(store.close)
 
         services = Services(settings, registry, engine, store, hasher, llm, closers=closers)
+        services.donations = VoiceVault(
+            settings.voice_dir, store, Sealer(settings.hash_secret.get_secret_value().encode())
+        )
         whatsapp = None
         if settings.whatsapp_enabled:
             try:
@@ -165,11 +175,16 @@ async def build_services(settings: Settings) -> Services:
                 hasher=hasher,
                 limits=limits,
                 privacy_url=f"{settings.public_url.rstrip('/')}/privacy" if settings.public_url else "",
+                donations=services.donations,
             )
         services.background.append(
             asyncio.create_task(
                 purge_loop(
-                    store, settings.retention_days, pattern_retention_days=settings.pattern_retention_days
+                    store,
+                    settings.retention_days,
+                    pattern_retention_days=settings.pattern_retention_days,
+                    donations=services.donations,
+                    voice_retention_days=settings.voice_retention_days,
                 )
             )
         )
