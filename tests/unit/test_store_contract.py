@@ -221,6 +221,15 @@ async def test_interaction_ids_follow_erasure(store: Store) -> None:
     assert {r["id"] for r in await store.export_interactions()} == await store.interaction_ids()
 
 
+async def test_interaction_ids_follow_retention(store: Store) -> None:
+    old = turn(message_id="old")
+    old.created_at = utcnow() - timedelta(days=100)
+    await store.add_interaction(old)
+    new_id = await store.add_interaction(turn(message_id="new"))
+    await store.purge_before(utcnow() - timedelta(days=90))
+    assert await store.interaction_ids() == {new_id}  # expired rows show up as stale in `review check`
+
+
 async def test_set_outcome_marks_undelivered_answers(store: Store) -> None:
     interaction_id = await store.add_interaction(turn(message_id="a"))
     await store.set_outcome(interaction_id, Outcome.ERROR, "undelivered: call 08031234567")
