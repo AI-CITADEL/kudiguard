@@ -17,6 +17,7 @@ from kudiguard.patterns import ScamPattern
 
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
+DELETION_MARKER_DAYS = 30  # DELETE markers (only for the sign-up import); stated on /privacy
 
 
 def utcnow() -> datetime:
@@ -40,6 +41,9 @@ class UserState:
     last_interaction_id: int | None = None  # for button follow-ups ("What should I do?", "Warn my family")
     created_at: datetime = field(default_factory=utcnow)
     last_seen_at: datetime = field(default_factory=utcnow)
+    # The CONSENT_VERSION of the welcome last *shown* (None = never welcomed, e.g. a row created by the sign-up form
+    # import): main consent is recorded only after the current welcome was shown.
+    welcome_version: str | None = None
     # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
     # text the user accepted together with the 18+ and own-voice confirmations (the chat's "Yes, I am 18+" button or
     # the sign-up form's ticked boxes); None = not donating. It survives a change of the main consent text; only
@@ -51,6 +55,7 @@ class UserState:
     donation_offered_version: str | None = (
         None  # which offer text: offered once per text, to old donors again
     )
+    donation_withdrawn_at: datetime | None = None  # last "No", STOP DONATING or STOP while donating
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,8 +110,17 @@ class Store(Protocol):
 
     async def delete_user(self, user_hash: str) -> int:
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
-        their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Returns
-        rows removed."""
+        their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Leaves only
+        a coded DELETE marker (``deleted_at``). Returns rows removed (the marker is not counted)."""
+        ...
+
+    async def deleted_at(self, user_hash: str) -> datetime | None:
+        """When this user last sent DELETE, from the coded marker ``delete_user`` leaves (``DELETION_MARKER_DAYS``).
+        Read only by the sign-up form import."""
+        ...
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        """Remove DELETE markers older than ``cutoff``. Returns markers removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:

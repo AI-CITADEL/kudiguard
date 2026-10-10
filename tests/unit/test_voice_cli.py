@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -365,14 +366,17 @@ def test_preconsent_needs_the_current_form_text_and_columns(
 
 
 def test_preconsent_never_overrides_a_later_choice(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
-    """Re-importing after STOP DONATING, STOP or a decline, or for a user active after the form, changes nothing."""
+    """Re-importing after STOP, a decline/withdrawal or an unanswered offer, or for a user active after the form,
+    changes nothing; nor do stale or repeated rows."""
     hasher = UserHasher(SECRET.encode())
     form = datetime.now(UTC) - timedelta(days=3)
     before = form - timedelta(days=1)
     cases = {
         "+2348011111111": UserState("", stopped=True, created_at=before, last_seen_at=before),
         "+2348022222222": UserState("", donation_offered_version=DONATION_VERSION, donation_offered_at=before,
-                                    created_at=before, last_seen_at=before),  # withdrew / declined
+                                    donation_withdrawn_at=before, created_at=before, last_seen_at=before),
+        "+2348044444444": UserState("", donation_offered_version=DONATION_VERSION, donation_offered_at=before,
+                                    created_at=before, last_seen_at=before),  # offered, never answered
         "+2348033333333": UserState("", created_at=before, last_seen_at=form + timedelta(hours=1)),
     }  # fmt: skip
     for number, state in cases.items():
@@ -380,11 +384,17 @@ def test_preconsent_never_overrides_a_later_choice(env: Env, capsys: pytest.Capt
         save_user(env, state)
     rows = [f"{n},yes,yes,yes,{form.isoformat()}" for n in cases]
     rows += [f"{PHONE},yes,yes,yes,{form.isoformat()}", f"0806 666 6666,yes,yes,yes,{recently(31)}"]
+    rows += [
+        f"0805 555 5555,yes,yes,yes,{form.isoformat()}",
+        f"+234 805 555 5555,yes,yes,yes,{form.isoformat()}",
+    ]
     assert preconsent(env, *rows) == 0
     printed = capsys.readouterr().out
-    assert "for 0 testers" in printed
-    assert "skipped 5 (never overriding a later choice): 1 active after the form, 1 already consented, " \
-           "1 declined or withdrew, 1 stopped, 1 too old" in printed  # fmt: skip
+    assert "for 1 testers: 0 already known to KudiGuard, 1 new." in printed  # the repeated number, once
+    assert (
+        "skipped 7 (never overriding a later choice): 1 active after the form, 1 already consented, "
+        "1 declined or withdrew, 1 listed twice, 1 offered, no answer yet, 1 stopped, 1 too old"
+    ) in printed
     for number in cases:
         state = stored_user(env, number)
         assert state is not None and state.donation_version is None
@@ -403,11 +413,58 @@ def test_preconsent_after_withdrawal_in_chat_is_not_resurrected(
         None,
         None,
     )  # STOP DONATING in chat
+    state.donation_withdrawn_at = datetime.now(UTC)
     save_user(env, state)
     assert preconsent(env, f"0809 999 9999,yes,yes,yes,{form}") == 0  # the same export imported again
     assert "1 declined or withdrew" in capsys.readouterr().out
     again = stored_user(env, "+2348099999999")
     assert again is not None and again.donation_version is None
+
+
+def delete_user(env: Env, number: str, when: datetime) -> None:
+    """What the DELETE command does, at ``when`` (the store stamps its marker with the current time)."""
+
+    async def run() -> None:
+        store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))
+        try:
+            await store.delete_user(UserHasher(SECRET.encode()).user_id(number))
+        finally:
+            await store.close()
+
+    with patch("kudiguard.storage.sqlite.utcnow", lambda: when):
+        asyncio.run(run())
+
+
+def test_a_delete_after_the_form_is_never_undone_by_the_import(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Day 1: the form. Day 3: DELETE. Day 5: the import. The coded DELETE marker makes the import skip them."""
+    now = datetime.now(UTC)
+    day1, day3 = now - timedelta(days=4), now - timedelta(days=2)
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{day1.isoformat()}") == 0  # imported on day 1
+    capsys.readouterr()
+    delete_user(env, "+2348099999999", day3)
+    assert stored_user(env, "+2348099999999") is None  # nothing left but the coded marker
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{day1.isoformat()}") == 0  # day 5: imported (again)
+    assert "1 deleted" in capsys.readouterr().out and stored_user(env, "+2348099999999") is None
+    # A DELETE *before* a newer form answer does not block it: that is a fresh choice.
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{recently(0.5)}") == 0
+    state = stored_user(env, "+2348099999999")
+    assert state is not None and state.donation_source == "form"
+
+
+def test_delete_markers_expire_with_the_purge(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
+    delete_user(env, "+2348099999999", datetime.now(UTC) - timedelta(days=31))
+    assert cli.main(["purge"]) == 0
+
+    async def marker() -> datetime | None:
+        store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))
+        try:
+            return await store.deleted_at(UserHasher(SECRET.encode()).user_id("+2348099999999"))
+        finally:
+            await store.close()
+
+    assert asyncio.run(marker()) is None
 
 
 def test_wipe_needs_all_and_deletes_everything(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
@@ -438,6 +495,17 @@ def test_exports_never_go_to_cloud_synced_folders(
 ) -> None:
     assert cli.main(["voice", "export", "--out", str(env.db.parent / name / "x")]) == 2
     assert "cloud-synced" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("name", ["Dropbox (Personal)", "Dropbox (Contoso)", "iCloudDrive", "Box Sync"])
+def test_more_cloud_sync_folder_names(env: Env, capsys: pytest.CaptureFixture[str], name: str) -> None:
+    assert cli.main(["voice", "export", "--out", str(env.db.parent / name / "x")]) == 2
+    assert "cloud-synced" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("number", ["08031234567abc", "0803 123 4567 ext", "x08031234567", "0803-123-4567#"])
+def test_numbers_with_letters_or_symbols_are_rejected(number: str) -> None:
+    assert voice_cli.nigerian_mobile(number) is None
 
 
 def test_ordinary_folder_names_are_not_mistaken_for_cloud_sync(env: Env) -> None:

@@ -120,6 +120,15 @@ async def test_privacy_page_follows_the_storage_location_and_switch(registry: La
         page = (await running.client.get("/privacy")).text
         assert "<strong>in Nigeria</strong>" in page and "Not switched on yet" in page
         assert "outside Nigeria (during the pilot)" not in page and "Cloudflare" in page
+        assert "Data passing through Meta and Cloudflare may be processed abroad" in page
+        assert "may not fully protect data held abroad" not in page
+
+
+async def test_privacy_page_states_the_transfer_risk_and_the_delete_marker(api: Api) -> None:
+    page = (await api.client.get("/privacy")).text
+    assert "Nigerian data-protection law may not fully protect data held abroad" in page
+    assert "We keep a coded marker for up to 30 days only so that an earlier sign-up form" in page
+    assert "{{" not in page
 
 
 @pytest.mark.parametrize(("enabled", "nigeria"), [(False, False), (True, True)])

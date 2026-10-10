@@ -46,7 +46,7 @@ from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, utcnow
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -595,6 +595,8 @@ def _web_router() -> APIRouter:
                 else f"{settings.pattern_retention_days} days"
             ),
             "STORAGE_LOCATION": html.escape(settings.storage_location.english),
+            "STORAGE_RISK": html.escape(settings.storage_location.english_risk),
+            "DELETION_MARKER_DAYS": str(DELETION_MARKER_DAYS),
             "DONATION_STATUS": (
                 "Available now."
                 if settings.voice_donation

@@ -204,7 +204,10 @@ def test_web_donation_version_matches_the_server() -> None:
     assert '"X-KudiGuard-Donation": DONATION_VERSION' in page and "/web/donation/withdraw" in page
     assert page.count("donate: ") == 4 and page.count("donationOff: ") == 4  # en, ha, yo, ig
     assert page.count("riskNigeria: ") == 4 and page.count("copy: ") == 4
-    assert page.count("{risk}") == 4 + 1  # four consent texts + the replacement in t()
+    assert page.count("{risk}") == 8 + 1  # four consent and four donation texts + the replacement in t()
+    assert (
+        page.count("copied: ") == 4 and "Meta" not in page.split("<script>")[1]
+    )  # the web is Cloudflare only
     assert '<code id="code"></code>' in page and "navigator.clipboard.writeText(session)" in page
     assert "18 or older" in page and "only my own voice" in page and "12 months" in page
 

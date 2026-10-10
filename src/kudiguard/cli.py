@@ -26,7 +26,7 @@ from kudiguard.donation import Sealer, VoiceVault
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
-from kudiguard.storage.base import utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 
@@ -96,6 +96,7 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
         try:
             vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
             voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
+            await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
             return await store.purge_before(utcnow() - timedelta(days=args.days)), voice
         finally:
             await store.close()

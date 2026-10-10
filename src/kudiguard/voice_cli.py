@@ -34,7 +34,7 @@ from kudiguard.config import ROOT, Settings
 from kudiguard.donation import DONATION_VERSION, Sealer, VoiceIntegrityError, VoiceVault
 from kudiguard.privacy import UserHasher, normalise_phone
 from kudiguard.speech.metrics import POOLED_METRICS
-from kudiguard.storage.base import Store, UserState, VoiceSample, aware
+from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, UserState, VoiceSample, aware
 from kudiguard.storage.sqlite import SQLiteStore
 from kudiguard.text import redact
 
@@ -44,18 +44,10 @@ COLUMNS = ("id", "language", "week", "duration_s", "asr_hypothesis", "reference"
 # (incl. no-break and ideographic spaces), or a leading tab/CR/LF. Same semantics as the review kit's cells.
 FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "\t", "\r", "\n", "\uff1d", "\uff0b", "\uff0d", "\uff20")
 EXPORT_DIRS = ("var", "exports")  # git-ignored folders of the checkout (.gitignore)
-# Folder names of sync clients ("OneDrive - Contoso" for business accounts, "My Drive" for Google Drive).
-CLOUD_PREFIXES = ("onedrive",)
-CLOUD_SYNCED = (
-    "dropbox",
-    "google drive",
-    "googledrive",
-    "my drive",
-    "icloud",
-    "icloud drive",
-    "icloud drive (archive)",
-    "box",
-)
+# Folder names of sync clients: prefixes catch "OneDrive - Contoso", "Dropbox (Personal)", "iCloudDrive", …;
+# exact names for the ambiguous short ones ("My Drive" is Google Drive's root, "Box" and "Box Sync" are Box's).
+CLOUD_PREFIXES = ("onedrive", "dropbox", "icloud", "google drive", "googledrive")
+CLOUD_SYNCED = ("my drive", "box", "box sync")
 TRUE = frozenset({"yes", "y", "true", "1", "x", "ticked"})
 REMINDER = (
     "PRIVACY: these are real people's voices (personal data, NDPA 2023). Share them only with named transcribers "
@@ -358,7 +350,10 @@ def cmd_remove(settings: Settings, args: argparse.Namespace) -> int:
 
 
 PRECONSENT_COLUMNS = ("number", "donate_confirmed", "age_confirmed", "own_voice_confirmed", "consented_at")
-PRECONSENT_MAX_AGE_DAYS = 30  # older form answers are not imported: the tester is asked in the chat instead
+PRECONSENT_MAX_AGE_DAYS = (
+    DELETION_MARKER_DAYS  # older answers are not imported (DELETE markers last this long)
+)
+_PHONE_TEXT = re.compile(r"^(?:whatsapp:|tel:)?[\d\s()+.\-]+$", re.IGNORECASE)  # digits and separators only
 _NIGERIAN_MOBILE = re.compile(r"^234[789][01]\d{8}$")
 _LOCAL_WITHOUT_ZERO = re.compile(r"^[789][01]\d{8}$")  # a spreadsheet dropped the leading 0 of 0803...
 _SCIENTIFIC = re.compile(r"\d[.,]?\d*[eE][+-]?\d+")  # 2.34803E+12: the spreadsheet already lost digits
@@ -367,7 +362,7 @@ _SCIENTIFIC = re.compile(r"\d[.,]?\d*[eE][+-]?\d+")  # 2.34803E+12: the spreadsh
 def nigerian_mobile(raw: str) -> str | None:
     """``+234XXXXXXXXXX`` for a Nigerian mobile number in any common format, else None (never guessed)."""
     text = raw.strip()
-    if not text or _SCIENTIFIC.search(text):
+    if not text or _SCIENTIFIC.search(text) or not _PHONE_TEXT.fullmatch(text):
         return None
     digits = normalise_phone(text)
     if digits.startswith("00"):  # international dialling prefix: 00 234 ...
@@ -419,19 +414,25 @@ def read_preconsents(path: Path, version: str) -> list[tuple[str, datetime]]:
     return rows
 
 
-def preconsent_blocker(user: UserState | None, at: datetime, now: datetime) -> str | None:
-    """Why a form answer must not be recorded: it would override a later STOP, withdrawal or decline (or an earlier
-    chat consent), or it is too old to rely on. None = record it."""
+def preconsent_blocker(
+    user: UserState | None, at: datetime, now: datetime, deleted_at: datetime | None = None
+) -> str | None:
+    """Why a form answer must not be recorded: it would override a later DELETE, STOP, withdrawal or decline (or an
+    earlier chat consent), or it is too old to rely on. None = record it."""
     if now - at > timedelta(days=PRECONSENT_MAX_AGE_DAYS):
         return "too old"
+    if deleted_at is not None and deleted_at >= at:
+        return "deleted"
     if user is None:
         return None
     if user.stopped:
         return "stopped"
     if user.donation_version is not None:
         return "already consented"
-    if user.donation_offered_version is not None or user.donation_offered_at is not None:
+    if user.donation_withdrawn_at is not None:
         return "declined or withdrew"
+    if user.donation_offered_version is not None or user.donation_offered_at is not None:
+        return "offered, no answer yet"
     if user.last_seen_at > at:
         return "active after the form"
     return None
@@ -440,20 +441,26 @@ def preconsent_blocker(user: UserState | None, at: datetime, now: datetime) -> s
 def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
     """Record sign-up-form consent as if the tester had tapped "Yes, I am 18+" (source=form; not asked again).
 
-    Never resurrects consent: rows whose user stopped, withdrew, declined or was active after the form are skipped
-    (those testers are asked in the chat instead). Import an export once, promptly, then delete it: a tester who sent
-    DELETE leaves no trace, so re-importing an old export would sign them up again (hence the age limit)."""
+    Never resurrects consent: rows whose user deleted their data, stopped, withdrew, declined, was offered or was
+    active after the form are skipped (those testers are asked in the chat instead). A DELETE leaves only a coded
+    marker for ``PRECONSENT_MAX_AGE_DAYS``, the same limit as the form's age, so a deleted tester is never re-enrolled.
+    Rows never imply main consent: the tester still gets the welcome in the chat. A number listed twice counts once."""
     rows = read_preconsents(Path(args.csv), args.version)
 
     async def run() -> tuple[int, int, Counter[str]]:
         store, _, hasher = await _open(settings)
         recorded_existing, recorded_new, skipped = 0, 0, Counter[str]()
         now = datetime.now(UTC)
+        seen: set[str] = set()
         try:
             for number, at in rows:
+                if number in seen:
+                    skipped["listed twice"] += 1
+                    continue
+                seen.add(number)
                 user_hash = hasher.user_id(number)
                 user = await store.get_user(user_hash)
-                if reason := preconsent_blocker(user, at, now):
+                if reason := preconsent_blocker(user, at, now, await store.deleted_at(user_hash)):
                     skipped[reason] += 1
                     continue
                 base = user or UserState(user_hash, created_at=at, last_seen_at=at)

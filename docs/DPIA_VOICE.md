@@ -26,6 +26,9 @@ against the gazetted text before filing.
       days are skipped.
     * A STOPped user who returns starts without donation consent.
     * Imported testers are not asked again in the chat.
+    * An import never implies main consent: the tester's first message, whatever it is, gets the welcome, which
+      carries the retention, reviewer and transfer notice. Main consent is recorded only after the current welcome
+      was shown (`welcome_version`).
 * **What we keep (s.24, minimisation):**
   * the original audio, at most 16 MB and 90 s of speech;
   * a random sample id;
@@ -172,6 +175,11 @@ against the gazetted text before filing.
   * On the web: untick the box, or press "Delete my donated recordings". This works only in the same browser;
     otherwise the donor quotes the donation code.
   * By request: `kudiguard voice erase --user …`.
+  * **DELETE marker (s.34 compliance record, s.24 minimisation):** DELETE leaves only a keyed HMAC of the user's
+    hash (its own label, no number and no content) with the time.
+    * It is read only by the sign-up import, so an earlier form answer can never re-enrol someone who deleted.
+    * It is purged after 30 days, the same limit as a form answer's age.
+    * It is disclosed on /privacy under DELETE.
   * DELETE also resets the "offered" mark (N5), so a returning user may be offered once more.
 * **Objection (s.36):** treated as withdrawal.
 * **Automated decisions (s.37):** none are made from donations.
@@ -229,7 +237,7 @@ lawyer confirms this.
   |---|---|
   | Activity | Voice-note donation for speech-recognition testing |
   | Data subjects | Adult users who opt in (chat, web, tester form) |
-  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source) |
+  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source, withdrawal time); DELETE markers (keyed HMAC and time, 30 days) |
   | Basis | Consent (s.25, s.30 explicit consent) |
   | Recipients | Named reviewers and transcribers under written confidentiality |
   | Transfers | Outside Nigeria during the pilot: our server, and Meta and Cloudflare in transit. Basis: informed consent (s.43) |

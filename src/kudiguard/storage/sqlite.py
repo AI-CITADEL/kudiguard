@@ -98,6 +98,10 @@ MIGRATIONS: Sequence[str] = (
     ALTER TABLE users ADD COLUMN donation_source TEXT;
     ALTER TABLE users ADD COLUMN donation_offered_at TEXT;
     ALTER TABLE users ADD COLUMN donation_offered_version TEXT;
+    ALTER TABLE users ADD COLUMN donation_withdrawn_at TEXT;
+    ALTER TABLE users ADD COLUMN welcome_version TEXT;
+    CREATE TABLE deletion_markers (marker TEXT PRIMARY KEY, deleted_at TEXT NOT NULL) WITHOUT ROWID;
+    CREATE INDEX ix_deletion_markers_time ON deletion_markers (deleted_at);
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
     INSERT INTO meta VALUES ('voice_vault_id', lower(hex(randomblob(16))));
     CREATE TABLE voice_samples (
@@ -116,7 +120,8 @@ MIGRATIONS: Sequence[str] = (
 )
 _USER_COLUMNS = (
     "user_hash, language, consented_at, consent_version, stopped, last_interaction_id, created_at, last_seen_at, "
-    "donation_version, donation_at, donation_source, donation_offered_at, donation_offered_version"
+    "donation_version, donation_at, donation_source, donation_offered_at, donation_offered_version, "
+    "donation_withdrawn_at, welcome_version"
 )
 
 
@@ -188,6 +193,8 @@ class SQLiteStore:
             donation_source=row["donation_source"],
             donation_offered_at=_dt(row["donation_offered_at"]),
             donation_offered_version=row["donation_offered_version"],
+            donation_withdrawn_at=_dt(row["donation_withdrawn_at"]),
+            welcome_version=row["welcome_version"],
         )
 
     async def save_user(self, state: UserState) -> None:
@@ -205,17 +212,21 @@ class SQLiteStore:
             state.donation_source,
             _ts(state.donation_offered_at) if state.donation_offered_at else None,
             state.donation_offered_version,
+            _ts(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
+            state.welcome_version,
         )
         await self._run(
             lambda db: db.execute(
-                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (user_hash) DO UPDATE SET language = excluded.language,
                      consented_at = excluded.consented_at, consent_version = excluded.consent_version,
                      stopped = excluded.stopped, last_interaction_id = excluded.last_interaction_id,
                      last_seen_at = excluded.last_seen_at, donation_version = excluded.donation_version,
                      donation_at = excluded.donation_at, donation_source = excluded.donation_source,
                      donation_offered_at = excluded.donation_offered_at,
-                     donation_offered_version = excluded.donation_offered_version""",
+                     donation_offered_version = excluded.donation_offered_version,
+                     donation_withdrawn_at = excluded.donation_withdrawn_at,
+                     welcome_version = excluded.welcome_version""",
                 values,
             )
         )
@@ -297,6 +308,8 @@ class SQLiteStore:
     # --- erasure and retention ------------------------------------------------------------------------
 
     async def delete_user(self, user_hash: str) -> int:
+        marker = self._hasher.deletion_marker(user_hash)
+
         def work(db: sqlite3.Connection) -> int:
             with _transaction(db):
                 scams = db.execute(
@@ -318,6 +331,11 @@ class SQLiteStore:
                 turns = db.execute("DELETE FROM interactions WHERE user_hash = ?", (user_hash,)).rowcount
                 users = db.execute("DELETE FROM users WHERE user_hash = ?", (user_hash,)).rowcount
                 voice = db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,)).rowcount
+                db.execute(
+                    "INSERT INTO deletion_markers VALUES (?, ?) ON CONFLICT (marker) DO UPDATE SET deleted_at = "
+                    "excluded.deleted_at",
+                    (marker, _ts(utcnow())),
+                )
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # erased pages must not linger in the WAL file
             return patterns + feedback + turns + users + voice
 
@@ -355,6 +373,21 @@ class SQLiteStore:
             return sorted(ids)
 
         return await self._run(work)
+
+    async def deleted_at(self, user_hash: str) -> datetime | None:
+        marker = self._hasher.deletion_marker(user_hash)
+        row = await self._run(
+            lambda db: db.execute(
+                "SELECT deleted_at FROM deletion_markers WHERE marker = ?", (marker,)
+            ).fetchone()
+        )
+        return _dt(row[0]) if row else None
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        cursor = await self._run(
+            lambda db: db.execute("DELETE FROM deletion_markers WHERE deleted_at < ?", (_ts(cutoff),))
+        )
+        return int(cursor.rowcount)
 
     async def purge_before(self, cutoff: datetime) -> int:
         stamp = _ts(cutoff)

@@ -85,11 +85,18 @@ Two placeholders follow `KUDIGUARD_STORAGE_LOCATION`, using the same strings as 
      mobile; an unticked box; or a missing, zone-less or future time. Bad rows are listed by line number only.
    * The command prints how many testers were already known to KudiGuard and how many are new.
    * Some rows are skipped and reported, and those testers are asked in the chat instead. A form answer never
-     overrides a later choice. Rows are skipped when the tester has since sent STOP, STOP DONATING or "No"; already
-     said yes in the chat; used KudiGuard after the form time; or filled the form more than 30 days ago.
-   * **Import each export once, promptly.** A tester who sent DELETE leaves no trace, so re-importing an old export
-     would sign them up again. The 30-day limit narrows that window.
+     overrides a later choice. Rows are skipped when the tester has since:
+     * sent DELETE (a coded marker is kept for 30 days for exactly this);
+     * sent STOP, STOP DONATING or "No";
+     * been offered donation in the chat;
+     * already said yes in the chat;
+     * used KudiGuard after the form time.
+
+     Rows are also skipped when the form was filled more than 30 days ago. A number listed twice counts once.
+   * Import each export once, promptly. Answers older than 30 days are skipped.
 3. Delete the CSV and the form export. They hold phone numbers. KudiGuard stores only the keyed hashes, with
    `source=form`.
-4. These testers are not offered donation again in the chat. Their voice notes are kept only while
+4. The import does **not** sign anyone up for KudiGuard itself: each tester's first WhatsApp message still gets
+   the welcome (retention, reviewers, transfer abroad), and they agree to it in the chat as everyone does.
+   These testers are not offered donation again in the chat. Their voice notes are kept only while
    `KUDIGUARD_VOICE_DONATION=true`, and only those recorded in WhatsApp and not marked forwarded.

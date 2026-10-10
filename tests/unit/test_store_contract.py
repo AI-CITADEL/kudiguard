@@ -292,6 +292,44 @@ async def test_withdrawal_deletes_only_that_donors_samples(store: Store) -> None
     assert await store.delete_voice_samples("u1") == []
 
 
+async def test_welcome_and_withdrawal_round_trip(store: Store) -> None:
+    withdrawn = utcnow()
+    await store.save_user(UserState("u1", welcome_version="2026-10-10", donation_withdrawn_at=withdrawn))
+    loaded = await store.get_user("u1")
+    assert (
+        loaded is not None
+        and loaded.welcome_version == "2026-10-10"
+        and loaded.donation_withdrawn_at == withdrawn
+    )
+    loaded.welcome_version, loaded.donation_withdrawn_at = None, None
+    await store.save_user(loaded)
+    again = await store.get_user("u1")
+    assert again is not None and again.welcome_version is None and again.donation_withdrawn_at is None
+
+
+async def test_delete_leaves_only_a_coded_marker_that_expires(store: Store, tmp_path: Path) -> None:
+    assert await store.deleted_at("u1") is None
+    await store.save_user(UserState("u1"))
+    before = utcnow()
+    assert await store.delete_user("u1") == 1  # the marker is not counted as data
+    marked = await store.deleted_at("u1")
+    assert marked is not None and marked >= before and await store.deleted_at("u2") is None
+    await store.delete_user("u1")  # a second DELETE moves the time on
+    later = await store.deleted_at("u1")
+    assert later is not None and later >= marked
+    if isinstance(store, SQLiteStore):  # only a keyed hash of the user hash is stored, never the hash itself
+        import sqlite3
+
+        db = sqlite3.connect(tmp_path / "kg.db")
+        assert db.execute("SELECT marker FROM deletion_markers").fetchall() == [
+            (UserHasher(b"s" * MIN_SECRET_BYTES).deletion_marker("u1"),)
+        ]
+        db.close()
+    assert await store.purge_deletion_markers(utcnow() - timedelta(days=1)) == 0
+    assert await store.purge_deletion_markers(utcnow() + timedelta(seconds=1)) == 1
+    assert await store.deleted_at("u1") is None
+
+
 async def test_sample_ids_are_unique(store: Store) -> None:
     await store.add_voice_sample(sample("1" * 32))
     with pytest.raises(ValueError, match="duplicate"):

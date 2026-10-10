@@ -402,10 +402,11 @@ class Conversation:
             removed = await self._erase_donations(turn.user_hash)
             donor = removed > 0 or (user is not None and user.donation_version is not None)
             if user is not None:
+                now = self._clock()
                 await self._store.save_user(
                     dataclasses.replace(
-                        user, stopped=True, last_seen_at=self._clock(), donation_version=None,
-                        donation_at=None, donation_source=None,
+                        user, stopped=True, last_seen_at=now, donation_version=None, donation_at=None,
+                        donation_source=None, donation_withdrawn_at=now if donor else user.donation_withdrawn_at,
                     )
                 )  # fmt: skip
             await self._send(
@@ -443,15 +444,18 @@ class Conversation:
         Returns the user if this message should be processed now: a text message after the welcome counts as
         consent ("by continuing, you agree"). A voice note before any language was chosen gets the menu again,
         because transcribing it with a guessed language model would mostly produce garbage.
+
+        Consent needs the *current* welcome to have been shown (``welcome_version``): a user who exists without it
+        (e.g. a tester row created by the sign-up form import, or a language button from an old menu) gets the
+        welcome first, whatever they sent.
         """
         now = self._clock()
-        if chosen:
-            base = user or UserState(turn.user_hash, created_at=now, last_seen_at=now)
-            await self._set_language(turn, base, chosen)
+        welcomed = user is not None and user.welcome_version == CONSENT_VERSION
+        if chosen and welcomed:
+            assert user is not None
+            await self._set_language(turn, user, chosen)
             return None
-        pending = (
-            user is not None and not user.stopped and user.consented_at is None
-        )  # welcomed, not yet consented
+        pending = welcomed and user is not None and not user.stopped and user.consented_at is None
         if pending and turn.message.kind is MessageKind.AUDIO:
             await self._messenger.send(turn.message.user_id, self._language_menu(turn.language))
             turn.replied = True
@@ -472,12 +476,13 @@ class Conversation:
         # consent is separate and survives a new main consent text, but never a STOP: a stopped user who comes back
         # starts without it (a fresh yes is required); the "offered" marks stay.
         state = UserState(turn.user_hash, language=turn.language, created_at=user.created_at if user else now,
-                          last_seen_at=now)  # fmt: skip
+                          last_seen_at=now, welcome_version=CONSENT_VERSION)  # fmt: skip
         if user is not None:
             state = dataclasses.replace(
                 state,
                 donation_offered_at=user.donation_offered_at,
                 donation_offered_version=user.donation_offered_version,
+                donation_withdrawn_at=user.donation_withdrawn_at,
             )
             if not user.stopped:
                 state = dataclasses.replace(
@@ -521,10 +526,12 @@ class Conversation:
             turn.replied = True
             return
         if kind is MessageKind.UNSUPPORTE***REMOVED***
+            await self._store.save_user(user)  # last_seen_at: every message counts as activity
             await self._send(turn, self._messages.text(turn.language, Msg.UNSUPPORTED))
             return
         parsed = parse_button(turn.message.button_id) if kind is MessageKind.BUTTON else None
         if parsed and parsed[0] in (Action.HELPFUL, Action.NOT_HELPFUL):
+            await self._store.save_user(user)
             await self._feedback(turn, parsed[0], parsed[1])
             return
         if parsed and parsed[0] is Action.DONATE:  # consent choices are never rate-limited
@@ -534,9 +541,11 @@ class Conversation:
             if self._collecting:
                 await self._offer_donation(turn, user)
             else:
+                await self._store.save_user(user)
                 await self._send(turn, self._messages.text(turn.language, Msg.DONATION_UNAVAILABLE))
             return
         if await self._rate_limited(turn):
+            await self._store.save_user(user)
             await self._send(turn, self._messages.text(turn.language, Msg.RATE_LIMITED))
             return
         if kind is MessageKind.BUTTON:
@@ -770,6 +779,7 @@ class Conversation:
                     user, donation_version=None, donation_at=None, donation_source=None, last_seen_at=now,
                     donation_offered_at=user.donation_offered_at or now,
                     donation_offered_version=user.donation_offered_version or DONATION_VERSION,
+                    donation_withdrawn_at=now,
                 )
             )  # fmt: skip
         key = Msg.DONATION_DECLINED if declined and not (was_donating or removed) else Msg.DONATION_OFF

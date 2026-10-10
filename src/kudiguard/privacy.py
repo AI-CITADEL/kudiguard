@@ -56,6 +56,10 @@ class UserHasher:
             return self._hmac(f"phone:{normalise_phone(stripped)}")
         return self._hmac(f"id:{external_id.strip()}")
 
+    def deletion_marker(self, user_hash: str) -> str:
+        """Coded marker of a DELETE (own label): lets the sign-up import skip someone who deleted after the form."""
+        return self._hmac(f"deleted:{user_hash}")
+
     def message_key(self, channel: str, message_id: str) -> str:
         """Opaque de-duplication key for a provider message id (which may embed the sender's number)."""
         return self._hmac(f"msg:{channel}:{message_id}")

@@ -26,7 +26,7 @@ from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
 from kudiguard.speech.audio import find_ffmpeg
-from kudiguard.storage.base import Store, utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 log = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ async def purge_loop(
             )
             if donations is not None:
                 removed += await donations.purge((now - timedelta(days=voice_retention_days)).date())
+            removed += await store.purge_deletion_markers(now - timedelta(days=DELETION_MARKER_DAYS))
             if removed:
                 log.info("retention purge removed %d rows", removed)
         except Exception:

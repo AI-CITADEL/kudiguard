@@ -273,6 +273,61 @@ async def test_consent_buttons_are_never_rate_limited(d: Harness) -> None:
     assert await d.say("stop donating") == [d.t(Msg.DONATION_OFF)]
 
 
+async def form_tester(h: Harness) -> None:
+    """A row as `kudiguard voice preconsent` creates it for a tester who never wrote to KudiGuard."""
+    at = utcnow() - timedelta(days=1)
+    await h.store.save_user(
+        UserState(h.user_hash, created_at=at, last_seen_at=at, donation_version=DONATION_VERSION, donation_at=at,
+                  donation_source="form", donation_offered_at=at, donation_offered_version=DONATION_VERSION)
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize("first", ["text", "voice", "button", "greeting"])
+async def test_a_form_tester_gets_the_welcome_before_anything_is_processed(d: Harness, first: str) -> None:
+    """The import never implies main consent: whatever they send first, they see the welcome (retention, reviewers,
+    transfer abroad) and the language menu, and nothing is processed, logged or donated."""
+    await form_tester(d)
+    if first == "voice":
+        texts = await voice(d)
+    elif first == "button":
+        texts = await d.say(button="lang:ha")  # e.g. a forwarded language menu
+    else:
+        texts = await d.say(QUESTION if first == "text" else "hello")
+    assert texts[0].startswith(d.t(Msg.WELCOME).split("\n")[0]) and d.t(Msg.RISK_OUTSIDE) in texts[0]
+    assert d.messenger.sent[-1][1].options  # the language menu
+    state = await user(d)
+    assert state.consented_at is None and state.welcome_version == CONSENT_VERSION
+    assert state.donation_version == DONATION_VERSION  # the form's donation consent is kept
+    assert await interactions(d) == [] and await samples(d) == [] and d.llm.requests == []
+    # Only now does continuing count as consent, and their voice notes are kept from then on.
+    await d.say(button="lang:en")
+    agreed = await user(d)
+    assert agreed.consent_version == CONSENT_VERSION and agreed.consented_at is not None
+    texts = await voice(d)
+    assert d.t(Msg.DONATION_OFFER) not in texts and len(await samples(d)) == 1
+
+
+async def test_a_language_button_never_skips_the_welcome(d: Harness) -> None:
+    """A stranger tapping a language option (an old or forwarded menu) is welcomed, not signed up."""
+    texts = await d.say(button="lang:yo")
+    assert texts[0] == d.t(Msg.WELCOME) and (await user(d)).consented_at is None
+    await d.store.save_user(
+        dataclasses.replace(await user(d), welcome_version="2026-10-08")
+    )  # an old welcome
+    texts = await d.say(button="lang:yo")
+    assert texts[0] == d.t(Msg.WELCOME) and (await user(d)).consented_at is None
+
+
+@pytest.mark.parametrize(("command", "reply"), [("DELETE", Msg.DELETED), ("STOP", Msg.STOPPED_DONOR)])
+async def test_a_form_testers_first_message_can_be_delete_or_stop(
+    d: Harness, command: str, reply: Msg
+) -> None:
+    await form_tester(d)
+    assert await d.say(command) == [d.t(reply)]
+    state = await d.store.get_user(d.user_hash)
+    assert state is None or (state.stopped and state.donation_version is None and state.donation_withdrawn_at)
+
+
 async def test_testers_who_consented_on_the_sign_up_form_are_not_asked_again(d: Harness) -> None:
     await d.onboard("en")
     now = utcnow()
@@ -374,6 +429,32 @@ async def test_the_transfer_risk_sentence_follows_the_storage_location(d: Harnes
     await d.say(button="lang:en")
     offer = (await voice(d))[-1]
     assert d.t(Msg.RISK_NIGERIA) in offer and d.t(Msg.RISK_OUTSIDE) not in offer
+
+
+async def test_withdrawals_are_timed_for_the_form_import(d: Harness) -> None:
+    await opt_in(d)
+    assert (await user(d)).donation_withdrawn_at is None
+    await d.say(button=NO)
+    assert (await user(d)).donation_withdrawn_at is not None
+
+
+async def test_every_kind_of_message_counts_as_activity(d: Harness) -> None:
+    """last_seen_at moves on unsupported messages, feedback, rate-limited and "not available" replies too, so the
+    form import's "active after the form" and the 90-day retention see them."""
+    wire(d, vault=vault(d), accept=False, per_user_per_hour=1)
+    await d.onboard("en")
+    for message in (
+        d.msg(kind=MessageKind.UNSUPPORTED), d.msg(button="helpful:1"), d.msg("donate voice"), d.msg(QUESTION),
+        d.msg(QUESTION),  # the second one is rate-limited
+    ):  # fmt: skip
+        state = await user(d)
+        await d.store.save_user(
+            dataclasses.replace(state, last_seen_at=state.last_seen_at - timedelta(days=1))
+        )
+        stale = (await user(d)).last_seen_at
+        await d.conversation.handle(message)
+        assert (await user(d)).last_seen_at > stale, message
+    assert d.messenger.texts[-1] == d.t(Msg.RATE_LIMITED)
 
 
 async def test_stop_for_a_non_donor_is_the_usual_reply(d: Harness) -> None:

@@ -61,8 +61,7 @@
   <section id="where">
     <h2>Where your data goes (transfer outside Nigeria)</h2>
     <p>To run KudiGuard, your messages pass through <strong>WhatsApp (Meta)</strong> and <strong>Cloudflare</strong>,
-    outside Nigeria, and are stored on our server <strong>{{STORAGE_LOCATION}}</strong>. Nigerian data-protection law
-    may not fully protect data held abroad, and you may find it harder to enforce your rights there. We tell you this
+    outside Nigeria, and are stored on our server <strong>{{STORAGE_LOCATION}}</strong>. {{STORAGE_RISK}} We tell you this
     before you agree: by continuing after our welcome message (or ticking the box on this website) you consent to this
     transfer (Nigeria Data Protection Act 2023, s.43). If you do not agree, please do not use KudiGuard; you can send
     DELETE at any time. We will update this notice, and ask you again where needed, if the server moves.</p>
@@ -144,7 +143,8 @@
     <h2>Your rights</h2>
     <ul>
       <li>On WhatsApp, send <strong>DELETE</strong> to erase everything linked to you, immediately, including donated
-        voice notes.</li>
+        voice notes. We keep a coded marker for up to {{DELETION_MARKER_DAYS}} days only so that an earlier sign-up form
+        cannot re-enrol you in voice donation; it holds no phone number and nothing you sent.</li>
       <li>Send <strong>STOP DONATING</strong> (or untick the box on this website) to withdraw your voice-note donation
         and delete what you donated.</li>
       <li>Send <strong>STOP</strong> to stop receiving messages; it also deletes donated voice notes. Your other data is

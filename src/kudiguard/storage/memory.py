@@ -28,6 +28,7 @@ class MemoryStore:
         self._patterns: dict[str, ScamPattern] = {}
         self._voice: dict[str, VoiceSample] = {}
         self._vault_id = uuid.uuid4().hex
+        self._deleted: dict[str, datetime] = {}  # DELETE marker -> when
 
     async def get_user(self, user_hash: str) -> UserState | None:
         self._ensure_open()
@@ -40,6 +41,7 @@ class MemoryStore:
             state,
             consented_at=aware(state.consented_at) if state.consented_at else None,
             donation_at=aware(state.donation_at) if state.donation_at else None,
+            donation_withdrawn_at=aware(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
             donation_offered_at=aware(state.donation_offered_at) if state.donation_offered_at else None,
             created_at=aware(state.created_at),
             last_seen_at=aware(state.last_seen_at),
@@ -101,6 +103,7 @@ class MemoryStore:
 
     async def delete_user(self, user_hash: str) -> int:
         self._ensure_open()
+        self._deleted[self._hasher.deletion_marker(user_hash)] = utcnow()
         removed = int(self._users.pop(user_hash, None) is not None)
         for item in self._interactions.values():  # examples taken from this user's stored messages
             if (
@@ -120,6 +123,17 @@ class MemoryStore:
             del self._interactions[interaction_id]
             removed += 1 + int(self._feedback.pop(interaction_id, None) is not None)
         return removed + len(await self.delete_voice_samples(user_hash))
+
+    async def deleted_at(self, user_hash: str) -> datetime | None:
+        self._ensure_open()
+        return self._deleted.get(self._hasher.deletion_marker(user_hash))
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        self._ensure_open()
+        old = [k for k, at in self._deleted.items() if at < aware(cutoff)]
+        for key in old:
+            del self._deleted[key]
+        return len(old)
 
     async def purge_before(self, cutoff: datetime) -> int:
         self._ensure_open()
