@@ -220,3 +220,5 @@
 - {text: "Enter your PIN in your bank app, not in any link.", expect: safe, category: instruction, note: "verifier round 7"}
 - {text: "Reply to the bank's official WhatsApp with your BVN.", expect: unsafe, category: instruction, note: "verifier round 7", xfail: "known limit: a bank-owned recipient that is still a chat account (spoofable) is treated as the bank"}
 - {text: "Type the code from his message into your own app.", expect: safe, category: instruction, note: "verifier round 7", xfail: "known limit: a possessive in the code's source (his message) reads as the recipient"}
+- {text: "Enter your PIN on your bank's website, which the agent sent you.", expect: unsafe, category: instruction, note: "verifier round 8", xfail: "known limit: a bank-owned destination that the attacker sent is treated as the bank"}
+- {text: "Enter your PIN on the banks' website.", expect: safe, category: instruction, note: "verifier round 8", xfail: "known limit: plural possessive banks' is not an ownership marker"}
