@@ -5,7 +5,7 @@ import csv
 import math
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -244,67 +244,170 @@ def test_wer_masks_numbers_in_typed_references() -> None:
     assert voice_cli.wer_by_language(rows)["en"]["wer"] == 0
 
 
-def test_preconsent_records_form_consent_for_hashed_numbers(
-    env: Env, capsys: pytest.CaptureFixture[str]
-) -> None:
-    signups = env.root / "signups.csv"
-    signups.write_text(
-        "number,age_confirmed,own_voice_confirmed,consented_at\n"
-        "0809 999 9999,yes,yes,2026-10-09T10:00:00+01:00\n"
-        f"{PHONE},TRUE,1,2026-10-09T09:00:00Z\n",
-        encoding="utf-8-sig",
-    )
-    assert cli.main(["voice", "preconsent", "--csv", str(signups), "--version", DONATION_VERSION]) == 0
-    printed = capsys.readouterr().out
-    assert "for 2 testers" in printed and "Delete the sign-up export" in printed
+HEADER = "number,donate_confirmed,age_confirmed,own_voice_confirmed,consented_at\n"
 
-    async def load(number: str) -> UserState | None:
+
+def recently(days: float = 1.0) -> str:
+    return (datetime.now(UTC) - timedelta(days=days)).isoformat()
+
+
+def preconsent(env: Env, *rows: str, version: str = DONATION_VERSION) -> int:
+    signups = env.root / "signups.csv"
+    signups.write_text(HEADER + "".join(f"{row}\n" for row in rows), encoding="utf-8-sig")
+    return cli.main(["voice", "preconsent", "--csv", str(signups), "--version", version])
+
+
+def stored_user(env: Env, number: str) -> UserState | None:
+    async def load() -> UserState | None:
         store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))
         try:
             return await store.get_user(UserHasher(SECRET.encode()).user_id(number))
         finally:
             await store.close()
 
-    new = asyncio.run(load("+2348099999999"))
+    return asyncio.run(load())
+
+
+def save_user(env: Env, state: UserState) -> None:
+    async def save() -> None:
+        store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))
+        try:
+            await store.save_user(state)
+        finally:
+            await store.close()
+
+    asyncio.run(save())
+
+
+def test_preconsent_records_form_consent_for_hashed_numbers(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    long_ago = datetime.now(UTC) - timedelta(days=10)
+    known = "+2348077777777"  # chatted (consented to the main notice) before filling the form
+    save_user(env, UserState(UserHasher(SECRET.encode()).user_id(known), language="ha", created_at=long_ago,
+                             last_seen_at=long_ago, consented_at=long_ago, consent_version="2026-10-10"))  # fmt: skip
+    form_time = recently(2)
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{form_time}", f"{known},TRUE,1,x,{form_time}") == 0
+    printed = capsys.readouterr().out
+    assert (
+        "for 2 testers: 1 already known to KudiGuard, 1 new." in printed
+        and "Delete the sign-up export" in printed
+    )
+    new = stored_user(env, "+2348099999999")
     assert new is not None and new.donation_source == "form" and new.donation_version == DONATION_VERSION
     assert (
-        new.donation_at == datetime(2026, 10, 9, 9, 0, tzinfo=UTC) and new.consented_at is None
+        new.donation_at == datetime.fromisoformat(form_time) and new.consented_at is None
     )  # chat consent: later
     assert new.donation_offered_version == DONATION_VERSION  # not asked again in the chat
-    existing = asyncio.run(load(PHONE))
-    assert existing is not None and existing.donation_source == "form"
+    existing = stored_user(env, known)
+    assert existing is not None and existing.donation_source == "form" and existing.language == "ha"
     assert "2348099999999" not in env.db.read_bytes().decode("latin-1")  # only hashes stored
 
 
 @pytest.mark.parametrize(
-    ("row", "version"),
-    [("0809 999 9999,yes,no,2026-10-09T10:00:00Z", DONATION_VERSION),  # own voice not ticked
-     ("0809 999 9999,,yes,2026-10-09T10:00:00Z", DONATION_VERSION),  # 18+ not ticked
-     (",yes,yes,2026-10-09T10:00:00Z", DONATION_VERSION),  # no number
-     ("0809 999 9999,yes,yes,2026-10-09T10:00:00", DONATION_VERSION),  # no timezone
-     ("0809 999 9999,yes,yes,not a date", DONATION_VERSION),
-     ("0809 999 9999,yes,yes,2099-01-01T00:00:00Z", DONATION_VERSION),  # in the future
-     ("0809 999 9999,yes,yes,2026-10-09T10:00:00Z", "2020-01-01")],  # an old form text
+    "number",
+    ["2348031234567", "+2348031234567", "+234 803 123 4567", "08031234567", "0803 123 4567", "234-803-123-4567",
+     "8031234567", "00 234 803 123 4567", "+234 803 123 4567 ", "whatsapp:+2348031234567", "07012345678",
+     "09012345678", "08112345678"],
+)  # fmt: skip
+def test_nigerian_numbers_in_any_common_format_match_the_whatsapp_user(number: str) -> None:
+    assert voice_cli.nigerian_mobile(number) is not None
+    hasher = UserHasher(SECRET.encode())
+    if "803" in number:
+        assert hasher.user_id(voice_cli.nigerian_mobile(number) or "") == hasher.user_id("2348031234567")
+
+
+@pytest.mark.parametrize(
+    "number",
+    ["2.34803E+12", "2,34803E+12", "8.03123E+09", "+234 (0) 803 123 4567", "+23408031234567", "0803123456",
+     "080312345678", "+44 7911 123456", "06012345678", "12345", "", "   ", "not a number"],
+)  # fmt: skip
+def test_numbers_that_are_not_nigerian_mobiles_reject_the_file(
+    env: Env, capsys: pytest.CaptureFixture[str], number: str
+) -> None:
+    assert voice_cli.nigerian_mobile(number) is None
+    assert (
+        preconsent(env, f"0809 999 9999,yes,yes,yes,{recently()}", f'"{number}",yes,yes,yes,{recently()}')
+        == 2
+    )
+    error = capsys.readouterr().err
+    assert "rows [3] have no valid Nigerian mobile number" in error and "format the column as text" in error
+    hint = "format the column as text: a spreadsheet turns 0803... into 803... or 2.34803E+12"
+    assert "nothing was imported" in error and (
+        not number.strip() or number.strip() not in error.replace(hint, "")
+    )
+    assert stored_user(env, "+2348099999999") is None
+
+
+@pytest.mark.parametrize(
+    "row",
+    ["0809 999 9999,no,yes,yes,{t}", "0809 999 9999,yes,,yes,{t}", "0809 999 9999,yes,yes,no,{t}",
+     "0809 999 9999,yes,yes,yes,2026-10-09T10:00:00", "0809 999 9999,yes,yes,yes,not a date",
+     "0809 999 9999,yes,yes,yes,2099-01-01T00:00:00Z"],
 )  # fmt: skip
 def test_preconsent_rejects_incomplete_rows_and_imports_nothing(
-    env: Env, capsys: pytest.CaptureFixture[str], row: str, version: str
+    env: Env, capsys: pytest.CaptureFixture[str], row: str
 ) -> None:
-    signups = env.root / "signups.csv"
-    signups.write_text(
-        f"number,age_confirmed,own_voice_confirmed,consented_at\n{PHONE},yes,yes,2026-10-09T09:00:00Z\n{row}\n",
-        encoding="utf-8",
-    )
-    assert cli.main(["voice", "preconsent", "--csv", str(signups), "--version", version]) == 2
-    assert "nothing was imported" in capsys.readouterr().err or version != DONATION_VERSION
-    assert cli.main(["voice", "access", "--user", "0809 999 9999"]) == 0
-    assert "none on record" in capsys.readouterr().out
+    assert preconsent(env, f"0807 777 7777,yes,yes,yes,{recently()}", row.format(t=recently())) == 2
+    assert "rows [3] lack a ticked" in capsys.readouterr().err
+    assert stored_user(env, "+2348077777777") is None and stored_user(env, "+2348099999999") is None
 
 
-def test_preconsent_needs_the_expected_columns(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
-    signups = env.root / "signups.csv"
-    signups.write_text("number,consented_at\n0809,2026-10-09T09:00:00Z\n", encoding="utf-8")
+def test_preconsent_needs_the_current_form_text_and_columns(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{recently()}", version="2020-01-01") == 2
+    assert "current donation text" in capsys.readouterr().err
+    signups = env.root / "old.csv"
+    signups.write_text("number,age_confirmed,own_voice_confirmed,consented_at\n", encoding="utf-8")
     assert cli.main(["voice", "preconsent", "--csv", str(signups), "--version", DONATION_VERSION]) == 2
-    assert "missing columns" in capsys.readouterr().err
+    assert "missing columns ['donate_confirmed']" in capsys.readouterr().err
+
+
+def test_preconsent_never_overrides_a_later_choice(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
+    """Re-importing after STOP DONATING, STOP or a decline, or for a user active after the form, changes nothing."""
+    hasher = UserHasher(SECRET.encode())
+    form = datetime.now(UTC) - timedelta(days=3)
+    before = form - timedelta(days=1)
+    cases = {
+        "+2348011111111": UserState("", stopped=True, created_at=before, last_seen_at=before),
+        "+2348022222222": UserState("", donation_offered_version=DONATION_VERSION, donation_offered_at=before,
+                                    created_at=before, last_seen_at=before),  # withdrew / declined
+        "+2348033333333": UserState("", created_at=before, last_seen_at=form + timedelta(hours=1)),
+    }  # fmt: skip
+    for number, state in cases.items():
+        state.user_hash = hasher.user_id(number)
+        save_user(env, state)
+    rows = [f"{n},yes,yes,yes,{form.isoformat()}" for n in cases]
+    rows += [f"{PHONE},yes,yes,yes,{form.isoformat()}", f"0806 666 6666,yes,yes,yes,{recently(31)}"]
+    assert preconsent(env, *rows) == 0
+    printed = capsys.readouterr().out
+    assert "for 0 testers" in printed
+    assert "skipped 5 (never overriding a later choice): 1 active after the form, 1 already consented, " \
+           "1 declined or withdrew, 1 stopped, 1 too old" in printed  # fmt: skip
+    for number in cases:
+        state = stored_user(env, number)
+        assert state is not None and state.donation_version is None
+    assert stored_user(env, "+2348066666666") is None
+
+
+def test_preconsent_after_withdrawal_in_chat_is_not_resurrected(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
+    form = recently(2)
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{form}") == 0
+    state = stored_user(env, "+2348099999999")
+    assert state is not None
+    state.donation_version, state.donation_at, state.donation_source = (
+        None,
+        None,
+        None,
+    )  # STOP DONATING in chat
+    save_user(env, state)
+    assert preconsent(env, f"0809 999 9999,yes,yes,yes,{form}") == 0  # the same export imported again
+    assert "1 declined or withdrew" in capsys.readouterr().out
+    again = stored_user(env, "+2348099999999")
+    assert again is not None and again.donation_version is None
 
 
 def test_wipe_needs_all_and_deletes_everything(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
@@ -314,10 +417,32 @@ def test_wipe_needs_all_and_deletes_everything(env: Env, capsys: pytest.CaptureF
     assert "deleted all 5" in capsys.readouterr().out and list(env.voice.glob("*.kgv")) == []
 
 
-def test_exports_never_go_to_cloud_synced_folders(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
-    for name in ("OneDrive", "Dropbox", "Google Drive"):
-        assert cli.main(["voice", "export", "--out", str(env.db.parent / name / "x")]) == 2
-        assert "cloud-synced" in capsys.readouterr().err
+def test_wipe_fails_loudly_when_audio_remains(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
+    """Audio the database does not know (the folder's marker names another database) is never swept, so wipe
+    must not report success."""
+    (env.voice / ".vault").write_text("another database", encoding="utf-8")
+    stray = env.voice / f"{'f' * 32}.kgv"
+    stray.write_bytes(b"someone else's audio")
+    assert cli.main(["voice", "wipe", "--all"]) == 1
+    error = capsys.readouterr().err
+    assert "ERROR: 1 voice files remain" in error and "after deleting 5 samples" in error
+    assert "do NOT rotate the key" in error and stray.exists()
+
+
+@pytest.mark.parametrize(
+    "name", ["OneDrive", "OneDrive - Contoso Ltd", "onedrive-personal", "Dropbox", "Google Drive", "My Drive",
+             "iCloud Drive", "Box"],
+)  # fmt: skip
+def test_exports_never_go_to_cloud_synced_folders(
+    env: Env, capsys: pytest.CaptureFixture[str], name: str
+) -> None:
+    assert cli.main(["voice", "export", "--out", str(env.db.parent / name / "x")]) == 2
+    assert "cloud-synced" in capsys.readouterr().err
+
+
+def test_ordinary_folder_names_are_not_mistaken_for_cloud_sync(env: Env) -> None:
+    for name in ("boxes", "my drivers", "exports-2026"):
+        assert cli.main(["voice", "export", "--out", str(env.db.parent / name)]) == 0
 
 
 def test_purge_needs_an_existing_database(

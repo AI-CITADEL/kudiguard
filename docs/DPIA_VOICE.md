@@ -19,8 +19,13 @@ against the gazetted text before filing.
     "donate voice". The user taps "Yes, I am 18+". The offer is shown once per offer text.
   * *Website:* a separate checkbox, unticked by default, sent with its own version header.
   * *Tester sign-up form:* see `docs/TESTER_SIGNUP.md`. The operator imports the form with `kudiguard voice
-    preconsent`. Every row must have both boxes ticked and a timestamp, otherwise nothing is imported. These
-    testers are not asked again in the chat.
+    preconsent`.
+    * Each row needs a valid Nigerian mobile number, all three boxes ticked and a past timestamp; otherwise
+      nothing is imported.
+    * A form answer never overrides a later STOP, withdrawal, decline or chat activity, and answers older than 30
+      days are skipped.
+    * A STOPped user who returns starts without donation consent.
+    * Imported testers are not asked again in the chat.
 * **What we keep (s.24, minimisation):**
   * the original audio, at most 16 MB and 90 s of speech;
   * a random sample id;
@@ -125,6 +130,9 @@ against the gazetted text before filing.
     references are typed. The operator deletes the export folder after `kudiguard voice wer`.
 * **Robustness:**
   * Writes run after the reply, in a background task that does not hold a turn slot. They never affect the reply.
+  * The per-donor daily cap, the withdrawal tombstones and the dropped-sample counters are kept in memory. A
+    restart resets them, which only loosens the daily cap. A withdrawal's deletion itself is in the database and
+    is permanent. Dropped samples are counted in the log lines (`voice donation not kept: <reason> (<n> so far)`).
   * Writes are serialised with erasure.
   * Erasure deletes rows, then files.
   * SQLite runs with `secure_delete` and a WAL checkpoint after erasure.
@@ -139,7 +147,9 @@ against the gazetted text before filing.
   * the welcome text and web consent in four languages;
   * the donation offer;
   * /privacy, "Where your data goes".
-* Each text says that Nigerian data-protection law may not fully protect data held abroad. Continuing (or ticking
+* Each text states the transfer risk for the configured location. While the server is abroad: "Nigerian
+  data-protection law may not fully protect data held abroad". In Nigeria: "data passing through Meta and
+  Cloudflare may be processed abroad". Continuing (or ticking
   the box) is the user's informed consent to the transfer (s.43). No NDPC adequacy decision had been published as
   of mid-2026, and these rules are already in force under the NDPA and GAID 2025.
 * **The location is a setting:** `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (default) or `nigeria`. Every text

@@ -22,15 +22,17 @@ import asyncio
 import csv
 import dataclasses
 import random
+import re
+import sys
 from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from kudiguard.config import ROOT, Settings
 from kudiguard.donation import DONATION_VERSION, Sealer, VoiceIntegrityError, VoiceVault
-from kudiguard.privacy import UserHasher
+from kudiguard.privacy import UserHasher, normalise_phone
 from kudiguard.speech.metrics import POOLED_METRICS
 from kudiguard.storage.base import Store, UserState, VoiceSample, aware
 from kudiguard.storage.sqlite import SQLiteStore
@@ -42,7 +44,18 @@ COLUMNS = ("id", "language", "week", "duration_s", "asr_hypothesis", "reference"
 # (incl. no-break and ideographic spaces), or a leading tab/CR/LF. Same semantics as the review kit's cells.
 FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "\t", "\r", "\n", "\uff1d", "\uff0b", "\uff0d", "\uff20")
 EXPORT_DIRS = ("var", "exports")  # git-ignored folders of the checkout (.gitignore)
-CLOUD_SYNCED = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "icloud drive", "box")
+# Folder names of sync clients ("OneDrive - Contoso" for business accounts, "My Drive" for Google Drive).
+CLOUD_PREFIXES = ("onedrive",)
+CLOUD_SYNCED = (
+    "dropbox",
+    "google drive",
+    "googledrive",
+    "my drive",
+    "icloud",
+    "icloud drive",
+    "icloud drive (archive)",
+    "box",
+)
 TRUE = frozenset({"yes", "y", "true", "1", "x", "ticked"})
 REMINDER = (
     "PRIVACY: these are real people's voices (personal data, NDPA 2023). Share them only with named transcribers "
@@ -112,6 +125,11 @@ def choose(
     return sorted(chosen, key=lambda s: (s.language, s.id))
 
 
+def _cloud_synced(folder: str) -> bool:
+    name = folder.lower().strip()
+    return name in CLOUD_SYNCED or name.startswith(CLOUD_PREFIXES)
+
+
 def safe_out(out: Path, allowed: Iterable[Path] = ()) -> Path:
     """Only the git-ignored ``var/`` and ``exports/`` folders (or ``allowed``, e.g. the database's folder), and never a
     cloud-synced folder: decrypted audio must not be committed or uploaded anywhere."""
@@ -119,7 +137,7 @@ def safe_out(out: Path, allowed: Iterable[Path] = ()) -> Path:
     roots = [(ROOT / name).resolve() for name in EXPORT_DIRS] + [a.resolve() for a in allowed]
     if not any(resolved.is_relative_to(root) for root in roots):
         raise ValueError(f"{out}: export only under {', '.join(str(r) for r in roots)} (git-ignored)")
-    if any(part.lower() in CLOUD_SYNCED for part in resolved.parts):
+    if any(_cloud_synced(part) for part in resolved.parts):
         raise ValueError(f"{out}: is inside a cloud-synced folder; export to a local folder")
     if (resolved / MANIFEST).exists():
         raise ValueError(f"{resolved / MANIFEST} already exists: use a new folder")
@@ -339,61 +357,128 @@ def cmd_remove(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+PRECONSENT_COLUMNS = ("number", "donate_confirmed", "age_confirmed", "own_voice_confirmed", "consented_at")
+PRECONSENT_MAX_AGE_DAYS = 30  # older form answers are not imported: the tester is asked in the chat instead
+_NIGERIAN_MOBILE = re.compile(r"^234[789][01]\d{8}$")
+_LOCAL_WITHOUT_ZERO = re.compile(r"^[789][01]\d{8}$")  # a spreadsheet dropped the leading 0 of 0803...
+_SCIENTIFIC = re.compile(r"\d[.,]?\d*[eE][+-]?\d+")  # 2.34803E+12: the spreadsheet already lost digits
+
+
+def nigerian_mobile(raw: str) -> str | None:
+    """``+234XXXXXXXXXX`` for a Nigerian mobile number in any common format, else None (never guessed)."""
+    text = raw.strip()
+    if not text or _SCIENTIFIC.search(text):
+        return None
+    digits = normalise_phone(text)
+    if digits.startswith("00"):  # international dialling prefix: 00 234 ...
+        digits = digits[2:]
+    if _LOCAL_WITHOUT_ZERO.fullmatch(digits):
+        digits = "234" + digits
+    return f"+{digits}" if _NIGERIAN_MOBILE.fullmatch(digits) else None
+
+
 def read_preconsents(path: Path, version: str) -> list[tuple[str, datetime]]:
-    """Rows of the tester sign-up export: number, age_confirmed, own_voice_confirmed, consented_at. Every row must
-    have both boxes ticked and a timezone-aware time; any bad row rejects the whole file (nothing half-imported)."""
+    """Rows of the tester sign-up export (``PRECONSENT_COLUMNS``). Every row must have a Nigerian mobile number, all
+    three boxes ticked and a past, timezone-aware time; any bad row rejects the whole file (nothing half-imported).
+    Bad rows are reported by line number, never by phone number."""
     if version != DONATION_VERSION:
         raise ValueError(
             f"the form must show the current donation text (version {DONATION_VERSION}), not {version}"
         )
     with path.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        missing = {"number", "age_confirmed", "own_voice_confirmed", "consented_at"} - set(
-            reader.fieldnames or ()
-        )
+        missing = set(PRECONSENT_COLUMNS) - set(reader.fieldnames or ())
         if missing:
             raise ValueError(f"{path}: missing columns {sorted(missing)}")
-        rows, errors = [], []
+        rows, bad_numbers, unconfirmed = [], [], []
         for line, row in enumerate(reader, start=2):
-            number = (row["number"] or "").strip()
+            number = nigerian_mobile(row["number"] or "")
             try:
                 at = aware(datetime.fromisoformat((row["consented_at"] or "").strip()))
             except ValueError:
                 at = None
-            confirmed = truthy(row["age_confirmed"]) and truthy(row["own_voice_confirmed"])
-            if number and confirmed and at is not None and at <= datetime.now(UTC):
-                rows.append((number, at))
+            boxes = ("donate_confirmed", "age_confirmed", "own_voice_confirmed")
+            if number is None:
+                bad_numbers.append(line)
+            elif not all(truthy(row[box]) for box in boxes) or at is None or at > datetime.now(UTC):
+                unconfirmed.append(line)
             else:
-                errors.append(line)
-    if errors:
-        raise ValueError(
-            f"{path}: rows {errors} lack a number, a ticked 18+ box, a ticked own-voice box or a past, timezone-aware "
-            "consented_at; nothing was imported"
+                rows.append((number, at))
+    problems = []
+    if bad_numbers:
+        problems.append(
+            f"rows {bad_numbers} have no valid Nigerian mobile number (format the column as text: a spreadsheet "
+            "turns 0803... into 803... or 2.34803E+12)"
         )
+    if unconfirmed:
+        problems.append(
+            f"rows {unconfirmed} lack a ticked donate, 18+ or own-voice box, or a past, timezone-aware consented_at"
+        )
+    if problems:
+        raise ValueError(f"{path}: {'; '.join(problems)}; nothing was imported")
     return rows
 
 
+def preconsent_blocker(user: UserState | None, at: datetime, now: datetime) -> str | None:
+    """Why a form answer must not be recorded: it would override a later STOP, withdrawal or decline (or an earlier
+    chat consent), or it is too old to rely on. None = record it."""
+    if now - at > timedelta(days=PRECONSENT_MAX_AGE_DAYS):
+        return "too old"
+    if user is None:
+        return None
+    if user.stopped:
+        return "stopped"
+    if user.donation_version is not None:
+        return "already consented"
+    if user.donation_offered_version is not None or user.donation_offered_at is not None:
+        return "declined or withdrew"
+    if user.last_seen_at > at:
+        return "active after the form"
+    return None
+
+
 def cmd_preconsent(settings: Settings, args: argparse.Namespace) -> int:
-    """Record sign-up-form consent as if the tester had tapped "Yes, I am 18+" (source=form; not asked again)."""
+    """Record sign-up-form consent as if the tester had tapped "Yes, I am 18+" (source=form; not asked again).
+
+    Never resurrects consent: rows whose user stopped, withdrew, declined or was active after the form are skipped
+    (those testers are asked in the chat instead). Import an export once, promptly, then delete it: a tester who sent
+    DELETE leaves no trace, so re-importing an old export would sign them up again (hence the age limit)."""
     rows = read_preconsents(Path(args.csv), args.version)
 
-    async def run() -> int:
+    async def run() -> tuple[int, int, Counter[str]]:
         store, _, hasher = await _open(settings)
+        recorded_existing, recorded_new, skipped = 0, 0, Counter[str]()
+        now = datetime.now(UTC)
         try:
             for number, at in rows:
                 user_hash = hasher.user_id(number)
-                user = await store.get_user(user_hash) or UserState(user_hash, created_at=at, last_seen_at=at)
+                user = await store.get_user(user_hash)
+                if reason := preconsent_blocker(user, at, now):
+                    skipped[reason] += 1
+                    continue
+                base = user or UserState(user_hash, created_at=at, last_seen_at=at)
                 await store.save_user(
                     dataclasses.replace(
-                        user, donation_version=args.version, donation_at=at, donation_source="form",
+                        base, donation_version=args.version, donation_at=at, donation_source="form",
                         donation_offered_at=at, donation_offered_version=args.version,
                     )
                 )  # fmt: skip
-            return len(rows)
+                if user is None:
+                    recorded_new += 1
+                else:
+                    recorded_existing += 1
+            return recorded_existing, recorded_new, skipped
         finally:
             await store.close()
 
-    print(f"recorded donation consent (source: form) for {asyncio.run(run())} testers.")
+    existing, new, skipped = asyncio.run(run())
+    print(
+        f"recorded donation consent (source: form) for {existing + new} testers: "
+        f"{existing} already known to KudiGuard, {new} new."
+    )
+    if skipped:
+        details = ", ".join(f"{count} {reason}" for reason, count in sorted(skipped.items()))
+        print(f"skipped {sum(skipped.values())} (never overriding a later choice): {details}")
     print("Delete the sign-up export now: it holds phone numbers. Only hashes were stored.")
     return 0
 
@@ -403,14 +488,23 @@ def cmd_wipe(settings: Settings, args: argparse.Namespace) -> int:
     if not args.all:
         raise ValueError("refusing to wipe without --all")
 
-    async def run() -> int:
+    async def run() -> tuple[int, int]:
         store, vault, _ = await _open(settings)
         try:
             return await vault.wipe()
         finally:
             await store.close()
 
-    print(f"deleted all {asyncio.run(run())} donated voice samples")
+    removed, remaining = asyncio.run(run())
+    if remaining:
+        print(
+            f"ERROR: {remaining} voice files remain in {settings.voice_dir} after deleting {removed} samples. The "
+            "folder does not belong to this database (or files are locked). Check KUDIGUARD_VOICE_DIR and "
+            "KUDIGUARD_DB_PATH; do NOT rotate the key until this folder is empty (see docs/DEPLOY.md).",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"deleted all {removed} donated voice samples; the folder holds no audio")
     return 0
 
 
@@ -449,7 +543,7 @@ def add_commands(commands: Any) -> None:
     remove.set_defaults(func=cmd_remove)
 
     pre = sub.add_parser("preconsent", help="record donation consent given on the tester sign-up form")
-    pre.add_argument("--csv", required=True, help="number,age_confirmed,own_voice_confirmed,consented_at")
+    pre.add_argument("--csv", required=True, help=",".join(PRECONSENT_COLUMNS))
     pre.add_argument("--version", required=True, help="the donation text version shown on the form")
     pre.set_defaults(func=cmd_preconsent)
 

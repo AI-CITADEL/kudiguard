@@ -469,17 +469,23 @@ class Conversation:
             return consented
         turn.language = match.greeting_language or turn.language
         # The welcome's language is kept provisionally (no consent yet) so a reply in it is understood. Donation
-        # consent is separate and survives a new main consent text (STOP already ended it for stopped users).
+        # consent is separate and survives a new main consent text, but never a STOP: a stopped user who comes back
+        # starts without it (a fresh yes is required); the "offered" marks stay.
         state = UserState(turn.user_hash, language=turn.language, created_at=user.created_at if user else now,
                           last_seen_at=now)  # fmt: skip
         if user is not None:
             state = dataclasses.replace(
-                state, donation_version=user.donation_version, donation_at=user.donation_at,
-                donation_source=user.donation_source, donation_offered_at=user.donation_offered_at,
+                state,
+                donation_offered_at=user.donation_offered_at,
                 donation_offered_version=user.donation_offered_version,
-            )  # fmt: skip
+            )
+            if not user.stopped:
+                state = dataclasses.replace(
+                    state, donation_version=user.donation_version, donation_at=user.donation_at,
+                    donation_source=user.donation_source,
+                )  # fmt: skip
         await self._store.save_user(state)
-        welcome = self._messages.text(turn.language, Msg.WELCOME, where=self._where(turn.language))
+        welcome = self._messages.text(turn.language, Msg.WELCOME, **self._hosting(turn.language))
         if self._privacy_url:
             welcome += "\n" + self._messages.text(turn.language, Msg.PRIVACY_LINK, url=self._privacy_url)
         await self._send(turn, welcome)
@@ -731,7 +737,7 @@ class Conversation:
                 user, donation_offered_at=self._clock(), donation_offered_version=DONATION_VERSION
             )
         )
-        text = self._messages.text(turn.language, Msg.DONATION_OFFER, where=self._where(turn.language))
+        text = self._messages.text(turn.language, Msg.DONATION_OFFER, **self._hosting(turn.language))
         await self._send(turn, text, buttons)
 
     async def _donation_choice(self, turn: _Turn, user: UserState, ref: str) -> None:
@@ -774,8 +780,12 @@ class Conversation:
             return await self._donations.erase(user_hash)
         return len(await self._store.delete_voice_samples(user_hash))  # no files on this server; the rows go
 
-    def _where(self, language: LanguageCode) -> str:
-        return self._messages.text(language, self._storage.message)
+    def _hosting(self, language: LanguageCode) -> dict[str, str]:
+        """``{where}`` and ``{risk}`` of the welcome and offer texts, for the configured storage location."""
+        return {
+            "where": self._messages.text(language, self._storage.message),
+            "risk": self._messages.text(language, self._storage.risk),
+        }
 
     # --- helpers ----------------------------------------------------------------------------------------
 

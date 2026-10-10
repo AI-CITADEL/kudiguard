@@ -234,8 +234,9 @@ class VoiceVault:
             await asyncio.to_thread(self._unlink_all, [sample_id])
         return found
 
-    async def wipe(self) -> int:
-        """Delete every sample (before rotating the key, or to end the programme). Returns samples removed."""
+    async def wipe(self) -> tuple[int, int]:
+        """Delete every sample (before rotating the key, or to end the programme). Returns (samples removed, audio
+        files still in the folder): anything left means the folder is not this database's, or files are locked."""
         async with self._lock:
             ids = [s.id for s in await self._store.voice_samples()]
             for sample_id in ids:
@@ -243,7 +244,13 @@ class VoiceVault:
             expected = await self._store.voice_vault_id()
             await asyncio.to_thread(self._unlink_all, ids)
             await asyncio.to_thread(self._sweep, set(), 0.0, expected)
-        return len(ids)
+            remaining = await asyncio.to_thread(self._audio_files)
+        return len(ids), remaining
+
+    def _audio_files(self) -> int:
+        if not self.directory.is_dir():
+            return 0
+        return sum(p.suffix in (SUFFIX, ".part") for p in self.directory.iterdir())
 
     async def purge(self, cutoff: date, *, orphan_grace_s: float = ORPHAN_GRACE_S) -> int:
         """Retention: remove samples from weeks starting on or before ``cutoff``, plus orphaned files."""

@@ -22,6 +22,11 @@ class StorageLocation(StrEnum):
         return Msg.WHERE_NIGERIA if self is StorageLocation.NIGERIA else Msg.WHERE_OUTSIDE
 
     @property
+    def risk(self) -> Msg:
+        """The localised transfer-risk sentence: our server abroad, or only Meta/Cloudflare abroad."""
+        return Msg.RISK_NIGERIA if self is StorageLocation.NIGERIA else Msg.RISK_OUTSIDE
+
+    @property
     def english(self) -> str:
         """For /privacy (English page)."""
         return "in Nigeria" if self is StorageLocation.NIGERIA else "outside Nigeria (during the pilot)"

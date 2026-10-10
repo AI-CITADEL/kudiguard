@@ -286,9 +286,13 @@ async def test_wipe_deletes_everything_but_the_marker(vault: VoiceVault, store: 
     for user in ("u1", "u2"):
         await vault.donate(donation(user=user))
     (vault.directory / f"{new_sample_id()}.part").write_bytes(b"debris")
-    assert await vault.wipe() == 2
+    assert await vault.wipe() == (2, 0)
     assert await store.voice_samples() == [] and sample_files(vault) == []
     assert (vault.directory / MARKER).exists()
+
+
+async def test_wipe_of_a_vault_that_never_wrote_anything(vault: VoiceVault) -> None:
+    assert await vault.wipe() == (0, 0) and not vault.directory.exists()
 
 
 async def test_purge_removes_expired_weeks_and_old_orphans_only(tmp_path: Path, store: MemoryStore) -> None:
@@ -327,7 +331,7 @@ async def test_another_databases_folder_is_never_swept_or_written(
     assert await stranger.purge(date(2000, 1, 1), orphan_grace_s=0) == 0
     assert real.path(kept).exists() and "does not belong to this database" in caplog.text
     assert await stranger.donate(donation()) is None and stranger.dropped["error:RuntimeError"] == 1
-    assert await stranger.wipe() == 0 and real.path(kept).exists()
+    assert await stranger.wipe() == (0, 1) and real.path(kept).exists()  # reported, never deleted
 
 
 async def test_an_unmarked_folder_with_audio_is_not_claimed(tmp_path: Path, store: MemoryStore) -> None:

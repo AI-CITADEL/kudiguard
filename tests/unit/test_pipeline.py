@@ -77,9 +77,9 @@ class Harness:
         self.messenger.clear()
 
     def t(self, key: Msg, lang: str = "en", /, **params: object) -> str:
-        params.setdefault(
-            "where", self.messages.text(lang, Msg.WHERE_OUTSIDE)
-        )  # the default storage location
+        # The default storage location fills the welcome's and the offer's {where} and {risk}.
+        params.setdefault("where", self.messages.text(lang, Msg.WHERE_OUTSIDE))
+        params.setdefault("risk", self.messages.text(lang, Msg.RISK_OUTSIDE))
         return self.messages.text(lang, key, **params)
 
     @property

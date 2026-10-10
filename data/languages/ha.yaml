@@ -62,7 +62,7 @@ strings:
     Ku aiko mini da *saƙon murya* ko rubutu, ko ku tura saƙon da kuke shakka a kai.
 
     🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Wasu ƙalilan amintattun masu bita (ƙungiyarmu ko masu harshen a matsayin harshen uwa, ƙarƙashin yarjejeniyar sirri a rubuce) za su iya karanta wasu daga cikin saƙonni da amsoshi, an ɓoye lambobi kuma babu lambar wayarku ko wata alamar gane ku, don duba inganci da tsaro; ana share kwafinsu bayan binciken. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su, sai dai idan kun zaɓi ba da gudummawarsu (za mu tambaye ku daban). Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
-    🌍 Don gudanar da KudiGuard, saƙonninku suna wucewa ta WhatsApp (Meta) da Cloudflare, a wajen Najeriya, kuma ana adana su a sabarmu {where}. Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba. Ta hanyar ci gaba, kun kuma amince da wannan canja wurin.
+    🌍 Don gudanar da KudiGuard, saƙonninku suna wucewa ta WhatsApp (Meta) da Cloudflare, a wajen Najeriya, kuma ana adana su a sabarmu {where}. {risk} Ta hanyar ci gaba, kun kuma amince da wannan canja wurin.
     ℹ️ Wannan jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Wane harshe zan yi amfani da shi?
@@ -111,7 +111,7 @@ strings:
     Za mu iya adana saƙonnin murya da kuke aikowa daga yanzu, don gwada da inganta fahimtar magana?
     • Sai idan kun kai shekara *18 ko fiye*, kuma saƙonnin murya da *muryarku* kawai. Don Allah kada ku aiko rikodin muryar wasu mutane. Muna ƙoƙarin kada mu adana saƙonnin murya da aka tura, kuma masu bitarmu suna share muryoyin wasu mutane.
     • Wasu ƙalilan amintattun masu bita da masu rubutawa, ƙarƙashin yarjejeniyar sirri a rubuce, za su saurare su su rubuta abin da aka faɗa. Ba ma amfani da muryarku don gane ku, kuma ba ma sayar da ita ko wallafa ta.
-    • Ana adana su a ɓoye (encrypted) a sabarmu {where} har tsawon watanni 12, ba tare da lambar wayarku ba. Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba.
+    • Ana adana su a ɓoye (encrypted) a sabarmu {where} har tsawon watanni 12, ba tare da lambar wayarku ba. {risk}
     • Ku aika *STOP DONATING* a kowane lokaci don dakatarwa da share su (*STOP* da *DELETE* ma suna share su).
     KudiGuard tana aiki iri ɗaya ko kun ce eh ko a'a.
   btn_donate_yes: "Ee, na kai 18+"
@@ -123,3 +123,5 @@ strings:
   stopped_donor: "Ba za ku ƙara samun saƙonni daga KudiGuard ba, kuma an share saƙonnin murya da kuka ba da gudummawa. Ku aika kowane saƙo don sake farawa."
   where_outside: "a wajen Najeriya a lokacin gwaji"
   where_nigeria: "a Najeriya"
+  risk_outside: "Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba."
+  risk_nigeria: "Bayanan da ke wucewa ta Meta da Cloudflare ana iya sarrafa su a ƙasashen waje, inda dokar kare bayanai ta Najeriya ba za ta yi aiki gaba ɗaya ba."

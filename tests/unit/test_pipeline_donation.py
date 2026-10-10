@@ -344,6 +344,38 @@ async def test_stop_also_deletes_donated_voice_notes(d: Harness) -> None:
     assert await samples(d) == [] and d.t(Msg.DONATION_OFFER) not in texts
 
 
+async def test_a_stopped_user_who_rejoins_never_gets_donation_consent_back(d: Harness) -> None:
+    """Even if consent was (wrongly) recorded on a stopped user, rejoining starts without it: a fresh yes is needed."""
+    await opt_in(d)
+    await d.say("STOP")
+    stopped = await user(d)
+    await d.store.save_user(
+        dataclasses.replace(
+            stopped, donation_version=DONATION_VERSION, donation_at=utcnow(), donation_source="form"
+        )
+    )
+    await d.say("hello")  # back: welcomed again
+    rejoined = await user(d)
+    assert rejoined.donation_version is None and rejoined.donation_source is None
+    assert rejoined.donation_offered_version == DONATION_VERSION  # the offer mark stays: not asked again
+    await d.say(button="lang:en")
+    await voice(d)
+    assert await samples(d) == []
+
+
+async def test_the_transfer_risk_sentence_follows_the_storage_location(d: Harness) -> None:
+    for language in COMMANDS:
+        outside = d.t(Msg.WELCOME, language)
+        assert d.t(Msg.RISK_OUTSIDE, language) in outside and d.t(Msg.RISK_NIGERIA, language) not in outside
+    d.conversation._storage = StorageLocation.NIGERIA
+    texts = await d.say("hello")
+    assert d.t(Msg.RISK_NIGERIA) in texts[0] and d.t(Msg.RISK_OUTSIDE) not in texts[0]
+    assert "Meta and Cloudflare may be processed abroad" in texts[0] and "in Nigeria" in texts[0]
+    await d.say(button="lang:en")
+    offer = (await voice(d))[-1]
+    assert d.t(Msg.RISK_NIGERIA) in offer and d.t(Msg.RISK_OUTSIDE) not in offer
+
+
 async def test_stop_for_a_non_donor_is_the_usual_reply(d: Harness) -> None:
     await d.onboard("en")
     assert await d.say("STOP") == [d.t(Msg.STOPPED)]

@@ -65,6 +65,8 @@ class Msg(StrEnum):
     STOPPED_DONOR = "stopped_donor"
     WHERE_OUTSIDE = "where_outside"
     WHERE_NIGERIA = "where_nigeria"
+    RISK_OUTSIDE = "risk_outside"
+    RISK_NIGERIA = "risk_nigeria"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

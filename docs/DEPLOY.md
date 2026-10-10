@@ -27,8 +27,9 @@ account that runs the watchdog:
     icacls .env /inheritance:r /grant:r "%USERNAME%:F" "SYSTEM:F"
 
 **Voice-note donation** (opt-in; docs/DPIA_VOICE.md). This is **off** until the DPIA is signed off.
-* *Before enabling:* send one real *forwarded* voice note to the live number and check the log line
-  `voice message: recorded=… forwarded=…`. Record in the DPIA whether Meta marks it.
+* *Before enabling:* send one normal voice note recorded in WhatsApp to the live number, and check that the log
+  line `voice message: recorded=True forwarded=False` appears. If `recorded` is False, nothing would ever be kept.
+  Then send one real *forwarded* voice note and record in the DPIA whether Meta marks it.
 * *Turning it on:* `KUDIGUARD_VOICE_DONATION=true`, then restart.
 * *Storage:* encrypted audio lives in `var/voice/` (`KUDIGUARD_VOICE_DIR`). A `.vault` marker ties it to its
   database, so never point it at another database's folder.
@@ -36,6 +37,10 @@ account that runs the watchdog:
   erase it at once.
 * *Backups:* back up `var/` without `.env`, so the copy cannot be decrypted.
 * *Key rotation:* `kudiguard voice wipe --all`, then change `KUDIGUARD_VOICE_KEY` (or the hash secret), then restart.
+  If wipe exits with "ERROR: N voice files remain", the folder belongs to another database (check
+  `KUDIGUARD_VOICE_DIR` and `KUDIGUARD_DB_PATH`) or the files are locked (stop the server). Fix that and run wipe
+  again. Do not rotate until the folder holds no `.kgv` or `.part` files. Delete stray files by hand only once you
+  are sure they are this deployment's.
 * *Requests by email:* `kudiguard voice access|erase --user <number | web:<donation code>>`. Confirm the requester
   first (DPIA §6).
 * *Flagged samples* (a child's voice, someone else's voice, or credentials read out):
