@@ -16,6 +16,20 @@ in from `kudiguard stats --exclude-users team.txt` (team testers' numbers, one p
 
 Ten de-identified exchanges with English glosses, and tester quotes, go here (from `kudiguard export`, already redacted).
 
+## Native-speaker review (to fill in after the pilot)
+Native speakers grade a stratified sample of 30–50 real replies (rubric and process: [NATIVE_REVIEW.md](NATIVE_REVIEW.md)).
+Paste the output of `kudiguard review score var/review/graded-*.csv --markdown` here.
+
+| Language | Replies graded | Accuracy (1-5) | Fluency (1-5) | Faithful to facts | Harmful or misleading |
+|---|---|---|---|---|---|
+| ha | _n_ | _x_ | _x_ | _x_% | _x_% |
+| yo | _n_ | _x_ | _x_ | _x_% | _x_% |
+| ig | _n_ | _x_ | _x_ | _x_% | _x_% |
+| **All** | _n_ | _x_ | _x_ | _x_% | _x_% |
+
+_n_ native-speaker reviewers; inter-rater agreement on _n_ double-graded replies: _x_. Replies marked harmful or
+unfaithful, and what was changed: _…_
+
 ## Blind accuracy (never tuned on; docs/SPIKES.md S6–S7)
 | Test | Result |
 |---|---|
@@ -25,5 +39,5 @@ Ten de-identified exchanges with English glosses, and tester quotes, go here (fr
 
 ## Known limitations
 * Genuine bank OTP SMS can be flagged 🟠 "be careful" (safe direction; fix pending separate examples).
-* Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review.
+* Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review (model replies: see above).
 * Speech accuracy measured on read speech; real voice notes from the pilot will be added.

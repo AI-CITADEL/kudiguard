@@ -4,6 +4,8 @@
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
     kudiguard purge [--days 90]
+    kudiguard review export [--out var/review/review.csv] [--n 50] [--languages ha,yo,ig] [--seed 0]
+    kudiguard review score graded.csv [more.csv ...] [--markdown]
 
 Exports contain no phone numbers or provider ids (pseudonymous user hashes, redacted text).
 """
@@ -16,9 +18,12 @@ import json
 import logging
 import sys
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
+import httpx
+
+from kudiguard import review
 from kudiguard.config import ROOT, Settings
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
@@ -41,13 +46,18 @@ def _hasher(settings: Settings) -> UserHasher:
     return UserHasher(settings.hash_secret.get_secret_value().encode())
 
 
+def _excluded(settings: Settings, path: str | None) -> frozenset[str]:
+    """Team testers' numbers / ids, one per line → user hashes (hashed here, never stored)."""
+    if not path:
+        return frozenset()
+    hasher = _hasher(settings)
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return frozenset(hasher.user_id(line.strip()) for line in lines if line.strip())
+
+
 def cmd_stats(settings: Settings, args: argparse.Namespace) -> int:
     rows = asyncio.run(_rows(settings))
-    exclude: frozenset[str] = frozenset()
-    if args.exclude_users:  # one phone number / id per line (team testers) → hashed here, never stored
-        hasher = _hasher(settings)
-        lines = Path(args.exclude_users).read_text(encoding="utf-8").splitlines()
-        exclude = frozenset(hasher.user_id(line.strip()) for line in lines if line.strip())
+    exclude = _excluded(settings, args.exclude_users)
     channels = frozenset(args.channels.split(",")) if args.channels else USER_CHANNELS
     report = build_report(rows, channels=channels, exclude_users=exclude)
     print(json.dumps(report.as_dict(), indent=2) if args.json else format_report(report))
@@ -94,6 +104,52 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
             await store.close()
 
     print(f"removed {asyncio.run(run())} rows older than {args.days} days")
+    return 0
+
+
+REVIEW_DIR = ROOT / "var" / "review"
+IGNORED_DIRS = (ROOT / "var", ROOT / "exports")  # in .gitignore: review sheets must never be committed
+
+
+def _committable(path: Path) -> bool:
+    path = path.resolve()
+    return path.is_relative_to(ROOT) and not any(path.is_relative_to(d) for d in IGNORED_DIRS)
+
+
+def cmd_review_export(settings: Settings, args: argparse.Namespace) -> int:
+    from kudiguard.api.services import build_knowledge
+
+    languages = tuple(code.strip() for code in args.languages.split(",") if code.strip())
+    rows = review.eligible(
+        asyncio.run(_rows(settings)),
+        languages=languages,
+        exclude_users=_excluded(settings, args.exclude_users),
+        since=date.fromisoformat(args.since) if args.since else None,
+    )
+    sample = review.stratified_sample(rows, args.n, seed=args.seed, languages=languages)
+
+    async def sheet() -> list[dict[str, str]]:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            knowledge = await build_knowledge(settings, client)
+            return await review.review_rows(sample, hasher=_hasher(settings), knowledge=knowledge)
+
+    out = Path(args.out) if args.out else REVIEW_DIR / f"review-{utcnow():%Y%m%d}.csv"
+    review.write_sheet(out, asyncio.run(sheet()))
+    print(f"wrote {len(sample)} of {len(rows)} eligible replies to {out}")
+    if len(sample) < args.n:
+        print(f"warning: only {len(sample)} eligible replies (asked for {args.n})", file=sys.stderr)
+    if _committable(out):
+        print(
+            f"warning: {out} is inside the repository and not ignored; keep review sheets under var/",
+            file=sys.stderr,
+        )
+    print("Share only with the named reviewers; delete every copy after scoring (docs/NATIVE_REVIEW.md).")
+    return 0
+
+
+def cmd_review_score(settings: Settings, args: argparse.Namespace) -> int:
+    card = review.score([review.read_sheet(Path(path)) for path in args.files])
+    print(review.markdown_scorecard(card) if args.markdown else review.format_scorecard(card))
     return 0
 
 
@@ -152,6 +208,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     purge = commands.add_parser("purge", help="delete evidence older than the retention period")
     purge.add_argument("--days", type=int, default=None)
     purge.set_defaults(func=cmd_purge)
+
+    reviews = commands.add_parser(
+        "review", help="native-speaker review of real replies (docs/NATIVE_REVIEW.md)"
+    )
+    review_commands = reviews.add_subparsers(dest="review_command", required=True)
+    sample = review_commands.add_parser("export", help="CSV sample of model-written replies for reviewers")
+    sample.add_argument("--out", help=f"CSV path (default: {REVIEW_DIR}/review-<date>.csv, not committed)")
+    sample.add_argument("--n", type=int, default=review.DEFAULT_SAMPLE)
+    sample.add_argument("--languages", default=",".join(review.DEFAULT_LANGUAGES))
+    sample.add_argument("--exclude-users", help="file with team testers' numbers (one per line) to leave out")
+    sample.add_argument("--seed", type=int, default=0, help="same database + seed = same sample")
+    sample.add_argument("--since", help="only replies from this date on (YYYY-MM-DD)")
+    sample.set_defaults(func=cmd_review_export)
+    graded = review_commands.add_parser("score", help="validate graded sheets and summarise the scores")
+    graded.add_argument("files", nargs="+")
+    graded.add_argument("--markdown", action="store_true", help="table for docs/VALIDATION.md")
+    graded.set_defaults(func=cmd_review_score)
 
     args = parser.parse_args(argv)
     settings = Settings()

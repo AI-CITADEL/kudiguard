@@ -10,6 +10,8 @@ from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import aware
 from kudiguard.text import redact
 
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")  # cells starting with these are evaluated by spreadsheets
+
 
 def _redacted(value: str | None) -> str | None:
     return redact(value) if value else value
@@ -26,6 +28,13 @@ def protect(interaction: Interaction, hasher: UserHasher) -> Interaction:
         error=_redacted(interaction.error),
         created_at=aware(interaction.created_at),
     )
+
+
+def spreadsheet_cell(value: str) -> str:
+    """Neutralise CSV formula injection (OWASP): user text, e.g. a forwarded scam, may start with ``=HYPERLINK(``.
+
+    A leading apostrophe makes Excel / Google Sheets show the text instead of evaluating it."""
+    return "'" + value if value.startswith(FORMULA_PREFIXES) else value
 
 
 def export_row(interaction: Interaction, helpful: bool | None) -> dict[str, Any]:

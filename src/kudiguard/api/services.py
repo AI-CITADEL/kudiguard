@@ -82,6 +82,35 @@ async def purge_loop(
         await asyncio.sleep(interval_s)
 
 
+async def build_knowledge(settings: Settings, client: httpx.AsyncClient) -> KnowledgeBase:
+    """The knowledge base exactly as the bot searches it (also used to re-derive grounding for reviews)."""
+
+    def knowledge_with(embedder: object | None) -> KnowledgeBase:
+        return knowledge_base_from_packs(
+            settings.data_dir / "packs",
+            client=client,
+            include=settings.packs or None,
+            embedder=embedder,  # type: ignore[arg-type]
+            allow_samples=settings.allow_sample_packs,
+        )
+
+    knowledge = None
+    if settings.embeddings:
+        try:
+            from kudiguard.knowledge.embeddings import FastEmbedder
+
+            knowledge = knowledge_with(FastEmbedder(cache_dir=settings.embeddings_cache))
+        except KnowledgeConfigError:
+            raise  # a broken pack is a configuration error, not a missing model
+        except Exception as exc:  # model not cached / not installed: keyword search still works
+            log.warning("semantic search disabled (keyword search only): %s", exc)
+    if knowledge is None:
+        knowledge = knowledge_with(None)
+    if failed := await knowledge.refresh_all():
+        log.warning("knowledge sources unavailable at startup: %s", sorted(failed))
+    return knowledge
+
+
 async def build_services(settings: Settings) -> Services:
     """Production wiring. Fails fast on missing secrets or broken configuration."""
     from kudiguard.channels.whatsapp import WhatsAppConfig, WhatsAppMessenger
@@ -92,30 +121,7 @@ async def build_services(settings: Settings) -> Services:
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
     try:
-
-        def knowledge_with(embedder: object | None) -> KnowledgeBase:
-            return knowledge_base_from_packs(
-                settings.data_dir / "packs",
-                client=client,
-                include=settings.packs or None,
-                embedder=embedder,  # type: ignore[arg-type]
-                allow_samples=settings.allow_sample_packs,
-            )
-
-        knowledge = None
-        if settings.embeddings:
-            try:
-                from kudiguard.knowledge.embeddings import FastEmbedder
-
-                knowledge = knowledge_with(FastEmbedder(cache_dir=settings.embeddings_cache))
-            except KnowledgeConfigError:
-                raise  # a broken pack is a configuration error, not a missing model
-            except Exception as exc:  # model not cached / not installed: keyword search still works
-                log.warning("semantic search disabled (keyword search only): %s", exc)
-        if knowledge is None:
-            knowledge = knowledge_with(None)
-        if failed := await knowledge.refresh_all():
-            log.warning("knowledge sources unavailable at startup: %s", sorted(failed))
+        knowledge = await build_knowledge(settings, client)
         api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
         llm = OpenAICompatLLM(settings.llm_url, client=client, api_key=api_key)
 
