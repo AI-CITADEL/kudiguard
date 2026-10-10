@@ -444,3 +444,52 @@
 - {lang: en, text: Pay the fee through the official app only., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
 - {lang: en, text: Pay through the agent at your bank branch., expect: pass, issue: unsafe_instruction, note: round 8 lead (b7 verifier)}
 - {lang: en, text: It's okay to send this to your bank's customer care through the app., expect: block, issue: safety_claim, note: 'round 8 lead: kept flagged on purpose (fake customer care accounts are common)'}
+- {lang: en, text: It is safe to report this to the police., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to report this to the police., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to call your bank., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to ignore this message., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to delete the message., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to block the number., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It is safe to ignore this message., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's not safe to share your PIN., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It is not safe to share your PIN., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's never safe to share your PIN., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to proceed., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to invest., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to transfer the money., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to log in., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to enter your PIN there., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's safe to scan the code., expect: block, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee in the official app he sent you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee through the official app he sent you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee via the official app they told you to download., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee on the official website in his message., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee at your bank branch., expect: pass, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee using your card on their site., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay the fee from your account to his number., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Send money to the account number in his SMS., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Send money to the account number in her message., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Transfer to the account number in his WhatsApp message., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay into the account number he gave you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay to the account number he gave you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Send money to the account he gave you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Transfer the money to the account number in the message., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: 'Give the caller your BVN, not the bank.', expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: 'Send your BVN to the agent, not the bank.', expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: 'Send your BVN to the man who called, he works with the bank.', expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Provide your NIN to the caller who says he is from the bank., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: 'Provide your BVN on the link, the bank needs it.', expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Submit your BVN on their website for your bank account update., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay through the agent in your bank., expect: pass, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Pay through the agent at the bank he mentioned., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Submit your BVN through the link to update your bank account., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Provide your BVN on the form so your bank account is not blocked., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Send your BVN to this number to reactivate your bank account., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Send your NIN to the agent to link it with your bank., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Give your BVN to the man so the bank can verify you., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Provide your BVN to the agent from your bank., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: 'Text your BVN to the number, the bank needs it.', expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Share your BVN with the caller; agent banking requires it., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: Scan the QR code he sent and pay., expect: block, issue: unsafe_instruction, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's genuine to ask for proof., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
+- {lang: en, text: It's okay., expect: pass, issue: safety_claim, note: round 9 lead (b8 verifier)}
