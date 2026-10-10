@@ -16,6 +16,7 @@ import httpx
 
 from kudiguard.config import Settings
 from kudiguard.engine import Engine
+from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
@@ -82,24 +83,29 @@ async def purge_loop(
         await asyncio.sleep(interval_s)
 
 
-async def build_knowledge(settings: Settings, client: httpx.AsyncClient) -> KnowledgeBase:
-    """The knowledge base exactly as the bot searches it (also used to re-derive grounding for reviews)."""
+async def build_knowledge(
+    settings: Settings, client: httpx.AsyncClient
+) -> tuple[KnowledgeBase, Embedder | None]:
+    """The knowledge base exactly as the bot searches it, and its embedder (None = keyword search only).
 
-    def knowledge_with(embedder: object | None) -> KnowledgeBase:
+    Also used to re-derive grounding for native-speaker reviews; the embedder can be shared by other checks."""
+
+    def knowledge_with(embedder: Embedder | None) -> KnowledgeBase:
         return knowledge_base_from_packs(
             settings.data_dir / "packs",
             client=client,
             include=settings.packs or None,
-            embedder=embedder,  # type: ignore[arg-type]
+            embedder=embedder,
             allow_samples=settings.allow_sample_packs,
         )
 
-    knowledge = None
+    knowledge, embedder = None, None
     if settings.embeddings:
         try:
             from kudiguard.knowledge.embeddings import FastEmbedder
 
-            knowledge = knowledge_with(FastEmbedder(cache_dir=settings.embeddings_cache))
+            candidate: Embedder = FastEmbedder(cache_dir=settings.embeddings_cache)
+            knowledge, embedder = knowledge_with(candidate), candidate
         except KnowledgeConfigError:
             raise  # a broken pack is a configuration error, not a missing model
         except Exception as exc:  # model not cached / not installed: keyword search still works
@@ -108,7 +114,7 @@ async def build_knowledge(settings: Settings, client: httpx.AsyncClient) -> Know
         knowledge = knowledge_with(None)
     if failed := await knowledge.refresh_all():
         log.warning("knowledge sources unavailable at startup: %s", sorted(failed))
-    return knowledge
+    return knowledge, embedder
 
 
 async def build_services(settings: Settings) -> Services:
@@ -121,7 +127,7 @@ async def build_services(settings: Settings) -> Services:
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
     try:
-        knowledge = await build_knowledge(settings, client)
+        knowledge, _ = await build_knowledge(settings, client)
         api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
         llm = OpenAICompatLLM(settings.llm_url, client=client, api_key=api_key)
 

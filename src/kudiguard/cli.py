@@ -4,8 +4,9 @@
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
     kudiguard purge [--days 90]
-    kudiguard review export [--out var/review/review.csv] [--n 50] [--languages ha,yo,ig] [--seed 0]
+    kudiguard review export [--out-dir var/review] [--n 50] [--languages ha,yo,ig] [--seed 0]
     kudiguard review score graded.csv [more.csv ...] [--markdown]
+    kudiguard review check sheet.csv [more.csv ...]
 
 Exports contain no phone numbers or provider ids (pseudonymous user hashes, redacted text).
 """
@@ -107,7 +108,6 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
-REVIEW_DIR = ROOT / "var" / "review"
 IGNORED_DIRS = (ROOT / "var", ROOT / "exports")  # in .gitignore: review sheets must never be committed
 
 
@@ -116,10 +116,20 @@ def _committable(path: Path) -> bool:
     return path.is_relative_to(ROOT) and not any(path.is_relative_to(d) for d in IGNORED_DIRS)
 
 
+def _review_dir(settings: Settings, out_dir: str | None) -> Path:
+    return (
+        Path(out_dir) if out_dir else settings.db_path.parent / "review"
+    )  # next to the database: var/review
+
+
 def cmd_review_export(settings: Settings, args: argparse.Namespace) -> int:
     from kudiguard.api.services import build_knowledge
 
-    languages = tuple(code.strip() for code in args.languages.split(",") if code.strip())
+    if args.n < 1:
+        raise ValueError("--n must be at least 1")
+    languages = tuple(dict.fromkeys(code.strip() for code in args.languages.split(",") if code.strip()))
+    if not languages:
+        raise ValueError("--languages needs at least one language code, e.g. ha,yo,ig")
     rows = review.eligible(
         asyncio.run(_rows(settings)),
         languages=languages,
@@ -128,22 +138,30 @@ def cmd_review_export(settings: Settings, args: argparse.Namespace) -> int:
     )
     sample = review.stratified_sample(rows, args.n, seed=args.seed, languages=languages)
 
-    async def sheet() -> list[dict[str, str]]:
+    async def sheet() -> tuple[list[dict[str, str]], bool]:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            knowledge = await build_knowledge(settings, client)
-            return await review.review_rows(sample, hasher=_hasher(settings), knowledge=knowledge)
+            knowledge, embedder = await build_knowledge(settings, client)
+            rows = await review.review_rows(sample, hasher=_hasher(settings), knowledge=knowledge)
+            return rows, embedder is not None
 
-    out = Path(args.out) if args.out else REVIEW_DIR / f"review-{utcnow():%Y%m%d}.csv"
-    review.write_sheet(out, asyncio.run(sheet()))
-    print(f"wrote {len(sample)} of {len(rows)} eligible replies to {out}")
+    sheet_rows, semantic = asyncio.run(sheet())
+    out_dir = _review_dir(settings, args.out_dir)
+    paths = review.write_sheets(out_dir, sheet_rows, stem=f"review-{utcnow():%Y%m%d}")
+    print(f"sampled {len(sample)} of {len(rows)} eligible replies")
+    for language, path in paths.items():
+        print(f"  {language}: {sum(r['language'] == language for r in sheet_rows)} replies -> {path}")
+    search = "semantic + keyword search" if semantic else "keyword search only (no embedding model)"
+    print(f"facts re-derived with {search}")
     if len(sample) < args.n:
         print(f"warning: only {len(sample)} eligible replies (asked for {args.n})", file=sys.stderr)
-    if _committable(out):
+    if _committable(out_dir):
         print(
-            f"warning: {out} is inside the repository and not ignored; keep review sheets under var/",
+            f"warning: {out_dir} is inside the repository and not ignored; keep review sheets under var/",
             file=sys.stderr,
         )
-    print("Share only with the named reviewers; delete every copy after scoring (docs/NATIVE_REVIEW.md).")
+    print(
+        "Send each reviewer only their language's file; delete every copy after scoring (docs/NATIVE_REVIEW.md)."
+    )
     return 0
 
 
@@ -151,6 +169,19 @@ def cmd_review_score(settings: Settings, args: argparse.Namespace) -> int:
     card = review.score([review.read_sheet(Path(path)) for path in args.files])
     print(review.markdown_scorecard(card) if args.markdown else review.format_scorecard(card))
     return 0
+
+
+def cmd_review_check(settings: Settings, args: argparse.Namespace) -> int:
+    """Replies erased (DELETE) or expired since the export must be removed from every copy of the sheets."""
+    current = review.known_review_ids(asyncio.run(_rows(settings)), _hasher(settings))
+    sheets = [review.read_sheet(Path(path)) for path in args.files]
+    stale = sorted({rid for sheet in sheets for rid in sheet.items if rid not in current})
+    if not stale:
+        print(f"all {len({rid for s in sheets for rid in s.items})} review ids are still in the database")
+        return 0
+    print("no longer in the database (erased by the user or expired): delete these rows from every copy")
+    print("\n".join(stale))
+    return 1
 
 
 def redact_query_strings(record: logging.LogRecord) -> bool:
@@ -214,7 +245,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     review_commands = reviews.add_subparsers(dest="review_command", required=True)
     sample = review_commands.add_parser("export", help="CSV sample of model-written replies for reviewers")
-    sample.add_argument("--out", help=f"CSV path (default: {REVIEW_DIR}/review-<date>.csv, not committed)")
+    sample.add_argument("--out-dir", help="folder for the sheets (default: review/ next to the database)")
     sample.add_argument("--n", type=int, default=review.DEFAULT_SAMPLE)
     sample.add_argument("--languages", default=",".join(review.DEFAULT_LANGUAGES))
     sample.add_argument("--exclude-users", help="file with team testers' numbers (one per line) to leave out")
@@ -225,6 +256,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     graded.add_argument("files", nargs="+")
     graded.add_argument("--markdown", action="store_true", help="table for docs/VALIDATION.md")
     graded.set_defaults(func=cmd_review_score)
+    check = review_commands.add_parser("check", help="list sheet rows erased or expired since the export")
+    check.add_argument("files", nargs="+")
+    check.set_defaults(func=cmd_review_check)
 
     args = parser.parse_args(argv)
     settings = Settings()

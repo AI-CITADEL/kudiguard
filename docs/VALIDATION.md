@@ -18,7 +18,8 @@ Ten de-identified exchanges with English glosses, and tester quotes, go here (fr
 
 ## Native-speaker review (to fill in after the pilot)
 Native speakers grade a stratified sample of 30–50 real replies (rubric and process: [NATIVE_REVIEW.md](NATIVE_REVIEW.md)).
-Paste the output of `kudiguard review score var/review/graded-*.csv --markdown` here.
+Paste the output of `kudiguard review score var/review/<lang>-*.csv ... --markdown` here (it also prints an
+inter-rater agreement table: pairwise agreement, Gwet's AC1 and splits per language).
 
 | Language | Replies graded | Accuracy (1-5) | Fluency (1-5) | Faithful to facts | Harmful or misleading |
 |---|---|---|---|---|---|

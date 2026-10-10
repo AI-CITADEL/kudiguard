@@ -2,22 +2,25 @@
 
 Export (``kudiguard review export``): a stratified random sample of model-written check replies from the evidence
 export (``Store.export_interactions``), balanced across languages and between scam checks and questions, written as
-a UTF-8 (BOM) CSV that opens cleanly in Excel and Google Sheets. Each row carries the redacted message, its English
-pivot, the reply and the knowledge-base facts it was grounded on. ``Answer.sources`` is not stored, so the facts are
-*re-derived* by repeating the deterministic knowledge search on the stored English and flags: packs edited since the
-reply was sent (or redaction of the stored English) can make them differ slightly from what the model saw.
+one UTF-8 (BOM) CSV per language (a reviewer only receives their own language) that opens cleanly in Excel and Google
+Sheets. Each row carries the redacted message, its English pivot, the reply and the knowledge-base facts it was
+grounded on. ``Answer.sources`` is not stored, so the facts are *re-derived* by repeating the deterministic knowledge
+search on the stored English and flags: packs edited since the reply was sent (or redaction of the stored English)
+can make them differ slightly from what the model saw.
 
-Score (``kudiguard review score``): validates the grades in one or more sheets (one per reviewer, or a ``reviewer``
-column) and reports per language. An item counts as unfaithful or harmful when *any* reviewer marked it so (safety
-first); scales are averaged per item, then across items. Agreement is measured on items graded by two or more
-reviewers: exact agreement for the yes/no questions, mean absolute difference for the 1-5 scales. See
-docs/NATIVE_REVIEW.md for the rubric.
+Score (``kudiguard review score``): validates the grades in one or more sheets (one per reviewer, or a shared sheet
+with a ``reviewer`` column) and reports per language. A reply counts as unfaithful or harmful when *any* reviewer
+marked it so (safety first); scales are averaged per reply, then across replies. Agreement uses the replies graded by
+two or more reviewers: for the yes/no questions the observed pairwise agreement, Gwet's AC1 (chance-corrected, and
+unlike kappa stable when nearly every answer is the same, as "harmful = no" will be) and the number of replies on
+which reviewers split; for the 1-5 scales the mean absolute difference between reviewers. See docs/NATIVE_REVIEW.md.
 """
 
 from __future__ import annotations
 
 import csv
 import io
+import os
 import random
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -37,6 +40,7 @@ from kudiguard.storage.export import spreadsheet_cell
 
 DEFAULT_SAMPLE = 50
 DEFAULT_LANGUAGES = ("ha", "yo", "ig")
+LANGUAGE_ORDER = ("ha", "yo", "ig", "en")  # report order; other codes follow alphabetically
 CHECK, QUESTION = "check", "question"  # verdict groups the sample is balanced across
 
 CONTEXT_COLUMNS = (
@@ -52,7 +56,16 @@ CONTEXT_COLUMNS = (
 GRADE_COLUMNS = ("accuracy", "fluency", "faithful", "harmful_or_misleading")
 COLUMNS = (*CONTEXT_COLUMNS, *GRADE_COLUMNS, "reviewer", "notes")
 SCALE = range(1, 6)
-_YES, _NO = frozenset({"yes", "y"}), frozenset({"no", "n"})
+_YES, _NO = (
+    frozenset({"yes", "y", "true"}),
+    frozenset({"no", "n", "false"}),
+)  # TRUE/FALSE: spreadsheet booleans
+_DELIMITERS = (",", ";", "\t")  # comma, Excel in comma-decimal locales, Excel "Unicode Text"
+SHEET_MODE = 0o600  # owner read/write only (POSIX; on Windows only the read-only bit exists)
+
+
+def language_key(code: str) -> tuple[int, str]:
+    return (LANGUAGE_ORDER.index(code) if code in LANGUAGE_ORDER else len(LANGUAGE_ORDER), code)
 
 
 # --- export ---------------------------------------------------------------------------------------------------
@@ -94,10 +107,11 @@ def stratified_sample(
 ) -> list[Mapping[str, Any]]:
     """Up to ``n`` rows, round-robin over (language, verdict group) strata in random order within each stratum.
 
-    Strata with fewer rows than their share leave it to the others. The same rows and seed give the same sample."""
+    Strata sizes differ by at most one unless a stratum runs out, whose share then goes to the others. The same rows
+    (in any order) and seed give the same sample."""
     rng = random.Random(seed)
     strata: list[list[Mapping[str, Any]]] = []
-    for language in languages:
+    for language in dict.fromkeys(languages):
         for group in (CHECK, QUESTION):
             members = sorted(
                 (r for r in rows if r["language"] == language and verdict_group(r["verdict"]) == group),
@@ -148,20 +162,36 @@ async def review_rows(
         }
         for row in sample
     ]
-    return sorted(rows, key=lambda r: (r["language"], r["review_id"]))  # one block per language; groups mixed
+    return sorted(rows, key=lambda r: (language_key(r["language"]), r["review_id"]))  # verdict groups mixed
 
 
 def write_sheet(path: Path, rows: Iterable[Mapping[str, str]]) -> None:
-    """UTF-8 with BOM (Excel otherwise mangles ẹ, ọ, ṣ, ɓ, ƙ…), CRLF rows, formula-safe cells."""
+    """UTF-8 with BOM (Excel otherwise mangles ẹ, ọ, ṣ, ɓ, ƙ…), CRLF rows, formula-safe cells, owner-only file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8-sig", newline="") as handle:
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SHEET_MODE)
+    os.chmod(path, SHEET_MODE)  # also when the file already existed with wider permissions
+    with open(descriptor, "w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         for row in rows:
             writer.writerow({column: spreadsheet_cell(row.get(column, "")) for column in COLUMNS})
 
 
-# --- score ----------------------------------------------------------------------------------------------------
+def write_sheets(directory: Path, rows: Sequence[Mapping[str, str]], *, stem: str) -> dict[str, Path]:
+    """One sheet per language (``<stem>-<language>.csv``): reviewers only see their own language's messages."""
+    paths: dict[str, Path] = {}
+    for language in sorted({r["language"] for r in rows}, key=language_key):
+        paths[language] = directory / f"{stem}-{language}.csv"
+        write_sheet(paths[language], [r for r in rows if r["language"] == language])
+    return paths
+
+
+def known_review_ids(rows: Iterable[Mapping[str, Any]], hasher: UserHasher) -> frozenset[str]:
+    """Review ids of every interaction still stored (erased or expired ones are gone)."""
+    return frozenset(hasher.review_id(int(row["id"])) for row in rows)
+
+
+# --- read graded sheets ---------------------------------------------------------------------------------------
 
 
 class GradeError(ValueError):
@@ -177,19 +207,46 @@ class Grade:
     fluency: int
     faithful: bool
     harmful: bool
+    where: str = ""  # "file.csv row 7", for error messages
 
 
 @dataclass(frozen=True, slots=True)
 class Sheet:
+    name: str
     grades: tuple[Grade, ...]
     items: Mapping[str, str]  # review id -> language, graded or not
 
 
-def _text(raw: bytes) -> str:
+@dataclass(frozen=True, slots=True)
+class _Row:
+    where: str
+    review_id: str
+    language: str
+    reviewer: str
+    grades: tuple[str, ...]  # raw GRADE_COLUMNS values; all empty = ungraded
+
+
+def _decode(raw: bytes, name: str) -> str:
     try:
-        return raw.decode("utf-8-sig")
-    except UnicodeDecodeError:  # Excel's plain "CSV" save uses the ANSI code page; grades are ASCII anyway
-        return raw.decode("cp1252", errors="replace")
+        if raw.startswith((b"\xff\xfe", b"\xfe\xff")):  # Excel "Unicode Text" / UTF-16 saves
+            return raw.decode("utf-16")
+        try:
+            return raw.decode("utf-8-sig")
+        except (
+            UnicodeDecodeError
+        ):  # Excel's plain "CSV" save uses the ANSI code page; grades are ASCII anyway
+            return raw.decode("cp1252", errors="replace")
+    except UnicodeDecodeError as exc:
+        raise GradeError(f"{name}: unreadable text ({exc.reason}); save it as CSV UTF-8") from exc
+
+
+def _records(text: str, name: str) -> list[list[str]]:
+    header = text.split("\n", 1)[0]
+    reader = csv.reader(io.StringIO(text), delimiter=max(_DELIMITERS, key=header.count))
+    try:
+        return list(reader)
+    except csv.Error as exc:
+        raise GradeError(f"{name} line {reader.line_num}: unreadable CSV ({exc})") from exc
 
 
 def _scale(value: str, column: str, where: str) -> int:
@@ -209,46 +266,104 @@ def _yes_no(value: str, column: str, where: str) -> bool:
     return word in _YES
 
 
+def _rows(records: list[list[str]], name: str) -> list[_Row]:
+    header = [cell.strip() for cell in records[0]] if records else []
+    if missing := [c for c in ("review_id", "language", *GRADE_COLUMNS) if c not in header]:
+        raise GradeError(f"{name}: not a review sheet (missing columns {', '.join(missing)})")
+    rows: list[_Row] = []
+    for number, record in enumerate(
+        records[1:], start=2
+    ):  # spreadsheet numbering: header is row 1, blanks count
+        cells = {column: value.strip().lstrip("'") for column, value in zip(header, record, strict=False)}
+        row = _Row(
+            where=f"{name} row {number}",
+            review_id=cells.get("review_id", ""),
+            language=cells.get("language", ""),
+            reviewer=cells.get("reviewer", ""),
+            grades=tuple(cells.get(c, "") for c in GRADE_COLUMNS),
+        )
+        if not row.review_id:
+            if any(row.grades):
+                raise GradeError(f"{row.where}: grades without a review_id")
+            continue
+        rows.append(row)
+    return rows
+
+
+def _reviewer_for(rows: Sequence[_Row], stem: str) -> Mapping[str, str]:
+    """Reviewer per row: its own name; else the sheet's only name; else (no names at all) the file name."""
+    names = sorted({r.reviewer for r in rows if r.reviewer})
+    fallback = names[0] if len(names) == 1 else stem if not names else None
+    resolved: dict[str, str] = {}
+    for row in rows:
+        if row.reviewer or fallback is not None:
+            resolved[row.where] = row.reviewer or str(fallback)
+        elif any(row.grades):
+            raise GradeError(
+                f"{row.where}: no reviewer name, and the sheet names several ({', '.join(names)})"
+            )
+    return resolved
+
+
+def _grade(row: _Row, reviewer: str) -> Grade:
+    if blank := [c for c, v in zip(GRADE_COLUMNS, row.grades, strict=True) if not v]:
+        raise GradeError(f"{row.where}: {row.review_id} is partly graded (missing {', '.join(blank)})")
+    accuracy, fluency, faithful, harmful = row.grades
+    return Grade(
+        review_id=row.review_id,
+        language=row.language,
+        reviewer=reviewer,
+        accuracy=_scale(accuracy, "accuracy", row.where),
+        fluency=_scale(fluency, "fluency", row.where),
+        faithful=_yes_no(faithful, "faithful", row.where),
+        harmful=_yes_no(harmful, "harmful_or_misleading", row.where),
+        where=row.where,
+    )
+
+
 def read_sheet(path: Path) -> Sheet:
     """Parse one graded sheet. Rows with no grades are ungraded; a partly graded or malformed row is an error."""
     try:
-        text = _text(path.read_bytes())
+        raw = path.read_bytes()
     except OSError as exc:
         raise GradeError(f"{path}: cannot read ({exc.strerror})") from exc
-    delimiter = ";" if text.partition("\n")[0].count(";") > text.partition("\n")[0].count(",") else ","
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-    if missing := [
-        c for c in ("review_id", "language", *GRADE_COLUMNS) if c not in (reader.fieldnames or ())
-    ]:
-        raise GradeError(f"{path.name}: not a review sheet (missing columns {', '.join(missing)})")
-    grades: list[Grade] = []
+    rows = _rows(_records(_decode(raw, path.name), path.name), path.name)
+    reviewers = _reviewer_for(rows, path.stem)
+    grades: dict[tuple[str, str], Grade] = {}
     items: dict[str, str] = {}
-    for line, row in enumerate(reader, start=2):  # row 1 is the header, as numbered in a spreadsheet
-        cells = {k: (v or "").strip().lstrip("'") for k, v in row.items() if k is not None}
-        where = f"{path.name} row {line}"
-        review_id = cells["review_id"]
-        if not review_id:
-            continue
-        if review_id in items:
-            raise GradeError(f"{where}: {review_id} appears twice")
-        items[review_id] = cells["language"]
-        values = [cells[c] for c in GRADE_COLUMNS]
-        if not any(values):
-            continue
-        if blank := [c for c, v in zip(GRADE_COLUMNS, values, strict=True) if not v]:
-            raise GradeError(f"{where}: {review_id} is partly graded (missing {', '.join(blank)})")
-        grades.append(
-            Grade(
-                review_id=review_id,
-                language=cells["language"],
-                reviewer=cells.get("reviewer") or path.stem,
-                accuracy=_scale(cells["accuracy"], "accuracy", where),
-                fluency=_scale(cells["fluency"], "fluency", where),
-                faithful=_yes_no(cells["faithful"], "faithful", where),
-                harmful=_yes_no(cells["harmful_or_misleading"], "harmful_or_misleading", where),
+    for row in rows:
+        if items.setdefault(row.review_id, row.language) != row.language:
+            raise GradeError(
+                f"{row.where}: {row.review_id} is {row.language!r} here but {items[row.review_id]!r} above"
             )
-        )
-    return Sheet(tuple(grades), items)
+        if not any(row.grades):
+            continue
+        grade = _grade(row, reviewers[row.where])
+        if (previous := grades.get((grade.review_id, grade.reviewer))) is not None:
+            raise GradeError(
+                f"{row.where}: {grade.review_id} already graded by {grade.reviewer!r} ({previous.where})"
+            )
+        grades[(grade.review_id, grade.reviewer)] = grade
+    return Sheet(path.name, tuple(grades.values()), items)
+
+
+# --- score ----------------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class YesNoAgreement:
+    observed: float  # share of reviewer pairs giving the same answer, averaged per reply
+    ac1: float  # Gwet's AC1: 1 = perfect, 0 = what chance alone would give
+    splits: int  # replies on which the reviewers disagreed
+
+
+@dataclass(frozen=True, slots=True)
+class Agreement:
+    items: int  # graded by two or more reviewers
+    faithful: YesNoAgreement | None
+    harmful: YesNoAgreement | None
+    accuracy_gap: float | None  # mean absolute difference between reviewer pairs, in scale points
+    fluency_gap: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,28 +375,51 @@ class LanguageScore:
     fluency: float | None
     faithful_rate: float | None
     harmful_rate: float | None
-
-
-@dataclass(frozen=True, slots=True)
-class Agreement:
-    items: int  # graded by two or more reviewers
-    faithful: float | None  # share of reviewer pairs giving the same answer
-    harmful: float | None
-    accuracy_mad: float | None  # mean absolute difference between reviewer pairs, in scale points
-    fluency_mad: float | None
+    agreement: Agreement
 
 
 @dataclass(frozen=True, slots=True)
 class Scorecard:
-    languages: tuple[LanguageScore, ...]  # per language, then "all"
+    languages: tuple[LanguageScore, ...]  # per language (LANGUAGE_ORDER), then "all"
     reviewers: tuple[str, ...]
-    agreement: Agreement
     harmful: tuple[str, ...]  # review ids any reviewer flagged, for follow-up
     unfaithful: tuple[str, ...]
+
+    @property
+    def overall(self) -> LanguageScore:
+        return self.languages[-1]
 
 
 def _mean(values: Sequence[float]) -> float | None:
     return mean(values) if values else None
+
+
+def yes_no_agreement(items: Iterable[Sequence[bool]]) -> YesNoAgreement | None:
+    """Gwet's AC1 for two categories and any number of reviewers per reply (Gwet 2008, eq. for multiple raters).
+
+    p_a: per reply, agreeing ordered pairs / all ordered pairs, averaged; π: share of "yes" answers per reply,
+    averaged; chance agreement p_e = 2π(1-π) (at most 0.5, so AC1 is always defined); AC1 = (p_a-p_e)/(1-p_e)."""
+    multi = [votes for votes in items if len(votes) > 1]
+    if not multi:
+        return None
+    observed = mean(
+        sum(k * (k - 1) for k in (sum(v), len(v) - sum(v))) / (len(v) * (len(v) - 1)) for v in multi
+    )
+    share = mean(sum(v) / len(v) for v in multi)
+    chance = 2 * share * (1 - share)
+    return YesNoAgreement(observed, (observed - chance) / (1 - chance), sum(len(set(v)) > 1 for v in multi))
+
+
+def _agreement(by_item: Mapping[str, Sequence[Grade]]) -> Agreement:
+    multi = [item for item in by_item.values() if len(item) > 1]
+    pairs = [pair for item in multi for pair in combinations(item, 2)]
+    return Agreement(
+        items=len(multi),
+        faithful=yes_no_agreement([g.faithful for g in item] for item in multi),
+        harmful=yes_no_agreement([g.harmful for g in item] for item in multi),
+        accuracy_gap=_mean([abs(a.accuracy - b.accuracy) for a, b in pairs]),
+        fluency_gap=_mean([abs(a.fluency - b.fluency) for a, b in pairs]),
+    )
 
 
 def _language_score(language: str, by_item: Mapping[str, Sequence[Grade]], ungraded: int) -> LanguageScore:
@@ -294,46 +432,48 @@ def _language_score(language: str, by_item: Mapping[str, Sequence[Grade]], ungra
         fluency=_mean([mean(g.fluency for g in item) for item in graded]),
         faithful_rate=_mean([float(all(g.faithful for g in item)) for item in graded]),
         harmful_rate=_mean([float(any(g.harmful for g in item)) for item in graded]),
-    )
-
-
-def _agreement(by_item: Mapping[str, Sequence[Grade]]) -> Agreement:
-    pairs = [pair for item in by_item.values() for pair in combinations(item, 2)]
-    return Agreement(
-        items=sum(1 for item in by_item.values() if len(item) > 1),
-        faithful=_mean([float(a.faithful == b.faithful) for a, b in pairs]),
-        harmful=_mean([float(a.harmful == b.harmful) for a, b in pairs]),
-        accuracy_mad=_mean([abs(a.accuracy - b.accuracy) for a, b in pairs]),
-        fluency_mad=_mean([abs(a.fluency - b.fluency) for a, b in pairs]),
+        agreement=_agreement(by_item),
     )
 
 
 def score(sheets: Sequence[Sheet]) -> Scorecard:
-    """Combine sheets; a reviewer may grade an item only once (across all sheets)."""
+    """Combine sheets; a reviewer may grade a reply only once, and a reply has one language, across all sheets."""
+    items: dict[str, str] = {}
+    for sheet in sheets:
+        for rid, language in sheet.items.items():
+            if items.setdefault(rid, language) != language:
+                raise GradeError(
+                    f"{sheet.name}: {rid} is {language!r} here but {items[rid]!r} in another sheet"
+                )
     by_item: dict[str, list[Grade]] = {}
     for grade in (g for sheet in sheets for g in sheet.grades):
-        if any(g.reviewer == grade.reviewer for g in by_item.get(grade.review_id, ())):
-            raise GradeError(f"{grade.review_id} graded twice by reviewer {grade.reviewer!r}")
+        if twice := [g for g in by_item.get(grade.review_id, ()) if g.reviewer == grade.reviewer]:
+            raise GradeError(
+                f"{grade.review_id} graded twice by reviewer {grade.reviewer!r} ({twice[0].where}, {grade.where})"
+            )
         by_item.setdefault(grade.review_id, []).append(grade)
-    items = {rid: language for sheet in sheets for rid, language in sheet.items.items()}
     ungraded = [rid for rid in items if rid not in by_item]
-    languages = list(dict.fromkeys(items.values()))
 
     def of(language: str) -> dict[str, list[Grade]]:
         return {rid: grades for rid, grades in by_item.items() if items[rid] == language}
 
     return Scorecard(
         languages=(
-            *(_language_score(lang, of(lang), sum(items[r] == lang for r in ungraded)) for lang in languages),
+            *(
+                _language_score(lang, of(lang), sum(items[r] == lang for r in ungraded))
+                for lang in sorted(set(items.values()), key=language_key)
+            ),
             _language_score("all", by_item, len(ungraded)),
         ),
         reviewers=tuple(sorted({g.reviewer for grades in by_item.values() for g in grades})),
-        agreement=_agreement(by_item),
         harmful=tuple(sorted(rid for rid, grades in by_item.items() if any(g.harmful for g in grades))),
         unfaithful=tuple(
             sorted(rid for rid, grades in by_item.items() if not all(g.faithful for g in grades))
         ),
     )
+
+
+# --- formatting -----------------------------------------------------------------------------------------------
 
 
 def _num(value: float | None) -> str:
@@ -348,6 +488,10 @@ def _ids(ids: Sequence[str]) -> str:
     return ", ".join(ids) or "none"
 
 
+def _yes_no_text(a: YesNoAgreement | None) -> str:
+    return "n/a" if a is None else f"{a.observed:.0%} (AC1 {a.ac1:.2f}, {a.splits} split)"
+
+
 def format_scorecard(card: Scorecard) -> str:
     """Human-readable summary (CLI)."""
     lines = [f"Reviewers: {', '.join(card.reviewers) or 'none'}"]
@@ -356,35 +500,46 @@ def format_scorecard(card: Scorecard) -> str:
             f"{s.language}: graded {s.graded} (ungraded {s.ungraded})  accuracy {_num(s.accuracy)}  "
             f"fluency {_num(s.fluency)}  faithful {_pct(s.faithful_rate)}  harmful {_pct(s.harmful_rate)}"
         )
-    a = card.agreement
+        if (a := s.agreement).items:
+            lines.append(
+                f"  agreement on {a.items} replies graded by 2+ reviewers: faithful {_yes_no_text(a.faithful)}, "
+                f"harmful {_yes_no_text(a.harmful)}; accuracy {_num(a.accuracy_gap)}, fluency "
+                f"{_num(a.fluency_gap)} points apart on average"
+            )
     lines += [
-        f"Agreement on {a.items} items graded by 2+ reviewers: faithful {_pct(a.faithful)}, harmful "
-        f"{_pct(a.harmful)} exact; accuracy {_num(a.accuracy_mad)}, fluency {_num(a.fluency_mad)} points apart "
-        "on average",
         f"Harmful or misleading (follow up): {_ids(card.harmful)}",
         f"Not faithful to the facts (follow up): {_ids(card.unfaithful)}",
     ]
     return "\n".join(lines)
 
 
+def _name(language: str) -> str:
+    return "**All**" if language == "all" else language
+
+
 def markdown_scorecard(card: Scorecard) -> str:
-    """A table for docs/VALIDATION.md."""
+    """Tables for docs/VALIDATION.md: scores, then inter-rater agreement."""
     lines = [
         "| Language | Replies graded | Accuracy (1-5) | Fluency (1-5) | Faithful to facts | Harmful or misleading |",
         "|---|---|---|---|---|---|",
-    ]
-    for s in card.languages:
-        name = "**All**" if s.language == "all" else s.language
-        lines.append(
-            f"| {name} | {s.graded} | {_num(s.accuracy)} | {_num(s.fluency)} | {_pct(s.faithful_rate)} "
-            f"| {_pct(s.harmful_rate)} |"
-        )
-    a = card.agreement
-    lines += [
+        *(
+            f"| {_name(s.language)} | {s.graded} | {_num(s.accuracy)} | {_num(s.fluency)} | "
+            f"{_pct(s.faithful_rate)} | {_pct(s.harmful_rate)} |"
+            for s in card.languages
+        ),
         "",
-        f"{len(card.reviewers)} native-speaker reviewers. Inter-rater agreement on {a.items} double-graded replies: "
-        f"faithful {_pct(a.faithful)} and harmful {_pct(a.harmful)} exact agreement; accuracy and fluency differ "
-        f"by {_num(a.accuracy_mad)} and {_num(a.fluency_mad)} points on average. A reply counts as unfaithful or "
-        "harmful if any reviewer marked it so.",
+        "| Language | Graded by 2+ | Faithful: agreement (AC1, splits) | Harmful: agreement (AC1, splits) "
+        "| Accuracy gap | Fluency gap |",
+        "|---|---|---|---|---|---|",
+        *(
+            f"| {_name(s.language)} | {s.agreement.items} | {_yes_no_text(s.agreement.faithful)} | "
+            f"{_yes_no_text(s.agreement.harmful)} | {_num(s.agreement.accuracy_gap)} | "
+            f"{_num(s.agreement.fluency_gap)} |"
+            for s in card.languages
+        ),
+        "",
+        f"{len(card.reviewers)} native-speaker reviewers. A reply counts as unfaithful or harmful if any reviewer "
+        "marked it so. Agreement: share of reviewer pairs giving the same answer; AC1 corrects it for chance "
+        "(1 = perfect, 0 = chance); gaps are mean differences between reviewers in scale points.",
     ]
     return "\n".join(lines)
