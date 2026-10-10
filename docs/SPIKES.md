@@ -178,3 +178,34 @@ lexicon with *separate* dev examples, then re-measure here once (recorded as a p
 **Retrieval, blind** (24 English queries): production path (rules flags + hybrid search) **67% top-1 / 96% top-3**
 (BM25 only: 67% / 79%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
 top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tuned on them).
+
+## E5 — Answer quality metric (10 Oct 2026, `scripts/eval_answers.py`; live numbers pending)
+
+The other evals score verdicts, retrieval and objective prompt properties; this one scores what the user reads.
+`data/eval/answers.yaml`: 40 graded cases (en 19 incl. Pidgin, ha/yo/ig 7 each; scams, genuine look-alikes, core and
+money-skills questions, follow-ups, injection, French, a long rambling voice-like message). Written from the pack facts,
+not from the prompt examples; a **dev set** (not frozen, ha/yo/ig wording draft). Each case: allowed `verdicts`,
+1–3 `must` points (each tied to a pack entry with `from:`; a unit test checks the ids exist) and `must_not` statements.
+
+The model-composed body is back-translated to English and scored (`kudiguard.evaluation.answers`):
+
+| Metric | How |
+|---|---|
+| verdict | engine verdict in the allowed set |
+| coverage | share of `must` points with cosine ≥ 0.72 (bge-small, symmetric) to a reply sentence or the whole reply |
+| violating | any `must_not` said (per clause, same polarity, cosine ≥ 0.85) or a fixed pattern: phone/account number, link or USSD code not in the packs, output-guard "safe" claim or refusal, "share/send … OTP/PIN", "you will get your money back" |
+| grounded | every sentence supported by the facts of the answer's sources (workstream B's grounding check; until merged a stand-in: back-translation + cosine ≥ 0.72 to a fact). Model-composed answers only |
+| fallback | fixed fallback text instead of a model reply (coverage counts as missed) |
+
+Calibration (bge-small, hand-written pairs): paraphrases of a fact 0.72–0.84, related-but-different advice 0.48–0.71,
+off-topic 0.40–0.55 → coverage threshold 0.72 (thin margin: use the metric to compare runs, not as an absolute).
+Negated statements score as high as the statement (0.73–0.86) and same-topic advice reaches 0.83 ("tell him to contact
+his bank" vs "send the money back to him") → `must_not` matching is per clause, same polarity, 0.85: conservative by
+design; the fixed patterns catch the dangerous cases.
+
+```
+python scripts/eval_answers.py --label t01 --runs 3        # data/eval/results/answers-t01.jsonl + summary
+python scripts/eval_answers.py --label t0 --runs 3 --only ha,en-otp-caller
+python scripts/eval_answers.py --compare data/eval/results/answers-t01.jsonl data/eval/results/answers-t0.jsonl
+```
+The summary also reports the share of cases whose reply is identical in every run (temperature 0.1 vs 0 + seed).
