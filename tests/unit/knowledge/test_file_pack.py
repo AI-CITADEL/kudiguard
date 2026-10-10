@@ -137,9 +137,9 @@ def test_missing_manifest(tmp_path: Path) -> None:
 
 @pytest.mark.live
 async def test_real_embedder_finds_paraphrases() -> None:
-    from kudiguard.knowledge.embeddings import FastEmbedder
+    from embedding_cache import local_fast_embedder
 
-    embedder = FastEmbedder(cache_dir=PACKS.parents[1] / "models" / "fastembed")
+    embedder = local_fast_embedder()  # local cache only: never downloads
     core = FilePackSource.load(PACKS / "kudiguard-core", embedder=embedder)
     text = "my money no reach the person but they debited me"
     hits = (await core.search(Query(text=text, vector=embedder.embed_query(text)))).hits
