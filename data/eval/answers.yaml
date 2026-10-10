@@ -446,7 +446,7 @@
     - {point: "Scammers pretend to be the EFCC or the police.", from: flag-impersonation}
     - {point: "End the conversation and contact the organisation yourself using its official number.", from: flag-impersonation}
     - {point: "Scammers rush you so you do not have time to think.", from: flag-urgency}
-  must_not: ["Pay now and the case will be dropped."]
+  must_not: ["Pay now and the case will be dropped.", "Pay the money now."]
 
 - id: ig-debit-legit
   lang: ig

@@ -25,7 +25,12 @@ from kudiguard.evaluation.stats import mean_or_none, percentile
 
 ALL = "all"
 STAND_IN = "FallbackGrounding"  # grounding stand-in until workstream B merges: its numbers are not comparable
-COMPARED_META = ("grounding", "cover_threshold", "forbid_threshold")  # must match for a fair comparison
+COMPARED_META = (
+    "grounding",
+    "cover_threshold",
+    "forbid_threshold",
+    "support_threshold",
+)  # must match for a fair comparison
 
 
 @dataclass(frozen=True, slots=True)

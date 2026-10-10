@@ -18,6 +18,7 @@ from kudiguard.domain import Flag, Outcome, Verdict
 from kudiguard.engine import Engine
 from kudiguard.evaluation.answers import AnswerScorer, names_in, numbers_in
 from kudiguard.evaluation.grounding import (
+    DEFAULT_SUPPORT_THRESHOLD,
     GROUNDING_MODULE,
     VERDICT_LINE,
     CheckerGrounding,
@@ -28,6 +29,7 @@ from kudiguard.evaluation.grounding import (
     evidence_for,
     make_grounding,
     split_claims,
+    support_threshold,
     text_specifics,
 )
 from kudiguard.evaluation.runner import TURN_DEADLINE_S, run_case, turn_deadline
@@ -55,9 +57,7 @@ def knowledge_result() -> KnowledgeResult:
 
 
 def test_evidence_is_what_the_model_saw() -> None:
-    evidence = evidence_for(
-        knowledge_result(), verdict=Verdict.LIKELY_SCAM, flags=(Flag.URGENCY,), message="  They want my OTP. "
-    )
+    evidence = evidence_for(knowledge_result(), verdict=Verdict.LIKELY_SCAM, flags=(Flag.URGENCY,))
     assert evidence == [
         "Fact one.",
         "Fact two.",
@@ -66,9 +66,8 @@ def test_evidence_is_what_the_model_saw() -> None:
         "Act two.",
         VERDICT_LINE[Verdict.LIKELY_SCAM],
         "The message pressures you to act fast.",
-        "They want my OTP.",
-    ]
-    assert evidence_for(KnowledgeResult(), verdict=Verdict.NOT_A_CHECK, message=" ") == []
+    ]  # no user text: B passes the message to check() instead
+    assert evidence_for(KnowledgeResult(), verdict=Verdict.NOT_A_CHECK) == []
 
 
 def test_split_claims_and_report() -> None:
@@ -87,13 +86,32 @@ def test_split_claims_and_report() -> None:
 async def test_fallback_grounding_back_translates_and_scores(registry: LanguageRegistry) -> None:
     llm = FakeLLM(translate="Never share the OTP code. Buy gold from the EFCC today.")
     grounding = FallbackGrounding(llm, WordEmbedder(), registry, threshold=0.7)
-    evidence = grounding.evidence(knowledge_result(), verdict=Verdict.CAUTION, flags=(), message="")
+    evidence = grounding.evidence(knowledge_result(), verdict=Verdict.CAUTION, flags=())
     assert evidence[-1] == VERDICT_LINE[Verdict.CAUTION]
     report = await grounding.ground("Kada ka ba kowa OTP.", "ha", ["Never share the OTP code with anyone."])
     assert report.english == "Never share the OTP code. Buy gold from the EFCC today."
     assert [c.supported for c in report.claims] == [True, False]
     assert report.claims[1].unmatched == ("efcc",)
     assert "Kada ka ba kowa OTP." in llm.calls(Purpose.TRANSLATE)[0].messages[-1]["content"]
+
+
+async def test_fallback_grounding_takes_specifics_from_the_message(registry: LanguageRegistry) -> None:
+    grounding = FallbackGrounding(FakeLLM(), WordEmbedder(), registry, threshold=0.5)
+    evidence = ["Do not pay the fee to collect a prize."]
+    reply = "Do not pay the 7500 naira fee to collect the prize."
+    assert (await grounding.ground(reply, "en", evidence)).claims[0].unmatched == ("7500",)
+    told = await grounding.ground(reply, "en", evidence, message="They want 7500 naira for my prize")
+    assert told.claims[0].supported  # the user named the amount: the reply may repeat it
+
+
+def test_support_threshold_follows_workstream_b(
+    monkeypatch: pytest.MonkeyPatch, registry: LanguageRegistry
+) -> None:
+    monkeypatch.setitem(sys.modules, GROUNDING_MODULE, None)
+    assert support_threshold() == DEFAULT_SUPPORT_THRESHOLD == 0.73
+    assert FallbackGrounding(FakeLLM(), WordEmbedder(), registry).threshold == 0.73
+    monkeypatch.setitem(sys.modules, GROUNDING_MODULE, SimpleNamespace(DEFAULT_THRESHOLD=0.7))
+    assert support_threshold() == 0.7
 
 
 async def test_fallback_grounding_english_and_edge_cases(registry: LanguageRegistry) -> None:
@@ -119,10 +137,10 @@ class BError(RuntimeError):
 class FakeChecker:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
-        self.calls: list[tuple[str, str, list[str]]] = []
+        self.calls: list[tuple[str, str, list[str], str]] = []
 
-    async def check(self, reply: str, language: str, evidence: list[str]) -> Any:
-        self.calls.append((reply, language, evidence))
+    async def check(self, reply: str, language: str, evidence: list[str], *, message: str = "") -> Any:
+        self.calls.append((reply, language, evidence, message))
         if self.error:
             raise self.error
         claim = SimpleNamespace(text="t", support=0.5, supported=False, unmatched=("efcc",))
@@ -137,7 +155,7 @@ def fake_b(checker: FakeChecker, built: list[tuple[Any, ...]] | None = None) -> 
     return SimpleNamespace(
         GroundingChecker=make,
         GroundingError=BError,
-        evidence_for=lambda knowledge, **kw: ["b-evidence", kw["verdict"], kw["message"]],
+        evidence_for=lambda knowledge, *, verdict, flags: ["b-evidence", verdict, *flags],
         names_in=lambda text: {"b-names"},
         numbers_in=lambda text: {"b-numbers"},
     )
@@ -146,11 +164,11 @@ def fake_b(checker: FakeChecker, built: list[tuple[Any, ...]] | None = None) -> 
 async def test_checker_grounding_adapts_workstream_b() -> None:
     checker = FakeChecker()
     adapter = CheckerGrounding(fake_b(checker), checker)  # type: ignore[arg-type]
-    report = await adapter.ground("r", "ha", ("fact",))
+    report = await adapter.ground("r", "ha", ("fact",), message="the user's message")
     assert report == GroundingReport("EN r", (Claim("t", 0.5, False, ("efcc",)),), 12)
-    assert checker.calls == [("r", "ha", ["fact"])]
-    evidence = adapter.evidence(KnowledgeResult(), verdict=Verdict.CAUTION, flags=(), message="m")
-    assert evidence == ["b-evidence", Verdict.CAUTION, "m"]
+    assert checker.calls == [("r", "ha", ["fact"], "the user's message")]
+    evidence = adapter.evidence(KnowledgeResult(), verdict=Verdict.CAUTION, flags=(Flag.URGENCY,))
+    assert evidence == ["b-evidence", Verdict.CAUTION, Flag.URGENCY]
     failing = FakeChecker(BError("no translation"))
     with pytest.raises(GroundingError, match="no translation"):
         await CheckerGrounding(fake_b(failing), failing).ground("r", "ha", ())  # type: ignore[arg-type]
@@ -178,17 +196,17 @@ def test_make_grounding_and_specifics_prefer_workstream_b(
 class StubGrounding:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
-        self.calls: list[tuple[str, str, Sequence[str]]] = []
+        self.calls: list[tuple[str, str, Sequence[str], str]] = []
         self.knowledge: list[KnowledgeResult] = []
 
-    def evidence(
-        self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag], message: str
-    ) -> list[str]:
+    def evidence(self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag]) -> list[str]:
         self.knowledge.append(knowledge)
-        return evidence_for(knowledge, verdict=verdict, flags=flags, message=message)
+        return evidence_for(knowledge, verdict=verdict, flags=flags)
 
-    async def ground(self, reply: str, language: str, evidence: Sequence[str]) -> GroundingReport:
-        self.calls.append((reply, language, evidence))
+    async def ground(
+        self, reply: str, language: str, evidence: Sequence[str], *, message: str = ""
+    ) -> GroundingReport:
+        self.calls.append((reply, language, evidence, message))
         if self.error:
             raise self.error
         claim = Claim("Your bank never asks for the OTP.", 0.9, True)
@@ -219,12 +237,9 @@ async def test_run_case_grounds_on_what_the_model_saw(
     grounding = StubGrounding()
     scorer = AnswerScorer(WordEmbedder(), registry, cover_threshold=0.6)
     result = await run_case(engine(registry, knowledge, llm), knowledge, grounding, scorer, case(lang="ha"))
-    reply, language, evidence = grounding.calls[0]
-    assert (reply, language) == ("Kar ka ba su OTP.", "ha")
-    assert (
-        evidence[-1] == "A caller wants my OTP"
-        and "The message asks for a code, PIN, password or BVN." in evidence
-    )
+    reply, language, evidence, message = grounding.calls[0]
+    assert (reply, language, message) == ("Kar ka ba su OTP.", "ha", "A caller wants my OTP")
+    assert evidence[-1] == "The message asks for a code, PIN, password or BVN."
     assert [e.entry.id for e in grounding.knowledge[0].entries][:1] == ["flag-asks-credentials"]
     assert result.observation.english == "Your bank never asks for the OTP." and result.observation.evidence
     assert result.score.grounded is True and result.grounding_ms == 7 and result.seconds >= 0
@@ -278,30 +293,31 @@ async def test_run_case_flags_rebuilt_evidence_that_differs(
         analyse=analysis("A caller wants my OTP", flags=["asks_credentials"]), compose="Never share it."
     )
     scorer = AnswerScorer(WordEmbedder(), registry)
-    result = await run_case(
-        engine(registry, knowledge, llm),
-        EmptyKnowledge(),
-        StubGrounding(),
-        scorer,
-        case(),  # type: ignore[arg-type]
-    )
+    empty: Any = EmptyKnowledge()
+    result = await run_case(engine(registry, knowledge, llm), empty, StubGrounding(), scorer, case())
     assert result.answer.sources and result.evidence_mismatch is True
 
 
 async def test_workstream_b_contract(registry: LanguageRegistry) -> None:
-    """Runs once kudiguard.safety.grounding exists: the adapter must fit B's real module."""
+    """Runs once kudiguard.safety.grounding exists: the adapter must fit B's real module (draft of 2026-10-10:
+    ``evidence_for(knowledge, *, verdict, flags)``; the message goes to ``check(..., message=)``)."""
     b = pytest.importorskip(GROUNDING_MODULE)
     parameters = inspect.signature(b.evidence_for).parameters
-    assert next(iter(parameters)) == "knowledge" and {"verdict", "flags", "message"} <= parameters.keys()
+    assert next(iter(parameters)) == "knowledge" and {"verdict", "flags"} <= parameters.keys()
+    assert "message" in inspect.signature(b.GroundingChecker.check).parameters
+    assert 0 < b.DEFAULT_THRESHOLD < 1 and support_threshold() == b.DEFAULT_THRESHOLD
     assert {"text", "support", "supported", "unmatched"} <= set(b.Claim.__dataclass_fields__)
     assert {"english", "claims", "ms"} <= set(b.GroundingReport.__dataclass_fields__)
     embedder = WordEmbedder()
     adapter = make_grounding(FakeLLM(translate="Never share your OTP code with anyone."), embedder, registry)
     assert isinstance(adapter, CheckerGrounding)
-    evidence = adapter.evidence(knowledge_result(), verdict=Verdict.LIKELY_SCAM, flags=(), message="m")
+    evidence = adapter.evidence(knowledge_result(), verdict=Verdict.LIKELY_SCAM, flags=())
     assert "Fact one." in evidence
     english = await adapter.ground(
-        "Never share your OTP code with anyone.", "en", ["Never share your OTP code with anyone."]
+        "Never share your OTP code with anyone.",
+        "en",
+        ["Never share your OTP code with anyone."],
+        message="m",
     )
     assert english.english.startswith("Never share") and english.claims
     hausa = await adapter.ground("Kada ka ba kowa OTP.", "ha", ["Never share your OTP code with anyone."])

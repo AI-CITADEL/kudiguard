@@ -55,11 +55,9 @@ async def run_case(
     if answer.outcome is Outcome.ANSWERED and answer.body.strip():
         found = await knowledge.search(Query(text=answer.english, flags=answer.flags, language=case.lang))
         mismatch = tuple(item.entry.id for item in found.entries[:MAX_ENTRIES]) != answer.sources
-        evidence = tuple(
-            grounding.evidence(found, verdict=answer.verdict, flags=answer.flags, message=answer.english)
-        )
+        evidence = tuple(grounding.evidence(found, verdict=answer.verdict, flags=answer.flags))
         try:
-            report = await grounding.ground(answer.body, case.lang, evidence)
+            report = await grounding.ground(answer.body, case.lang, evidence, message=answer.english)
         except GroundingError:
             english = answer.body if case.lang == PIVOT else None  # unscored: no back-translation
         else:

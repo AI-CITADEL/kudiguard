@@ -2,7 +2,8 @@
 stand-in with the same names and contract, so the merge is a switch, not a rewrite (``make_grounding``).
 
 The evidence is what the model was shown (B's ``evidence_for``): the facts and actions of ``prompts.facts_block``,
-the verdict's meaning, the red flags and the user's English message. Once B merges, the eval engine must be built like
+the verdict's meaning and the red flags; the user's English message goes to ``check(message=...)`` (B uses it for
+specifics a reply may repeat, e.g. the amount the user named). Once B merges, the eval engine must be built like
 production (grounding on): ungrounded English replies are then replaced before they reach the user, so the English
 grounded rate is ~100% by construction and the measure that matters is the other languages (via back-translation).
 """
@@ -32,7 +33,9 @@ facts_block: Callable[[KnowledgeResult], tuple[list[str], list[str]]] = (
 )
 
 GROUNDING_MODULE = "kudiguard.safety.grounding"  # workstream B
-DEFAULT_SUPPORT_THRESHOLD = 0.75  # B's DEFAULT_THRESHOLD
+DEFAULT_SUPPORT_THRESHOLD = (
+    0.73  # stand-in only; mirrors B's DEFAULT_THRESHOLD (``support_threshold`` reads B's)
+)
 MIN_CLAIM_WORDS = 3  # "Stay calm." carries no checkable fact
 VERDICT_LINE: dict[Verdict, str] = {  # as in B
     Verdict.LIKELY_SCAM: "This looks like a scam.",
@@ -83,26 +86,25 @@ def evidence_for(
     *,
     verdict: Verdict | None = None,
     flags: Sequence[Flag] = (),
-    message: str = "",
 ) -> list[str]:
-    """What a COMPOSE reply may say (mirrors B): facts and actions shown, verdict line, red flags, the message."""
+    """What a COMPOSE reply may say (mirrors B): facts and actions shown, verdict line, red flags."""
     facts, actions = facts_block(knowledge)
     evidence = [*facts, *actions]
     if verdict is not None and verdict in VERDICT_LINE:
         evidence.append(VERDICT_LINE[verdict])
     evidence.extend(f"The message {FLAG_TEXT[f]}." for f in flags)
-    if message.strip():
-        evidence.append(message.strip())
     return evidence
 
 
 class Grounding(Protocol):
     def evidence(
-        self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag], message: str
+        self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag]
     ) -> list[str]: ...
 
-    async def ground(self, reply: str, language: LanguageCode, evidence: Sequence[str]) -> GroundingReport:
-        """Raises ``GroundingError``."""
+    async def ground(
+        self, reply: str, language: LanguageCode, evidence: Sequence[str], *, message: str = ""
+    ) -> GroundingReport:
+        """``message``: the user's English message. Raises ``GroundingError``."""
         ...
 
 
@@ -113,14 +115,14 @@ class CheckerGrounding:
         self._module = module
         self._checker = checker
 
-    def evidence(
-        self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag], message: str
-    ) -> list[str]:
-        return list(self._module.evidence_for(knowledge, verdict=verdict, flags=flags, message=message))
+    def evidence(self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag]) -> list[str]:
+        return list(self._module.evidence_for(knowledge, verdict=verdict, flags=flags))
 
-    async def ground(self, reply: str, language: LanguageCode, evidence: Sequence[str]) -> GroundingReport:
+    async def ground(
+        self, reply: str, language: LanguageCode, evidence: Sequence[str], *, message: str = ""
+    ) -> GroundingReport:
         try:
-            report = await self._checker.check(reply, language, list(evidence))
+            report = await self._checker.check(reply, language, list(evidence), message=message)
         except self._module.GroundingError as exc:
             raise GroundingError(str(exc)) from exc
         claims = tuple(
@@ -132,7 +134,7 @@ class CheckerGrounding:
 
 class FallbackGrounding:
     """Stand-in until B merges: plain back-translation (N-ATLAS), then a claim is supported when it paraphrases an
-    evidence sentence (cosine >= ``threshold``) and its names and numbers appear in the evidence."""
+    evidence sentence (cosine >= ``threshold``) and its names and numbers appear in the evidence or the message."""
 
     def __init__(
         self,
@@ -140,19 +142,19 @@ class FallbackGrounding:
         embedder: Embedder,
         registry: LanguageRegistry,
         *,
-        threshold: float = DEFAULT_SUPPORT_THRESHOLD,
+        threshold: float | None = None,
     ) -> None:
         self._llm = llm
         self._embedder = embedder
         self._registry = registry
-        self.threshold = threshold
+        self.threshold = support_threshold() if threshold is None else threshold
 
-    def evidence(
-        self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag], message: str
-    ) -> list[str]:
-        return evidence_for(knowledge, verdict=verdict, flags=flags, message=message)
+    def evidence(self, knowledge: KnowledgeResult, *, verdict: Verdict, flags: Sequence[Flag]) -> list[str]:
+        return evidence_for(knowledge, verdict=verdict, flags=flags)
 
-    async def ground(self, reply: str, language: LanguageCode, evidence: Sequence[str]) -> GroundingReport:
+    async def ground(
+        self, reply: str, language: LanguageCode, evidence: Sequence[str], *, message: str = ""
+    ) -> GroundingReport:
         english = reply if language == PIVOT else await self._translate(reply, language)
         claims = split_claims(english)
         units = list(dict.fromkeys([*evidence, *(s for text in evidence for s in split_sentences(text))]))
@@ -160,7 +162,7 @@ class FallbackGrounding:
         if claims and units:
             vectors = self._embedder.embed_documents([*claims, *units])
             support = (vectors[: len(claims)] @ vectors[len(claims) :].T).max(axis=1)
-        known = " ".join(evidence)
+        known = " ".join([*evidence, message])  # the message counts for specifics only (as in B)
         known_numbers, known_words = numbers_in(known), words_in(known)
         scored = []
         for text, best in zip(claims, support, strict=True):
@@ -202,3 +204,9 @@ def text_specifics() -> tuple[Specifics, Specifics]:
     if module is None:
         return names_in, numbers_in
     return module.names_in, module.numbers_in
+
+
+def support_threshold() -> float:
+    """The grounding threshold in use: B's ``DEFAULT_THRESHOLD`` when installed, else the stand-in's mirror."""
+    module = _workstream_b()
+    return DEFAULT_SUPPORT_THRESHOLD if module is None else float(module.DEFAULT_THRESHOLD)

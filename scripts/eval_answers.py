@@ -27,7 +27,7 @@ import httpx
 
 from kudiguard.engine import Engine
 from kudiguard.evaluation.answers import AnswerScorer, KeyPoint, load_cases, pack_entries
-from kudiguard.evaluation.grounding import make_grounding, text_specifics
+from kudiguard.evaluation.grounding import make_grounding, support_threshold, text_specifics
 from kudiguard.evaluation.runner import run_case
 from kudiguard.evaluation.summary import (
     Record,
@@ -88,6 +88,7 @@ async def main(args: argparse.Namespace) -> None:
             "grounding": type(grounding).__name__,
             "cover_threshold": scorer.cover_threshold,
             "forbid_threshold": scorer.forbid_threshold,
+            "support_threshold": support_threshold(),
             "commit": git_commit(),
             "url": args.url,
             "started": datetime.now(UTC).isoformat(timespec="seconds"),

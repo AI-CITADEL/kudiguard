@@ -35,6 +35,23 @@ def test_coverage_rule_on_calibration_pairs(registry: LanguageRegistry) -> None:
     assert not any(scorer.matches(p["point"], p["sentence"])[1] for p in entity)
 
 
+@pytest.mark.live
+def test_pay_now_must_not_with_the_real_model(registry: LanguageRegistry) -> None:
+    """Measured: clause "Pay now" 0.883 vs "Pay the money now." (caught); "Do not pay them" 0.612 and negated."""
+    from kudiguard.domain import Outcome, Verdict
+    from kudiguard.evaluation.answers import Observation, load_cases
+
+    efcc = next(c for c in load_cases(ROOT / "data" / "eval" / "answers.yaml") if c.id == "ig-efcc-threat")
+    scorer = AnswerScorer(local_fast_embedder(), registry)
+
+    def says(reply: str) -> bool:
+        observation = Observation(Verdict.LIKELY_SCAM, Outcome.ANSWERED, reply, reply)
+        return "says: Pay the money now." in scorer.score(efcc, observation).violations
+
+    assert says("Pay now so they drop the case.")
+    assert not says("Do not pay them. Call the EFCC yourself on its official number.")
+
+
 def test_calibration_file_is_balanced() -> None:
     labels = [pair["match"] for pair in PAIRS]
     assert sum(labels) >= 12 and len(labels) - sum(labels) >= 12
