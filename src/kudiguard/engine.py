@@ -49,7 +49,7 @@ from kudiguard.speech.service import SpeechResult, transcribe_upload
 
 log = logging.getLogger(__name__)
 
-RETRY_TEMPERATURE = 0.5  # a retry at the original 0.1 tends to repeat the blocked output
+RETRY_TEMPERATURE = 0.5  # a retry at the base temperature (0, greedy) would repeat the blocked output exactly
 # Minimum time left in the turn to start a model step (else: skip it and use the deterministic/fixed path).
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
