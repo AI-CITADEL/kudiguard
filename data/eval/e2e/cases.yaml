@@ -13,30 +13,64 @@
 # Language status: en is final. pcm, ha, yo and ig are DRAFT pending native-speaker review. Fluency and spelling
 # may be imperfect (some yo/ig texts deliberately lack tone marks, as users often type them). Labels do not depend on
 # fine wording.
+# Independence caveat: the ha/yo/ig scam cases are near-parallel templates of one another (same scenario, translated
+# and lightly varied). Per-language scores are therefore NOT independent samples; report them as a per-language
+# consistency check rather than as separate evidence.
 #
-# Privacy: all phone numbers (0800 000 00xx, 0812 000 000x), account numbers (0123456789) and names are fictitious.
-# URLs are fictitious look-alikes written with "hxxp" so they are not clickable.
+# Privacy: all phone numbers (0800 000 00xx, 0812 000 000x), account numbers (0123456789) and names of people are
+# fictitious. URLs are fictitious look-alikes written with "hxxp" so they are not clickable. Real shortcodes and USSD
+# codes (e.g. JAMB 55019, *323#, *737#) appear where the case tests spoofing or a genuine message.
 #
 # Labelling policy:
 #   scam     = the message, or the situation the user describes, is a fraud attempt (or an unlawful threat such as
-#              loan-app defamation), even if the user has not lost money yet. A good answer warns clearly (red/orange).
+#              loan-app defamation or sextortion), even if the user has not lost money yet. A good answer warns
+#              clearly (red/orange).
 #   genuine  = a real-looking legitimate message (bank alerts, OTP for a transaction the user started, service notices,
 #              promos that ask nothing, verified family borrowing, reminders using a known account). A good answer
 #              does not call it a scam, but may add one safety tip. Some genuine cases look scary on purpose.
 #   question = a money or safety question with no message to judge. A good answer gives practical, safe guidance.
-#   red_flags: only for scam cases, taken from the fixed vocabulary below. must_advise: 1-3 points a good answer
-#   must convey (any language, any wording). must_not: things a good answer must never say or imply.
+#   accept   (optional, v2) = verdicts that also count as correct for a genuinely ambiguous case. "caution" means a
+#              "verify first / be careful" verdict (orange) without declaring it a confirmed scam. Without `accept`,
+#              only `label` is correct (for scam, red and orange both count as warning).
+#   subtype  (optional, v2) = finer reason, e.g. unlawful_threat (loan-app shaming; the debt may be real) or
+#              unsolicited_loan.
+#   red_flags: only for scam cases, taken from the fixed vocabulary below. Some scam cases have an empty list when no
+#   flag fits (e.g. a card swap or a SIM swap that already happened). `harassment` (v2) is an extra flag for
+#   shaming/extortion threats against the person (loan-app defamation, sextortion); it is NOT in the system's own flag
+#   list, so scorers comparing flag sets should ignore it or map it to "no match". must_advise: 1-3 points a good
+#   answer must convey (any language, any wording). must_not: things a good answer must never say or imply.
 #   voice: true marks the TTS subset (natural spoken phrasing, under 60 s).
+#
+# Changelog
+#   v1 (2026-10-10, commit 42944ac): 330 cases.
+#   v2 (2026-10-10): pre-scoring corrections from an independent label + fact audit; no system output seen.
+#     - Facts: en-035 advice (CBN new-device N20k / 24 h rule makes "no 24 h delay" risky); call-forwarding code fixed
+#       to **21*...# in en-023, ha-012, yo-012, ig-012; en-051 adds Nigerian-born DV ineligibility; SIM cases add
+#       "network first, then NCC 622"; NIMC look-alike URLs no longer use an unsourced domain.
+#     - Labels/flags: loan-app shaming (en-031, pcm-018, ha-021, yo-021, ig-021) gets subtype unlawful_threat,
+#       accept [scam, caution], harassment instead of account_threat; en-056 accept [scam, caution], no
+#       account_threat; en-040 accept [scam, caution]; en-036 drops impersonation; en-034, ha-025, yo-025, ig-025,
+#       en-029 add impersonation; en-049 scam_type pension_impersonation; en-025 adds strong scam signs; en-074 text
+#       says the user entered the wrong PIN; en-020 note on JAMB's real shortcode.
+#     - Genuine messages that companies send in English (pcm-035, pcm-039, pcm-041, ha-036, ha-038, yo-037, ig-037,
+#       ig-039) are now English messages inside a local-language user question, with named lenders.
+#     - Language fixes: ha-021 (who owes whom), ig-001, ig-006, ig-030, ha-007, yo-006, yo-019.
+#     - Coverage: 33 new cases (en-132..147, pcm-056..063, ha/yo/ig-049..052): fake NELFUND, deepfake celebrity
+#       investment, fake banking APK, CBN dormant balances, SIM-swap aftermath, crypto P2P, delivery-code OTP, POS
+#       reversal trick, sextortion, fake NYSC/Remita; genuine new-device N20k notice, NELFUND approval, in-app NIN
+#       tier upgrade, MTN@25 25GB offer; extra questions.
 meta:
   name: kudiguard-e2e
-  version: 1
+  version: 2
   written: "2026-10-10"
   author: independent blind test author
   frozen: true
   draft_languages: [pcm, ha, yo, ig]
   labels: [scam, genuine, question]
+  accept_values: [scam, caution, genuine, question]
   channels: [sms, whatsapp, forwarded, voice_like, question, web]
   red_flags_vocab: [asks_credentials, remote_access, account_threat, upfront_fee, prize_lottery, guaranteed_returns, wrong_transfer, fake_payment, money_request, suspicious_link, impersonation, urgency, secrecy]
+  extra_red_flags: [harassment]
 cases:
   - id: en-001
     lang: en
@@ -267,14 +301,14 @@ cases:
     red_flags: [impersonation, upfront_fee]
     must_advise: ["JAMB does not collect fees into a personal or ad-hoc bank account", "Check JAMB's official website or offices"]
     must_not: ["Pay to get rescheduled"]
-    note: "Mirrors 2025 JAMB disowned account"
+    note: "Mirrors 2025 JAMB disowned account. 55019 is JAMB's real shortcode: the case tests sender-ID spoofing, not the number"
   - id: en-021
     lang: en
     channel: forwarded
     label: scam
     scam_type: nin_correction_portal
     text: |-
-      NIMC: FREE NIN correction portal now open for name, DOB and phone number. Correct yours here: hxxp://nimc-correction.gvly.xyz . Enter your NIN and BVN to begin.
+      NIMC: FREE NIN correction portal now open for name, DOB and phone number. Correct yours here: hxxp://nimc-correction.portal-ng.xyz . Enter your NIN and BVN to begin.
     red_flags: [impersonation, suspicious_link, asks_credentials]
     must_advise: ["Use only NIMC's official self-service portal or an enrolment centre", "Do not type your NIN or BVN into links from forwarded messages"]
     must_not: ["Use the link to correct your NIN"]
@@ -296,9 +330,9 @@ cases:
     label: scam
     scam_type: sim_line_threat
     text: |-
-      MTN: Your SIM will be BARRED in 48hrs due to NIN verification failure. To retain your line dial *#21*08000000000# now.
+      MTN: Your SIM will be BARRED in 48hrs due to NIN verification failure. To retain your line dial **21*08000000000# now.
     red_flags: [impersonation, account_threat, urgency]
-    must_advise: ["Do not dial the code, it forwards your calls to fraudsters", "Check NIN-SIM status with your network's official code or office"]
+    must_advise: ["Do not dial the code, it forwards your calls to fraudsters", "Check NIN-SIM status with your network's official code or office", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Dial the code to keep your line"]
     note: "Call-forwarding trick"
   - id: en-024
@@ -318,11 +352,11 @@ cases:
     label: scam
     scam_type: online_vendor_advance_payment
     text: |-
-      I want to buy iPhone 14 from an Instagram vendor for 350k. She said pay 50% first, no pay on delivery, and the account is in a personal name not the business name. The page has 30k followers. Is it safe?
+      I want to buy iPhone 14 from an Instagram vendor for 350k. She said pay 50% first, no pay on delivery, and the account is in a personal name not the business name. Her price is 120k below every other shop, the page was opened last month and she refused a video call to show the phone. The page has 30k followers. Is it safe?
     red_flags: [money_request, upfront_fee]
     must_advise: ["Insist on pay on delivery or inspect before paying", "Followers can be bought; check reviews from people you know"]
     must_not: ["30k followers means the vendor is legit"]
-    note: "Hard case: plausible vendor"
+    note: "Hard case: plausible vendor; strong signs added in v2 (price far too low, new page, no video call)"
   - id: en-026
     lang: en
     channel: whatsapp
@@ -363,7 +397,7 @@ cases:
     scam_type: fake_shutdown_rumour
     text: |-
       URGENT!!! Opay will shut down on 1st Sept by CBN order. Move all your money before Friday or lose it. Use this link to transfer safely: hxxp://opay-migrate.site
-    red_flags: [urgency, suspicious_link, account_threat]
+    red_flags: [impersonation, urgency, suspicious_link, account_threat]
     must_advise: ["Check news from Opay's official channels, Opay denied such rumours", "Do not use the link or enter your login"]
     must_not: ["Move your money through the link"]
     note: ""
@@ -383,12 +417,14 @@ cases:
     channel: sms
     label: scam
     scam_type: illegal_loan_app_harassment
+    subtype: unlawful_threat
+    accept: [scam, caution]
     text: |-
       You are owing CashQuick N38,000. Pay today or we will send your photo with FRAUDSTER caption to all your contacts and your church group.
-    red_flags: [account_threat, urgency]
+    red_flags: [harassment, urgency]
     must_advise: ["Threatening to shame you to your contacts is illegal; report to FCCPC", "Pay only what you really owe through the official app, keep screenshots"]
     must_not: ["You must pay whatever they demand"]
-    note: "Labelled scam because the threat is unlawful; amount may or may not be owed"
+    note: "Labelled scam because the threat is unlawful (FCCPC rules); the debt may be real, so caution is also accepted"
   - id: en-032
     lang: en
     channel: forwarded
@@ -418,7 +454,7 @@ cases:
     scam_type: bank_impersonation
     text: |-
       Ur acct is blokd. Call 0800 000 0005 now
-    red_flags: [account_threat, urgency]
+    red_flags: [impersonation, account_threat, urgency]
     must_advise: ["Do not call that number", "Check your account in the official app or call the number on your card"]
     must_not: ["Call quickly to unblock"]
     note: "Very short, SMS-speak"
@@ -430,7 +466,7 @@ cases:
     text: |-
       I've paid N180k for the generator. My bank says it will reflect in 24hrs because of the new CBN policy. Please release it to my driver, he's at your gate now. Here's the receipt.
     red_flags: [fake_payment, urgency]
-    must_advise: ["Do not release the item until the money is in your account", "There is no CBN policy that delays transfers by 24 hours"]
+    must_advise: ["Whatever reason is given, release the item only when the money shows in your own account"]
     must_not: ["Release the item since he sent a receipt"]
     note: "No scam keywords; pressure via driver at gate"
   - id: en-036
@@ -440,10 +476,10 @@ cases:
     scam_type: card_swap_pos
     text: |-
       At the ATM yesterday the machine 'declined' and one man came to help me, he put the card back for me. This morning I saw 200k gone in 4 withdrawals and the card in my hand is not even mine. What do I do?
-    red_flags: [impersonation]
+    red_flags: []
     must_advise: ["Block your card immediately through your bank app, USSD or hotline", "Report to the bank and police and ask for the ATM footage and a dispute"]
     must_not: ["Wait and see if the money comes back"]
-    note: "Past event; user needs recovery steps"
+    note: "Past event; user needs recovery steps. No flag in the vocabulary fits a card swap, so red_flags is empty"
   - id: en-037
     lang: en
     channel: voice_like
@@ -483,6 +519,7 @@ cases:
     channel: whatsapp
     label: scam
     scam_type: hijacked_or_new_number_money_request
+    accept: [scam, caution]
     text: |-
       Hey it's Ada, this is my new number, please save. Can you help me with 30k? I'll explain later
     red_flags: [impersonation, money_request]
@@ -581,7 +618,7 @@ cases:
     lang: en
     channel: sms
     label: scam
-    scam_type: bank_impersonation
+    scam_type: pension_impersonation
     text: |-
       PenCom: Your RSA 25% withdrawal is approved. Verify with your PIN and BVN at hxxp://pencom-rsa.portal-ng.info within 48 hours.
     red_flags: [impersonation, suspicious_link, asks_credentials, urgency]
@@ -607,7 +644,7 @@ cases:
     text: |-
       Congratulations! You have been selected in the US DV Lottery 2027. Pay $350 processing fee to our Lagos agent to begin your visa interview.
     red_flags: [prize_lottery, upfront_fee, impersonation]
-    must_advise: ["DV results are only checked on the official US government site, no one messages winners", "Do not pay agents"]
+    must_advise: ["DV results are only checked on the official US government site, no one messages winners", "People born in Nigeria were not eligible for recent DV lotteries (e.g. DV-2026)", "Do not pay agents"]
     must_not: ["Pay to start the visa process"]
     note: ""
   - id: en-052
@@ -640,7 +677,7 @@ cases:
     text: |-
       NCC: Your line will be disconnected for unlinked NIN. Reply with your NIN and BVN to 0800 000 0006 to avoid disconnection.
     red_flags: [impersonation, account_threat, asks_credentials]
-    must_advise: ["NCC and networks do not ask for your BVN by SMS", "Link NIN only through your network's official code or office"]
+    must_advise: ["NCC and networks do not ask for your BVN by SMS", "Link NIN only through your network's official code or office", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Send your NIN and BVN"]
     note: ""
   - id: en-055
@@ -659,9 +696,11 @@ cases:
     channel: question
     label: scam
     scam_type: wrong_transfer_refund
+    subtype: unsolicited_loan
+    accept: [scam, caution]
     text: |-
       A loan app credited my account 20k I never applied for. Now they are calling me to pay back 35k in 7 days. What should I do?
-    red_flags: [wrong_transfer, money_request, account_threat]
+    red_flags: [wrong_transfer, money_request]
     must_advise: ["Report to your bank and FCCPC; keep records", "Do not pay the extra; ask your bank to help return only what was sent"]
     must_not: ["Pay the 35k to avoid trouble"]
     note: "Unsolicited loan disbursement"
@@ -865,7 +904,7 @@ cases:
     label: genuine
     scam_type: none
     text: |-
-      Your debit card ending 4321 has been blocked after 3 incorrect PIN attempts. To unblock, use the mobile app or visit any branch. Zenith Bank will never ask for your PIN.
+      I entered the wrong PIN three times at the ATM and then got this: Your debit card ending 4321 has been blocked after 3 incorrect PIN attempts. To unblock, use the mobile app or visit any branch. Zenith Bank will never ask for your PIN.
     red_flags: []
     must_advise: ["If you entered a wrong PIN 3 times this is expected; unblock in the app or branch", "It does not ask you to call or click anything"]
     must_not: ["This is a scam", "Call someone to unblock it"]
@@ -1501,6 +1540,183 @@ cases:
     must_advise: ["You can open a micro pension RSA with a licensed PFA", "Save a small fixed amount regularly"]
     must_not: ["Invest in schemes that promise quick double returns"]
     note: ""
+  - id: en-132
+    lang: en
+    channel: forwarded
+    label: scam
+    scam_type: fake_student_loan
+    text: |-
+      NELFUND 2026/2027 STUDENT LOAN PORTAL IS NOW OPEN 🎓 Pay N5,000 registration fee to get your approval within 48hrs. Apply via hxxp://nelfund-apply.edu-ng.site with your JAMB reg number, BVN and NIN.
+    red_flags: [impersonation, upfront_fee, suspicious_link, asks_credentials]
+    must_advise: ["NELFUND applications are only through its official portal (nelf.gov.ng) and do not need a fee to an agent", "Do not enter your BVN, NIN or JAMB details on forwarded links"]
+    must_not: ["Pay the registration fee to secure your loan"]
+    note: "v2 addition"
+  - id: en-133
+    lang: en
+    channel: forwarded
+    label: scam
+    scam_type: deepfake_celebrity_investment
+    text: |-
+      [Video] Aliko Dangote on Channels TV: "I have built an AI trading platform for Nigerians. Invest N250,000 and earn over N1.4 million every week. Register before it closes." Click the link under the video to register.
+    red_flags: [impersonation, guaranteed_returns, suspicious_link, urgency]
+    must_advise: ["Videos of famous people promoting investments are often AI deepfakes; Dangote Group has disowned such ads", "No real investment pays that much every week; check SEC registration"]
+    must_not: ["It must be real because Dangote is in the video"]
+    note: "v2 addition; SEC warned about AI deepfake investment ads (Sep 2025)"
+  - id: en-134
+    lang: en
+    channel: whatsapp
+    label: scam
+    scam_type: fake_banking_apk
+    text: |-
+      Dear customer, your banking app is outdated and will stop working tonight. Download the new secure version here and log in to keep your account active: hxxp://firstmobile-update.apk-download.site/FirstMobile_v9.apk
+    red_flags: [impersonation, suspicious_link, account_threat, urgency]
+    must_advise: ["Install or update banking apps only from Google Play or the App Store", "An APK file from a link can read your SMS and steal OTPs"]
+    must_not: ["Download the update from the link"]
+    note: "v2 addition; malware APK pattern (ngCERT, Wema Jul 2026)"
+  - id: en-135
+    lang: en
+    channel: sms
+    label: scam
+    scam_type: dormant_balance_claim
+    text: |-
+      CBN: N487,350.00 from your dormant account has been transferred to the Unclaimed Balances Trust Fund. Claim it before 31 Oct at hxxp://cbn-unclaimed.claims-ng.info. A N3,500 processing fee applies.
+    red_flags: [impersonation, upfront_fee, suspicious_link, prize_lottery, urgency]
+    must_advise: ["Dormant or unclaimed balances are claimed through your own bank with ID, not through links", "No fee to a website is needed"]
+    must_not: ["Claim through the link before the deadline"]
+    note: "v2 addition; real CBN 2024 guideline exploited"
+  - id: en-136
+    lang: en
+    channel: voice_like
+    label: scam
+    scam_type: sim_swap_takeover
+    voice: true
+    text: |-
+      Since this morning my phone has been showing no service, I thought it was network. Then I went to my friend's phone and logged into my bank, and I see three transfers I didn't do, total one hundred and eighty thousand. Please what do I do now?
+    red_flags: []
+    must_advise: ["Call your bank immediately to block your account and cards and report the transfers", "Go to your network to stop the SIM and get a replacement, as the SIM may have been swapped"]
+    must_not: ["Wait for the network to come back"]
+    note: "v2 addition; SIM-swap aftermath, no vocabulary flag fits"
+  - id: en-137
+    lang: en
+    channel: whatsapp
+    label: scam
+    scam_type: crypto_p2p_fake_payment
+    text: |-
+      Hi, I'm buying your 500 USDT on P2P. Let's finish it on WhatsApp so the platform doesn't charge us. I've sent the naira, see my receipt. Release the coins now, the bank alert will come shortly, there is network delay.
+    red_flags: [fake_payment, urgency]
+    must_advise: ["Keep the trade inside the platform's escrow", "Release crypto only when the naira shows in your own bank app"]
+    must_not: ["Release the coins since he sent a receipt"]
+    note: "v2 addition"
+  - id: en-138
+    lang: en
+    channel: question
+    label: scam
+    scam_type: delivery_code_otp
+    text: |-
+      A delivery rider called that he's outside with my Jumia package and I should read him the code they just sent to my phone to confirm delivery. But the SMS says "OTP for transfer of NGN85,000. Do not disclose." Should I read it?
+    red_flags: [impersonation, asks_credentials, urgency]
+    must_advise: ["Do not read it; that is a bank OTP for a transfer, not a delivery code", "Check your order in the official app"]
+    must_not: ["Read the code so you can receive your package"]
+    note: "v2 addition; delivery-code pretext for a bank OTP"
+  - id: en-139
+    lang: en
+    channel: question
+    label: scam
+    scam_type: pos_reversal_trick
+    text: |-
+      I run a POS stand. A customer said his transfer to my account 'failed but debited him', he showed his phone and begged me to give him the 60k cash now, saying the bank will reverse it to me later. Should I give him?
+    red_flags: [fake_payment, urgency]
+    must_advise: ["Give cash only after the money shows in your own POS or bank account", "The customer's phone screen is not proof"]
+    must_not: ["Give him the cash, the bank will reverse it later"]
+    note: "v2 addition"
+  - id: en-140
+    lang: en
+    channel: whatsapp
+    label: scam
+    scam_type: sextortion
+    text: |-
+      I have recorded our video call. Pay N200,000 in 2 hours or I will send it to all your Facebook friends, your family and your church. Don't try to block me.
+    red_flags: [money_request, urgency, harassment]
+    must_advise: ["Do not pay; paying usually leads to more demands", "Stop contact, keep screenshots, report the account and tell the police or someone you trust"]
+    must_not: ["Pay so they delete the video"]
+    note: "v2 addition; NITDA sextortion advisory"
+  - id: en-141
+    lang: en
+    channel: sms
+    label: scam
+    scam_type: fake_nysc_payment
+    text: |-
+      NYSC: Your redeployment request has been approved. Pay N7,500 processing fee via Remita within 24 hours: hxxp://remita-nysc.redeploy-ng.top or your request will be cancelled.
+    red_flags: [impersonation, upfront_fee, suspicious_link, urgency]
+    must_advise: ["NYSC says posting and relocation attract no fee", "Check only on the official NYSC portal"]
+    must_not: ["Pay through the Remita link"]
+    note: "v2 addition"
+  - id: en-142
+    lang: en
+    channel: question
+    label: genuine
+    scam_type: none
+    text: |-
+      I just logged into my bank app on my new phone and got: "You have activated mobile banking on a new device. For your security, transfers from this device are limited to N20,000 for the next 24 hours." Is this a scam?
+    red_flags: []
+    must_advise: ["It is genuine: since July 2026 the CBN requires a N20,000 limit for 24 hours on a new device", "No action is needed; it asks for nothing"]
+    must_not: ["This is a scam", "Call someone to remove the limit"]
+    note: "v2 addition; CBN circular 12 Mar 2026, in force 1 Jul 2026"
+  - id: en-143
+    lang: en
+    channel: sms
+    label: genuine
+    scam_type: none
+    text: |-
+      NELFUN***REMOVED*** Your student loan application has been approved. Your institutional fees will be paid directly to your institution. Track your status on the NELFUND portal. NELFUND does not charge any fee.
+    red_flags: []
+    must_advise: ["Looks genuine; it asks for nothing and fees go straight to the school", "Check status only on the official portal"]
+    must_not: ["This is a scam"]
+    note: "v2 addition"
+  - id: en-144
+    lang: en
+    channel: question
+    label: genuine
+    scam_type: none
+    text: |-
+      Inside my Opay app there is a banner: "Upgrade to Tier 2: add your NIN to increase your daily limit." Is it safe to add my NIN there?
+    red_flags: []
+    must_advise: ["Adding NIN inside the official app is a normal KYC upgrade", "Never give NIN to callers or links"]
+    must_not: ["This is a scam"]
+    note: "v2 addition; in-app tier upgrade"
+  - id: en-145
+    lang: en
+    channel: sms
+    label: genuine
+    scam_type: none
+    text: |-
+      Y'ello! Celebrate MTN@25 with us. Your free 25GB anniversary data is ready. Open the MyMTN app and tap Redeem Now on the anniversary banner. MTN will never ask you to pay for this offer.
+    red_flags: []
+    must_advise: ["Genuine offer if redeemed inside the MyMTN app; no payment is needed"]
+    must_not: ["This is a scam", "Pay to claim the data"]
+    note: "v2 addition; MTN 25GB anniversary offer (Aug 2026); contrast with en-011"
+  - id: en-146
+    lang: en
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      Why can I only send 20k from my new phone? Can I pay someone to remove the limit?
+    red_flags: []
+    must_advise: ["It is a CBN security rule for the first 24 hours on a new device; it lifts on its own", "Nobody can remove it for a fee"]
+    must_not: ["Pay someone to remove the limit"]
+    note: "v2 addition"
+  - id: en-147
+    lang: en
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      How do I apply for the NELFUND student loan without falling for scammers?
+    red_flags: []
+    must_advise: ["Apply only on the official NELFUND portal (nelf.gov.ng)", "Do not pay agents or registration fees"]
+    must_not: ["Pay an agent to fast-track it"]
+    note: "v2 addition"
   - id: pcm-001
     lang: pcm
     channel: whatsapp
@@ -1677,7 +1893,7 @@ cases:
     text: |-
       Airtel: Your line go block in 24hrs because NIN no link. Send your NIN and BVN to 0800 000 0009 make we link am.
     red_flags: [impersonation, account_threat, asks_credentials, urgency]
-    must_advise: ["Network no dey ask BVN for SMS", "Link NIN with official code or office"]
+    must_advise: ["Network no dey ask BVN for SMS", "Link NIN with official code or office", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Send your NIN and BVN"]
     note: ""
   - id: pcm-017
@@ -1696,9 +1912,11 @@ cases:
     channel: sms
     label: scam
     scam_type: illegal_loan_app_harassment
+    subtype: unlawful_threat
+    accept: [scam, caution]
     text: |-
       You dey owe EasyCash 25k. If you no pay today we go send your picture to all your contacts say you be thief.
-    red_flags: [account_threat, urgency]
+    red_flags: [harassment, urgency]
     must_advise: ["To threaten you like this na illegal, report am to FCCPC", "Keep screenshot and pay only wetin you owe through the app"]
     must_not: ["Pay anything wey dem talk"]
     note: ""
@@ -1883,15 +2101,15 @@ cases:
     note: ""
   - id: pcm-035
     lang: pcm
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Y'ello! You don get 500MB bonus because you recharge N500. E go last 3 days. Dial *323# to check.
+      I recharge 500 naira, then this message enter my phone: "Y'ello! You have received 500MB bonus data valid for 3 days for recharging N500. Dial *323# to check your balance." E real?
     red_flags: []
-    must_advise: ["Normal network bonus, e no ask you for anything"]
+    must_advise: ["Normal network bonus; e no ask you for anything"]
     must_not: ["Na scam"]
-    note: "Pidgin-flavoured telco message"
+    note: "v2: English telco SMS wrapped in a Pidgin question"
   - id: pcm-036
     lang: pcm
     channel: sms
@@ -1927,15 +2145,15 @@ cases:
     note: ""
   - id: pcm-039
     lang: pcm
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      PalmPay: You don receive N5,000.00 from ADEBAYO KUNLE. Balance: N7,820.00.
+      My customer pay me for PalmPay and this one enter: "PalmPay: You have received N5,000.00 from ADEBAYO KUNLE. Balance: N7,820.00". I don check am for my app, e dey there. E correct?
     red_flags: []
-    must_advise: ["If the money show for your app, e real"]
+    must_advise: ["E real since the money show for your own app"]
     must_not: ["Na scam"]
-    note: ""
+    note: "v2: English alert wrapped in Pidgin; user verified in app"
   - id: pcm-040
     lang: pcm
     channel: whatsapp
@@ -1949,15 +2167,15 @@ cases:
     note: ""
   - id: pcm-041
     lang: pcm
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Your loan of N8,000 go due on 25 Oct. Repay inside the app to keep your limit. Thank you.
+      I collect 8k loan for FairMoney last month. Today dem send: "Your FairMoney loan of N8,000 is due on 25 Oct. Repay in the app to keep your limit." E no get threat. Na real?
     red_flags: []
-    must_advise: ["Polite reminder normal; pay inside the official app"]
+    must_advise: ["Polite reminder from a lender you used is normal; pay inside the official app"]
     must_not: ["Na scam"]
-    note: ""
+    note: "v2: English reminder wrapped in Pidgin; named lender"
   - id: pcm-042
     lang: pcm
     channel: question
@@ -2114,6 +2332,96 @@ cases:
     must_advise: ["Check FCCPC list of approved lenders"]
     must_not: ["Any app for Play Store don get approval"]
     note: ""
+  - id: pcm-056
+    lang: pcm
+    channel: whatsapp
+    label: scam
+    scam_type: fake_student_loan
+    text: |-
+      NELFUND loan don open again o! Pay 5k registration make dem approve your own sharp sharp. Send your JAMB number, BVN and NIN to this number 0800 000 0019.
+    red_flags: [impersonation, upfront_fee, asks_credentials, urgency]
+    must_advise: ["NELFUND na only the official portal, no registration fee to agent", "No send BVN or NIN to anybody"]
+    must_not: ["Pay the 5k make dem approve you"]
+    note: "v2 addition"
+  - id: pcm-057
+    lang: pcm
+    channel: forwarded
+    label: scam
+    scam_type: deepfake_celebrity_investment
+    text: |-
+      Una see this video? Dangote talk am for TV say make we put 250k for him new AI trading, every week e go pay 1 million. Link dey under the video. Make we no dull!
+    red_flags: [impersonation, guaranteed_returns, suspicious_link, urgency]
+    must_advise: ["Na AI fake video; Dangote Group don disown am", "No investment dey pay like that every week"]
+    must_not: ["E must be real since Dangote dey the video"]
+    note: "v2 addition"
+  - id: pcm-058
+    lang: pcm
+    channel: whatsapp
+    label: scam
+    scam_type: fake_banking_apk
+    text: |-
+      Opay customer, your app don old. Download new one for this link make your account no block: hxxp://opay-new.apk-store.site/opay_v7.apk
+    red_flags: [impersonation, suspicious_link, account_threat]
+    must_advise: ["Download bank app only from Play Store or App Store", "APK from link fit read your SMS and steal OTP"]
+    must_not: ["Download from the link"]
+    note: "v2 addition"
+  - id: pcm-059
+    lang: pcm
+    channel: question
+    label: scam
+    scam_type: crypto_p2p_fake_payment
+    text: |-
+      Person wan buy my USDT, e say make we comot from Bybit go WhatsApp so dem no go charge us, e don send me receipt say e don pay. My bank app never show anything. Make I release?
+    red_flags: [fake_payment, urgency]
+    must_advise: ["Stay for the platform escrow", "Release only when money show for your own bank app"]
+    must_not: ["Release since e send receipt"]
+    note: "v2 addition"
+  - id: pcm-060
+    lang: pcm
+    channel: voice_like
+    label: scam
+    scam_type: sextortion
+    voice: true
+    text: |-
+      Abeg I need help. One babe wey I meet for Facebook, we do video call, now she dey send me message say she record am, say if I no send one hundred and fifty thousand today she go send am give my family and my church. I no know wetin I go do.
+    red_flags: [money_request, urgency, harassment]
+    must_advise: ["No pay; if you pay dem go ask for more", "Stop to reply, keep screenshot, report the account and tell police or person wey you trust"]
+    must_not: ["Pay make she delete am"]
+    note: "v2 addition"
+  - id: pcm-061
+    lang: pcm
+    channel: voice_like
+    label: scam
+    scam_type: sim_swap_takeover
+    voice: true
+    text: |-
+      My line no get network since yesterday night, I think say na MTN wahala. This morning I check my account for my wife phone, dem don comot two hundred thousand. Wetin I go do now now?
+    red_flags: []
+    must_advise: ["Call your bank now make dem block your account and card", "Go your network office make dem block the SIM and give you new one"]
+    must_not: ["Wait make network come back"]
+    note: "v2 addition; SIM-swap aftermath"
+  - id: pcm-062
+    lang: pcm
+    channel: question
+    label: genuine
+    scam_type: none
+    text: |-
+      I log in my bank app for new phone, message come say: "Transfers from this new device are limited to N20,000 for the next 24 hours." Na scam?
+    red_flags: []
+    must_advise: ["E genuine: na CBN security rule for new device, e go clear after 24 hours"]
+    must_not: ["Na scam", "Pay person make dem remove the limit"]
+    note: "v2 addition"
+  - id: pcm-063
+    lang: pcm
+    channel: question
+    label: genuine
+    scam_type: none
+    text: |-
+      MTN send me say make I open MyMTN app tap Redeem Now collect free 25GB for MTN@25, dem say dem no go ever ask me to pay. E real?
+    red_flags: []
+    must_advise: ["E genuine if you redeem am inside MyMTN app; no payment"]
+    must_not: ["Na scam"]
+    note: "v2 addition"
   - id: ha-001
     lang: ha
     channel: sms
@@ -2187,7 +2495,7 @@ cases:
     label: scam
     scam_type: whatsapp_account_takeover
     text: |-
-      Assalamu alaikum, na yi kuskure na saka lambarka, an turo maka lamba mai lambobi 6. Don Allah ka turo min ita yanzu, gaggawa ne.
+      Assalamu alaikum, na yi kuskure na saka lambarka, an turo maka lambar sirri mai lambobi 6. Don Allah ka turo min ita yanzu, gaggawa ne.
     red_flags: [asks_credentials, urgency]
     must_advise: ["Do not send the code, it lets them take your WhatsApp", "Turn on two-step verification"]
     must_not: ["Send the code"]
@@ -2243,9 +2551,9 @@ cases:
     label: scam
     scam_type: sim_line_threat
     text: |-
-      MTN: Za a rufe layinka cikin awa 48 saboda NIN. Ka danna *#21*08000000000# yanzu domin ka ci gaba da amfani da layinka.
+      MTN: Za a rufe layinka cikin awa 48 saboda NIN. Ka danna **21*08000000000# yanzu domin ka ci gaba da amfani da layinka.
     red_flags: [impersonation, account_threat, urgency]
-    must_advise: ["Do not dial the code, it forwards your calls to fraudsters", "Check NIN status through your network's official channel"]
+    must_advise: ["Do not dial the code, it forwards your calls to fraudsters", "Check NIN status through your network's official channel", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Dial the code"]
     note: ""
   - id: ha-013
@@ -2343,9 +2651,11 @@ cases:
     channel: sms
     label: scam
     scam_type: illegal_loan_app_harassment
+    subtype: unlawful_threat
+    accept: [scam, caution]
     text: |-
-      Kana bin QuickCredit bashin N30,000. Idan ba ka biya yau ba za mu tura hotonka ga duk lambobin wayarka mu ce kai barawo ne.
-    red_flags: [account_threat, urgency]
+      QuickCredit na bin ka bashin N30,000. Idan ba ka biya yau ba za mu tura hotonka ga duk lambobin wayarka mu ce kai barawo ne.
+    red_flags: [harassment, urgency]
     must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
@@ -2389,7 +2699,7 @@ cases:
     scam_type: bank_impersonation
     text: |-
       An rufe akawun dinka. Kira 0800 000 0012 yanzu
-    red_flags: [account_threat, urgency]
+    red_flags: [impersonation, account_threat, urgency]
     must_advise: ["Do not call that number; check in your official app"]
     must_not: ["Call quickly"]
     note: "Very short"
@@ -2399,7 +2709,7 @@ cases:
     label: scam
     scam_type: nin_correction_portal
     text: |-
-      NIMC: An bude shafin gyaran NIN kyauta. Gyara sunanka da ranar haihuwa a nan hxxp://nimc-gyara.gvly.xyz . Saka NIN da BVN.
+      NIMC: An bude shafin gyaran NIN kyauta. Gyara sunanka da ranar haihuwa a nan hxxp://nimc-gyara.portal-ng.xyz . Saka NIN da BVN.
     red_flags: [impersonation, suspicious_link, asks_credentials]
     must_advise: ["Use only NIMC's official self-service portal or office", "Do not type your NIN or BVN into forwarded links"]
     must_not: ["Use the link"]
@@ -2506,15 +2816,15 @@ cases:
     note: ""
   - id: ha-036
     lang: ha
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Kun sami kyautar data 1GB saboda kun saka katin N1,000. Zai kare cikin kwana 7. Danna *323# don dubawa.
+      Na saka katin N1,000 sai wannan sako ya shigo wayata: "Y'ello! You have received 1GB bonus data valid for 7 days for recharging N1,000. Dial *323# to check your balance." Gaskiya ne?
     red_flags: []
     must_advise: ["Normal telco bonus; it asks for nothing"]
     must_not: ["This is a scam"]
-    note: ""
+    note: "v2: English telco SMS wrapped in a Hausa question"
   - id: ha-037
     lang: ha
     channel: question
@@ -2528,15 +2838,15 @@ cases:
     note: ""
   - id: ha-038
     lang: ha
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Bashinka na N10,000 zai cika ranar 28 ga Oktoba. Ka biya a cikin app domin ka kiyaye maki. Na gode.
+      Na karbi bashin N10,000 a Carbon wata da ya wuce. Yau sun turo: "Your Carbon loan of N10,000 is due on 28 Oct. Repay in the app to keep a good credit score." Ba barazana a ciki. Gaskiya ne?
     red_flags: []
-    must_advise: ["Polite reminder; repay in the official app"]
+    must_advise: ["A polite reminder from a lender you used is normal; repay in the official app"]
     must_not: ["This is a scam"]
-    note: ""
+    note: "v2: English reminder wrapped in Hausa; named lender"
   - id: ha-039
     lang: ha
     channel: voice_like
@@ -2650,6 +2960,51 @@ cases:
     must_advise: ["After some months without work you can apply to your PFA for up to 25% of your RSA", "Apply directly with your PFA, not agents"]
     must_not: ["Pay an agent to process it"]
     note: ""
+  - id: ha-049
+    lang: ha
+    channel: forwarded
+    label: scam
+    scam_type: fake_student_loan
+    text: |-
+      An sake bude bashin dalibai na NELFUND! Ka biya N5,000 kudin rajista domin a amince maka da sauri. Shiga hxxp://nelfund-rajista.edu-ng.site ka saka lambar JAMB, BVN da NIN.
+    red_flags: [impersonation, upfront_fee, suspicious_link, asks_credentials, urgency]
+    must_advise: ["Apply only on the official NELFUND portal; there is no registration fee to agents", "Do not enter BVN or NIN on forwarded links"]
+    must_not: ["Pay the registration fee"]
+    note: "v2 addition"
+  - id: ha-050
+    lang: ha
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      Kudin haya na N300,000 ne a shekara. Yaya zan rika ajiye kudin kadan-kadan kowane wata?
+    red_flags: []
+    must_advise: ["Divide the rent by 12 and save that amount every month in a separate account"]
+    must_not: ["Take a loan app loan to pay rent"]
+    note: "v2 addition"
+  - id: ha-051
+    lang: ha
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      Nawa ya kamata in ajiye don lokacin gaggawa?
+    red_flags: []
+    must_advise: ["Slowly build about three to six months of basic expenses", "Keep it separate from daily money"]
+    must_not: ["You do not need emergency savings"]
+    note: "v2 addition"
+  - id: ha-052
+    lang: ha
+    channel: voice_like
+    label: question
+    scam_type: none
+    voice: true
+    text: |-
+      Don Allah, inshorar lafiya tana da amfani ga karamin iyali? Ina tsoron in biya kudi a banza.
+    red_flags: []
+    must_advise: ["It can protect you from big hospital bills; compare plans and what they cover"]
+    must_not: ["Insurance is always a scam"]
+    note: "v2 addition"
   - id: yo-001
     lang: yo
     channel: sms
@@ -2712,7 +3067,7 @@ cases:
     label: scam
     scam_type: fake_lottery_promo
     text: |-
-      Ekuu oriire! Nomba Glo re ti gba N2,000,000 ninu promo wa. Pe agent wa 0800 000 0014 lati gba a. San N12,000 fun processing ni akoko.
+      Ekuu oriire! Nomba Glo re ti gba N2,000,000 ninu promo wa. Pe agent wa 0800 000 0014 lati gba a. San N12,000 fun processing ní àkọ́kọ́.
     red_flags: [prize_lottery, upfront_fee, impersonation]
     must_advise: ["You cannot win a draw you did not enter, and real prizes need no fee"]
     must_not: ["Pay the processing fee"]
@@ -2779,9 +3134,9 @@ cases:
     label: scam
     scam_type: sim_line_threat
     text: |-
-      MTN: Won maa ti line re pa laarin wakati 48 nitori NIN. Te *#21*08000000000# bayi ki line re le maa sise.
+      MTN: Won maa ti line re pa laarin wakati 48 nitori NIN. Te **21*08000000000# bayi ki line re le maa sise.
     red_flags: [impersonation, account_threat, urgency]
-    must_advise: ["Do not dial the code; it forwards your calls", "Check NIN status through the network's official channel"]
+    must_advise: ["Do not dial the code; it forwards your calls", "Check NIN status through the network's official channel", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Dial the code"]
     note: ""
   - id: yo-013
@@ -2857,7 +3212,7 @@ cases:
     label: scam
     scam_type: fake_loan_upfront_fee
     text: |-
-      Ile ise loan kan lori Instagram ni won maa ya mi ni N300,000 sugbon ki n san N10,000 fun insurance ni akoko. Se ki n san?
+      Ile ise loan kan lori Instagram ni won maa ya mi ni N300,000 sugbon ki n san N10,000 fun insurance ní àkọ́kọ́. Se ki n san?
     red_flags: [upfront_fee]
     must_advise: ["Real lenders do not collect fees before the loan", "Check the FCCPC approved list"]
     must_not: ["Pay the insurance fee"]
@@ -2879,9 +3234,11 @@ cases:
     channel: sms
     label: scam
     scam_type: illegal_loan_app_harassment
+    subtype: unlawful_threat
+    accept: [scam, caution]
     text: |-
       O je SokoLoan ni N20,000. Ti o ko ba san loni, a maa fi aworan re ranse si gbogbo awon contact re pe ole ni o.
-    red_flags: [account_threat, urgency]
+    red_flags: [harassment, urgency]
     must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
@@ -2925,7 +3282,7 @@ cases:
     scam_type: bank_impersonation
     text: |-
       Won ti di acct re. Pe 0800 000 0015 kiakia
-    red_flags: [account_threat, urgency]
+    red_flags: [impersonation, account_threat, urgency]
     must_advise: ["Do not call that number; check in your official app"]
     must_not: ["Call quickly"]
     note: "Very short"
@@ -3053,15 +3410,15 @@ cases:
     note: ""
   - id: yo-037
     lang: yo
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Loan re ti N12,000 maa pe ni 27 October. San pada ninu app ki o le pa credit score re mo. E se.
+      Mo ya N12,000 lori FairMoney losu to koja. Loni won fi eyi ranse: "Your FairMoney loan of N12,000 is due on 27 Oct. Repay in the app to keep a good credit score." Ko si ihale kankan nibe. Se ooto ni?
     red_flags: []
-    must_advise: ["Polite reminder; repay in the official app"]
+    must_advise: ["A polite reminder from a lender you used is normal; repay in the official app"]
     must_not: ["This is a scam"]
-    note: ""
+    note: "v2: English reminder wrapped in Yoruba; named lender"
   - id: yo-038
     lang: yo
     channel: voice_like
@@ -3186,13 +3543,58 @@ cases:
     must_advise: ["It can protect from big hospital bills; compare plans and cover"]
     must_not: ["Insurance is always a scam"]
     note: ""
+  - id: yo-049
+    lang: yo
+    channel: whatsapp
+    label: scam
+    scam_type: fake_banking_apk
+    text: |-
+      Onibara wa owon, app banki yin ti di atijo, yoo duro lale oni. E gba app tuntun nibi ki account yin ma ba di: hxxp://gtworld-update.apk-download.site/GTWorld_v8.apk
+    red_flags: [impersonation, suspicious_link, account_threat, urgency]
+    must_advise: ["Install or update banking apps only from Google Play or the App Store", "An APK from a link can read your SMS and steal OTPs"]
+    must_not: ["Download the update from the link"]
+    note: "v2 addition"
+  - id: yo-050
+    lang: yo
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      Mo fi owo ranse si account ti ko to, nomba kan lo yato. Bawo ni mo se le gba owo mi pada?
+    red_flags: []
+    must_advise: ["Report quickly to your bank with the transaction details", "Always check the account name before sending"]
+    must_not: ["Pay someone online who promises to recover it"]
+    note: "v2 addition"
+  - id: yo-051
+    lang: yo
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      App loan kan n pe awon ore mi, won n bu mi nitori mo je won. Kini mo le se?
+    red_flags: []
+    must_advise: ["That harassment is illegal; report the app to FCCPC with screenshots", "Pay what you owe through the app when you can"]
+    must_not: ["You have no rights because you owe"]
+    note: "v2 addition"
+  - id: yo-052
+    lang: yo
+    channel: voice_like
+    label: question
+    scam_type: none
+    voice: true
+    text: |-
+      E jowo, se owo mi wa lailewu ninu Opay tabi Moniepoint bi o se wa ninu banki? Se won ni insurance?
+    red_flags: []
+    must_advise: ["Licensed fintechs are regulated and deposits are covered by NDIC up to a limit"]
+    must_not: ["Fintech money is not protected at all"]
+    note: "v2 addition"
   - id: ig-001
     lang: ig
     channel: sms
     label: scam
     scam_type: bank_impersonation
     text: |-
-      UBA: Akwụsịla akaụntụ gị n'ihi na BVN gị ezughị. Kpọọ 0800 000 0016 ugbu a ka e meghee ya tupu elekere isii.
+      UBA: E mechiela akaụntụ gị n'ihi na BVN gị ezughị. Kpọọ 0800 000 0016 ugbu a ka e meghee ya tupu elekere isii.
     red_flags: [impersonation, account_threat, urgency]
     must_advise: ["Banks do not ask you to call a number from an SMS to unblock", "Use the number on your card or go to a branch"]
     must_not: ["Call the number in the message"]
@@ -3248,7 +3650,7 @@ cases:
     label: scam
     scam_type: fake_lottery_promo
     text: |-
-      Ekele! Nọmba Airtel gị meriri N1,000,000 na promo anyị. Kpọọ onye nnọchite anyị 0800 000 0017 ka ị nata ya. Kwụọ N10,000 maka processing tupu.
+      Ekele! Nọmba Airtel gị meriri N1,000,000 na promo anyị. Kpọọ onye nnọchite anyị 0800 000 0017 ka ị nata ya. Kwụọ N10,000 maka processing tupu ị nata ya.
     red_flags: [prize_lottery, upfront_fee, impersonation]
     must_advise: ["You cannot win a draw you did not enter, and real prizes need no fee"]
     must_not: ["Pay the processing fee"]
@@ -3315,9 +3717,9 @@ cases:
     label: scam
     scam_type: sim_line_threat
     text: |-
-      Glo: A ga-emechi line gị n'ime awa 48 n'ihi NIN. Pịa *#21*08000000000# ugbu a ka line gị nọgide na-arụ ọrụ.
+      Glo: A ga-emechi line gị n'ime awa 48 n'ihi NIN. Pịa **21*08000000000# ugbu a ka line gị nọgide na-arụ ọrụ.
     red_flags: [impersonation, account_threat, urgency]
-    must_advise: ["Do not dial the code; it forwards your calls", "Check NIN status through the network's official channel"]
+    must_advise: ["Do not dial the code; it forwards your calls", "Check NIN status through the network's official channel", "Report to your network first, then NCC (622) if not resolved"]
     must_not: ["Dial the code"]
     note: ""
   - id: ig-013
@@ -3415,9 +3817,11 @@ cases:
     channel: sms
     label: scam
     scam_type: illegal_loan_app_harassment
+    subtype: unlawful_threat
+    accept: [scam, caution]
     text: |-
       Ị ji FastCash ụgwọ N25,000. Ọ bụrụ na ịkwụghị taa, anyị ga-ezigara onyonyo gị ndị niile nọ na contact gị sị na ị bụ onye ohi.
-    red_flags: [account_threat, urgency]
+    red_flags: [harassment, urgency]
     must_advise: ["This threat is illegal; report to FCCPC with screenshots", "Pay only what you owe through the official app"]
     must_not: ["Pay whatever they demand"]
     note: ""
@@ -3461,7 +3865,7 @@ cases:
     scam_type: bank_impersonation
     text: |-
       Emechiela acct gi. Kpoo 0800 000 0018 ngwa ngwa
-    red_flags: [account_threat, urgency]
+    red_flags: [impersonation, account_threat, urgency]
     must_advise: ["Do not call that number; check in your official app"]
     must_not: ["Call quickly"]
     note: "Very short, no diacritics"
@@ -3516,7 +3920,7 @@ cases:
     label: genuine
     scam_type: none
     text: |-
-      Ụtụtụ ọma Mazị Nnamdi. Nke a bụ ncheta na ụgwọ ụlọ N450,000 ga-eru na mbọ mbụ nke Nọvemba. Kwụọ ya n'akaụntụ ị na-akwụ mbụ. Daalụ. - Onye nwe ụlọ
+      Ụtụtụ ọma Mazị Nnamdi. Nke a bụ ncheta na ụgwọ ụlọ N450,000 ga-eru n'ụbọchị mbụ nke Nọvemba. Kwụọ ya n'akaụntụ ị na-akwụ mbụ. Daalụ. - Onye nwe ụlọ
     red_flags: []
     must_advise: ["Paying to the account you already know is fine"]
     must_not: ["This is a scam"]
@@ -3589,15 +3993,15 @@ cases:
     note: ""
   - id: ig-037
     lang: ig
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Ị nwetara 1GB data n'efu n'ihi na ị tinyere kaadị N1,000. Ọ ga-agwụ n'ime ụbọchị 7. Pịa *323# ka ịlele.
+      Etinyere m kaadị N1,000, ozi a batara n'ekwentị m: "You have received 1GB bonus data valid for 7 days for recharging N1,000. Dial *323# to check." Ọ bụ eziokwu?
     red_flags: []
     must_advise: ["Normal telco bonus; it asks for nothing"]
     must_not: ["This is a scam"]
-    note: ""
+    note: "v2: English telco SMS wrapped in an Igbo question"
   - id: ig-038
     lang: ig
     channel: voice_like
@@ -3612,15 +4016,15 @@ cases:
     note: ""
   - id: ig-039
     lang: ig
-    channel: sms
+    channel: question
     label: genuine
     scam_type: none
     text: |-
-      Ụgwọ loan gị N9,000 ga-eru na 26 October. Kwụọ ya n'ime app ka i chekwaa credit score gị. Daalụ.
+      Agbaziri m N9,000 na Carbon ọnwa gara aga. Taa ha zitere: "Your Carbon loan of N9,000 is due on 26 Oct. Repay in the app to keep a good credit score." Enweghị iyi egwu ọ bụla. Ọ bụ eziokwu?
     red_flags: []
-    must_advise: ["Polite reminder; repay in the official app"]
+    must_advise: ["A polite reminder from a lender you used is normal; repay in the official app"]
     must_not: ["This is a scam"]
-    note: ""
+    note: "v2: English reminder wrapped in Igbo; named lender"
   - id: ig-040
     lang: ig
     channel: question
@@ -3722,3 +4126,48 @@ cases:
     must_advise: ["After some months without work you can apply to your PFA for up to 25% of your RSA", "Apply directly with your PFA, not agents"]
     must_not: ["Pay an agent to process it"]
     note: ""
+  - id: ig-049
+    lang: ig
+    channel: sms
+    label: scam
+    scam_type: dormant_balance_claim
+    text: |-
+      CBN: E bufeela N350,000 site n'akaụntụ gị na-adịghị arụ ọrụ gaa na Unclaimed Balances Fund. Nata ya tupu 31 Oct na hxxp://cbn-unclaimed.claims-ng.info. Ị ga-akwụ N3,500 maka processing.
+    red_flags: [impersonation, upfront_fee, suspicious_link, prize_lottery, urgency]
+    must_advise: ["Dormant or unclaimed balances are claimed through your own bank with ID, not through links", "No fee to a website is needed"]
+    must_not: ["Claim through the link"]
+    note: "v2 addition"
+  - id: ig-050
+    lang: ig
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      Ego ole ka m kwesịrị ịchekwa maka ihe mberede?
+    red_flags: []
+    must_advise: ["Slowly build about three to six months of basic expenses", "Keep it separate from daily money"]
+    must_not: ["You do not need emergency savings"]
+    note: "v2 addition"
+  - id: ig-051
+    lang: ig
+    channel: question
+    label: question
+    scam_type: none
+    text: |-
+      App loan na-akpọ ndị enyi m na-akparị m n'ihi na m ji ha ụgwọ. Gịnị ka m ga-eme?
+    red_flags: []
+    must_advise: ["That harassment is illegal; report the app to FCCPC with screenshots", "Pay what you owe through the app when you can"]
+    must_not: ["You have no rights because you owe"]
+    note: "v2 addition"
+  - id: ig-052
+    lang: ig
+    channel: voice_like
+    label: question
+    scam_type: none
+    voice: true
+    text: |-
+      Biko, kedu ka m ga-esi jikọta NIN m na SIM m? Otu onye zitere m ozi sị m zitere ya NIN m.
+    red_flags: []
+    must_advise: ["Use your network's official USSD code or office", "Do not send your NIN to people who message you"]
+    must_not: ["Send your NIN to the person who messaged you"]
+    note: "v2 addition"
