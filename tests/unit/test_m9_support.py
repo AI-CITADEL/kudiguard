@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -268,8 +269,13 @@ async def test_build_services_with_embeddings_and_speech(
 
     created: dict[str, object] = {}
 
-    class FakeEmbedder:
+    from fakes import BagOfWordsEmbedder
+
+    class FakeEmbedder(BagOfWordsEmbedder):
+        DIM = 384  # the shipped guard classifier's embedding size
+
         def __init__(self, cache_dir: Path) -> None:
+            super().__init__()
             created["embedder"] = cache_dir
 
     class FakeASR:
@@ -294,6 +300,7 @@ async def test_build_services_with_embeddings_and_speech(
     try:
         assert services.engine.has_speech and "embedder" in created and "ha" in created["asr_models"]  # type: ignore[operator]
         assert services.engine.grounding is not None  # on by default, reusing the search model
+        assert services.engine.classifier is not None  # shadow by default, same model
         assert services.engine.grounding.threshold == services.settings.grounding_threshold
         assert services.engine.grounding.budget_s == services.settings.grounding_budget_ms / 1000
     finally:
@@ -449,13 +456,19 @@ def test_guard_classifier_wiring(tmp_path: Path, caplog: pytest.LogCaptureFixtur
     from kudiguard.languages import LanguageRegistry
     from kudiguard.safety.guard_classifier import DEFAULT_BUDGET_S
 
+    class Bge(BagOfWordsEmbedder):  # the shipped artefact's dimension
+        DIM = 384
+
     registry = LanguageRegistry.load(Path(__file__).resolve().parents[2] / "data" / "languages")
-    embedder = BagOfWordsEmbedder()
+    embedder = Bge()
     defaults = base_settings(tmp_path)
     assert defaults.guard_classifier_mode == "shadow" and defaults.guard_classifier_threshold is None
+    assert defaults.guard_classifier_pidgin_mode is None
     assert defaults.guard_classifier_budget_ms == DEFAULT_BUDGET_S * 1000
     built = build_guard_classifier(defaults, registry, embedder)
-    assert built is not None and built.threshold == built.model.threshold and built.budget_s == 0.1
+    assert (
+        built is not None and built.threshold == built.model.threshold and built.budget_s == DEFAULT_BUDGET_S
+    )
     tuned = build_guard_classifier(
         base_settings(tmp_path, guard_classifier_threshold=0.9), registry, embedder
     )
@@ -469,3 +482,61 @@ def test_guard_classifier_wiring(tmp_path: Path, caplog: pytest.LogCaptureFixtur
         missing = base_settings(tmp_path, guard_classifier_path=tmp_path / "none.npz")
         assert build_guard_classifier(missing, registry, embedder) is None
     assert "needs the embedding model" in caplog.text and "no usable artefact" in caplog.text
+    pidgin_only = base_settings(tmp_path, guard_classifier_mode="off", guard_classifier_pidgin_mode="enforce")
+    assert build_guard_classifier(pidgin_only, registry, embedder) is not None
+
+
+def test_guard_classifier_mismatch_disables_the_layer_with_one_error(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    from fakes import BagOfWordsEmbedder
+    from kudiguard.api.services import build_guard_classifier
+    from kudiguard.languages import LanguageRegistry
+
+    registry = LanguageRegistry.load(Path(__file__).resolve().parents[2] / "data" / "languages")
+    with caplog.at_level("ERROR", logger="kudiguard.api.services"):
+        assert build_guard_classifier(base_settings(tmp_path), registry, BagOfWordsEmbedder()) is None
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert len(errors) == 1 and "384-dim embeddings, the embedder gives 512" in errors[0].getMessage()
+
+
+def test_env_example_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A .env copied from .env.example must start: empty optional values mean "unset", not a parse error."""
+    example = (Path(__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8")
+    env = tmp_path / ".env"
+    env.write_text(example, encoding="utf-8")
+    for name in list(os.environ):
+        if name.startswith(("KUDIGUARD_", "WHATSAPP_")):
+            monkeypatch.delenv(name)
+    settings = Settings(_env_file=env)  # type: ignore[call-arg]
+    assert settings.guard_classifier_threshold is None and settings.guard_classifier_pidgin_mode is None
+    env.write_text(example + "\nKUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=\nKUDIGUARD_GUARD_CLASSIFIER_PIDGIN_MODE= \n",
+                   encoding="utf-8")  # fmt: skip
+    blank = Settings(_env_file=env)  # type: ignore[call-arg]
+    assert blank.guard_classifier_threshold is None and blank.guard_classifier_pidgin_mode is None
+    env.write_text(example + "\nKUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=0.7\n", encoding="utf-8")
+    assert Settings(_env_file=env).guard_classifier_threshold == 0.7  # type: ignore[call-arg]
+
+
+async def test_grounding_warm_up_failure_is_not_fatal(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    from types import SimpleNamespace
+
+    from kudiguard.api.services import build_grounding
+    from kudiguard.languages import LanguageRegistry
+
+    class Broken:
+        def embed_documents(self, texts: object) -> object:
+            raise RuntimeError("onnx")
+
+        def embed_query(self, text: str) -> object:
+            raise RuntimeError("onnx")
+
+    registry = LanguageRegistry.load(ROOT / "data" / "languages")
+    entry = SimpleNamespace(facts=("Banks never ask for your PIN.",), actions=())
+    knowledge = SimpleNamespace(sources=(SimpleNamespace(entries=(entry,)),))
+    with caplog.at_level("WARNING", logger="kudiguard.api.services"):
+        grounding = await build_grounding(base_settings(tmp_path), registry, Broken(), knowledge)  # type: ignore[arg-type]
+    assert grounding is not None and "grounding evidence not pre-embedded: onnx" in caplog.text
+    await grounding.aclose()

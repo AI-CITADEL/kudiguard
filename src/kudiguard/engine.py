@@ -52,7 +52,7 @@ from kudiguard.safety.grounding import (
     evidence_for,
     without_unsupported_steps,
 )
-from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier
+from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier, is_pidgin
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
 from kudiguard.speech.service import SpeechResult, transcribe_upload
@@ -127,6 +127,7 @@ class Engine:
         on_grounding: GroundingHook | None = None,
         classifier: UnsafeAdviceClassifier | None = None,
         classifier_mode: ClassifierMode = ClassifierMode.SHADOW,
+        classifier_pidgin_mode: ClassifierMode | None = None,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -144,8 +145,14 @@ class Engine:
         # Hook for persisting results (e.g. onto the stored interaction): called with (turn_id, report, ms) after
         # every check, also the shadow checks that finish after the reply was sent.
         self.on_grounding = on_grounding
-        self.classifier = classifier if classifier_mode is not ClassifierMode.OFF else None
+        # Pidgin replies arrive as "en": ``classifier_pidgin_mode`` (None = the same mode) lets them run in shadow
+        # while English is enforced, or the other way round
         self.classifier_mode = classifier_mode
+        self.classifier_pidgin_mode = (
+            classifier_mode if classifier_pidgin_mode is None else classifier_pidgin_mode
+        )
+        modes = {self.classifier_mode, self.classifier_pidgin_mode}
+        self.classifier = classifier if modes != {ClassifierMode.OFF} else None
         self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
 
@@ -320,41 +327,39 @@ class Engine:
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
 
+    def _classifier_mode(self, text: str, language: LanguageCode) -> ClassifierMode:
+        if self.classifier is None or not self.classifier.supports(language):
+            return ClassifierMode.OFF
+        return self.classifier_pidgin_mode if is_pidgin(text) else self.classifier_mode
+
     async def _classified_unsafe(self, text: str, language: LanguageCode) -> bool:
-        """Enforce mode only: the learned layer's verdict on a reply the regex guard let through. Fails open."""
-        if (
-            self.classifier is None
-            or self.classifier_mode is not ClassifierMode.ENFORCE
-            or not self.classifier.supports(language)
-        ):
+        """Enforce mode only: the learned layer's verdict on a reply the regex guard let through. Waits in the
+        classifier's queue within its budget, then fails open."""
+        if self.classifier is None or self._classifier_mode(text, language) is not ClassifierMode.ENFORCE:
             return False
         try:
-            verdict = await self.classifier.check(text, language)
+            verdict = await self.classifier.check(text, language, wait=True)
         except Exception as exc:  # optional layer: the regex verdict stands
             log.warning("guard classifier not run, regex verdict only: %s", exc)
             return False
-        log.info("guard_classifier mode=enforce flagged=%s p=%.2f ms=%d", verdict.flagged, verdict.probability,
-                 verdict.ms)  # fmt: skip
+        log.info("guard_classifier mode=enforce flagged=%s p=%.2f ms=%d units=%d unscored=%d", verdict.flagged,
+                 verdict.probability, verdict.ms, verdict.scored, verdict.unscored)  # fmt: skip
         return verdict.flagged
 
     def _classify_in_background(self, text: str, language: LanguageCode, turn_id: str | None) -> None:
         """Shadow mode: score the sent reply after the fact and log it (counts only, never the text)."""
         classifier = self.classifier
-        if (
-            classifier is None
-            or self.classifier_mode is not ClassifierMode.SHADOW
-            or not classifier.supports(language)
-        ):
+        if classifier is None or self._classifier_mode(text, language) is not ClassifierMode.SHADOW:
             return
 
         async def run() -> None:
             try:
-                verdict = await classifier.check(text, language)
+                verdict = await classifier.check(text, language, wait=False)
             except Exception as exc:
                 log.warning("guard classifier not run (shadow): %s", exc)
                 return
-            log.info("guard_classifier turn=%s mode=shadow flagged=%s p=%.2f ms=%d", turn_id, verdict.flagged,
-                     verdict.probability, verdict.ms)  # fmt: skip
+            log.info("guard_classifier turn=%s mode=shadow flagged=%s p=%.2f ms=%d units=%d unscored=%d", turn_id,
+                     verdict.flagged, verdict.probability, verdict.ms, verdict.scored, verdict.unscored)  # fmt: skip
 
         task = asyncio.create_task(run())
         self._shadow.add(task)

@@ -36,9 +36,15 @@ def classifier(registry: LanguageRegistry) -> UnsafeAdviceClassifier:
 
 
 def engine(
-    registry: LanguageRegistry, knowledge: KnowledgeBase, llm: FakeLLM, model: object, mode: ClassifierMode
+    registry: LanguageRegistry,
+    knowledge: KnowledgeBase,
+    llm: FakeLLM,
+    model: object,
+    mode: ClassifierMode,
+    pidgin: ClassifierMode | None = None,
 ) -> Engine:
-    return Engine(registry=registry, llm=llm, knowledge=knowledge, classifier=model, classifier_mode=mode)  # type: ignore[arg-type]
+    return Engine(registry=registry, llm=llm, knowledge=knowledge, classifier=model, classifier_mode=mode,  # type: ignore[arg-type]
+                  classifier_pidgin_mode=pidgin)  # fmt: skip
 
 
 def scam(compose: object) -> FakeLLM:
@@ -70,8 +76,8 @@ async def test_enforce_fails_open(
     registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
 ) -> None:
     class Broken(UnsafeAdviceClassifier):
-        async def check(self, text: str, language: str) -> object:  # type: ignore[override]
-            raise ClassifierError("busy")
+        async def check(self, text: str, language: str, *, wait: bool = True) -> object:  # type: ignore[override]
+            raise ClassifierError("busy", "busy")
 
     broken = Broken(hand_model(), BagOfWordsEmbedder(), OutputGuard(registry))
     with caplog.at_level(logging.WARNING, logger="kudiguard.engine"):
@@ -100,8 +106,8 @@ async def test_shadow_failure_is_logged(
     registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
 ) -> None:
     class Broken(UnsafeAdviceClassifier):
-        async def check(self, text: str, language: str) -> object:  # type: ignore[override]
-            raise ClassifierError("out of time")
+        async def check(self, text: str, language: str, *, wait: bool = True) -> object:  # type: ignore[override]
+            raise ClassifierError("timeout", "out of time")
 
     broken = Broken(hand_model(), BagOfWordsEmbedder(), OutputGuard(registry))
     turn = engine(registry, knowledge, scam(SLIPS), broken, ClassifierMode.SHADOW)
@@ -127,3 +133,31 @@ async def test_off_or_other_language_skips_the_model(
                     classifier(registry), ClassifierMode.SHADOW)  # fmt: skip
     await shadow.check("Sun ce in ba su OTP", "ha")
     assert not shadow._shadow
+
+
+PIDGIN_SLIPS = "Na scam be this.\nDrop the code for them make dem check am."
+
+
+async def test_pidgin_replies_can_run_in_their_own_mode(
+    registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
+) -> None:
+    # English enforced, Pidgin in shadow: the Pidgin slip is sent (and logged), the English one is replaced
+    turn = engine(registry, knowledge, scam(PIDGIN_SLIPS), classifier(registry), ClassifierMode.ENFORCE,
+                  ClassifierMode.SHADOW)  # fmt: skip
+    with caplog.at_level(logging.INFO, logger="kudiguard.engine"):
+        answer = await turn.check(OTP_SCAM, "en", turn_id="p1")
+        await turn.aclose()
+    assert answer.body == PIDGIN_SLIPS and "guard_classifier turn=p1 mode=shadow flagged=True" in caplog.text
+    english = engine(registry, knowledge, scam(SLIPS), classifier(registry), ClassifierMode.ENFORCE,
+                     ClassifierMode.SHADOW)  # fmt: skip
+    assert (await english.check(OTP_SCAM, "en")).outcome is Outcome.FALLBACK
+    # Pidgin only: English replies are not scored at all
+    only = engine(
+        registry, knowledge, scam(SLIPS), classifier(registry), ClassifierMode.OFF, ClassifierMode.ENFORCE
+    )
+    assert only.classifier is not None
+    assert (await only.check(OTP_SCAM, "en")).body == SLIPS and not only._shadow
+    off = engine(
+        registry, knowledge, scam(SLIPS), classifier(registry), ClassifierMode.OFF, ClassifierMode.OFF
+    )
+    assert off.classifier is None

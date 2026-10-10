@@ -39,9 +39,8 @@ class OutputIssue(StrEnum):
     SAFETY_CLAIM = "safety_claim"
     UNSAFE_INSTRUCTION = "unsafe_instruction"
     OUTCOME_CLAIM = "outcome_claim"  # blocking only in enforce mode (see engine)
-    CLASSIFIED_UNSAFE = (
-        "classified_unsafe"  # the learned second layer (safety.guard_classifier), enforce mode
-    )
+    # the learned second layer (safety.guard_classifier), enforce mode
+    CLASSIFIED_UNSAFE = "classified_unsafe"
     REFUSAL = "refusal"
     EMPTY = "empty"
     UNGROUNDED = "ungrounded"  # a claim not supported by the evidence (safety.grounding)
@@ -62,7 +61,11 @@ class OutputGuard:
             issues.append(OutputIssue.SAFETY_CLAIM)
         if any(p.search(folded) for p in patterns.refusals):
             issues.append(OutputIssue.REFUSAL)
-        if any(_unsafe_sentence(s, patterns) for s, question in sentences if not question):
+        # quoted speech ("Fraudsters say \"send your PIN\" to scare you") is not an instruction to the user
+        unquoted = [
+            (m.group(1), m.group(2).startswith("?")) for m in _SENTENCE.finditer(_mask_speech(folded))
+        ]
+        if any(_unsafe_sentence(s, patterns) for s, question in unquoted if not question):
             issues.append(OutputIssue.UNSAFE_INSTRUCTION)
         if any(_outcome_claim(s, patterns) for s, _ in sentences):
             issues.append(OutputIssue.OUTCOME_CLAIM)
@@ -71,25 +74,131 @@ class OutputGuard:
     def units(self, text: str, language: LanguageCode) -> list[Unit]:
         """The sentences of a reply and, when a sentence has several, its clauses, for a second (learned) layer.
         ``gated`` marks units a classifier must not block on its own: questions, units negated in their opening
-        window, reported speech, subordinate clauses ("if they ask you to ..."), descriptions ("you send them the
-        code and they ..."), fragments under three words, text before a colon and quoted or negated scripts after
-        one ("Scammers often say: ...", "Tell him: no, ...")."""
+        window, reported speech ("they will probably ask you to ...", "dem fit tell you make you ..."), subordinate
+        clauses ("if they ask you to ..."), descriptions ("you send them the code and they ..."), fragments under
+        three words, units that start inside double quotes (a quoted script), text before a colon that only
+        introduces what follows ("Scammers often say:", "Tell the caller this:") and quoted or negated scripts after
+        one ("Tell him: no, ..."). An instruction before a colon ("Reply with your card details: ...") is scored."""
         patterns = self._registry.guard_patterns(language)
+        folded = normalize(text)
+        quoted = _quoted_spans(folded)
         units: list[Unit] = []
-        for match in _SENTENCE.finditer(normalize(text)):
-            sentence, question = match.group(1).strip(), match.group(2).startswith("?")
+        for match in _SENTENCE.finditer(folded):
+            raw, question = match.group(1), match.group(2).startswith("?")
+            sentence = raw.strip()
             if not sentence:
                 continue
-            units.append(Unit(sentence, question or ":" in sentence or _gated(sentence, sentence, patterns)))
+            start = match.start(1) + len(raw) - len(raw.lstrip())
+            in_quotes = _inside(_first_word(folded, start), quoted)
+            gated = question or in_quotes or ":" in sentence or _gated(sentence, sentence, patterns)
+            units.append(Unit(sentence, gated))
             segments = sentence.split(":")
             clauses: list[tuple[str, bool]] = []
             for index, segment in enumerate(segments):
                 script = bool(index) and _quoted_or_negated(segments[index - 1], patterns)
-                intro = index < len(segments) - 1  # "tell him:" introduces what follows
+                intro = index < len(segments) - 1 and _introduces(segment, patterns)
                 clauses += [(c, script or intro) for c in _clauses(segment, patterns)]
             if len(clauses) > 1:
-                units.extend(Unit(c, question or off or _gated(c, sentence, patterns)) for c, off in clauses)
+                cursor = 0
+                for clause, off in clauses:
+                    offset = sentence.find(clause, cursor)
+                    cursor = max(offset, cursor)
+                    inside = _inside(_first_word(folded, start + cursor), quoted)
+                    units.append(
+                        Unit(clause, question or off or inside or _gated(clause, sentence, patterns))
+                    )
         return units
+
+
+def _quoted_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of the text inside closed pairs of double quotes (straight or curly) on one line. An unclosed
+    quote marks nothing: a stray quote must not hide the rest of a reply."""
+    spans = [(m.start(1), m.end(1)) for m in _CURLY_QUOTED.finditer(text)]
+    spans += [(m.start(1), m.end(1)) for m in _STRAIGHT_QUOTED.finditer(text)]
+    return spans
+
+
+def _first_word(text: str, position: int) -> int:
+    match = _WORD.search(text, position)
+    return match.start() if match else position
+
+
+def _mask_speech(text: str) -> str:
+    """``text`` with quoted speech replaced by "quote": a closed quote that opens the text or a sentence or follows a
+    word that introduces speech ("say", "write", "like", "message"; see ``_INTRODUCERS``). Other quotes stay, so
+    quoting the object ("send \"the code\" to him") hides nothing."""
+    result, last = [], 0
+    for start, end in sorted(_quoted_spans(text)):
+        before = text[: start - 1].rstrip()
+        words = _words(before[-40:])
+        if not before or before.endswith((".", "!", "?", ":", "\n")) or (words and words[-1] in _INTRODUCERS):
+            inner = text[start:end].rstrip()
+            ending = inner[
+                len(inner.rstrip(".!?")) :
+            ]  # keep a sentence end inside the quote: 'said: "Pay." Then'
+            result.append(text[last:start] + "quote" + ending)
+            last = end
+    return "".join(result) + text[last:]
+
+
+def _inside(position: int, spans: list[tuple[int, int]]) -> bool:
+    return any(a <= position < b for a, b in spans)
+
+
+_CURLY_QUOTED = re.compile("\u201c([^\u201d\n]*)\u201d")
+_STRAIGHT_QUOTED = re.compile(r'"([^"\n]*)"')
+
+
+def _introduces(intro: str, patterns: GuardPatterns) -> bool:
+    """Text before a colon that only introduces what follows: reported speech or a negated script (see
+    ``_quoted_or_negated``), ending in a word such as "this", "example", "say" or "below", or a speech verb with no
+    secret or money in it ("Tell the agent: ..."; but "Reply with your card details: ..." is an instruction)."""
+    words = _words(intro)
+    if len(words) < 3 or _quoted_or_negated(intro, patterns) or words[-1] in _INTRODUCERS:
+        return True
+    return words[0] in _SPEECH_VERBS and not _INTRO_OBJECT.search(intro)
+
+
+_SPEECH_VERBS = frozenset(["tell", "say", "reply", "answer", "text", "write", "ask", "message"])
+_INTRO_OBJECT = re.compile(
+    r"\b(?:otp|pin|bvn|nin|password|passcode|cvv|code|token|card|details|money|fee|account|number|payment)\b"
+)
+
+
+_INTRODUCERS = frozenset(
+    [
+        "this",
+        "these",
+        "following",
+        "below",
+        "example",
+        "e.g",
+        "eg",
+        "like",
+        "say",
+        "says",
+        "said",
+        "saying",
+        "tell",
+        "tells",
+        "told",
+        "reply",
+        "answer",
+        "write",
+        "writes",
+        "wrote",
+        "text",
+        "texts",
+        "message",
+        "messages",
+        "script",
+        "words",
+        "steps",
+        "tips",
+        "signs",
+        "ways",
+    ]
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,11 +225,12 @@ _SUBORDINATE_OR_DESCRIPTION = re.compile(
     r"(?:if|once|when|whenever|after|before|as soon as|the moment|until|because|since)\b"
     r"|you\s+(?:send|share|give|tell|pay|transfer|enter|type|click|install|reply|\w+ed)\b"
 )
-# "they said ...", "the caller asked you to ...", "scammers will tell you to ...": reported, not advice (English)
+# "they said ...", "the caller asked you to ...", "he will probably ask you to ...", Pidgin "dem go ask you ...",
+# "dem fit talk say ...": reported, not advice (English and Pidgin)
 _REPORTED_START = re.compile(
-    r"(?:they|he|she|someone|scammers?|fraudsters?|the\s+[\w']+)\s+(?:[\w']+\s+)?"
-    r"(?:said|say|says|told|tell|tells|asked|ask|asks|want|wants|wanted|claim\w*|promise[sd]?|threaten\w*|warn\w*"
-    r"|will\s+(?:say|tell|ask|want))\b"
+    r"(?:they|he|she|someone|scammers?|fraudsters?|dem|im|the\s+[\w']+)\s+(?:[\w']+\s+){0,2}"
+    r"(?:said|say|says|told|tell|tells|talk|asked|ask|asks|want|wants|wanted|claim\w*|promise[sd]?|threaten\w*"
+    r"|warn\w*|write|writes|wrote|text|texts|message|messages)\b"
 )
 
 

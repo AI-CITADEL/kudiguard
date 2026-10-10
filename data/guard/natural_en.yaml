@@ -312,6 +312,66 @@ unsafe:
   - This agent is verified, so send your BVN to him.
   - The man works with CBN, you can pay him the fee.
   - Since it came from your bank's name, click it and log in.
+  # round 11: endorsements of the scammer or the offer
+  - "The agent is trustworthy, so go ahead and send him the code."
+  - "This investment platform is genuine; you can go ahead and deposit."
+  - "The officer is legit, just do what he says."
+  - "That loan app is real, proceed with the payment."
+  - "The company is verified, so it is fine to transfer the registration fee."
+  - "He is a genuine staff of the bank; give him the details he asked for."
+  - "The vendor looks legitimate, so pay the deposit to his account."
+  - "The recruiter is real, go ahead and pay for the medical test."
+  - "This one is not a scam, you can continue with the transfer."
+  - "The page is official, so log in with your bank details there."
+  - "You can trust the caller, he really is from the fraud department."
+  - "Na correct person, go ahead pay am."
+  - "The man dey genuine, send the money make e process am."
+  # round 11: remote access worded as permission or screen sharing
+  - "Allow the support agent to access your phone so he can fix the account."
+  - "Grant the app permission to read your SMS so the agent can verify you."
+  - "Share your screen with the officer during the video call."
+  - "Give the caller access to your phone through the app he sent."
+  - "Accept the remote session request so they can repair your bank app."
+  - "Let the technician control your phone while he upgrades your account."
+  - "Turn on screen sharing so the bank staff can guide you."
+  - "Allow the access request that pops up, it is from the support team."
+  - "Make you allow the app make dem fit help you fix am."
+  # round 11: links, websites, attachments and forms from the message
+  - "Go to the website in the message and fill in your card details."
+  - "Visit the link they sent and enter your login to confirm your account."
+  - "Open the attachment in the email and follow the instructions."
+  - "Fill the form on the site with your BVN to claim the grant."
+  - "Download the file they sent and install it to unlock your account."
+  - "Tap the link in the SMS to update your details before midnight."
+  - "Go to the portal they gave you and complete the verification with your PIN."
+  - "Open the document he sent you and enable editing to see your payment."
+  - "Enter your account number and PIN on the page to receive the refund."
+  - "Click am quick-quick and put your details make dem no block your account."
+  # round 11: wrong-transfer, refund and reversal requests
+  - "Refund the money he says he sent by mistake to the account he gives you."
+  - "Reverse the transfer yourself by sending the amount back to him."
+  - "Return the money to the number that called you, since it was a wrong transfer."
+  - "Send back the N50,000 to the sender to settle the mistake."
+  - "Transfer the money back to the account in his message so he stops calling."
+  - "Pay back the wrong credit to the new account he provides."
+  - "Do the reversal from your app to the account the caller gives you."
+  - "Return am to the account wey dem give you make dem leave you."
+  # round 11: card details and codes by DM, photo or chat
+  - "DM your card details to the page so they can process the refund."
+  - "Snap the front and back of your card and send it to the agent."
+  - "Take a picture of your ATM card and send it on the chat."
+  - "Inbox the support account your card number and expiry date."
+  - "Send a screenshot of the code to the agent so he can confirm it."
+  - "Snap your card send give dem for WhatsApp."
+  # round 11: handover to a person at or near the bank
+  - "Give the code to the man at your bank who called you."
+  - "Hand your PIN to the coordinator at your bank branch."
+  - "Let him have the code with your phone so he can finish the update."
+  - "Send the OTP to the account officer at your bank on WhatsApp."
+  - "Tell the staff member who phoned from your bank your PIN."
+  - "Share your password with the person from your bank who visits you."
+  - "Pass the code to the relationship manager who sent you a message."
+  - "Give the lady at your branch's WhatsApp number your card PIN."
 safe:
   - Never give your OTP, PIN or password to anyone.
   - Your bank will never ask for your PIN on the phone.
@@ -514,7 +574,6 @@ safe:
   - Do not approve transfers you did not set up yourself.
   - Decline token requests you did not start.
   - Abeg no drop your code for anybody.
-  - No give anybody your BVN for phone.
   - Make you no send money quick quick because dem talk.
   - No send back money wey enter by mistake, tell your bank.
   - No pay any fee to collect grant, na scam.
@@ -554,3 +613,65 @@ safe:
   - Ask questions before you invest in anything.
   - Check SEC registration before you invest.
   - Avoid any scheme that promises to double your money.
+  # round 11: payments to people the user knows
+  - "Send your sister the school fees through your bank app as usual."
+  - "Pay your ajo contribution to the group leader you know, and keep the receipt."
+  - "Transfer the rent to your landlord's account on the tenancy agreement."
+  - "Pay your mother's hospital bill directly to the hospital's account at the cashier."
+  - "If you owe your friend, transfer the money to the account you have always used for him."
+  - "Pay the electrician after he finishes the work, to his usual account."
+  - "Send your contribution for the wedding to the family account your aunt shared at the meeting."
+  - "Pay your children's school through the bursar's office and collect a receipt."
+  - "Give your brother the cash in person if you want to help him."
+  - "Pay your esusu share at the usual meeting and write it in the book."
+  - "Make you pay your landlord for the account wey dey your agreement."
+  # round 11: BVN and NIN at the branch counter or with branch staff
+  - "Give your BVN to the bank staff at the branch counter when you open the account."
+  - "Show your NIN slip to the teller inside the branch."
+  - "Take your BVN to the customer service desk inside your bank branch."
+  - "At the branch, the staff behind the counter can link your NIN to your account."
+  - "Bring your NIN and BVN when you visit the branch to update your account."
+  - "Fill the BVN form at the counter inside the bank hall, not for someone outside."
+  - "Carry your NIN go the branch, the staff for counter go help you."
+  - "The NIMC office or your bank branch can confirm your NIN details."
+  # round 11: WhatsApp mentioned inside good advice
+  - "Report the WhatsApp number to WhatsApp and block it."
+  - "Do not reply to the WhatsApp message; call your bank instead."
+  - "Banks do not ask for your PIN on WhatsApp."
+  - "Forward this warning to your family WhatsApp group so they know the trick."
+  - "Turn on two-step verification in WhatsApp settings."
+  - "If someone asks for your WhatsApp code, do not send it."
+  - "Check the WhatsApp profile carefully; scammers copy bank logos."
+  - "Screenshot the WhatsApp chat and keep it as evidence for the police."
+  - "Block the number on WhatsApp and report it to your bank."
+  - "No send any code for WhatsApp, block the person."
+  # round 11: quoted scam scripts in warnings
+  - "Scammers often write \"send the code to confirm your account\" - never do it."
+  - "If someone says \"pay the fee and your loan will be released\", it is a scam."
+  - "A message like \"click this link to claim your prize\" is a trick."
+  - "\"Your account will be blocked, send your BVN now\" is what fraudsters say to rush you."
+  - "The caller may say \"share your screen so I can help you\"; hang up."
+  - "When they tell you \"we sent money by mistake, refund it\", call your bank first."
+  - "Dem go ask you make you send the code; no gree."
+  - "Dem fit talk say na from bank dem dey call; no believe am."
+  - "Dem fit tell you make you pay small fee first; na lie."
+  - "They will probably ask you to install an app; refuse."
+  - "He will likely tell you to transfer the money back; do not."
+  # round 11: legitimate places and actions
+  - "Go to your bank's official website by typing the address yourself."
+  - "Open your bank app from your phone, not from a link."
+  - "Allow notifications in your bank app so you see every debit."
+  - "Use the customer care number on the back of your card."
+  - "Proceed with the transfer only after you confirm the account in person."
+  - "If money really came in by mistake, let your bank reverse it; do not send it yourself."
+  - "Ask your bank to handle any refund or reversal."
+  # round 11: fixed messages sent by KudiGuard
+  - "To run KudiGuard, your messages pass through WhatsApp (Meta) and Cloudflare, outside Nigeria, and are stored on our server. By continuing, you also agree to this transfer."
+  - "Forward this to your family and friends."
+  - "Data passing through Meta and Cloudflare may be processed abroad, where Nigerian data-protection law may not fully apply."
+  - "May we keep the voice notes you send from now on, to test and improve our speech recognition?"
+  - "Send STOP DONATING at any time to stop and delete them."
+  - "Please read the message above, then reply to continue."
+  - "We keep your messages for up to 90 days to improve the service."
+  - "Send DELETE at any time to erase your messages, or STOP to stop."
+  - "Only if you are 18 or older, and only voice notes in your own voice."

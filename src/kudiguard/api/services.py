@@ -104,27 +104,33 @@ def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) 
 def build_guard_classifier(
     settings: Settings, registry: LanguageRegistry, embedder: Embedder | None
 ) -> UnsafeAdviceClassifier | None:
-    """The learned second guard layer (English), reusing the knowledge-search embedder; None when off/unavailable."""
-    if ClassifierMode(settings.guard_classifier_mode) is ClassifierMode.OFF:
+    """The learned second guard layer (English), reusing the knowledge-search embedder; None when off/unavailable.
+
+    The artefact is validated here once (checksum, features, embedding model and dimension): a mismatch disables
+    the layer with one error at startup, never one per reply."""
+    pidgin = settings.guard_classifier_pidgin_mode or settings.guard_classifier_mode
+    if {settings.guard_classifier_mode, pidgin} == {"off"}:
         return None
     if embedder is None:
         log.warning("guard classifier disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
         return None
     try:
         model = ClassifierModel.load(settings.guard_classifier_path)
-    except (OSError, ValueError, KeyError) as exc:
-        log.warning(
+        classifier = UnsafeAdviceClassifier(
+            model,
+            embedder,
+            OutputGuard(registry),
+            threshold=settings.guard_classifier_threshold,
+            budget_s=settings.guard_classifier_budget_ms / 1000,
+        )
+    except Exception as exc:  # optional layer: a bad artefact or embedder must not stop the service
+        log.error(
             "guard classifier disabled: no usable artefact at %s (%s)", settings.guard_classifier_path, exc
         )
         return None
-    log.info("guard classifier (%s): version %s", settings.guard_classifier_mode, model.version)
-    return UnsafeAdviceClassifier(
-        model,
-        embedder,
-        OutputGuard(registry),
-        threshold=settings.guard_classifier_threshold,
-        budget_s=settings.guard_classifier_budget_ms / 1000,
-    )
+    log.info("guard classifier (%s, Pidgin %s): version %s", settings.guard_classifier_mode, pidgin,
+             model.version)  # fmt: skip
+    return classifier
 
 
 async def build_grounding(
@@ -240,6 +246,11 @@ async def build_services(settings: Settings) -> Services:
             on_grounding=log_grounding,
             classifier=classifier,
             classifier_mode=ClassifierMode(settings.guard_classifier_mode),
+            classifier_pidgin_mode=(
+                ClassifierMode(settings.guard_classifier_pidgin_mode)
+                if settings.guard_classifier_pidgin_mode
+                else None
+            ),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

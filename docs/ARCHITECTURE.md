@@ -38,13 +38,19 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
    Promised outcomes and threats stated as fact ("you will get your money back", "your account will be blocked")
    are logged only (blocking in enforce mode). This is the deterministic safety net; ha/yo/ig patterns are DRAFT
    pending native review.
-4. **Learned guard layer** (`safety/guard_classifier.py`, English and Pidgin): logistic regression on the bge-small
-   embedding of each reply sentence/clause plus lexical cues catches unsafe advice the patterns were not written for;
-   it blocks only units the regex helpers do not mark as negated, reported, conditional or descriptive.
-   `KUDIGUARD_GUARD_CLASSIFIER_MODE`: **shadow (default)** scores after sending and logs; **enforce** treats a flag
-   like a guard hit (retry, then fixed text). 100 ms budget, fails open to the regex verdict. Dev: 97.6% recall,
-   1.6% false positives combined with the regex (SPIKES S8). Weights are a versioned artefact trained by
-   `scripts/train_guard_classifier.py`; ha/yo/ig stay regex-only.
+4. **Learned guard layer** (`safety/guard_classifier.py`, English; Nigerian Pidgin only because it arrives as `en`
+   and is scored by the same English model): logistic regression on the bge-small embedding of each reply
+   sentence/clause plus lexical cues catches unsafe advice the patterns were not written for; it blocks only units
+   the regex helpers do not mark as negated, quoted, reported, conditional or descriptive (up to 8 per reply, the
+   most suspicious first, one embedding batch). `KUDIGUARD_GUARD_CLASSIFIER_MODE`: **shadow (default)** scores after
+   sending and logs; **enforce** treats a flag like a guard hit (retry, then fixed text);
+   `KUDIGUARD_GUARD_CLASSIFIER_PIDGIN_MODE` can differ for Pidgin. 250 ms budget with a short bounded queue, then the
+   regex verdict stands (fail-open counts by reason in the logs). Honest numbers (SPIKES S8, round 11): the round-10
+   version scored 83% recall / **11.8% false positives** on the independent English held-out set (Pidgin 77% /
+   14%), against 1.6% claimed on a leaky dev split; the current version is trained on a frozen set with a grouped
+   split and an out-of-fold threshold (out-of-fold ~74% recall / 1.8% false positives; clean dev 74% / 0%) and
+   awaits a new independent set. The artefact is validated at startup (checksum, features, embedding model and
+   size). ha/yo/ig stay regex-only (held-out recall 0-21%).
 5. **Grounding check** (`safety/grounding.py`): each claim of an English reply is compared by meaning (bge-small)
    with same-polarity evidence sentences (facts, actions, verdict, flags, generic framing, reviewed fixed advice);
    its numbers and agency names must appear in the evidence or the user's message. The user's message supports a

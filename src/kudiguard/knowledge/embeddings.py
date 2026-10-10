@@ -94,6 +94,7 @@ class FastEmbedder:
     ) -> None:
         from fastembed import TextEmbedding  # optional dependency
 
+        self.model_name = model_name  # checked against artefacts trained on it (safety.guard_classifier)
         self._model = TextEmbedding(
             model_name,
             cache_dir=str(cache_dir) if cache_dir else None,

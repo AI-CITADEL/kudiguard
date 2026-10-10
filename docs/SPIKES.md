@@ -213,6 +213,81 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   chars, 1.3 s at 1,941). The cost is the embedding model itself (~4 ms per sentence). ha/yo/ig: not checked live.
   8 simultaneous checks: one runs, seven are skipped (busy, fail open), ~37 ms total: no queueing (enforce instead
   waits within its budget). Warm-up at startup: ~3–4 s for every default pack (2.8 s measured for 297 sentences).
+* **Guard, round 11: the learned layer measured honestly, then fixed by failure class.** The independent held-out
+  set (scored by the verifier; we saw only the failure classes) showed the round-10 dev numbers were optimistic:
+
+  | held-out (independent) | recall, regex alone | recall, regex OR classifier | false positives, regex / combined |
+  |---|---|---|---|
+  | English | 34% | 83% | 5.9% / **11.8%** (dev claimed 1.6%) |
+  | Pidgin (scored as `en`) | - | 77% | 14% combined |
+  | Hausa / Yoruba / Igbo (regex only) | 0-21% | - | - |
+
+  Why dev lied: the dev split was by sentence hash, so 145 of 398 dev items had a template near-duplicate in train
+  (grammar worst), and 160 easy dev negatives set the threshold. Round-10 latency was also understated (13/29 ms
+  claimed; the verifier measured p50 135 ms for 8 cue sentences and 334 ms for 20 because every unit was embedded).
+  Fixes (structural, by class, not by sentence):
+  * **Frozen training set** `data/guard/train_set.jsonl` (2,156 items, committed; the artefact records its SHA-256 and
+    a unit test checks it), so merges that add fixed strings or probes cannot move the model or the gate. Master's
+    new fixed strings (hosting disclosure, donation and consent texts, "Forward this to your family and friends") are
+    negatives, and every fixed string is train-only. The live gate runs on the frozen dev rows with a band (recall
+    -3 points, false positives +1 point vs the artefact's record) and says which half moved. The 6 items that were
+    exact copies of the b9/probe9 set (now public) are removed from `natural_en.yaml` (1) or marked `train: false`
+    in `guard_probes.yaml` (5); probe9 is no longer used as evidence.
+  * **Split by group**: each grammar destination is one group, and near-duplicates (bge cosine >= 0.9 or character-
+    trigram Jaccard >= 0.6) are merged; whole groups fill 20% of each source. The grammar chains into one template
+    cluster, so it is train-only. Remaining dev leak: 0% by difflib ratio >= 0.8, trigram Jaccard >= 0.6 or cosine >=
+    0.9; 79% of dev items still have a train item at bge cosine >= 0.8, which for bge-small means "same topic" (at
+    0.8, union-find puts 1,859 of 2,156 items in one cluster), not a duplicate.
+  * **Threshold chosen out of fold**: 5 group folds over the training split, on the hand-written and probe items (1,135;
+    grammar and fixed strings are easy negatives), lowest threshold with combined false positives <= 2%: **0.945**.
+    The out-of-fold curve reproduces the held-out picture (at 0.6: 11.5% false positives, cf. 11.8% held-out at the
+    old 0.65), whereas the clean dev split is still easier (3.1% at 0.6). Curve (regex OR classifier):
+
+    | threshold | out-of-fold recall / false positives (1,135) | clean dev recall / false positives (281) |
+    |---|---|---|
+    | 0.60 | 94.4% / 11.5% | 95.0% / 3.1% |
+    | 0.70 | 91.3% / 7.9% | 92.6% / 1.3% |
+    | 0.80 | 87.7% / 4.5% | 87.6% / 0.6% |
+    | 0.85 | 84.0% / 3.7% | 84.3% / 0% |
+    | **0.945 (shipped)** | **~74% / 1.8%** | **74.4% / 0%** (regex alone 55.4% / 0%) |
+
+    The shipped threshold trades recall for false positives; `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD` (e.g. 0.85) moves
+    along the curve. Expect the next independent set to land nearer the out-of-fold column than the dev column.
+  * **Scoring**: no keyword pre-filter (it dropped 17 of 32 en/pcm held-out misses before scoring: endorsements,
+    permission/screen-share wording, websites, attachments, refunds/reversals, "DM/snap your card"). Every ungated unit
+    of >= 3 words is a candidate; the 8 most suspicious (by lexical cues) are embedded in one batch, the rest counted
+    as unscored and logged. Lexical cues now 9 (new: remote access/permission/website/attachment, endorsement; refunds
+    and reversals count as payment; "WhatsApp" alone is no longer a stranger cue), and the training data gained
+    hand-written examples for each missed class and for the false-positive classes (payments to known people,
+    BVN/NIN at the branch counter, WhatsApp in good advice, quoted scam scripts, Pidgin reported speech).
+  * **Trusted-recipient skip narrowed**: a unit is left to the regex only when the verb's own recipient is the bank,
+    the authorities or the user's own app/phone with no person before it and no person, link or supplied page after
+    it ("Forward his message to your bank" skips; "...to the man at your bank", "...to the coordinator at your bank
+    branch", "let him have the code with your phone" are scored), or a BVN/NIN given at the counter/teller.
+  * **Gating**: units that start inside closed double quotes are quoted speech (and the regex no longer reads quoted
+    speech after "say/write/like/message..." or opening a sentence as an instruction, while `Send "the OTP" to him`
+    still blocks and an unclosed quote hides nothing); Pidgin reported speech ("Dem go ask you...", "Dem fit talk
+    say...", "Dem fit tell you make you...") and "He/They will (probably) ask you to..." are reported; text before a
+    colon is gated only when it merely introduces ("Tell the caller this:", "Tell the agent:"), so "Reply to the agent
+    with your card details: ..." is scored. Regex: BVN/NIN to the teller, at the counter or to staff in the banking
+    hall pass (14 new probes, one strict xfail: "...at the counter and to the agent outside" is judged per clause).
+  * **Runtime**: calls queue (bounded: 3 in flight for enforce; shadow waits behind at most one) within the budget
+    instead of failing open at once; fail-open counts by reason (busy, timeout, error), scored calls and unscored
+    units are kept in `classifier.stats` and logged with each failure; each log line carries units scored/unscored.
+    Enforce waits; shadow never delays an enforce call by more than one scoring. The artefact is validated at startup
+    (weights checksum, feature names = code, embedding model name, embedding dimension); a mismatch disables the
+    layer with one error. A per-variety mode (`KUDIGUARD_GUARD_CLASSIFIER_PIDGIN_MODE`, e.g. English enforce, Pidgin
+    shadow) uses a Pidgin marker check, since Pidgin arrives as `en`. An empty `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=`
+    in `.env` now means "unset" (it crashed startup).
+  * **Latency, re-measured** (CPU, this dev machine, one batch, cap 8 units): typical reply p50 20-38 ms / p95 21-58
+    ms; 8 cue sentences (10 units, 8 scored) p50 51-92 ms / p95 73-116 ms; 20 cue sentences (22 units, 8 scored) p50
+    59-88 ms / p95 77-104 ms (ranges over runs with other work on the machine; uncapped, 12 units cost p95 ~156 ms).
+    Budget now 250 ms (one queued call ahead fits). The verifier's machine was slower than ours; budgets should be
+    checked on the pilot host.
+  * Suites with the shipped decision (in-sample for the training split): our probes 374/376 (0 false positives /
+    167), D's set 189/192 (1/91), grammar 2,808/2,808; regex sweep (b6 corpus + probes + D) 0 regressions against
+    all earlier rounds. Recommendation unchanged: **shadow for the pilot**; Pidgin especially (14% false positives
+    held-out). The next numbers must come from a new independent set (the old held-out set informed these classes).
 * **Guard, round 10: learned second layer** (`safety/guard_classifier.py`, `scripts/train_guard_classifier.py`,
   artefact `data/guard/en_classifier.npz` + `.json`). Logistic regression (numpy, deterministic full-batch gradient
   descent; scikit-learn is not installed) on the bge-small embedding (the already-loaded knowledge model, reply text
@@ -235,9 +310,11 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   | ... natural sentences only (97) | 98.2% | 91.5% | 2.6% |
 
   On the (mostly in-sample) suites the combined layer keeps: our probes 358/362 (4 false positives / 160, e.g. "Pay
-  through the agent at your bank branch"), D's set 190/192 (2/91), grammar 2,801/2,808 (7/1,280). Latency (CPU,
-  only cue units are embedded): p50 13 ms / p95 17 ms for a typical reply, p50 29 ms for a reply with 8 cue
-  sentences; budget 100 ms, then the regex verdict stands. Recommendation: **shadow for the pilot** (default) - dev
+  through the agent at your bank branch"), D's set 190/192 (2/91), grammar 2,801/2,808 (7/1,280). Latency claimed
+  then (only cue units embedded): p50 13 ms / p95 17 ms typical, p50 29 ms for 8 cue sentences; **corrected in round
+  11** (the verifier measured p50 135 ms for 8 cue sentences, 334 ms for 20). The "classifier alone" row scores each
+  whole dev sentence without gating (the script mislabelled it; round 11 reports gated units separately). Held-out
+  results for this version are in round 11: 11.8% false positives, not 1.6%. Recommendation: **shadow for the pilot** (default) - dev
   numbers are strong but the data are ours; switch to enforce after the independent held-out set and a review of
   the shadow logs. **ha/yo/ig**: LaBSE transfer (train on English, test on our draft sentences) gives AUC 0.67 / 0.72
   / 0.62 and recall <= 21% at the English threshold: not shipped (regex only for those languages).
