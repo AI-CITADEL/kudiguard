@@ -15,6 +15,8 @@ commands:
   stop: [ẹ dá a dúró, má fi ránṣẹ́ mọ́]  # not bare "dúró": it also means "wait"
   delete: [pa àwọn ìfiránṣẹ́ mi rẹ́]
   language: [èdè, yí èdè padà]
+  donate: [fi ohùn mi tọrẹ, ìtọrẹ ohùn]  # DRAFT, pending native review
+  stop_donating: [dá ìtọrẹ ohùn dúró, ẹ dá ìtọrẹ ohùn dúró]  # DRAFT
   greetings: [báwo, báwo ni, ẹ n lẹ́, ẹ kú àárọ̀, ẹ kú ọ̀sán, ẹ kú ìrọ̀lẹ́, ẹ kú alẹ́, ẹ ṣé, ẹ ṣeun, o ṣé, o ṣeun,
     ẹ ṣé gan, pẹ̀lẹ́, ó dáa]
 
@@ -52,7 +54,8 @@ strings:
 
     Ẹ fi *àtẹ̀jíṣẹ́ ohùn* tàbí ọ̀rọ̀ ránṣẹ́ sí mi, tàbí kí ẹ dárí ọ̀rọ̀ tí ẹ kò dá lójú rẹ̀ sí mi.
 
-    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀. Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i; DELETE tún ń pa àwọn tí a mú láti inú ọ̀rọ̀ yín àìpẹ́ yìí rẹ́. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
+    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. Àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé (ẹgbẹ́ wa tàbí àwọn tí èdè náà jẹ́ èdè abínibí wọn, lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀) lè ka díẹ̀ lára àwọn ọ̀rọ̀ àti èsì, pẹ̀lú nọ́ńbà tí a bò mọ́lẹ̀, láìsí nọ́mbà fóònù yín tàbí àmì ìdánimọ̀ kankan, láti ṣàyẹ̀wò dídára àti ààbò; a ń pa ẹ̀dà tiwọn rẹ́ lẹ́yìn àyẹ̀wò. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí ẹ bá yàn láti fi wọ́n tọrẹ (a máa béèrè lọ́tọ̀). Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i; DELETE tún ń pa àwọn tí a mú láti inú ọ̀rọ̀ yín àìpẹ́ yìí rẹ́. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
+    🌍 Láti ṣiṣẹ́ KudiGuard, àwọn ọ̀rọ̀ yín ń kọjá láàárín WhatsApp (Meta) àti Cloudflare, lẹ́yìn òde Nàìjíríà, a sì ń tọ́jú wọn sórí sáfà wa {where}. {risk} Tí ẹ bá tẹ̀síwájú, ẹ tún gbà sí gbígbé dátà yìí lọ.
     ℹ️ Ìtọ́sọ́nà ni èyí, kì í ṣe ìmọ̀ràn ìṣúná owó.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Èdè wo ni kí n lò?
@@ -84,7 +87,7 @@ strings:
   rate_limited: ⏳ Ẹ ti fi ọ̀pọ̀ ọ̀rọ̀ ránṣẹ́. Ẹ jọ̀ọ́ ẹ dúró díẹ̀ kí ẹ tó tún gbìyànjú.
   error_retry: 😔 Ẹ má bínú, nǹkan kan ṣẹlẹ̀ ní ẹ̀gbẹ́ mi. Ẹ jọ̀ọ́ ẹ tún gbìyànjú láìpẹ́.
   stopped: Ẹ kò ní gba ọ̀rọ̀ láti ọ̀dọ̀ KudiGuard mọ́. Ẹ fi ọ̀rọ̀ èyíkéyìí ránṣẹ́ láti tún bẹ̀rẹ̀.
-  deleted: 🗑️ A ti pa àwọn ọ̀rọ̀ yín rẹ́.
+  deleted: 🗑️ A ti pa àwọn ọ̀rọ̀ yín àti àtẹ̀jíṣẹ́ ohùn tí ẹ fi tọrẹ rẹ́.
   fallback_scam: "Ẹ má ṣe fi owó ránṣẹ́, ẹ má sì fún ẹnikẹ́ni ní kóòdù, PIN tàbí ọ̀rọ̀ aṣínà yín. Ẹ dá ìbáṣepọ̀ dúró, kí ẹ sì pe báǹkì yín ní nọ́ńbà tó wà lórí káàdì yín."
   fallback_answer: "Mi ò lè pèsè ìdáhùn kíkún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́, tàbí kí ẹ béèrè lọ́wọ́ báǹkì yín tààrà."
   fallback_steps: |-
@@ -95,3 +98,25 @@ strings:
   at_capacity: "😔 KudiGuard ti kún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ọjọ́ díẹ̀."
   busy: "⏳ Ọ̀pọ̀ ènìyàn ló ń béèrè báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ìṣẹ́jú kan."
   privacy_link: "🔐 Ìkéde àṣírí: {url}"
+  # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
+  donation_offer: |-
+    🎙️ *Àṣàyàn ni: ẹ ran KudiGuard lọ́wọ́ láti gbọ́ ohùn àwọn ọmọ Nàìjíríà*
+    Ṣé a lè tọ́jú àtẹ̀jíṣẹ́ ohùn tí ẹ bá fi ránṣẹ́ láti ìsinsìnyí lọ, láti ṣàyẹ̀wò àti láti mú ìdámọ̀ ọ̀rọ̀ sísọ wa dára sí i?
+    • Kìkì tí ẹ bá ti pé ọmọ ọdún *18 tàbí jù bẹ́ẹ̀ lọ*, àti kìkì àtẹ̀jíṣẹ́ ohùn tí ó jẹ́ *ohùn ara yín*. Ẹ jọ̀ọ́ ẹ má fi ohùn àwọn ẹlòmíì ránṣẹ́. A ń gbìyànjú láti má tọ́jú àtẹ̀jíṣẹ́ ohùn tí a dárí ránṣẹ́, àwọn olùyẹ̀wò wa sì ń pa ohùn àwọn ẹlòmíì rẹ́.
+    • Àwọn olùyẹ̀wò àti akọ̀wé díẹ̀ tí a gbẹ́kẹ̀lé, lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀, ń gbọ́ wọn, wọ́n sì ń kọ ohun tí a sọ sílẹ̀. A kì í lo ohùn yín láti dá yín mọ̀, a kì í sì ta á tàbí tẹ̀ ẹ́ jáde.
+    • A ń tọ́jú wọn ní ìpamọ́ (encrypted) sórí sáfà wa {where} fún oṣù 12 jù lọ, láìsí nọ́mbà fóònù yín. {risk}
+    • Ẹ fi *STOP DONATING* ránṣẹ́ nígbàkígbà láti dá a dúró àti láti pa wọ́n rẹ́ (*STOP* àti *DELETE* náà ń pa wọ́n rẹ́).
+    KudiGuard ń ṣiṣẹ́ bákan náà bóyá ẹ gbà tàbí ẹ kọ̀.
+  btn_donate_yes: "Bẹ́ẹ̀ni, mo pé 18+"
+  btn_donate_no: "Rárá, ẹ ṣé"
+  donation_on: "✅ Ẹ ṣé! Láti ìsinsìnyí, a ń tọ́jú àtẹ̀jíṣẹ́ ohùn tí ẹ fi ohùn ara yín gbà sílẹ̀ fún oṣù 12 jù lọ láti mú ìdámọ̀ ọ̀rọ̀ sísọ dára sí i. Ẹ fi *STOP DONATING* ránṣẹ́ nígbàkígbà láti dá a dúró àti láti pa wọ́n rẹ́."
+  donation_off: "🗑️ Ìtọrẹ ohùn ti dúró. A ti pa gbogbo àtẹ̀jíṣẹ́ ohùn tí ẹ fi tọrẹ rẹ́, a kò sì ní tọ́jú àwọn tuntun."
+  donation_declined: "👍 Kò burú. A kò ní tọ́jú àtẹ̀jíṣẹ́ ohùn yín: a ń pa wọ́n rẹ́ lẹ́yìn tí a bá kọ wọ́n sílẹ̀."
+  donation_unavailable: "🎙️ Ìtọrẹ ohùn kò tíì sí nílẹ̀. Ẹ ṣé fún ìfẹ́ yín!"
+  stopped_donor: "Ẹ kò ní gba ọ̀rọ̀ láti ọ̀dọ̀ KudiGuard mọ́, a sì ti pa àtẹ̀jíṣẹ́ ohùn tí ẹ fi tọrẹ rẹ́. Ẹ fi ọ̀rọ̀ èyíkéyìí ránṣẹ́ láti tún bẹ̀rẹ̀."
+  where_outside: "lẹ́yìn òde Nàìjíríà nígbà ìdánwò yìí"
+  where_nigeria: "ní Nàìjíríà"
+  risk_outside: "Òfin ààbò dátà Nàìjíríà lè má dáàbò bo dátà tí ó wà lókè òkun pátápátá."
+  risk_nigeria: "Dátà tí ó ń kọjá láàárín Meta àti Cloudflare lè jẹ́ ṣíṣe lókè òkun, níbi tí òfin ààbò dátà Nàìjíríà lè má ṣiṣẹ́ pátápátá."
+  # Sent before the welcome reached the user: not taken as consent. DRAFT.
+  read_welcome: "☝️ Ẹ jọ̀ọ́ ẹ ka ọ̀rọ̀ tí ó wà lókè, lẹ́yìn náà ẹ fèsì láti tẹ̀síwájú."

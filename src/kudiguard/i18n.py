@@ -55,6 +55,19 @@ class Msg(StrEnum):
     AT_CAPACITY = "at_capacity"
     BUSY = "busy"
     PRIVACY_LINK = "privacy_link"
+    DONATION_OFFER = "donation_offer"
+    BTN_DONATE_YES = "btn_donate_yes"
+    BTN_DONATE_NO = "btn_donate_no"
+    DONATION_ON = "donation_on"
+    DONATION_OFF = "donation_off"
+    DONATION_DECLINED = "donation_declined"
+    DONATION_UNAVAILABLE = "donation_unavailable"
+    STOPPED_DONOR = "stopped_donor"
+    WHERE_OUTSIDE = "where_outside"
+    WHERE_NIGERIA = "where_nigeria"
+    RISK_OUTSIDE = "risk_outside"
+    RISK_NIGERIA = "risk_nigeria"
+    READ_WELCOME = "read_welcome"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

@@ -10,11 +10,12 @@ import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 
 from kudiguard.config import Settings
+from kudiguard.donation import VOICE_RETENTION_DAYS, Sealer, VoiceVault
 from kudiguard.engine import Engine
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
@@ -26,12 +27,14 @@ from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
 from kudiguard.speech.audio import find_ffmpeg
-from kudiguard.storage.base import Store, utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 log = logging.getLogger(__name__)
 
 PURGE_INTERVAL_S = 6 * 3600
+# A pass may run late (sleep drift, slow disk): DELETE markers expire this much earlier.
+PURGE_MARGIN = timedelta(hours=1)
 
 
 @dataclass
@@ -44,6 +47,7 @@ class Services:
     llm: LLM
     conversation: Conversation | None = None  # present when a chat channel (WhatsApp) is configured
     whatsapp: object | None = None  # channels.whatsapp.WhatsAppConfig when configured
+    donations: VoiceVault | None = None  # opt-in voice-note donation (WhatsApp and the web page)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     background: list[asyncio.Task[None]] = field(default_factory=list)
 
@@ -67,19 +71,23 @@ async def purge_loop(
     retention_days: int,
     interval_s: float = PURGE_INTERVAL_S,
     pattern_retention_days: int = PATTERN_RETENTION_DAYS,
+    donations: VoiceVault | None = None,
+    voice_retention_days: int = VOICE_RETENTION_DAYS,
 ) -> None:
-    """Delete evidence (and, on their own clock, scam examples) older than their retention periods (NDPA)."""
+    """Delete evidence (and, on their own clocks, scam examples and donated voice notes) older than their retention
+    periods (NDPA s.24), every ``interval_s``."""
     while True:
-        try:
-            now = utcnow()
-            removed = await store.purge_before(now - timedelta(days=retention_days))
-            removed += await store.purge_patterns_before(
-                (now - timedelta(days=pattern_retention_days)).date()
-            )
-            if removed:
-                log.info("retention purge removed %d rows", removed)
-        except Exception:
-            log.exception("retention purge failed")
+        removed = await _purge_once(
+            store,
+            utcnow(),
+            retention_days,
+            pattern_retention_days,
+            interval_s,
+            donations,
+            voice_retention_days,
+        )
+        if removed:
+            log.info("retention purge removed %d rows", removed)
         await asyncio.sleep(interval_s)
 
 
@@ -115,6 +123,41 @@ async def build_knowledge(
     if failed := await knowledge.refresh_all():
         log.warning("knowledge sources unavailable at startup: %s", sorted(failed))
     return knowledge, embedder
+
+
+async def _purge_once(
+    store: Store,
+    now: datetime,
+    retention_days: int,
+    pattern_retention_days: int,
+    interval_s: float,
+    donations: VoiceVault | None,
+    voice_retention_days: int,
+) -> int:
+    """One retention pass; each step on its own, so one failing never skips the others."""
+    # DELETE markers are dropped one interval (plus a margin for slow passes) early, so none ever outlives
+    # DELETION_MARKER_DAYS (/privacy), while still outliving every importable form answer (29 days).
+    marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s) + PURGE_MARGIN
+    steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
+        ("evidence", lambda: store.purge_before(now - timedelta(days=retention_days))),
+        (
+            "scam examples",
+            lambda: store.purge_patterns_before((now - timedelta(days=pattern_retention_days)).date()),
+        ),
+        ("deletion markers", lambda: store.purge_deletion_markers(marker_cutoff)),
+    ]
+    if donations is not None:
+        vault = donations
+        steps.append(
+            ("donated voice notes", lambda: vault.purge((now - timedelta(days=voice_retention_days)).date()))
+        )
+    removed = 0
+    for name, work in steps:
+        try:
+            removed += await work()
+        except Exception:
+            log.exception("retention purge failed (%s)", name)
+    return removed
 
 
 async def build_services(settings: Settings) -> Services:
@@ -156,6 +199,11 @@ async def build_services(settings: Settings) -> Services:
         closers.append(store.close)
 
         services = Services(settings, registry, engine, store, hasher, llm, closers=closers)
+        # Always built (erasure and retention must work even while collection is off).
+        services.donations = VoiceVault(
+            settings.voice_dir, store, Sealer(settings.voice_secret()), max_per_day=settings.voice_max_per_day,
+            max_bytes=int(settings.voice_max_gb * 1024**3),
+        )  # fmt: skip
         whatsapp = None
         if settings.whatsapp_enabled:
             try:
@@ -177,11 +225,18 @@ async def build_services(settings: Settings) -> Services:
                 hasher=hasher,
                 limits=limits,
                 privacy_url=f"{settings.public_url.rstrip('/')}/privacy" if settings.public_url else "",
+                donations=services.donations,
+                accept_donations=settings.voice_donation,
+                storage=settings.storage_location,
             )
         services.background.append(
             asyncio.create_task(
                 purge_loop(
-                    store, settings.retention_days, pattern_retention_days=settings.pattern_retention_days
+                    store,
+                    settings.retention_days,
+                    pattern_retention_days=settings.pattern_retention_days,
+                    donations=services.donations,
+                    voice_retention_days=settings.voice_retention_days,
                 )
             )
         )

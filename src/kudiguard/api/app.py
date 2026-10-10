@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import html
+import json
 import logging
 import re
 import time
@@ -25,9 +26,9 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -36,14 +37,16 @@ from kudiguard.api.ratelimit import RateLimiter
 from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
 from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
+from kudiguard.donation import DONATION_VERSION, Donation
 from kudiguard.engine import Answer, AnswerKind
 from kudiguard.envfile import load_env_file
+from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
 from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, utcnow
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -562,8 +565,15 @@ def _web_router() -> APIRouter:
     router = APIRouter(include_in_schema=False)
 
     @router.get("/")
-    async def page() -> FileResponse:
-        return FileResponse(STATIC / "voice.html", media_type="text/html; charset=utf-8")
+    async def page(request: Request) -> HTMLResponse:
+        """The web page, told whether voice donation is on and where data is stored (its texts follow)."""
+        settings: Settings = request.app.state.settings
+        config = {
+            "donation": settings.voice_donation,
+            "storageInNigeria": settings.storage_location is StorageLocation.NIGERIA,
+        }
+        page = (STATIC / "voice.html").read_text(encoding="utf-8")
+        return HTMLResponse(page.replace("{{CONFIG}}", json.dumps(config)))
 
     @router.get("/privacy")
     async def privacy(request: Request) -> HTMLResponse:
@@ -584,20 +594,42 @@ def _web_router() -> APIRouter:
                 if years and not rest
                 else f"{settings.pattern_retention_days} days"
             ),
+            "STORAGE_LOCATION": html.escape(settings.storage_location.english),
+            "STORAGE_RISK": html.escape(settings.storage_location.english_risk),
+            "DELETION_MARKER_DAYS": str(DELETION_MARKER_DAYS),
+            "DONATION_STATUS": (
+                "Available now."
+                if settings.voice_donation
+                else "Not switched on yet: this describes how it will work once it is."
+            ),
+            "VOICE_RETENTION": (
+                "12 months"
+                if settings.voice_retention_days == 365
+                else f"{settings.voice_retention_days} days"
+            ),
         }
         page = (STATIC / "privacy.html").read_text(encoding="utf-8")
         # One pass: a value can never introduce another placeholder.
         return HTMLResponse(re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page))
 
     @router.post("/web/check")
-    async def web_check(request: Request, services: ServicesDep) -> CheckResponse:
+    async def web_check(
+        request: Request, services: ServicesDep, background: BackgroundTasks
+    ) -> CheckResponse:
         # Consent, session and rate limit come in headers so they are checked before any upload is read.
         if request.headers.get("x-kudiguard-consent") != CONSENT_VERSION:  # consent to the current text only
             raise HTTPException(403, "consent is required")
+        # Voice donation: a separate, optional box with its own version; absent = no donation.
+        donating = request.headers.get("x-kudiguard-donation", "")
+        settings: Settings = request.app.state.settings
+        if donating and not settings.voice_donation:
+            raise HTTPException(403, "voice donation is not enabled on this server")
+        if donating and donating != DONATION_VERSION:
+            raise HTTPException(403, "voice donation consent is out of date: reload the page")
+        consented_at = utcnow()  # a withdrawal after this moment wins over the background write
         session = request.headers.get("x-kudiguard-session", "")
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
-        settings: Settings = request.app.state.settings
         _too_many(request.app.state.web_limiter, client_ip(request, settings.trust_proxy_headers))
         pending: set[str] = request.app.state.pending_web_sessions
         async with request.app.state.web_admission:  # check + reserve atomically (store counts yield)
@@ -611,10 +643,33 @@ def _web_router() -> APIRouter:
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
             )  # fmt: skip
+            if (
+                donating and audio is not None and services.donations is not None
+            ):  # after the response is sent
+                background.add_task(
+                    services.donations.donate,
+                    Donation(
+                        user_hash=services.hasher.user_id(f"web:{session}"), channel="web", language=answer.language,
+                        audio=audio, hypothesis=transcript or "", consent_version=donating,
+                        consented_at=consented_at,
+                    ),
+                )  # fmt: skip
             return _check_response(services, answer, transcript, ms)
         finally:
             if admitted:
                 pending.discard(session)  # now counted from the evidence log (or never served)
+
+    @router.post("/web/donation/withdraw")
+    async def withdraw_donation(request: Request, services: ServicesDep) -> dict[str, int]:
+        """Unticking the donation box: stop and delete this browser session's donated voice notes (NDPA s.35:
+        as easy as giving it). Needs only the session id the page keeps; never rate-limited or consent-gated."""
+        session = request.headers.get("x-kudiguard-session", "")
+        if not re.fullmatch(SESSION_PATTERN, session):
+            raise HTTPException(422, "invalid session id")
+        user_hash = services.hasher.user_id(f"web:{session}")
+        if services.donations is not None:
+            return {"deleted": await services.donations.erase(user_hash)}
+        return {"deleted": len(await services.store.delete_voice_samples(user_hash))}
 
     return router
 

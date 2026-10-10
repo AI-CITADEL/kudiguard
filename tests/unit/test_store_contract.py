@@ -1,15 +1,16 @@
 """One behavioural contract, run against every Store implementation (SQLite for production, memory for tests)."""
 
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
-from kudiguard.storage.base import Store, UserState, utcnow
+from kudiguard.storage.base import Store, UserState, VoiceSample, utcnow
 from kudiguard.storage.memory import MemoryStore
 from kudiguard.storage.sqlite import SQLiteStore
 
@@ -261,3 +262,164 @@ async def test_count_active_users_by_channel(store: Store) -> None:
     assert await store.count_active_users_since(since, channels={"whatsapp"}) == 1
     assert await store.count_active_users_since(since, channels={"web", "whatsapp"}) == 3
     assert await store.count_active_users_since(since, channels=()) == 0
+
+
+# --- voice-note donation ------------------------------------------------------------------------------------------
+
+
+def sample(sample_id: str, user: str = "u1", day: date = date(2026, 10, 15), **kw: object) -> VoiceSample:
+    values: dict[str, object] = {
+        "id": sample_id, "user_hash": user, "week": day, "language": "yo", "channel": "whatsapp",
+        "consent_version": "2026-10-10", "hypothesis": "pe 08031234567", "duration_s": 3.5,
+    }  # fmt: skip
+    values.update(kw)
+    return VoiceSample(**values)  # type: ignore[arg-type]
+
+
+async def test_donation_consent_round_trips(store: Store) -> None:
+    given, offered = utcnow(), utcnow() - timedelta(days=1)
+    await store.save_user(
+        UserState("u1", donation_version="2026-10-10", donation_at=given, donation_offered_at=offered)
+    )
+    loaded = await store.get_user("u1")
+    assert loaded is not None and loaded.donation_version == "2026-10-10"
+    assert loaded.donation_at == given and loaded.donation_offered_at == offered
+    loaded.donation_version, loaded.donation_at = None, None  # withdrawal
+    await store.save_user(loaded)
+    again = await store.get_user("u1")
+    assert again is not None and again.donation_version is None and again.donation_at is None
+    assert again.donation_offered_at == offered  # offered once, remembered
+
+
+async def test_voice_samples_are_minimised_and_ordered_by_week(store: Store) -> None:
+    await store.add_voice_sample(sample("b" * 32, day=date(2026, 10, 15)))  # Thursday
+    await store.add_voice_sample(sample("a" * 32, user="u2", day=date(2026, 10, 19), duration_s=None))
+    await store.add_voice_sample(sample("c" * 32, day=date(2026, 10, 12)))
+    rows = await store.voice_samples()
+    assert [(r.id, r.week) for r in rows] == [
+        ("b" * 32, date(2026, 10, 12)), ("c" * 32, date(2026, 10, 12)), ("a" * 32, date(2026, 10, 19)),
+    ]  # fmt: skip
+    assert all("08031234567" not in r.hypothesis for r in rows)  # redacted by the store
+    assert rows[0].duration_s == 3.5 and rows[2].duration_s is None
+    assert rows[0].consent_version == "2026-10-10" and rows[0].channel == "whatsapp"
+    assert [r.id for r in await store.voice_samples("u2")] == ["a" * 32]
+    assert await store.voice_samples("nobody") == []
+
+
+async def test_withdrawal_deletes_only_that_donors_samples(store: Store) -> None:
+    for n, user in enumerate(("u1", "u1", "u2")):
+        await store.add_voice_sample(sample(f"{n}" * 32, user=user))
+    assert await store.delete_voice_samples("u1") == ["0" * 32, "1" * 32]
+    assert [s.id for s in await store.voice_samples()] == ["2" * 32]
+    assert await store.delete_voice_samples("u1") == []
+
+
+async def test_welcome_and_withdrawal_round_trip(store: Store) -> None:
+    withdrawn = utcnow()
+    await store.save_user(UserState("u1", welcome_version="2026-10-10", donation_withdrawn_at=withdrawn))
+    loaded = await store.get_user("u1")
+    assert (
+        loaded is not None
+        and loaded.welcome_version == "2026-10-10"
+        and loaded.donation_withdrawn_at == withdrawn
+    )
+    loaded.welcome_version, loaded.donation_withdrawn_at = None, None
+    await store.save_user(loaded)
+    again = await store.get_user("u1")
+    assert again is not None and again.welcome_version is None and again.donation_withdrawn_at is None
+
+
+async def test_delete_leaves_only_a_coded_marker_that_expires(store: Store, tmp_path: Path) -> None:
+    assert await store.deleted_at("u1") is None
+    await store.save_user(UserState("u1"))
+    before = utcnow()
+    assert await store.delete_user("u1") == 1  # the marker is not counted as data
+    marked = await store.deleted_at("u1")
+    assert marked is not None and marked >= before and await store.deleted_at("u2") is None
+    await store.delete_user("u1")  # a second DELETE moves the time on
+    later = await store.deleted_at("u1")
+    assert later is not None and later >= marked
+    if isinstance(store, SQLiteStore):  # only a keyed hash of the user hash is stored, never the hash itself
+        import sqlite3
+
+        db = sqlite3.connect(tmp_path / "kg.db")
+        assert db.execute("SELECT marker FROM deletion_markers").fetchall() == [
+            (UserHasher(b"s" * MIN_SECRET_BYTES).deletion_marker("u1"),)
+        ]
+        db.close()
+    assert await store.purge_deletion_markers(utcnow() - timedelta(days=1)) == 0
+    assert await store.purge_deletion_markers(utcnow() + timedelta(seconds=1)) == 1
+    assert await store.deleted_at("u1") is None
+
+
+async def test_form_consent_is_a_compare_and_set(store: Store) -> None:
+    long_ago = utcnow() - timedelta(days=2)
+    form = UserState("u1", created_at=long_ago, last_seen_at=long_ago, donation_version="2026-10-10",
+                     donation_at=long_ago, donation_source="form", donation_offered_at=long_ago,
+                     donation_offered_version="2026-10-10")  # fmt: skip
+    assert await store.record_form_consent(form, None)  # a new row
+    assert not await store.record_form_consent(form, None)  # it exists now: never overwritten
+    read = UserState("u2", language="ha", created_at=long_ago, last_seen_at=long_ago, consented_at=long_ago)
+    await store.save_user(read)
+    changed = dataclasses.replace(
+        read, last_seen_at=utcnow()
+    )  # a message arrived after the import read the row
+    await store.save_user(changed)
+    assert not await store.record_form_consent(dataclasses.replace(form, user_hash="u2"), read)
+    assert await store.record_form_consent(dataclasses.replace(form, user_hash="u2"), changed)
+    stored = await store.get_user("u2")
+    assert stored is not None and stored.donation_source == "form" and stored.language == "ha"
+    assert stored.consented_at == long_ago  # nothing but the donation fields was touched
+    for blocker in ({"stopped": True}, {"donation_withdrawn_at": long_ago}, {"donation_offered_version": "x"},
+                    {"donation_version": "x"}):  # fmt: skip
+        state = UserState("u3", created_at=long_ago, last_seen_at=long_ago, **blocker)  # type: ignore[arg-type]
+        await store.save_user(state)
+        assert not await store.record_form_consent(dataclasses.replace(form, user_hash="u3"), state), blocker
+    assert not await store.record_form_consent(dataclasses.replace(form, user_hash="gone"), read)  # no row
+
+
+async def test_sample_ids_are_unique(store: Store) -> None:
+    await store.add_voice_sample(sample("1" * 32))
+    with pytest.raises(ValueError, match="duplicate"):
+        await store.add_voice_sample(sample("1" * 32, user="u2"))
+    assert [s.user_hash for s in await store.voice_samples()] == ["u1"]
+
+
+async def test_the_voice_vault_id_is_stable_per_database(store: Store) -> None:
+    first = await store.voice_vault_id()
+    assert len(first) == 32 and await store.voice_vault_id() == first
+
+
+async def test_a_single_flagged_sample_can_be_deleted(store: Store) -> None:
+    await store.add_voice_sample(sample("1" * 32))
+    await store.add_voice_sample(sample("2" * 32))
+    assert await store.delete_voice_sample("1" * 32)
+    assert not await store.delete_voice_sample("1" * 32)
+    assert [s.id for s in await store.voice_samples()] == ["2" * 32]
+
+
+async def test_voice_retention_purges_whole_weeks_on_or_before_the_cutoff(store: Store) -> None:
+    await store.add_voice_sample(sample("1" * 32, day=date(2025, 10, 6)))  # week of Monday 2025-10-06
+    await store.add_voice_sample(sample("2" * 32, day=date(2025, 10, 13)))
+    assert await store.purge_voice_samples(date(2025, 10, 5)) == []
+    assert await store.purge_voice_samples(date(2025, 10, 6)) == ["1" * 32]
+    assert [s.id for s in await store.voice_samples()] == ["2" * 32]
+
+
+async def test_delete_user_also_removes_donated_sample_rows(store: Store) -> None:
+    await store.save_user(UserState("u1", donation_version="2026-10-10", donation_at=utcnow()))
+    await store.add_voice_sample(sample("1" * 32))
+    await store.add_voice_sample(sample("2" * 32, user="u2"))
+    assert await store.delete_user("u1") == 2  # the user row and one sample
+    assert [s.id for s in await store.voice_samples()] == ["2" * 32]
+
+
+async def test_a_donors_consent_record_outlives_inactivity_while_samples_exist(store: Store) -> None:
+    long_ago = utcnow() - timedelta(days=200)
+    for user in ("donor", "idle"):
+        await store.save_user(UserState(user, created_at=long_ago, last_seen_at=long_ago))
+    await store.add_voice_sample(sample("1" * 32, user="donor"))
+    assert await store.purge_before(utcnow() - timedelta(days=90)) == 1  # only the idle non-donor
+    assert await store.get_user("donor") is not None and await store.get_user("idle") is None
+    await store.delete_voice_samples("donor")
+    assert await store.purge_before(utcnow() - timedelta(days=90)) == 1  # now it ages out as usual

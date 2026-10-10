@@ -17,6 +17,7 @@ from kudiguard.patterns import ScamPattern
 
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
+DELETION_MARKER_DAYS = 30  # DELETE markers (only for the sign-up import); stated on /privacy
 
 
 def utcnow() -> datetime:
@@ -40,6 +41,40 @@ class UserState:
     last_interaction_id: int | None = None  # for button follow-ups ("What should I do?", "Warn my family")
     created_at: datetime = field(default_factory=utcnow)
     last_seen_at: datetime = field(default_factory=utcnow)
+    # The CONSENT_VERSION of the welcome last *shown* (None = never welcomed, e.g. a row created by the sign-up form
+    # import): main consent is recorded only after the current welcome was shown.
+    welcome_version: str | None = None
+    # When that welcome was sent (accepted by WhatsApp); consent comes only from messages sent after it.
+    welcome_at: datetime | None = None
+    # Voice-note donation (``kudiguard.donation``): separate, opt-in consent. ``donation_version`` is the donation
+    # text the user accepted together with the 18+ and own-voice confirmations (the chat's "Yes, I am 18+" button or
+    # the sign-up form's ticked boxes); None = not donating. It survives a change of the main consent text; only
+    # STOP, STOP DONATING, "No" and DELETE end it. Kept while the user has donated samples, as proof of consent (s.26).
+    donation_version: str | None = None
+    donation_at: datetime | None = None
+    donation_source: str | None = None  # how consent was given: "chat" or "form" (tester sign-up form)
+    donation_offered_at: datetime | None = None  # when the offer was last shown
+    donation_offered_version: str | None = (
+        None  # which offer text: offered once per text, to old donors again
+    )
+    donation_withdrawn_at: datetime | None = None  # last "No", STOP DONATING or STOP while donating
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceSample:
+    """One donated voice note's record (the audio itself is an encrypted file named by ``id``).
+
+    Minimised: a random id, the donor's pseudonymous hash (for withdrawal, erasure and access requests), the week
+    (Monday) instead of a timestamp, and the speech-recognition hypothesis, redacted by every Store."""
+
+    id: str
+    user_hash: str
+    week: date
+    language: LanguageCode
+    channel: str
+    consent_version: str  # the donation text the donor accepted (per-sample proof of consent)
+    hypothesis: str
+    duration_s: float | None = None
 
 
 class StoreClosedError(RuntimeError):
@@ -77,11 +112,28 @@ class Store(Protocol):
 
     async def delete_user(self, user_hash: str) -> int:
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
-        their stored messages. Returns rows removed."""
+        their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Leaves only
+        a coded DELETE marker (``deleted_at``). Returns rows removed (the marker is not counted)."""
+        ...
+
+    async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
+        """Compare-and-set for the sign-up import: store ``state``'s donation consent (version, time, source and the
+        offer marks) only if the user row is still exactly as read (``expected``; None = no row yet), never stopped,
+        withdrawn or offered meanwhile. Touches no other field. Returns whether it was recorded."""
+        ...
+
+    async def deleted_at(self, user_hash: str) -> datetime | None:
+        """When this user last sent DELETE, from the coded marker ``delete_user`` leaves (``DELETION_MARKER_DAYS``).
+        Read only by the sign-up form import."""
+        ...
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        """Remove DELETE markers older than ``cutoff``. Returns markers removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:
-        """Retention: atomically remove data older than ``cutoff``. Returns rows removed."""
+        """Retention: atomically remove data older than ``cutoff``. Returns rows removed. A user row is kept while
+        the user has donated voice samples (it holds their donation consent record)."""
         ...
 
     async def add_pattern(self, pattern: ScamPattern) -> None:
@@ -102,6 +154,33 @@ class Store(Protocol):
 
     async def interaction_ids(self) -> frozenset[int]:
         """Ids of every stored interaction (cheap: no text is read), e.g. to spot rows erased since a review export."""
+        ...
+
+    async def add_voice_sample(self, sample: VoiceSample) -> None:
+        """Record a donated voice note (the hypothesis is redacted). The audio file is the caller's
+        (``donation.VoiceVault``). Raises ``ValueError`` for an id that already exists."""
+        ...
+
+    async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
+        """Donated samples, all or one donor's, ordered by week then id (never by insertion order)."""
+        ...
+
+    async def delete_voice_samples(self, user_hash: str) -> list[str]:
+        """Withdrawal/erasure: remove a donor's sample rows; returns their ids so the files can be deleted."""
+        ...
+
+    async def delete_voice_sample(self, sample_id: str) -> bool:
+        """Remove one sample row (a reviewer found a child's or another person's voice). False if unknown."""
+        ...
+
+    async def voice_vault_id(self) -> str:
+        """A random id created once per database; the voice folder carries it too, so files are only ever swept
+        against the database they belong to."""
+        ...
+
+    async def purge_voice_samples(self, cutoff: date) -> list[str]:
+        """Retention: remove samples from weeks starting on or before ``cutoff`` (so none outlives its period);
+        returns their ids."""
         ...
 
     async def close(self) -> None: ...

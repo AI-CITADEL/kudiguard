@@ -38,7 +38,37 @@ unfaithful, and what was changed: _…_
 | Knowledge retrieval, 24 questions | right entry in top 3: 96% |
 | Speech, Google FLEURS clips as WhatsApp audio (WER) | Hausa 28% · Yoruba 33% · Igbo 46% |
 
+## Speech on real voice notes (donated, opt-in)
+Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The transcription loop:
+
+1. **Export a sample:** `kudiguard voice export --out var/voice-export/2026-10 --n 50 --seed 1 [--languages ha,yo]`.
+   * This draws a seeded random sample per language.
+   * It writes the decrypted audio to `audio/<id>.<ext>`, plus `manifest.csv` (UTF-8 BOM, formula-safe) with the
+     automatic `asr_hypothesis` and an empty `reference` column.
+   * Only `var/` or `exports/` are accepted, never a cloud-synced folder.
+2. **Transcribe:** native-speaker transcribers work under written confidentiality, locally, with no cloud drives
+   and no copies abroad.
+   * Listen to the audio and type exactly what was said into `reference`. Do not edit the hypothesis.
+   * Type every number as `[number]`. References are masked like the hypotheses anyway.
+   * Keep tone marks where you hear them.
+   * Save the file as **CSV UTF-8**.
+   * Report sample ids that contain a child's voice, another person's voice, or a PIN, OTP, BVN or account number
+     read out. Delete them with `kudiguard voice remove <id> ...`.
+3. **Score:** `kudiguard voice wer var/voice-export/2026-10/manifest.csv` gives pooled WER per language (diacritics
+   folded and kept) and CER, with the same scoring as `scripts/eval_asr.py` (`kudiguard.speech.metrics`). Copy the
+   table here. The hypotheses come from the model that ran at donation time. To compare a new model, re-transcribe
+   the same clips with it (and keep the human references).
+4. **Clean up:** delete the export folder and every transcriber's copy.
+
+`kudiguard voice stats` counts donors, samples and minutes per language.
+
+| Language | Clips | WER | WER+d | CER |
+|---|---|---|---|---|
+| ha / yo / ig / en | _n_ | _x_ | _x_ | _x_ |
+
 ## Known limitations
+* A language tap within 5 s of the welcome gets "please read the message above" once, because consent must
+  come after the notice could be read (docs/DEPLOY.md).
 * Genuine bank OTP SMS can be flagged 🟠 "be careful" (safe direction; fix pending separate examples).
 * Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review (model replies: see above).
 * Speech accuracy measured on read speech; real voice notes from the pilot will be added.

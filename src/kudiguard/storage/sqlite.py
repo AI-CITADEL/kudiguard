@@ -21,7 +21,7 @@ from typing import Any, TypeVar
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import StoreClosedError, UserState, aware, utcnow
+from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -91,7 +91,52 @@ MIGRATIONS: Sequence[str] = (
     ) WITHOUT ROWID;
     CREATE INDEX ix_patterns_week ON scam_patterns (week, text);
     """,
+    # 3: opt-in voice-note donation: consent record per user, one row per donated sample (audio in encrypted files)
+    """
+    ALTER TABLE users ADD COLUMN donation_version TEXT;
+    ALTER TABLE users ADD COLUMN donation_at TEXT;
+    ALTER TABLE users ADD COLUMN donation_source TEXT;
+    ALTER TABLE users ADD COLUMN donation_offered_at TEXT;
+    ALTER TABLE users ADD COLUMN donation_offered_version TEXT;
+    ALTER TABLE users ADD COLUMN donation_withdrawn_at TEXT;
+    ALTER TABLE users ADD COLUMN welcome_version TEXT;
+    ALTER TABLE users ADD COLUMN welcome_at TEXT;
+    CREATE TABLE deletion_markers (marker TEXT PRIMARY KEY, deleted_at TEXT NOT NULL) WITHOUT ROWID;
+    CREATE INDEX ix_deletion_markers_time ON deletion_markers (deleted_at);
+    CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+    INSERT INTO meta VALUES ('voice_vault_id', lower(hex(randomblob(16))));
+    CREATE TABLE voice_samples (
+        id TEXT PRIMARY KEY,
+        user_hash TEXT NOT NULL,
+        week TEXT NOT NULL,
+        language TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        consent_version TEXT NOT NULL,
+        hypothesis TEXT NOT NULL,
+        duration_s REAL
+    ) WITHOUT ROWID;
+    CREATE INDEX ix_voice_user ON voice_samples (user_hash);
+    CREATE INDEX ix_voice_week ON voice_samples (week);
+    """,
 )
+_USER_COLUMNS = (
+    "user_hash, language, consented_at, consent_version, stopped, last_interaction_id, created_at, last_seen_at, "
+    "donation_version, donation_at, donation_source, donation_offered_at, donation_offered_version, "
+    "donation_withdrawn_at, welcome_version, welcome_at"
+)
+_USER_SLOTS = ", ".join("?" * len(_USER_COLUMNS.split(",")))
+
+
+def _user_values(state: UserState) -> tuple[object, ...]:
+    """A users row in ``_USER_COLUMNS`` order."""
+    return (
+        state.user_hash, state.language, _ts(state.consented_at) if state.consented_at else None,
+        state.consent_version, int(state.stopped), state.last_interaction_id, _ts(state.created_at),
+        _ts(state.last_seen_at), state.donation_version, _ts(state.donation_at) if state.donation_at else None,
+        state.donation_source, _ts(state.donation_offered_at) if state.donation_offered_at else None,
+        state.donation_offered_version, _ts(state.donation_withdrawn_at) if state.donation_withdrawn_at else None,
+        state.welcome_version, _ts(state.welcome_at) if state.welcome_at else None,
+    )  # fmt: skip
 
 
 def _ts(value: datetime) -> str:
@@ -157,29 +202,59 @@ class SQLiteStore:
             last_interaction_id=row["last_interaction_id"],
             created_at=_dt_required(row["created_at"]),
             last_seen_at=_dt_required(row["last_seen_at"]),
+            donation_version=row["donation_version"],
+            donation_at=_dt(row["donation_at"]),
+            donation_source=row["donation_source"],
+            donation_offered_at=_dt(row["donation_offered_at"]),
+            donation_offered_version=row["donation_offered_version"],
+            donation_withdrawn_at=_dt(row["donation_withdrawn_at"]),
+            welcome_version=row["welcome_version"],
+            welcome_at=_dt(row["welcome_at"]),
         )
 
     async def save_user(self, state: UserState) -> None:
-        values = (
-            state.user_hash,
-            state.language,
-            _ts(state.consented_at) if state.consented_at else None,
-            state.consent_version,
-            int(state.stopped),
-            state.last_interaction_id,
-            _ts(state.created_at),
-            _ts(state.last_seen_at),
-        )
+        values = _user_values(state)
         await self._run(
             lambda db: db.execute(
-                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                f"""INSERT INTO users ({_USER_COLUMNS}) VALUES ({_USER_SLOTS})
                    ON CONFLICT (user_hash) DO UPDATE SET language = excluded.language,
                      consented_at = excluded.consented_at, consent_version = excluded.consent_version,
                      stopped = excluded.stopped, last_interaction_id = excluded.last_interaction_id,
-                     last_seen_at = excluded.last_seen_at""",
+                     last_seen_at = excluded.last_seen_at, donation_version = excluded.donation_version,
+                     donation_at = excluded.donation_at, donation_source = excluded.donation_source,
+                     donation_offered_at = excluded.donation_offered_at,
+                     donation_offered_version = excluded.donation_offered_version,
+                     donation_withdrawn_at = excluded.donation_withdrawn_at,
+                     welcome_version = excluded.welcome_version, welcome_at = excluded.welcome_at""",
                 values,
             )
         )
+
+    async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
+        if expected is None:
+            values = _user_values(state)
+            cursor = await self._run(
+                lambda db: db.execute(
+                    f"INSERT INTO users ({_USER_COLUMNS}) VALUES ({_USER_SLOTS}) ON CONFLICT (user_hash) DO NOTHING",
+                    values,
+                )
+            )
+            return int(cursor.rowcount) == 1
+        params = (
+            state.donation_version, _ts(state.donation_at) if state.donation_at else None, state.donation_source,
+            _ts(state.donation_offered_at) if state.donation_offered_at else None, state.donation_offered_version,
+            state.user_hash, _ts(expected.last_seen_at),
+        )  # fmt: skip
+        cursor = await self._run(
+            lambda db: db.execute(
+                """UPDATE users SET donation_version = ?, donation_at = ?, donation_source = ?,
+                     donation_offered_at = ?, donation_offered_version = ?
+                   WHERE user_hash = ? AND last_seen_at = ? AND stopped = 0 AND donation_version IS NULL
+                     AND donation_withdrawn_at IS NULL AND donation_offered_version IS NULL""",
+                params,
+            )
+        )
+        return int(cursor.rowcount) == 1
 
     # --- messages and interactions --------------------------------------------------------------------
 
@@ -258,6 +333,8 @@ class SQLiteStore:
     # --- erasure and retention ------------------------------------------------------------------------
 
     async def delete_user(self, user_hash: str) -> int:
+        marker = self._hasher.deletion_marker(user_hash)
+
         def work(db: sqlite3.Connection) -> int:
             with _transaction(db):
                 scams = db.execute(
@@ -278,10 +355,64 @@ class SQLiteStore:
                 ).rowcount
                 turns = db.execute("DELETE FROM interactions WHERE user_hash = ?", (user_hash,)).rowcount
                 users = db.execute("DELETE FROM users WHERE user_hash = ?", (user_hash,)).rowcount
+                voice = db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,)).rowcount
+                db.execute(
+                    "INSERT INTO deletion_markers VALUES (?, ?) ON CONFLICT (marker) DO UPDATE SET deleted_at = "
+                    "excluded.deleted_at",
+                    (marker, _ts(utcnow())),
+                )
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # erased pages must not linger in the WAL file
-            return patterns + feedback + turns + users
+            return patterns + feedback + turns + users + voice
 
         return await self._run(work)
+
+    async def delete_voice_samples(self, user_hash: str) -> list[str]:
+        def work(db: sqlite3.Connection) -> list[str]:
+            with _transaction(db):
+                ids = [
+                    r[0] for r in db.execute("SELECT id FROM voice_samples WHERE user_hash = ?", (user_hash,))
+                ]
+                db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,))
+            if ids:
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            return sorted(ids)
+
+        return await self._run(work)
+
+    async def delete_voice_sample(self, sample_id: str) -> bool:
+        def work(db: sqlite3.Connection) -> bool:
+            removed = db.execute("DELETE FROM voice_samples WHERE id = ?", (sample_id,)).rowcount == 1
+            if removed:
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            return removed
+
+        return await self._run(work)
+
+    async def purge_voice_samples(self, cutoff: date) -> list[str]:
+        stamp = cutoff.isoformat()
+
+        def work(db: sqlite3.Connection) -> list[str]:
+            with _transaction(db):
+                ids = [r[0] for r in db.execute("SELECT id FROM voice_samples WHERE week <= ?", (stamp,))]
+                db.execute("DELETE FROM voice_samples WHERE week <= ?", (stamp,))
+            return sorted(ids)
+
+        return await self._run(work)
+
+    async def deleted_at(self, user_hash: str) -> datetime | None:
+        marker = self._hasher.deletion_marker(user_hash)
+        row = await self._run(
+            lambda db: db.execute(
+                "SELECT deleted_at FROM deletion_markers WHERE marker = ?", (marker,)
+            ).fetchone()
+        )
+        return _dt(row[0]) if row else None
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        cursor = await self._run(
+            lambda db: db.execute("DELETE FROM deletion_markers WHERE deleted_at < ?", (_ts(cutoff),))
+        )
+        return int(cursor.rowcount)
 
     async def purge_before(self, cutoff: datetime) -> int:
         stamp = _ts(cutoff)
@@ -293,7 +424,10 @@ class SQLiteStore:
                     (stamp,),
                 ).rowcount
                 turns = db.execute("DELETE FROM interactions WHERE created_at < ?", (stamp,)).rowcount
-                users = db.execute("DELETE FROM users WHERE last_seen_at < ?", (stamp,)).rowcount
+                users = db.execute(  # a donor's row is their consent record: kept while samples exist
+                    "DELETE FROM users WHERE last_seen_at < ? AND user_hash NOT IN (SELECT user_hash FROM voice_samples)",
+                    (stamp,),
+                ).rowcount
                 claims = db.execute("DELETE FROM processed_messages WHERE claimed_at < ?", (stamp,)).rowcount
             return feedback + turns + users + claims
 
@@ -343,6 +477,41 @@ class SQLiteStore:
     async def interaction_ids(self) -> frozenset[int]:
         rows = await self._run(lambda db: db.execute("SELECT id FROM interactions").fetchall())
         return frozenset(int(r["id"]) for r in rows)
+
+    async def add_voice_sample(self, sample: VoiceSample) -> None:
+        values = (
+            sample.id, sample.user_hash, week_of(sample.week).isoformat(), sample.language, sample.channel,
+            sample.consent_version, redact(sample.hypothesis), sample.duration_s,
+        )  # fmt: skip
+
+        def work(db: sqlite3.Connection) -> None:
+            try:
+                db.execute("INSERT INTO voice_samples VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
+            except sqlite3.IntegrityError as exc:  # same contract as the memory store
+                raise ValueError("duplicate voice sample id") from exc
+
+        await self._run(work)
+
+    async def voice_vault_id(self) -> str:
+        row = await self._run(
+            lambda db: db.execute("SELECT value FROM meta WHERE key = 'voice_vault_id'").fetchone()
+        )
+        return str(row[0])
+
+    async def voice_samples(self, user_hash: str | None = None) -> list[VoiceSample]:
+        query = "SELECT * FROM voice_samples"
+        params: tuple[str, ...] = ()
+        if user_hash is not None:
+            query, params = query + " WHERE user_hash = ?", (user_hash,)
+        rows = await self._run(lambda db: db.execute(query + " ORDER BY week, id", params).fetchall())
+        return [
+            VoiceSample(
+                id=r["id"], user_hash=r["user_hash"], week=date.fromisoformat(r["week"]), language=r["language"],
+                channel=r["channel"], consent_version=r["consent_version"], hypothesis=r["hypothesis"],
+                duration_s=r["duration_s"],
+            )
+            for r in rows
+        ]  # fmt: skip
 
     async def close(self) -> None:
         def work() -> None:

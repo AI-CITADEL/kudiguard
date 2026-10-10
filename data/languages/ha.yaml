@@ -15,6 +15,8 @@ commands:
   stop: [daina aiko min, daina turo min sako]  # not "tsaya": it means "wait"
   delete: [goge bayanai na, goge sakonni na]
   language: [harshe, canja harshe]
+  donate: [ba da gudummawar murya, bada gudummawar murya]  # DRAFT, pending native review
+  stop_donating: [daina gudummawar murya, daina karbar murya ta]  # DRAFT
   greetings: [sannu, sannu da zuwa, ina kwana, ina wuni, barka, barka da safe, barka da rana, barka da yamma,
     salam, assalamu alaikum, na gode, nagode, mun gode, to, madalla]
 
@@ -59,7 +61,8 @@ strings:
 
     Ku aiko mini da *saƙon murya* ko rubutu, ko ku tura saƙon da kuke shakka a kai.
 
-    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su. Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
+    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Wasu ƙalilan amintattun masu bita (ƙungiyarmu ko masu harshen a matsayin harshen uwa, ƙarƙashin yarjejeniyar sirri a rubuce) za su iya karanta wasu daga cikin saƙonni da amsoshi, an ɓoye lambobi kuma babu lambar wayarku ko wata alamar gane ku, don duba inganci da tsaro; ana share kwafinsu bayan binciken. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su, sai dai idan kun zaɓi ba da gudummawarsu (za mu tambaye ku daban). Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
+    🌍 Don gudanar da KudiGuard, saƙonninku suna wucewa ta WhatsApp (Meta) da Cloudflare, a wajen Najeriya, kuma ana adana su a sabarmu {where}. {risk} Ta hanyar ci gaba, kun kuma amince da wannan canja wurin.
     ℹ️ Wannan jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
   choose_language: Wane harshe zan yi amfani da shi?
@@ -91,7 +94,7 @@ strings:
   rate_limited: ⏳ Kun aiko saƙonni da yawa. Don Allah ku jira kaɗan sannan ku sake gwadawa.
   error_retry: 😔 Yi haƙuri, an sami matsala a ɓangarena. Don Allah ku sake gwadawa nan ba da daɗewa ba.
   stopped: Ba za ku ƙara samun saƙonni daga KudiGuard ba. Ku aika kowane saƙo don sake farawa.
-  deleted: 🗑️ An share saƙonninku.
+  deleted: 🗑️ An share saƙonninku da duk saƙonnin murya da kuka ba da gudummawa.
   fallback_scam: "Kada ku tura kuɗi, kuma kada ku bayar da wata lamba, PIN ko kalmar sirri. Ku daina hulɗa da su, ku kira bankinku ta lambar da ke jikin katinku."
   fallback_answer: "Ban iya shirya cikakkiyar amsa yanzu ba. Don Allah ku sake gwadawa nan ba da jimawa ba, ko ku tambayi bankinku kai tsaye."
   fallback_steps: |-
@@ -102,3 +105,25 @@ strings:
   at_capacity: "😔 KudiGuard ta cika yanzu. Don Allah ku sake gwadawa bayan 'yan kwanaki."
   busy: "⏳ Mutane da yawa suna tambaya yanzu. Don Allah ku sake gwadawa bayan minti ɗaya."
   privacy_link: "🔐 Sanarwar sirri: {url}"
+  # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
+  donation_offer: |-
+    🎙️ *Zaɓi ne: ku taimaka wa KudiGuard ta fahimci muryoyin 'yan Najeriya*
+    Za mu iya adana saƙonnin murya da kuke aikowa daga yanzu, don gwada da inganta fahimtar magana?
+    • Sai idan kun kai shekara *18 ko fiye*, kuma saƙonnin murya da *muryarku* kawai. Don Allah kada ku aiko rikodin muryar wasu mutane. Muna ƙoƙarin kada mu adana saƙonnin murya da aka tura, kuma masu bitarmu suna share muryoyin wasu mutane.
+    • Wasu ƙalilan amintattun masu bita da masu rubutawa, ƙarƙashin yarjejeniyar sirri a rubuce, za su saurare su su rubuta abin da aka faɗa. Ba ma amfani da muryarku don gane ku, kuma ba ma sayar da ita ko wallafa ta.
+    • Ana adana su a ɓoye (encrypted) a sabarmu {where} har tsawon watanni 12, ba tare da lambar wayarku ba. {risk}
+    • Ku aika *STOP DONATING* a kowane lokaci don dakatarwa da share su (*STOP* da *DELETE* ma suna share su).
+    KudiGuard tana aiki iri ɗaya ko kun ce eh ko a'a.
+  btn_donate_yes: "Ee, na kai 18+"
+  btn_donate_no: "A'a, na gode"
+  donation_on: "✅ Na gode! Daga yanzu muna adana saƙonnin murya da kuka yi rikodi da muryarku har tsawon watanni 12 don inganta fahimtar magana. Ku aika *STOP DONATING* a kowane lokaci don dakatarwa da share su."
+  donation_off: "🗑️ An dakatar da gudummawar murya. An share duk saƙonnin murya da kuka ba da gudummawa, kuma ba za a adana sababbi ba."
+  donation_declined: "👍 Babu damuwa. Ba za a adana saƙonnin muryarku ba: ana share su bayan an rubuta su."
+  donation_unavailable: "🎙️ Gudummawar murya ba ta samu ba tukuna. Mun gode da niyyarku!"
+  stopped_donor: "Ba za ku ƙara samun saƙonni daga KudiGuard ba, kuma an share saƙonnin murya da kuka ba da gudummawa. Ku aika kowane saƙo don sake farawa."
+  where_outside: "a wajen Najeriya a lokacin gwaji"
+  where_nigeria: "a Najeriya"
+  risk_outside: "Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba."
+  risk_nigeria: "Bayanan da ke wucewa ta Meta da Cloudflare ana iya sarrafa su a ƙasashen waje, inda dokar kare bayanai ta Najeriya ba za ta yi aiki gaba ɗaya ba."
+  # Sent before the welcome reached the user: not taken as consent. DRAFT.
+  read_welcome: "☝️ Don Allah ku karanta saƙon da ke sama, sannan ku amsa don ci gaba."

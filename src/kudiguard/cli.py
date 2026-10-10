@@ -3,10 +3,11 @@
     kudiguard serve [--host 127.0.0.1] [--port 8000]
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
-    kudiguard purge [--days 90]
+    kudiguard purge [--days 90]          (also donated voice notes past KUDIGUARD_VOICE_RETENTION_DAYS)
     kudiguard review export [--out-dir var/review] [--n 50] [--languages ha,yo,ig] [--seed 0]
     kudiguard review score graded.csv [more.csv ...] [--markdown]
     kudiguard review check sheet.csv [more.csv ...]
+    kudiguard voice export|wer|stats|access|erase|remove|preconsent|wipe   (kudiguard.voice_cli)
 
 Exports contain no phone numbers or provider ids (pseudonymous user hashes, redacted text).
 """
@@ -25,12 +26,13 @@ from pathlib import Path
 
 import httpx
 
-from kudiguard import review
+from kudiguard import review, voice_cli
 from kudiguard.config import ROOT, Settings
+from kudiguard.donation import Sealer, VoiceVault
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
-from kudiguard.storage.base import utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 
@@ -98,14 +100,24 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
-    async def run() -> int:
+    async def run() -> tuple[int, int, int]:
+        if not settings.db_path.is_file():  # never create an empty database (its vault would match no files)
+            raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
         try:
-            return await store.purge_before(utcnow() - timedelta(days=args.days))
+            vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
+            voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
+            markers = await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
+            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice, markers
         finally:
             await store.close()
 
-    print(f"removed {asyncio.run(run())} rows older than {args.days} days")
+    rows, voice, markers = asyncio.run(run())
+    print(
+        f"removed {rows} rows older than {args.days} days; "
+        f"{voice} donated voice samples older than {settings.voice_retention_days} days; "
+        f"{markers} DELETE markers older than {DELETION_MARKER_DAYS} days"
+    )
     return 0
 
 
@@ -281,6 +293,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     check = review_commands.add_parser("check", help="list sheet rows erased or expired since the export")
     check.add_argument("files", nargs="+")
     check.set_defaults(func=cmd_review_check)
+    voice_cli.add_commands(commands)
 
     args = parser.parse_args(argv)
     settings = Settings()

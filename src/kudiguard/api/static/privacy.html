@@ -26,7 +26,7 @@
 <body>
 <main>
   <h1>🛡️ KudiGuard Privacy Notice</h1>
-  <p class="muted">Effective 8 October 2026 · Operated by {{OPERATOR}} · Nigeria Data Protection Act 2023</p>
+  <p class="muted">Effective 10 October 2026 · Operated by {{OPERATOR}} · Nigeria Data Protection Act 2023</p>
 
   <section>
     <h2>What KudiGuard does</h2>
@@ -44,7 +44,8 @@
         them out.</li>
       <li>Our scam assessment, an English translation of your message, the channel used (WhatsApp or website), your
         language, when you agreed to this notice, your 👍/👎 feedback, and timing information.</li>
-      <li><strong>Voice notes</strong> are turned into text and then deleted; the audio itself is not stored.</li>
+      <li><strong>Voice notes</strong> are turned into text and then deleted; the audio itself is not stored, unless
+        you choose to donate your voice notes (see <a href="#donation">Voice-note donation</a>).</li>
     </ul>
     <p>We do not ask for your contacts, location or photos, and we never ask for PINs, OTPs or passwords.</p>
   </section>
@@ -54,7 +55,55 @@
     <p>To answer you, to improve the service and measure how well it works, and to protect others from scams
     (including improving KudiGuard's scam detection and, after review, training its models), based on
     your <strong>consent</strong>, which you give by continuing after our welcome message (or ticking the box on this
-    website).</p>
+    website). Voice-note donation has its own, separate consent (below); KudiGuard works the same without it.</p>
+  </section>
+
+  <section id="where">
+    <h2>Where your data goes (transfer outside Nigeria)</h2>
+    <p>To run KudiGuard, your messages pass through <strong>WhatsApp (Meta)</strong> and <strong>Cloudflare</strong>,
+    outside Nigeria, and are stored on our server <strong>{{STORAGE_LOCATION}}</strong>. {{STORAGE_RISK}} We tell you this
+    before you agree: by continuing after our welcome message (or ticking the box on this website) you consent to this
+    transfer (Nigeria Data Protection Act 2023, s.43). If you do not agree, please do not use KudiGuard; you can send
+    DELETE at any time. We will update this notice, and ask you again where needed, if the server moves.</p>
+  </section>
+
+  <section id="donation">
+    <h2>Voice-note donation (optional)</h2>
+    <p><strong>{{DONATION_STATUS}}</strong></p>
+    <p>You can choose to let us keep your voice notes to test and improve how well KudiGuard understands Hausa, Yoruba,
+    Igbo and Nigerian English speech. It is <strong>off unless you say yes</strong>: on WhatsApp we ask once, after one of
+    your voice notes has been answered, and you can say yes with the "Yes, I am 18+" button (or send
+    <strong>DONATE VOICE</strong> to see the offer); on this website, tick the separate donation box. Pilot testers may
+    instead say yes on the tester sign-up form, which asks the same and has its own 18+ and own-voice boxes; we then do
+    not ask again in the chat.</p>
+    <ul>
+      <li><strong>Who can donate:</strong> adults (18 or older) only, and only voice notes in your own voice. Please do
+        not donate recordings of other people. On WhatsApp we keep only voice notes recorded in the app and try not to
+        keep forwarded ones (WhatsApp does not always tell us), and our reviewers delete any recording with someone
+        else's voice, or a child's. Text messages are never donated.</li>
+      <li><strong>What we keep:</strong> each voice note you send <em>after</em> saying yes, as you sent it, encrypted,
+        with a random id, the coded form of your number or website session (so you can withdraw), your language, the
+        channel, the week it arrived (not the time), its length when known, the version of the offer you accepted, and
+        our automatic transcript (most numbers masked). On WhatsApp (or the sign-up form) we also record when and how
+        you said yes; on the website, each recording carries the version you accepted. Voice notes you sent before
+        saying yes are never kept. Please do not read out PINs, OTPs, BVNs or account numbers: transcribers type
+        numbers as [number], and recordings with such details are deleted.</li>
+      <li><strong>What it is used for:</strong> only to test and improve speech recognition. A few trusted reviewers
+        and transcribers (our team, or native speakers engaged under written confidentiality) listen to a sample and
+        write down what was said, so we can measure and reduce errors. We never use your voice to identify you or to
+        recognise who is speaking, and we never sell, publish or share the recordings with anyone else.</li>
+      <li><strong>Where:</strong> recordings are stored only on KudiGuard's own server, {{STORAGE_LOCATION}}, never in
+        third-party cloud storage (see <a href="#where">Where your data goes</a>). Transcribers work on copies on their own
+        devices without uploading them anywhere or taking them to another country, and delete them once the transcripts
+        are typed.</li>
+      <li><strong>How long:</strong> up to <strong>{{VOICE_RETENTION}}</strong>, then deleted automatically.</li>
+      <li><strong>Stop at any time:</strong> on WhatsApp send <strong>STOP DONATING</strong> (or tap "No, thanks"),
+        <strong>STOP</strong> or <strong>DELETE</strong>; on this website untick the box or press "Delete my donated
+        recordings". Each of these stops collection <em>and deletes every voice note you donated</em>, and you get a
+        confirmation. On the website this works only in the same browser; from another browser, send us the donation
+        code shown when you ticked the box. If we change the offer, we ask donors again and keep nothing new until
+        they answer.</li>
+    </ul>
   </section>
 
   <section>
@@ -65,6 +114,10 @@
       <li><strong>Meta (WhatsApp)</strong> carries messages between you and us; <strong>Cloudflare</strong> provides the
         secure network connection to our server. Each follows its own privacy policy and may process data outside
         Nigeria under its own safeguards.</li>
+      <li><strong>Reviewers:</strong> to check the quality and safety of our answers, a few trusted reviewers (our team,
+        or native speakers engaged under written confidentiality) may read a sample of de-identified messages and replies
+        (most numbers masked, and without your phone number or any id of you). Their copies are deleted after the
+        check. Donated voice notes are also heard by such reviewers and transcribers (see above).</li>
       <li>We do not sell or share your data for advertising. Anonymised totals (for example, how many checks were made in
         each language) may be published.</li>
     </ul>
@@ -74,7 +127,9 @@
     <h2>How long</h2>
     <ul>
       <li>Messages and replies: deleted automatically <strong>{{RETENTION_DAYS}} days</strong> after they were sent.</li>
-      <li>Your settings (language, consent): deleted {{RETENTION_DAYS}} days after your last message.</li>
+      <li>Your settings (language, consent): deleted {{RETENTION_DAYS}} days after your last message, or, if you donated
+        voice notes, once none of them is left (they record your donation consent).</li>
+      <li>Donated voice notes: up to {{VOICE_RETENTION}} (see above).</li>
       <li><strong>Scam examples:</strong> when a message is judged a likely scam or suspicious, a separate copy is kept
         for up to <strong>{{PATTERN_RETENTION}}</strong> to protect others and improve KudiGuard: its wording and English
         translation (most numbers, emails and card numbers masked; most links reduced to the website name), the language,
@@ -87,18 +142,26 @@
   <section>
     <h2>Your rights</h2>
     <ul>
-      <li>On WhatsApp, send <strong>DELETE</strong> to erase everything linked to you, immediately.</li>
-      <li>Send <strong>STOP</strong> to stop receiving messages; your data is then kept only until it expires or you
-        send DELETE.</li>
-      <li>To access, correct or delete your data (including from the website), or to object to its use: {{CONTACT}}.</li>
+      <li>On WhatsApp, send <strong>DELETE</strong> to erase everything linked to you, immediately, including donated
+        voice notes. We keep a coded marker for up to {{DELETION_MARKER_DAYS}} days only so that an earlier sign-up form
+        cannot re-enrol you in voice donation; it holds no phone number and nothing you sent.</li>
+      <li>Send <strong>STOP DONATING</strong> (or untick the box on this website) to withdraw your voice-note donation
+        and delete what you donated.</li>
+      <li>Send <strong>STOP</strong> to stop receiving messages; it also deletes donated voice notes. Your other data is
+        then kept only until it expires or you send DELETE.</li>
+      <li>To access, correct or delete your data (including from the website, and including a copy of your donated
+        voice notes), or to object to its use: {{CONTACT}}. To protect you, we answer only the person behind the number
+        or donation code: we confirm by messaging that WhatsApp number, or you send us your website donation code.</li>
       <li>You can complain to the <a href="https://ndpc.gov.ng">Nigeria Data Protection Commission</a>.</li>
     </ul>
   </section>
 
   <section>
     <h2>Security</h2>
-    <p>Data is protected in transit (HTTPS), phone numbers are stored only in coded form, and data is kept on
-    access-controlled systems. Changes to this notice will be announced to users before they take effect.</p>
+    <p>Data is protected in transit (HTTPS), phone numbers are stored only in coded form, donated voice notes are
+    encrypted at rest (AES-256-GCM), and data is kept on access-controlled systems. If a breach puts your rights at
+    risk, we will inform the Nigeria Data Protection Commission within 72 hours, and tell you immediately when the
+    risk to you is high. Changes to this notice will be announced to users before they take effect.</p>
   </section>
 
   <p class="muted" style="margin-top: 24px;"><a href="/">← Back to KudiGuard</a> · N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies.</p>

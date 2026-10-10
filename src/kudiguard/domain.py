@@ -30,6 +30,13 @@ class InboundMessage:
     audio_mime: str | None = None
     button_id: str | None = None
     media_id: str | None = None  # provider media reference; fetched lazily (after consent) via the channel
+    # Voice donation keeps only notes recorded in the app (WhatsApp ``audio.voice``) and not marked forwarded
+    # (``context.forwarded``, documented for other types): a forwarded note is usually someone else's voice.
+    voice_note: bool = False
+    forwarded: bool = False
+    # When the user sent it (provider clock, Unix seconds). WhatsApp always sets it (the receive time if the payload
+    # lacks one). None only in tests and channels without provider timestamps: the welcome-race check is skipped.
+    sent_at: float | None = None
 
 
 class Flag(StrEnum):

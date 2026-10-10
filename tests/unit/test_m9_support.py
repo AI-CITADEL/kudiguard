@@ -128,8 +128,113 @@ async def test_build_services_with_whatsapp(tmp_path: Path, monkeypatch: pytest.
     services = await build_services(base_settings(tmp_path, whatsapp_enabled=True, packs=("kudiguard-core",)))
     try:
         assert services.conversation is not None and services.whatsapp is not None
+        assert services.donations is not None and services.conversation._donations is services.donations
+        assert services.donations.directory == Settings().voice_dir  # isolated per test (conftest)
+        assert not services.conversation._collecting  # off until the DPIA is signed off
     finally:
         await services.aclose()
+    services = await build_services(
+        base_settings(tmp_path, whatsapp_enabled=True, packs=("kudiguard-core",), voice_donation=True,
+                      storage_location="nigeria")
+    )  # fmt: skip
+    try:
+        assert services.conversation is not None and services.conversation._collecting
+        assert services.conversation._storage == "nigeria"
+    finally:
+        await services.aclose()
+
+
+def test_voice_donation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import ValidationError
+
+    from kudiguard.hosting import StorageLocation
+
+    defaults = Settings(_env_file=None, hash_secret=SECRET)  # type: ignore[call-arg]
+    assert defaults.voice_donation is False and defaults.voice_retention_days == 365
+    assert defaults.storage_location is StorageLocation.OUTSIDE_NIGERIA  # never "in Nigeria" by default
+    assert defaults.voice_secret() == SECRET.encode()
+    own_key = Settings(_env_file=None, hash_secret=SECRET, voice_key="k" * 40)  # type: ignore[call-arg]
+    assert own_key.voice_secret() == b"k" * 40
+    blank_key = Settings(_env_file=None, hash_secret=SECRET, voice_key="")  # type: ignore[call-arg]
+    assert blank_key.voice_secret() == SECRET.encode()  # KUDIGUARD_VOICE_KEY= as in .env.example
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, voice_retention_days=366)  # type: ignore[call-arg]
+    monkeypatch.setenv("KUDIGUARD_STORAGE_LOCATION", "nigeria")
+    assert Settings(_env_file=None).storage_location is StorageLocation.NIGERIA  # type: ignore[call-arg]
+    monkeypatch.setenv("KUDIGUARD_STORAGE_LOCATION", "lagos")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+    assert (
+        StorageLocation.NIGERIA.english == "in Nigeria"
+        and "outside" in StorageLocation.OUTSIDE_NIGERIA.english
+    )
+
+
+async def test_one_failing_purge_step_never_skips_the_others(caplog: pytest.LogCaptureFixture) -> None:
+    from datetime import datetime, timedelta
+
+    from kudiguard.api.services import PURGE_INTERVAL_S, PURGE_MARGIN
+    from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
+
+    # Markers must outlive every importable form answer (29 days) even when dropped early.
+    assert PURGE_INTERVAL_S < 24 * 3600
+    assert timedelta(days=DELETION_MARKER_DAYS) - timedelta(
+        seconds=PURGE_INTERVAL_S
+    ) - PURGE_MARGIN > timedelta(days=29)
+    caplog.set_level("INFO", logger="kudiguard.api.services")
+    marker_cutoffs: list[datetime] = []
+
+    class Store:
+        async def purge_before(self, cutoff: object) -> int:
+            raise RuntimeError("locked")
+
+        async def purge_patterns_before(self, cutoff: object) -> int:
+            return 1
+
+        async def purge_deletion_markers(self, cutoff: datetime) -> int:
+            marker_cutoffs.append(cutoff)
+            return 2
+
+    class Vault:
+        async def purge(self, cutoff: object) -> int:
+            raise OSError("disk")
+
+    task = asyncio.create_task(purge_loop(Store(), 90, interval_s=3600, donations=Vault()))  # type: ignore[arg-type]
+    await asyncio.sleep(0.02)
+    task.cancel()
+    assert len(marker_cutoffs) == 1  # ran although evidence (before) and voice (after) failed
+    expected = utcnow() - timedelta(days=DELETION_MARKER_DAYS) + timedelta(hours=1) + PURGE_MARGIN  # early
+    assert abs((marker_cutoffs[0] - expected).total_seconds()) < 5
+    assert "retention purge failed (evidence)" in caplog.text
+    assert "retention purge failed (donated voice notes)" in caplog.text
+    assert "retention purge removed 3 rows" in caplog.text
+
+
+async def test_purge_loop_expires_donated_voice_notes_on_their_own_clock() -> None:
+    from datetime import date, timedelta
+
+    from kudiguard.storage.base import utcnow
+
+    cutoffs: list[date] = []
+
+    class Store:
+        async def purge_before(self, cutoff: object) -> int:
+            return 0
+
+        async def purge_patterns_before(self, cutoff: object) -> int:
+            return 0
+
+    class Vault:
+        async def purge(self, cutoff: date) -> int:
+            cutoffs.append(cutoff)
+            return 2
+
+    task = asyncio.create_task(
+        purge_loop(Store(), 90, interval_s=0.01, donations=Vault(), voice_retention_days=365)  # type: ignore[arg-type]
+    )
+    await asyncio.sleep(0.03)
+    task.cancel()
+    assert cutoffs and cutoffs[0] == (utcnow() - timedelta(days=365)).date()
 
 
 async def test_build_services_without_whatsapp_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
