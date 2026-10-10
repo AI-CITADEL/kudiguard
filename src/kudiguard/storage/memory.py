@@ -150,6 +150,10 @@ class MemoryStore:
         self._ensure_open()
         return [export_row(i, self._feedback.get(k)) for k, i in sorted(self._interactions.items())]
 
+    async def interaction_ids(self) -> frozenset[int]:
+        self._ensure_open()
+        return frozenset(self._interactions)
+
     async def close(self) -> None:
         self._closed = True
 

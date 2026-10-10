@@ -17,6 +17,7 @@ import re
 
 MIN_SECRET_BYTES = 32
 ID_HEX_CHARS = 32  # 128 bits: collision-free at any realistic user count
+REVIEW_ID_HEX_CHARS = 10  # 40 bits: short enough to read out, collision-free for review samples
 SECRET_ENV = "KUDIGUARD_HASH_SECRET"
 _NIGERIA = "234"
 _PREFIX = re.compile(r"^(?:whatsapp|tel):", re.IGNORECASE)
@@ -59,3 +60,9 @@ class UserHasher:
     def message_key(self, channel: str, message_id: str) -> str:
         """Opaque de-duplication key for a provider message id (which may embed the sender's number)."""
         return self._hmac(f"msg:{channel}:{message_id}")
+
+    def review_id(self, interaction_id: int) -> str:
+        """Opaque label for an interaction shown to human reviewers: stable across exports (so several reviewers'
+        sheets line up), unlinkable to the row or the user without the secret. The ``R-`` prefix stops spreadsheets
+        reading hex such as ``12e45`` as a number."""
+        return "R-" + self._hmac(f"review:{interaction_id}")[:REVIEW_ID_HEX_CHARS]

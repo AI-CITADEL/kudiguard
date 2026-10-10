@@ -37,13 +37,13 @@ def test_own_partner_packs_are_not_cited_as_a_source() -> None:
     import dataclasses
 
     from kudiguard.knowledge.models import KnowledgeResult
-    from kudiguard.prompts import _facts_block
+    from kudiguard.prompts import facts_block
 
     own = dataclasses.replace(
         sourced("budget", ("Write down what you spend.",), partner="Money Skills"), cite=False
     )
     cited = sourced("bvn", ("A BVN links your accounts.",), partner="Demo Bank")
-    facts, _ = _facts_block(KnowledgeResult(entries=(own, cited)))
+    facts, _ = facts_block(KnowledgeResult(entries=(own, cited)))
     assert facts == ["Write down what you spend.", "A BVN links your accounts. (source: Demo Bank)"]
 
 

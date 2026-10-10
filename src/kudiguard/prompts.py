@@ -321,7 +321,8 @@ def select_flags(rule_flags: Sequence[Flag], analysis: Analysis) -> tuple[Flag, 
 # --- compose ------------------------------------------------------------------------------------------
 
 
-def _facts_block(knowledge: KnowledgeResult) -> tuple[list[str], list[str]]:
+def facts_block(knowledge: KnowledgeResult) -> tuple[list[str], list[str]]:
+    """The facts and actions COMPOSE is grounded on (also shown to native-speaker reviewers, ``kudiguard.review``)."""
     facts: list[str] = []
     actions: list[str] = []
     for item in knowledge.entries[:MAX_ENTRIES]:
@@ -366,7 +367,7 @@ def compose_request(
     knowledge: KnowledgeResult,
 ) -> ChatRequest:
     example = _example_for(verdict, flags)
-    facts, actions = _facts_block(knowledge)
+    facts, actions = facts_block(knowledge)
     return ChatRequest(
         messages=(
             {"role": "system", "content": _COMPOSE_SYSTEM},
