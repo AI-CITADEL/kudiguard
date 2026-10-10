@@ -171,7 +171,7 @@ _NEGATION_IDIOM = re.compile(
     r"\b(?:do not worry|don't worry|dont worry|not to worry|no problem|never mind|without delay|stop worrying|"
     r"no wahala)\b"
 )
-_CLAUSE = re.compile(r"[;:]|\b(?:and|but|just|so|then)\b")
+_CLAUSE = re.compile(r"[;:,]|\b(?:and|but|just|then)\b")  # not "so": "pay now so it is not blocked"
 NEGATION_WINDOW = 6  # words from the clause start: "your bank will never ask", "do not share"
 _ATTRIBUTION = re.compile(
     r"\b(?:they|he|she|the (?:caller|sender|message|person|man|woman|text|sms|scammers?)|someone|scammers?)\b"
@@ -309,11 +309,15 @@ def split_claims(english: str) -> list[str]:
 
 
 def negated(sentence: str) -> bool:
-    """A clause opens with a negation (within ``NEGATION_WINDOW`` words), idioms such as "don't worry" aside."""
+    """A clause opens with a negation (within ``NEGATION_WINDOW`` words), idioms such as "don't worry" aside.
+
+    A later clause that starts with "not" is a contrast ("..., not only the interest rate"), not a negation."""
     text = _NEGATION_IDIOM.sub(" ", fold(sentence))
+    clauses = [_LETTER_WORD.findall(c) for c in _CLAUSE.split(text)]
     return any(
-        _NEGATION.search(" ".join(_LETTER_WORD.findall(clause)[:NEGATION_WINDOW]))
-        for clause in _CLAUSE.split(text)
+        _NEGATION.search(" ".join(words[:NEGATION_WINDOW]))
+        for index, words in enumerate(clauses)
+        if not (index and words[:1] == ["not"])
     )
 
 

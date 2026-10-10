@@ -26,7 +26,7 @@ from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
-from kudiguard.safety.grounding import GroundingChecker, GroundingMode
+from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.storage.base import Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
@@ -83,6 +83,19 @@ async def purge_loop(
         except Exception:
             log.exception("retention purge failed")
         await asyncio.sleep(interval_s)
+
+
+def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) -> None:
+    """Per-turn grounding result for the shadow review (>= 100 real replies before enforce): counts only, no text.
+
+    TODO(merge with E's pipeline): store grounded / unsupported_claims / grounding_ms on the turn's interaction row
+    (needs a store migration); until then ``kudiguard`` logs carry them, keyed by the provider message id.
+    """
+    if report is None:
+        log.info("grounding turn=%s checked=no ms=%d", turn_id, ms)
+    else:
+        log.info("grounding turn=%s grounded=%s unsupported_claims=%d claims=%d ms=%d", turn_id, report.grounded,
+                 len(report.unsupported), len(report.claims), ms)  # fmt: skip
 
 
 async def build_grounding(
@@ -192,6 +205,7 @@ async def build_services(settings: Settings) -> Services:
             ffmpeg=ffmpeg,
             grounding=grounding,
             grounding_mode=GroundingMode(settings.grounding_mode),
+            on_grounding=log_grounding,
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

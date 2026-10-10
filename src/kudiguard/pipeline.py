@@ -530,7 +530,9 @@ class Conversation:
             extra = [task.result() for task in tasks]
             turn.transcript = "\n".join(p for p in (turn.transcript, *extra) if p)
 
-        answer = await self._engine.check(turn.transcript, turn.language, deadline=turn.deadline)
+        answer = await self._engine.check(
+            turn.transcript, turn.language, deadline=turn.deadline, turn_id=turn.message.message_id
+        )
         if answer.kind is not AnswerKind.CHECK:
             await self._store.save_user(user)
             voice_unclear = turn.voice and answer.kind is AnswerKind.CONTENT_FREE

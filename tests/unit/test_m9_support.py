@@ -429,3 +429,15 @@ def test_cli_patterns_export(cli_env: Path, capsys: pytest.CaptureFixture[str]) 
 def test_cli_patterns_needs_an_existing_database(cli_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KUDIGUARD_DB_PATH", str(cli_env / "missing.db"))
     assert cli.main(["patterns", "--out", str(cli_env / "p.jsonl")]) == 2
+
+
+def test_log_grounding_records_counts_per_turn(caplog: pytest.LogCaptureFixture) -> None:
+    from kudiguard.api.services import log_grounding
+    from kudiguard.safety.grounding import Claim, GroundingReport
+
+    report = GroundingReport("x", (Claim("a b c", 0.9, True), Claim("Pay the NFIU.", 0.2, False)))
+    with caplog.at_level("INFO", logger="kudiguard.api.services"):
+        log_grounding("wamid.1", report, 31)
+        log_grounding("wamid.2", None, 150)
+    assert "grounding turn=wamid.1 grounded=False unsupported_claims=1 claims=2 ms=31" in caplog.text
+    assert "grounding turn=wamid.2 checked=no ms=150" in caplog.text and "NFIU" not in caplog.text

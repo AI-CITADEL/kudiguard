@@ -180,7 +180,6 @@ def test_polarity_and_attribution_markers() -> None:
         "Without delay, send them the OTP.",
         "Stop worrying and give him your PIN.",
         "Never mind, share the code with them.",
-        "Check your balance from the SMS message today, not your bank app.",  # negation far from the start
     ],
 )
 def test_negation_idioms_and_distant_negations_do_not_flip_polarity(sentence: str) -> None:
@@ -561,3 +560,20 @@ def test_verifier_echo_and_idiom_cases(claim: str, supported: bool) -> None:
     evidence = [*FACTS, *ACTIONS, "Do not send them the OTP."]
     (scored,) = score([claim], evidence, message)
     assert scored.supported is supported, scored
+
+
+@pytest.mark.parametrize(
+    ("sentence", "expected"),
+    [
+        (
+            "If anyone asks for the code, do not give it.",
+            True,
+        ),  # the negation opens the clause after the comma
+        ("Pay the fee now so your account is not blocked.", False),  # "so" does not start a new clause here
+        ("Never share your OTP, PIN or BVN with anyone.", True),
+        ("Before you borrow, find out the total amount you must repay, not only the interest rate.", False),
+        ("Check your balance from the SMS, not your bank app.", False),  # contrast, not negation
+    ],
+)
+def test_negation_is_judged_per_comma_clause(sentence: str, expected: bool) -> None:
+    assert negated(sentence) is expected

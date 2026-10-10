@@ -346,3 +346,16 @@ async def test_outcome_claims_are_log_only_unless_enforced(
     enforced = await engine(registry, knowledge, llm, None, ENFORCE).check(OTP_SCAM, "en")
     assert enforced.body == GROUNDED and enforced.issues == (OutputIssue.OUTCOME_CLAIM,)
     assert len(llm.calls(Purpose.COMPOSE)) == 2  # the warmer retry
+
+
+async def test_a_failing_shadow_check_is_logged_as_not_run(
+    registry: LanguageRegistry, knowledge: KnowledgeBase, caplog: pytest.LogCaptureFixture
+) -> None:
+    turn = engine(registry, knowledge, scam_llm(GROUNDED), Recording(error=GroundingError("busy")))
+    with caplog.at_level(logging.WARNING, logger="kudiguard.engine"):
+        await turn.check(OTP_SCAM, "en")
+        await turn.aclose()
+    assert (
+        "grounding check not run (shadow): busy" in caplog.text
+        and "sending the guarded reply" not in caplog.text
+    )

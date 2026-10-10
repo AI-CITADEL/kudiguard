@@ -359,7 +359,10 @@ class Engine:
         try:
             report = await self.grounding.check(text, language, evidence, message=message, deadline=deadline)
         except Exception as exc:  # optional step: any failure (incl. its time cap) sends the guarded reply
-            log.warning("grounding check failed, sending the guarded reply: %s", exc)
+            if self.grounding_mode is GroundingMode.SHADOW:  # the reply has already gone out
+                log.warning("grounding check not run (shadow): %s", exc)
+            else:
+                log.warning("grounding check failed, sending the guarded reply: %s", exc)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         log.info(
             "grounding_ms=%d language=%s mode=%s grounded=%s unsupported=%d/%d min_support=%.2f",

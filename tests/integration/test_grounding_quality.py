@@ -25,7 +25,7 @@ from kudiguard.knowledge.models import KnowledgeResult, Query, SourcedEntry
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.safety.grounding import DEFAULT_THRESHOLD, GroundingChecker, evidence_for, score_claims
-from kudiguard.safety.output_guard import OutputGuard
+from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA: dict[str, list[dict[str, Any]]] = yaml.safe_load(
@@ -106,7 +106,7 @@ def test_threshold_is_the_dev_choice_and_holds_out(checker: GroundingChecker) ->
             f"(caught {caught}/{caught + missed}, false flags {ff}/{sup})"
         )
     caught, missed, ff, sup = tally(checker, claims("test"), DEFAULT_THRESHOLD)
-    assert caught / (caught + missed) >= 0.5  # held out, incl. polarity inversions (measured 56%)
+    assert caught / (caught + missed) >= 0.5  # held out, incl. polarity inversions (measured 69%)
     assert ff / sup <= 0.1  # measured 0/14
 
 
@@ -124,7 +124,9 @@ async def test_replies_scam_echoes_blocked_and_realistic_replies_measured(
         found = await knowledge.search(Query(text=case["message"], flags=flags, language="en"))
         ev = evidence_for(found, verdict=Verdict(case["verdict"]), flags=flags)
         report = await checker.check(case["reply"], "en", ev, message=case["message"])
-        guarded = bool(guard.check(case["reply"], "en"))
+        guarded = bool(
+            set(guard.check(case["reply"], "en")) - {OutputIssue.OUTCOME_CLAIM}
+        )  # log-only in shadow
         if case["acceptable"]:
             good += 1
             flagged_good += not report.grounded
@@ -155,7 +157,8 @@ async def test_attributed_restatement_passes_and_unattributed_echo_does_not(
     )
     guard = OutputGuard(registry)
     assert said.grounded and not guard.check(said.english, "en")
-    assert not echo.grounded or guard.check(echo.english, "en")  # blocked by one layer or the other
+    # blocked in shadow mode too: the guard, not the (log-only) grounding verdict or an outcome claim
+    assert OutputIssue.UNSAFE_INSTRUCTION in guard.check(echo.english, "en")
 
 
 async def _latencies(checker: GroundingChecker, message_chars: int, runs: int = 30) -> list[float]:

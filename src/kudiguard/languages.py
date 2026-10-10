@@ -70,6 +70,10 @@ class _OutputGuardSpec(BaseModel):
     negations: list[str] = Field(default_factory=list)
     negations_after: list[str] = Field(default_factory=list)
     clause_breaks: list[str] = Field(default_factory=list)
+    condition_breaks: list[str] = Field(
+        default_factory=list
+    )  # start a new clause, kept: "unless you send..."
+    speech_commands: list[str] = Field(default_factory=list)  # "do as he says:" introduces an instruction
     # "send it" / "give it to them": unsafe when the same sentence names a ``credentials`` term ("..., so send it").
     pronoun_instructions: list[str] = Field(default_factory=list)
     credentials: list[str] = Field(default_factory=list)
@@ -77,6 +81,8 @@ class _OutputGuardSpec(BaseModel):
     # blocked"); a ``reported_speech`` word earlier in the clause ("they said") exempts it.
     outcome_claims: list[str] = Field(default_factory=list)
     reported_speech: list[str] = Field(default_factory=list)
+    hedges_before: list[str] = Field(default_factory=list)  # "if ...", "there is no guarantee ..."
+    hedges_after: list[str] = Field(default_factory=list)  # "... if you report quickly", "not guaranteed"
 
 
 class _CommandsSpec(BaseModel):
@@ -98,10 +104,14 @@ class GuardPatterns:
     negations: Patterns = ()
     negations_after: Patterns = ()
     clause_breaks: Patterns = ()
+    condition_breaks: Patterns = ()
+    speech_commands: Patterns = ()
     pronoun_instructions: Patterns = ()
     credentials: Patterns = ()
     outcome_claims: Patterns = ()
     reported_speech: Patterns = ()
+    hedges_before: Patterns = ()
+    hedges_after: Patterns = ()
 
 
 def _ui_length(text: str) -> int:
