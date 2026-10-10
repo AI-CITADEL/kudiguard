@@ -153,8 +153,8 @@ _LEAD = r"^(?:(?:just|so|and|then|now|simply|quickly|please|kindly|you (?:can|sh
 _CODE = r"(?:otp|pin|password|cvv|code|card (?:number|details)|bvn)"
 # "Share/send/type... the OTP/PIN" as an instruction at the start of a clause (negated clauses are skipped).
 _CREDENTIALS = re.compile(
-    _LEAD
-    + r"(?P<verb>share|send|give|tell|read|forward|provide|dictate|type|enter|input|paste|reply(?: with)?)\s+"
+    _LEAD + r"(?P<verb>share|send|give|tell|read|forward|provide|dictate|type|enter|input|paste"
+    r"|reply(?: to (?P<to>(?:\S+\s+){1,3}?)with| with)?)\s+"
     r"(?P<before>(?:\S+\s+){0,4}?)" + _CODE + r"\b(?P<after>.*)$"
 )
 # "...so send it": a bare object pronoun, when the sentence is about a code.
@@ -175,13 +175,17 @@ _OTHER_RECIPIENT = re.compile(r"\b(?:bank|branch|app|family|police|efcc)\b")
 # yourself"); handing it to a POS operator or ATM attendant is not, so these count for the typing verbs only.
 _TYPING = frozenset({"type", "enter", "input", "paste"})
 _TYPING_SAFE = re.compile(
-    r"\b(?:pos|atm|machine|terminal|keypad|your own|yourself|new (?:pin|password|code)|twice|block\w*|chang\w*)\b"
+    r"\b(?:pos|atm|machine|terminal|keypad|ivr|your own|yourself|new (?:pin|password|code)|twice|block\w*"
+    r"|chang\w*)\b"
 )
-# Untrusted places to type a code: they override the safe words ("type the OTP into the WhatsApp chat to block...").
-_UNTRUSTED_PLACE = re.compile(
-    r"\b(?:link|website|web site|site|form|page|whatsapp|chat|sms|email|his|her|their|scammer\w*|laptop"
-    r"|agent's|someone's|caller's)\b"
+# An untrusted place as the DESTINATION of the code ("into the WhatsApp chat", "on the link"): it overrides the safe
+# words. Not where the code came from ("sent by SMS", "from the SMS"), nor a place of the user's own bank ("the bank's
+# website", "the form on your bank's own app").
+_UNTRUSTED_DESTINATION = re.compile(
+    r"\b(?:into|in|on|onto|at|to|through)\s+(?P<before>(?:\S+\s+){0,3}?)"
+    r"(?:link|website|web site|site|form|page|whatsapp|chat|sms|email|laptop)\b(?P<after>(?:\s+\S+){0,4})"
 )
+_NOT_A_DESTINATION = re.compile(r"\b(?:by|from|via)\b")
 # "Change your PIN by typing it on the agent's phone": a gerund instruction with an untrusted destination.
 _GERUND = re.compile(
     r"\bby\s+(?:typing|entering|inputting|pasting|sending|giving|sharing|reading)\b(?P<after>.*)$"
@@ -267,6 +271,15 @@ def names_in(text: str) -> set[str]:
     return names
 
 
+def untrusted_destination(text: str) -> bool:
+    """A link, website, form, chat, SMS or email the code would be typed into, unless it is the user's own bank's."""
+    for match in _UNTRUSTED_DESTINATION.finditer(text):
+        owned = "bank" in match.group("before") or "bank" in match.group("after")
+        if not owned and not _NOT_A_DESTINATION.search(match.group("before")):
+            return True
+    return False
+
+
 def credential_request(clause: str, sentence: str = "") -> bool:
     """An instruction to hand over or type a code/PIN for the person asking (or for no one named). ``sentence``:
     the whole sentence, so "...so send it" counts when the sentence is about a code."""
@@ -276,18 +289,19 @@ def credential_request(clause: str, sentence: str = "") -> bool:
     about_code = _MENTIONS_CODE.search(normalize(sentence or clause))
     match = _CREDENTIALS.search(folded)
     if match is not None:
-        verb, recipient = match.group("verb"), match.group("before") + " " + match.group("after")
+        verb = match.group("verb")
+        recipient = f"{match.group('to') or ''} {match.group('before')} {match.group('after')}"
     elif (bare := _SEND_IT.search(folded)) is not None and about_code:
         verb, recipient = bare.group("verb"), bare.group("after")
     elif (gerund := _GERUND.search(folded)) is not None and about_code:
         after = gerund.group("after")
-        return bool(_SUSPECT_RECIPIENT.search(after) or _UNTRUSTED_PLACE.search(after))
+        return bool(_SUSPECT_RECIPIENT.search(after) or untrusted_destination(after))
     else:
         return False
     if _SUSPECT_RECIPIENT.search(recipient):
         return True
     if verb in _TYPING:
-        if _UNTRUSTED_PLACE.search(folded):
+        if untrusted_destination(folded):
             return True
         if _TYPING_SAFE.search(folded):
             return False

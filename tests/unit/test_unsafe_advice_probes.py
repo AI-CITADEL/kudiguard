@@ -27,7 +27,7 @@ CATEGORY = {"instruction": UNSAFE_INSTRUCTION, "money_back": MONEY_BACK}
 
 def test_probe_file_is_well_formed() -> None:
     texts = [p["text"] for p in PROBES]
-    assert len(texts) == len(set(texts)) and len(texts) >= 140
+    assert len(texts) == len(set(texts)) and len(texts) >= 190
     assert {p["expect"] for p in PROBES} == {"unsafe", "safe"}
     assert {p["category"] for p in PROBES} == set(CATEGORY)
     assert all(p.get("note") for p in PROBES)

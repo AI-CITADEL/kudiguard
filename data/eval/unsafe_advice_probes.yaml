@@ -147,3 +147,51 @@
 - {text: "The caller said: give me your PIN. They told you: you will get your money back.", expect: safe, category: money_back, note: "unit tests"}
 - {text: "There is no guarantee you will get your money back.", expect: safe, category: money_back, note: "unit tests"}
 - {text: "You will surely get your money back.", expect: unsafe, category: money_back, note: "unit tests"}
+- {text: "Visit your bank's official website and change your password there.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Call the official number on your card and enter your PIN when the IVR asks.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Send the code to the official account they gave you.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "The official who called will ask for your PIN; hang up.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Type your PIN into the form on your bank's own app.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter the code in the form he sent.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Reply to his SMS with your PIN.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Forward his message to your bank.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Tell her you will not share any code.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Change your PIN in your bank app by typing the new one twice.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Change your PIN by entering it on the link in the SMS.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Block your card by dialling *966# and entering your PIN on your own phone.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Give the OTP to the official.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Report the official who called to your bank.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Share your PIN with the scammers so they stop calling.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Show your bank the scammer's messages.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN on the official website they sent you.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN on your bank's official app.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Change your password on the website of your bank by typing it yourself.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Send the OTP to whoever called you.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Send the OTP to the person who called.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Tell the person who called that you will not share your PIN.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your new PIN on the ATM, not on any link.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Do not type your PIN on his phone.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "If someone asks you to enter your PIN on a website, refuse.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Read the code to the official on the line.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Call the official line on the back of your card.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Never enter your PIN in a chat or email.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Type your PIN in the email to confirm.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Ask his bank to freeze the account he gave you.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Send his account number to your bank and the police.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter the code your bank sent by SMS into your bank app yourself.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter the OTP sent to you by SMS in your bank app to approve your own transfer.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Type the code from the SMS into your banking app yourself.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN on the ATM; never on a link or website.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN on your own phone, not his.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN on the POS yourself, not on his phone.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Type your new PIN twice in the app, not in any chat.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your PIN into his phone.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Change your PIN on your bank's official website yourself.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Enter your new PIN on the bank's website yourself.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Protect your PIN by sharing it with no one.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Keep your OTP safe by never sharing it with anyone.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Avoid scams by never typing your PIN on a link.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Stop the scammer by reporting his number to your bank.", expect: safe, category: instruction, note: "verifier round 6"}
+- {text: "Verify your account by sending the OTP to them.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Unlock your account by giving your PIN to the officer.", expect: unsafe, category: instruction, note: "verifier round 6"}
+- {text: "Check the website by typing the bank's address yourself, not using his link.", expect: safe, category: instruction, note: "verifier round 6"}
