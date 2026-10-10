@@ -153,21 +153,27 @@ _LEAD = r"^(?:(?:just|so|and|then|now|simply|quickly|please|kindly|you (?:can|sh
 _CODE = r"(?:otp|pin|password|cvv|code|card (?:number|details)|bvn)"
 # "Share/send/type... the OTP/PIN" as an instruction at the start of a clause (negated clauses are skipped).
 _CREDENTIALS = re.compile(
-    _LEAD + r"(?:share|send|give|tell|read|forward|provide|dictate|type|enter|input|paste|reply(?: with)?)\s+"
+    _LEAD
+    + r"(?P<verb>share|send|give|tell|read|forward|provide|dictate|type|enter|input|paste|reply(?: with)?)\s+"
     r"(?P<before>(?:\S+\s+){0,4}?)" + _CODE + r"\b(?P<after>.*)$"
 )
 # "...so send it": a bare object pronoun, when the sentence is about a code.
 _SEND_IT = re.compile(
-    _LEAD + r"(?:share|send|give|read|forward|dictate|type|enter|paste)\s+it\b(?P<after>.*)$"
+    _LEAD + r"(?P<verb>share|send|give|read|forward|dictate|type|enter|paste)\s+it\b(?P<after>.*)$"
 )
 _MENTIONS_CODE = re.compile(r"\b" + _CODE + r"\b")
 _INSTRUCTION_BREAK = re.compile(r"\s+(?:and|then|so)\s+")  # "do as he says and send your PIN"
 # Who the code goes to: the person asking is a violation; a bank/app (or nobody, caught as negation) is not.
 _SUSPECT_RECIPIENT = re.compile(
-    r"\b(?:caller|him|her|them|us|me|he|she|they|agent|person|man|woman|stranger|sender|officer|staff)\b"
+    r"\b(?:caller|him|her|them|us|me|he|she|they|agent|person|man|woman|stranger|sender|officer|staff|anyone"
+    r"|anybody)\b"
 )
-_OTHER_RECIPIENT = re.compile(
-    r"\b(?:bank|branch|app|family|police|efcc|anyone|anybody|pos|atm|machine|terminal|keypad|official)\b"
+_OTHER_RECIPIENT = re.compile(r"\b(?:bank|branch|app|family|police|efcc)\b")
+# Typing a PIN is safe on your own device or a card machine ("enter your new PIN twice", "on the POS machine
+# yourself"); handing it to a POS operator or ATM attendant is not, so these count for the typing verbs only.
+_TYPING = frozenset({"type", "enter", "input", "paste"})
+_TYPING_SAFE = re.compile(
+    r"\b(?:pos|atm|machine|terminal|keypad|your own|yourself|new (?:pin|password|code)|twice|block\w*|chang\w*)\b"
 )
 # Reported speech: a speech verb directly followed by ':' or a quote mark introduces the scammer's own words.
 _SPEECH = re.compile(
@@ -183,7 +189,8 @@ _DICTATED = re.compile(
     r"(?:the |that |this )?(?:caller|him|her|them|agent|person|man|woman|scammer|sender|officer|staff)\s*:"
     r".*\b(?:otp|pin|password|cvv|code|card (?:number|details)|bvn)\b"
 )
-# "They told you that you will...", "If they say you will...": a promise reported, not made.
+# "They told you that you will...", "If they say you will...": a promise reported, not made ("we promise..." is made).
+_FIRST_PERSON = re.compile(r"\b(?:i|we)\s+(?:\w+\s+)?$")
 _REPORTED_PROMISE = re.compile(
     r"\b(?:say|says|said|tell|tells|told|promis\w*|claim\w*|assur\w*)\s+(?:\S+\s+){0,3}?(?:that\s+)?(?:you will|you'll)\b"
 )
@@ -257,12 +264,16 @@ def credential_request(clause: str, sentence: str = "") -> bool:
         return False
     match = _CREDENTIALS.search(folded)
     if match is not None:
-        recipient = match.group("before") + " " + match.group("after")
+        verb, recipient = match.group("verb"), match.group("before") + " " + match.group("after")
     elif (bare := _SEND_IT.search(folded)) is not None and _MENTIONS_CODE.search(normalize(sentence)):
-        recipient = bare.group("after")
+        verb, recipient = bare.group("verb"), bare.group("after")
     else:
         return False
-    return bool(_SUSPECT_RECIPIENT.search(recipient)) or not _OTHER_RECIPIENT.search(recipient)
+    if _SUSPECT_RECIPIENT.search(recipient):
+        return True
+    if verb in _TYPING and _TYPING_SAFE.search(folded):
+        return False
+    return not _OTHER_RECIPIENT.search(recipient)
 
 
 def money_back_promise(clause: str, sentence: str = "") -> bool:
@@ -270,7 +281,8 @@ def money_back_promise(clause: str, sentence: str = "") -> bool:
     folded = normalize(clause)
     if not _MONEY_BACK.search(folded) or negated(folded):
         return False
-    return not _REPORTED_PROMISE.search(normalize(sentence or clause))
+    text = normalize(sentence or clause)
+    return not any(not _FIRST_PERSON.search(text[: m.start()]) for m in _REPORTED_PROMISE.finditer(text))
 
 
 def unattributed(sentence: str) -> str:

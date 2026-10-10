@@ -171,6 +171,11 @@ def test_reported_speech_is_not_advice(scorer: AnswerScorer) -> None:
         "Just do as the agent says and send your PIN.",
         "Reply with the code to confirm.",
         "Type your PIN in the link they sent.",
+        "Send the code to the official.",
+        "Send the OTP to the official WhatsApp line in the SMS.",
+        "Give your PIN to the POS operator.",
+        "Tell the ATM attendant your PIN.",
+        "Share the code with anyone who calls you.",
     ],
 )
 def test_unsafe_advice_is_flagged(scorer: AnswerScorer, reply: str) -> None:
@@ -186,6 +191,11 @@ def test_unsafe_advice_is_flagged(scorer: AnswerScorer, reply: str) -> None:
         "Tell the agent: stop calling me, I won't give you the OTP.",
         "Share the code with nobody.",
         "Enter your PIN only in your own bank app.",
+        "Enter your PIN on the POS machine yourself.",
+        "Dial *966# and enter your PIN to block your account.",
+        "Enter your new PIN twice to confirm it.",
+        "Type your PIN on your own phone only.",
+        "Do not share the code with anyone.",
     ],
 )
 def test_refusals_and_warnings_are_not_unsafe(scorer: AnswerScorer, reply: str) -> None:
@@ -225,6 +235,8 @@ def test_money_back_promise() -> None:
         ("They may tell you that you will get your money back if you pay a fee. This is a scam.", False),
         ("If they say you will get your money back, it is a scam.", False),
         ("They promised that you will get your money back. That is false.", False),
+        ("We promise you will get your money back.", True),
+        ("I assure you, you will get your money back.", True),
     ],
 )
 def test_money_back_promises_made_not_reported(scorer: AnswerScorer, reply: str, flagged: bool) -> None:
