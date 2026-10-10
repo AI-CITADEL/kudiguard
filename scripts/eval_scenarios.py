@@ -23,6 +23,7 @@ import yaml
 
 from kudiguard.domain import Verdict
 from kudiguard.engine import AnswerKind, Engine
+from kudiguard.evaluation.stats import percentile
 from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import ChatRequest, Completion, LLMError
@@ -106,10 +107,7 @@ async def main(url: str, rules_only: bool) -> None:
         print(f"  {language}: {confusion.line()}")
     print(f"  all: {overall.line()}")
     if not rules_only:
-        latencies.sort()
-        print(
-            f"  latency p50 {latencies[len(latencies) // 2]:.1f}s  p95 {latencies[int(len(latencies) * 0.95)]:.1f}s"
-        )
+        print(f"  latency p50 {percentile(latencies, 0.5):.1f}s  p95 {percentile(latencies, 0.95):.1f}s")
     print("\n".join(misses) or "  no misses")
     print(f"per-item results: {out.relative_to(ROOT)}")
 

@@ -1,0 +1,42 @@
+# Coverage calibration for the answer-quality scorer (kudiguard.evaluation.answers.AnswerScorer.matches):
+# a `must` point vs one reply sentence, labelled by hand. match: true = the sentence conveys the point.
+# The rule is cosine (bge-small, symmetric) >= cover_threshold AND the point's names/numbers appear in the sentence.
+# Measured by tests/integration/test_answer_calibration.py (-m live); results in docs/SPIKES.md E5.
+# Hand-written, partly by the scorer's author, partly from the 2026-10-10 review (marked `review`).
+
+# --- paraphrases (should match) ---------------------------------------------------------------------------
+- {point: "Your bank will never ask for your OTP.", sentence: "Banks do not ask customers for their one-time code by phone or message.", match: true}
+- {point: "Do not share the code with anyone.", sentence: "Keep the code to yourself; never give it to the caller.", match: true}
+- {point: "You cannot win a promo you did not enter.", sentence: "If you never entered the draw, you could not have won it.", match: true}
+- {point: "Do not pay any fee to receive a loan.", sentence: "Paying a processing fee before getting a loan is a sign of a scam, so do not pay.", match: true}
+- {point: "Check your balance in your bank app, not the SMS.", sentence: "Confirm the money arrived by checking your balance in your banking app.", match: true}
+- {point: "Start with a small emergency fund target, such as one week of spending.", sentence: "Begin by saving enough for one week of household costs for emergencies.", match: true}
+- {point: "Check the company is registered with the SEC.", sentence: "Look up the company on the SEC Nigeria website before you invest.", match: true}
+- {point: "Keep the transaction reference.", sentence: "Hold on to the receipt or reference number of the transfer.", match: true}
+- {point: "Most failed transfers are reversed automatically.", sentence: "Usually the bank returns the money on its own when a transfer fails.", match: true}
+- {point: "Call the person on their usual number before sending money.", sentence: "Phone your friend on the number you already know to confirm it is really them.", match: true}
+- {point: "Report the harassment to the FCCPC.", sentence: "You can report the loan app's harassment to the FCCPC.", match: true}
+- {point: "Dial *565*0# from the phone number you registered with.", sentence: "Dial *565*0# on the phone line linked to your BVN.", match: true}
+- {point: "Ask your network provider to block the SIM.", sentence: "Call your network provider and ask them to block the SIM card.", match: true}
+- {point: "Report to your bank and the EFCC instead of paying anyone.", sentence: "Do not pay him; report it to your bank and to the EFCC.", match: true}
+- {point: "Most failed transfers are reversed automatically.", sentence: "The money usually returns on its own.", match: true, note: "review: missed paraphrase (0.684 here)"}
+
+# --- related but different (should not match) -------------------------------------------------------------
+- {point: "Your bank will never ask for your OTP.", sentence: "Change your PIN and password.", match: false}
+- {point: "Do not pay any fee to receive a loan.", sentence: "Loan apps must be approved by the FCCPC.", match: false}
+- {point: "Check your balance in your bank app, not the SMS.", sentence: "Turn on alerts so you see every transaction.", match: false}
+- {point: "Start with a small emergency fund target, such as one week of spending.", sentence: "Invest only money you will not need soon.", match: false}
+- {point: "Keep the transaction reference.", sentence: "Report to your bank first.", match: false}
+- {point: "You cannot win a promo you did not enter.", sentence: "Fake promos use the names of banks and telecom companies.", match: false}
+- {point: "Most failed transfers are reversed automatically.", sentence: "Your bank cannot take money back from another account without consent.", match: false}
+- {point: "Report the harassment to the FCCPC.", sentence: "Report the harassment to the EFCC.", match: false, note: "review: EFCC vs FCCPC (0.897 on this pair; 0.748 on the review's wording)"}
+- {point: "Ask your network provider to block the SIM.", sentence: "Ask your bank to block your account.", match: false, note: "review: block account vs block SIM (0.787)"}
+- {point: "Move a fixed amount into savings as soon as you receive your salary.", sentence: "Write down what you earn and what you spend each month.", match: false, note: "review: save monthly vs write down earnings (0.696 here; 0.769 on the review's wording)"}
+- {point: "Change your PIN and password.", sentence: "Cover your hand when you type your PIN.", match: false, note: "review: change PIN vs cover hand (0.815)"}
+- {point: "Check if the company is registered with the SEC.", sentence: "Check if the lender is approved by the FCCPC.", match: false}
+- {point: "Dial *565*0# from the phone number you registered with.", sentence: "Dial *346# from the phone number linked to your NIN.", match: false}
+
+# --- off-topic (should not match) -------------------------------------------------------------------------
+- {point: "Your bank will never ask for your OTP.", sentence: "Write down what you earn and spend each month.", match: false}
+- {point: "Do not pay any fee to receive a loan.", sentence: "Cover your hand when you type your PIN.", match: false}
+- {point: "Keep the transaction reference.", sentence: "Inflation means prices go up over time.", match: false}

@@ -33,6 +33,7 @@ from kudiguard.llm.base import LLM, ChatRequest, LLMError
 from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.llm.sampling import add_sampling_arguments, describe, with_sampling
 from kudiguard.prompts import (
+    EXAMPLE_PHRASES,
     Intent,
     clean_reply,
     compose_request,
@@ -58,8 +59,6 @@ ENGLISH_STOPWORDS = {
     "this",
 }
 SIGN_OFF = re.compile(r"\b(best regards|regards|dear user|sincerely|zauna lafiya)\b", re.IGNORECASE)
-# Phrases unique to the worked examples: seeing one that is in neither the example used nor the facts = a leak.
-EXAMPLE_PHRASES = ("code sent to your phone", "real offers do not ask", "*346#")
 TASK_ECHO = re.compile(r"\b(task:|answer the user's|money question)", re.IGNORECASE)
 
 

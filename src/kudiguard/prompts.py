@@ -162,6 +162,9 @@ _EXAMPLE_QUESTION = _Example(
     actions=(),
     reply="You can see your NIN from your phone.\n1. Dial *346# from the phone number linked to your NIN.",
 )
+WORKED_EXAMPLES = (_EXAMPLE_CREDENTIALS, _EXAMPLE_SCAM, _EXAMPLE_QUESTION)
+# One phrase unique to each example's reply: seen in a reply whose facts lack it, it shows a copied example (evals).
+EXAMPLE_PHRASES = ("code sent to your phone", "real offers do not ask", "*346#")
 
 _SPECIAL_TOKENS = re.compile(r"<\|[^|>]{0,40}\|>")
 _DATA_TAGS = re.compile(r"<\s*/?\s*(?:message|facts|actions)\s*>", re.IGNORECASE)

@@ -11,6 +11,7 @@ from statistics import median
 import pytest
 import yaml
 
+from embedding_cache import local_fast_embedder
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import FilePackSource
 from kudiguard.knowledge.models import Query
@@ -60,9 +61,8 @@ async def test_bm25_accuracy_and_latency() -> None:
 
 @pytest.mark.live
 async def test_hybrid_accuracy_and_latency() -> None:
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3, p50_ms = await evaluate(FastEmbedder(cache_dir=ROOT / "models" / "fastembed"))
+    top1, top3, p50_ms = await evaluate(local_fast_embedder())
     print(f"\nHybrid: top1={top1:.0%} top3={top3:.0%} p50={p50_ms:.2f}ms")
     assert top1 >= 0.85
     assert top3 >= 0.90
@@ -102,9 +102,8 @@ async def test_pipeline_accuracy_bm25() -> None:
 
 @pytest.mark.live
 async def test_pipeline_accuracy_hybrid() -> None:
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3 = await evaluate_pipeline(FastEmbedder(cache_dir=ROOT / "models" / "fastembed"))
+    top1, top3 = await evaluate_pipeline(local_fast_embedder())
     print(f"\nPipeline (rules + hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.85
     assert top3 >= 0.92
@@ -121,9 +120,8 @@ async def test_blind_set_pipeline_bm25() -> None:
 @pytest.mark.live
 async def test_blind_set_pipeline_hybrid() -> None:
     """Measured 67% top-1 / 96% top-3 on 2026-10-08 (compose is grounded on the top 3)."""
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3 = await evaluate_pipeline(FastEmbedder(cache_dir=ROOT / "models" / "fastembed"), BLIND)
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), BLIND)
     print(f"\nBlind pipeline (hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.6
     assert top3 >= 0.9
@@ -146,11 +144,8 @@ async def test_money_skills_reachable_bm25() -> None:
 
 @pytest.mark.live
 async def test_money_skills_reachable_hybrid() -> None:
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3 = await evaluate_pipeline(
-        FastEmbedder(cache_dir=ROOT / "models" / "fastembed"), MONEY, PRODUCTION
-    )
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), MONEY, PRODUCTION)
     print(f"\nMoney skills (rules + hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.8
     assert top3 >= 0.95
@@ -173,11 +168,8 @@ async def test_blind_set_with_production_packs_hybrid() -> None:
 
     Accepted -1 top-1 versus core: "keep small small money aside every week" now ranks irregular-income above
     saving-basics (both in the top 3)."""
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3 = await evaluate_pipeline(
-        FastEmbedder(cache_dir=ROOT / "models" / "fastembed"), BLIND, PRODUCTION
-    )
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), BLIND, PRODUCTION)
     print(f"\nBlind, production packs (hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.58  # one miss below the measured 15/24
     assert top3 >= 0.9
@@ -193,11 +185,8 @@ async def test_pipeline_accuracy_bm25_production() -> None:
 
 @pytest.mark.live
 async def test_pipeline_accuracy_hybrid_production() -> None:
-    from kudiguard.knowledge.embeddings import FastEmbedder
 
-    top1, top3 = await evaluate_pipeline(
-        FastEmbedder(cache_dir=ROOT / "models" / "fastembed"), CASES, PRODUCTION
-    )
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), CASES, PRODUCTION)
     print(f"\nPipeline, production packs (rules + hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.85
     assert top3 >= 0.92
