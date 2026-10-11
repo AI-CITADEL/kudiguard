@@ -222,3 +222,15 @@ class Relevance:
     def met(self, relevance: float | None, *, dense: bool) -> bool:
         """None (an unscored hit, e.g. from a partner API) never meets a level."""
         return relevance is not None and relevance >= (self.dense if dense else self.bm25)
+
+
+# Defaults for the advice-quality levels (settings ``KUDIGUARD_*``; docs/ARCHITECTURE.md "Advice quality"), chosen on
+# the dev retrieval sets with all four packs.
+# Search hits below this never reach COMPOSE: the highest level that keeps every correct top-3 hit.
+MIN_RELEVANCE = Relevance(dense=0.62, bm25=0.60)
+# Genuine notices (pack entries "notice-*": the user's own OTP, a login alert, a reversal): measured on the dev
+# retrieval sets with all packs (docs/ARCHITECTURE.md, "Advice quality"), 7% / 5% of wrong hits reach this level.
+NOTICE_MIN = Relevance(dense=0.80, bm25=0.84)
+# An entry's model answer is used only when that entry is the top hit at this level (conservative: above the 0.62 /
+# 0.60 cut-off; on the dev sets, all packs, it keeps 85% / 81% of correct top-3 hits and 51% / 55% of wrong ones).
+EXAMPLE_MIN = Relevance(dense=0.70, bm25=0.70)

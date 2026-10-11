@@ -207,7 +207,7 @@ _EXAMPLE_PIDGIN = _Example(
 )
 # Words and letters of Hausa, Yoruba and Igbo that Pidgin and English do not use (a reply to Pidgin in one of them)
 _OTHER_LANGUAGE_WORDS = re.compile(
-    r"\b(?:wannan|kada|idan|zamba|kuma|bankin|nan take|mase|maṣe|wọn|nipasẹ|ndị|nke|gị|unu|biko|ọ bụ)\b",
+    r"\b(?:wannan|kada|idan|zamba|kuma|bankin|nan take|mase|maṣe|wọn|nipasẹ|ndị|nke|gị|ọ bụ)\b",
     re.IGNORECASE,
 )
 _OTHER_LANGUAGE_LETTERS = re.compile(r"[ẹọṣɗƙɓịụ]", re.IGNORECASE)
@@ -431,9 +431,17 @@ def _example_for(verdict: Verdict, flags: Sequence[Flag], has_facts: bool = True
     return _EXAMPLE_QUESTION if has_facts or verdict is Verdict.NO_FLAGS else _EXAMPLE_NO_FACTS
 
 
-def worked_example_reply(verdict: Verdict, flags: Sequence[Flag], knowledge: KnowledgeResult) -> str:
+def _shot(verdict: Verdict, flags: Sequence[Flag], has_facts: bool, language_name: str) -> _Example:
+    if language_name == PIDGIN_NAME and verdict in (Verdict.LIKELY_SCAM, Verdict.CAUTION):
+        return _EXAMPLE_PIDGIN
+    return _example_for(verdict, flags, has_facts)
+
+
+def worked_example_reply(
+    verdict: Verdict, flags: Sequence[Flag], knowledge: KnowledgeResult, language_name: str
+) -> str:
     """The fixed worked example's reply ``compose_request`` shows when no entry example is given (copy check)."""
-    return _example_for(verdict, flags, bool(facts_block(knowledge)[0])).reply
+    return _shot(verdict, flags, bool(facts_block(knowledge)[0]), language_name).reply
 
 
 def entry_example(knowledge: KnowledgeResult) -> str | None:
@@ -457,8 +465,7 @@ def compose_request(
     facts, actions = facts_block(knowledge)
     worked: tuple[dict[str, str], ...] = ()
     if not example and worked_example:
-        pidgin_scam = language_name == PIDGIN_NAME and verdict in (Verdict.LIKELY_SCAM, Verdict.CAUTION)
-        shot = _EXAMPLE_PIDGIN if pidgin_scam else _example_for(verdict, flags, bool(facts))
+        shot = _shot(verdict, flags, bool(facts), language_name)
         worked = (
             {
                 "role": "user",

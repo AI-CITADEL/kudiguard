@@ -273,3 +273,15 @@ async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_bm25
 @pytest.mark.live
 async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_hybrid() -> None:
     assert (await _top(CUSTOMER_CARE, local_fast_embedder()))[0] != "sit-fake-customer-care"
+
+
+PARAPHRASE_PROBES_BM25 = [  # review of 53bdeed: inflected wording must still cue the situational entry
+    ("Someone stole my ATM card at the market", "sit-card-stolen"),
+    ("thieves took my bank card from my bag", "sit-card-stolen"),
+    ("I was defrauded of 200k yesterday", "sit-lost-money-now"),
+]
+
+
+@pytest.mark.parametrize(("query", "entry"), PARAPHRASE_PROBES_BM25)
+async def test_paraphrase_probes_bm25(query: str, entry: str) -> None:
+    assert entry in (await _top(query, None))[:3]

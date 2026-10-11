@@ -393,6 +393,12 @@ lexicon:
       - '(?:what is|whats) (?:your|ur) (?:otp|pin|cvv|password|bvn|nin|card number)'
       - 'ask(?:ed|ing|s)?\W+(?:\w+\W+){0,4}?for\W+(?:\w+\W+){0,3}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin)'
       - '(?:otp|pin|cvv|password|verification code)\W+(?:\w+\W+){0,6}?(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|forward)\W+(?:it|them|to me)'
+      # a "do not share" that makes an exception is still a request ("... except our agent who will call you")
+      - '(?:not|never|dont|don''t|no go)\W+(?:\w+\W+){0,2}?(?:send|give|share|tell|read|forward|disclose|reveal)\W+(?:\w+\W+){0,8}?(?:except|but|only|apart from|other than)\W+(?:\w+\W+){0,2}?(?:agent|staff|officer|us|him|her|the caller|caller|team)'
+      - 'except\W+(?:our|the|your bank)\W+(?:\w+\W+)?(?:agent|staff|officer|team)'
+      - '(?:read|give|tell|send|call out)\W+(?:the code|the otp|the pin|your (?:otp|pin|code)|the token)\W+(?:\w+\W+){0,1}?to (?:the |our |your )?(?:agent|officer|caller|staff|him|her)'
+      - '(?:give|send|tell|read)\W+(?:it|them)\W+to (?:him|her|the (?:agent|officer|caller|staff))\W+only'
+      - '(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|read|forward)\W+(?:me |us )?(?:the|your|ur) (?:code|otp|pin)\b(?! to your)'
     remote_access:
       - 'anydesk'
       - 'teamviewer'
@@ -415,7 +421,9 @@ lexicon:
       # first person: the caller says the money went to "my account" and wants it back
       - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )(?:my|mine) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
       - '(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|my money|the excess|her money|his money)\W+(?:back\W+)?to (?:him|her|them)'
-      - '(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)'
+      - '(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)\W+(?:\w+\W+){0,8}?(?:by mistake|mistakenly|wrongly|in error|by error|wrong account|sent you too much|excess (?:amount|money) i sent)'
+      - '(?:by mistake|mistakenly|wrongly|in error|by error|wrong account|sent you too much|excess (?:amount|money) i sent)\W+(?:\w+\W+){0,10}?(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)'
+      - 'excess (?:amount|money) i sent'
     account_threat:
       - '(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|line|whatsapp)\W+(?:\w+\W+){0,4}?(?:blocked|suspended|deactivated|restricted|frozen|barred|disabled|banned|closed|don block|go block)'
       - '(?:block|suspend|deactivat|restrict|freez|bar|ban)\w*\W+(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|whatsapp)'
@@ -456,6 +464,15 @@ lexicon:
       - '(?:this is|i am|im|we are|calling from|called from|call(?:ed|ing)? (?:me )?from|claim\w* to be|pretend\w* to be|posing as|(?:he|she|they|it) (?:is|was|are|were)|(?:him|she|dem|e) be|(?:a|one|some|wani) (?:man|woman|person|guy|lady)? ?(?:from )?)\W+(?:\w+\W+){0,3}?customer (?:care|service|support)'
       - 'customer (?:care|service|support)\W+(?:\w+\W+){0,3}?(?:called|calls|calling|call me|texted|messaged|sent|said|says|told|tells|asked|asks|dm\w*|reached out|contacted|replied|kira|pe|kporo)'
       - 'bank (?:staff|official|manager|agent|officer)'
+      # named customer care is a claim, except after a question's verb ("how do I reach GTBank customer care?")
+      - '(?<!reach )(?<!call )(?<!contact )(?<!is )(?<!the )(?<!my )(?<!to )(?<!for )(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)\w* customer (?:care|service|support)(?: unit| desk| team)?'
+      - '^customer (?:care|service|support)(?: desk| unit)?[:.]'
+      - 'message from customer (?:care|service|support)'
+      - 'contact our customer (?:care|service|support)'
+      - '(?:this is|i am from|i m from|im from|we are from|calling from)\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
+      - '^(?:hello\W+|hi\W+)?(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)\W+here\b'
+      - '(?:hello|hi)\W+this is\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
+      - 'regards\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
       - '(?:gt ?bank|gtco|access|zenith|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic)\w* ?(?:support|care|help|team)'
       - 'on (?:twitter|x|telegram|facebook|instagram)'
       - 'cbn(?!\.gov\.ng)'

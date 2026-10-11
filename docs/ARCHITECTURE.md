@@ -146,6 +146,14 @@ Settings in `.env.example` ("Advice quality"); code in `knowledge/service.py` (c
   "he said he is from customer care", "him be customer care") or as the one who contacted the user ("customer care
   called/asked/DMed"), not in a question ("what is my bank's customer care number?"). Rules-only on the dev sets:
   impersonation on scams answers.yaml 3/20 -> 3/20, prompts.yaml 5/18 -> 5/18; customer-care questions 2/2 -> 0/2.
+* **Rule fixes after review (53bdeed)**: a negated "do not share" that makes an exception ("... except our agent",
+  "give it to him only") and "read the code to the officer" still flag `asks_credentials`; "send back the excess / the
+  balance" needs a wrong-transfer cue (by mistake, in error, wrong account...); named or headed customer care ("GTBank
+  customer service:", "Customer care desk.", "message from customer service", "contact our customer care") and "this
+  is / I am from / ... here / Regards, <bank>" count as impersonation claims, while "what is my bank's customer care
+  number?" and "how do I reach GTBank customer care?" stay clean. Probe table: `tests/unit/test_rules_review.py`.
+  Rules-only on the dev sets, master -> new: answers.yaml scams 14/20 -> 15/20, non-scams 2/21 -> 2/21; prompts.yaml
+  17/18 -> 17/18, 2/16 -> 2/16 (impersonation and asks_credentials recall unchanged).
 * **Pidgin, stabilised**: Pidgin input with a scam verdict gets a Pidgin worked example; a reply to Pidgin input that
   reads as Hausa, Yoruba or Igbo (`prompts.reads_as_hausa_yoruba_igbo`) is composed once more in English.
 * **Pidgin replies** (`KUDIGUARD_PIDGIN_REPLIES`): Pidgin arrives as language `en`; when

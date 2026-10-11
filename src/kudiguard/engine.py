@@ -27,7 +27,7 @@ from typing import Any
 from kudiguard.commands import CommandMatcher
 from kudiguard.domain import Flag, LanguageCode, Outcome, ScamAssessment, Verdict
 from kudiguard.i18n import Messages, Msg
-from kudiguard.knowledge.models import Contact, KnowledgeResult, Query, Relevance
+from kudiguard.knowledge.models import EXAMPLE_MIN, NOTICE_MIN, Contact, KnowledgeResult, Query, Relevance
 from kudiguard.knowledge.service import KnowledgeBase
 from kudiguard.languages import PIVOT, LanguageRegistry
 from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_within
@@ -109,12 +109,6 @@ SHADOW_DRAIN_S = 1.0  # shutdown wait for shadow checks when the checker has no 
 MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
 
 
-# Genuine notices (pack entries "notice-*": the user's own OTP, a login alert, a reversal): measured on the dev
-# retrieval sets with all packs (docs/ARCHITECTURE.md, "Advice quality"), 7% / 5% of wrong hits reach this level.
-NOTICE_MIN = Relevance(dense=0.80, bm25=0.84)
-# An entry's model answer is used only when that entry is the top hit at this level (conservative: above the 0.62 /
-# 0.60 cut-off; on the dev sets, all packs, it keeps 85% / 81% of correct top-3 hits and 51% / 55% of wrong ones).
-EXAMPLE_MIN = Relevance(dense=0.70, bm25=0.70)
 # The only model flags a genuine notice may carry and still be lowered: a bank alert reads as urgent, official and
 # private. Any other flag (a code, money or details to send, a link, a fee, a threat) keeps the model's verdict.
 NOTICE_SOFT_FLAGS = frozenset({Flag.URGENCY, Flag.IMPERSONATION, Flag.SECRECY})
@@ -578,13 +572,18 @@ class Engine:
         example = self._example(knowledge)
 
         # the example the model is shown (the entry's, else the fixed worked example), for the copy check
-        shown = example or worked_example_reply(verdict, flags, knowledge)
+        compose_language = target if direct else self.registry.get(PIVOT).name
+        english_name = self.registry.get(PIVOT).name
+
+        def shown_for(language_name: str) -> str:
+            """The example the request shows (the entry's, else the fixed one for that language): copy check."""
+            return example or worked_example_reply(verdict, flags, knowledge, language_name)
 
         def build(
             model_answer: str | None, worked_example: bool = True, language_name: str | None = None
         ) -> ChatRequest:
             return compose_request(
-                language_name=language_name or (target if direct else self.registry.get(PIVOT).name),
+                language_name=language_name or compose_language,
                 english=english,
                 verdict=verdict,
                 flags=flags,
@@ -597,14 +596,19 @@ class Engine:
         if direct:
             generation = await self._generate(request, language, deadline, sources)
             generation = await self._unless_copied(
-                generation, shown, knowledge, build(None, worked_example=False), language, deadline, sources
-            )
+                generation, shown_for(compose_language), knowledge, build(None, worked_example=False), language,
+                deadline, sources,
+            )  # fmt: skip
             if pidgin and generation.text is not None and reads_as_hausa_yoruba_igbo(generation.text):
                 # asked for Pidgin, got Hausa/Yoruba/Igbo: once more with the plain English instruction
                 log.info("compose: Pidgin input got a reply in another language, retrying in English")
                 retry = await self._generate(
-                    build(example, language_name=self.registry.get(PIVOT).name), language, deadline, sources
+                    build(example, language_name=english_name), language, deadline, sources
                 )
+                retry = await self._unless_copied(
+                    retry, shown_for(english_name), knowledge,
+                    build(None, worked_example=False, language_name=english_name), language, deadline, sources,
+                )  # fmt: skip
                 retry.ms += generation.ms
                 retry.issues = generation.issues + retry.issues
                 generation = retry
@@ -617,7 +621,13 @@ class Engine:
             return _Generation(unavailable=True, rejections=("no_time",))
         draft = await self._generate(request, PIVOT, deadline, sources)
         draft = await self._unless_copied(
-            draft, shown, knowledge, build(None, worked_example=False), PIVOT, deadline, sources
+            draft,
+            shown_for(compose_language),
+            knowledge,
+            build(None, worked_example=False),
+            PIVOT,
+            deadline,
+            sources,
         )
         draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
         if draft.text is None:

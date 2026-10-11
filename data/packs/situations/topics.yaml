@@ -22,7 +22,7 @@
   actions:
     - Block the card now in your bank app or by calling your bank.
     - Report any unknown debit to your bank and keep the complaint number.
-  keywords: [card stolen, stolen card, lost card, block my card, dem steal my card, my card don lost]
+  keywords: [card stolen, stolen card, lost card, block my card, dem steal my card, my card don lost, stole my card, stole my atm card, took my bank card, took my atm card]
 
 # Sources: general bank/telecom practice, as in kudiguard-core lost-phone (not separately web-verified)
 - id: sit-phone-stolen-banking
@@ -35,7 +35,7 @@
     - Check your account for transfers you did not make and report them to your bank at once.
   actions:
     - Call your bank first, then your network provider.
-  keywords: [phone stolen, phone snatched, dem snatch my phone, stolen phone with bank app]
+  keywords: [phone stolen, phone snatched, dem snatch my phone, stolen phone with bank app, snatched my phone, phone was stolen, stole my phone]
 
 # Sources: general bank/telecom practice (block SIM, then mobile/USSD banking), as in kudiguard-core lost-phone and
 #   report-fraud; NCC complaint escalation 622 verified 2026-10-07 in kudiguard-core contacts
@@ -49,7 +49,7 @@
     - Check your accounts for transfers you did not make and report them to your bank.
   actions:
     - Call your network provider, then your bank, from another phone.
-  keywords: [sim swap, sim stopped working suddenly, no signal and bank alert, sim not registered suddenly, my line no dey work, my sim stop working]
+  keywords: [sim swap, sim stopped working suddenly, no signal and bank alert, sim not registered suddenly, my line no dey work, my sim stop working, sim has no network]
 
 # Sources: WhatsApp Help Center "How to recover a compromised account" https://faq.whatsapp.com/1131652977717250 and
 #   two-step verification (Settings > Account > Two-step verification) (checked 2026-10-11);
@@ -415,7 +415,7 @@
     - Do not pay anyone who promises to recover the money for a fee.
   actions:
     - Call your bank first, then report to the EFCC or police.
-  keywords: [i have been scammed, scammed, i sent money to scammer, dem scam me, fraudster collected my money, what to do after scam, place lien]
+  keywords: [i have been scammed, scammed, i sent money to scammer, dem scam me, fraudster collected my money, what to do after scam, place lien, defrauded, scammed me of]
 
 # Sources: CBN complaint route https://www.cbn.gov.ng/supervision/cpdcomgt.html and
 #   https://www.cbn.gov.ng/FinInc/FinLit/How_Lodge_Complaints.pdf (checked 2026-10-11)

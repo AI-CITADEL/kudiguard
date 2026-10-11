@@ -322,7 +322,7 @@ async def test_a_copied_fixed_worked_example_is_composed_again_without_any_examp
     from kudiguard.prompts import worked_example_reply
 
     copied = worked_example_reply(
-        Verdict.CAUTION, (), KnowledgeResult(entries=StubKnowledge((OTHER, 0.9)).result.entries)
+        Verdict.CAUTION, (), KnowledgeResult(entries=StubKnowledge((OTHER, 0.9)).result.entries), "English"
     )
     llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=[copied, REPLY])
     answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(
@@ -456,3 +456,26 @@ def test_reads_as_hausa_yoruba_igbo() -> None:
 
     assert reads_as_hausa_yoruba_igbo("Wannan naa jẹ aṣiwere. Banki rẹ ko beere OTP")
     assert not reads_as_hausa_yoruba_igbo("Na scam be this. Your bank no go ever ask you for your OTP.")
+
+
+async def test_a_copied_pidgin_worked_example_is_composed_again(registry: LanguageRegistry) -> None:
+    from kudiguard.prompts import PIDGIN_NAME, worked_example_reply
+
+    knowledge = StubKnowledge((OTHER, 0.9))
+    copied = worked_example_reply(Verdict.LIKELY_SCAM, (), knowledge.result, PIDGIN_NAME)
+    assert "no dey ask" in copied
+    llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=[copied, REPLY])
+    answer = await engine(registry, llm, knowledge).check(PIDGIN, "en")
+    assert len(llm.calls(Purpose.COMPOSE)) == 2 and answer.body == REPLY
+
+
+async def test_the_english_retry_for_pidgin_is_copy_checked_too(registry: LanguageRegistry) -> None:
+    from kudiguard.prompts import worked_example_reply
+
+    knowledge = StubKnowledge((OTHER, 0.9))
+    english_copy = worked_example_reply(
+        Verdict.LIKELY_SCAM, (Flag.ASKS_CREDENTIALS,), knowledge.result, "English"
+    )
+    llm = FakeLLM(analyse=analysis(), compose=["Wannan zamba ne. Kada ka ba su lambar.", english_copy, REPLY])
+    answer = await engine(registry, llm, knowledge).check(PIDGIN, "en")
+    assert len(llm.calls(Purpose.COMPOSE)) == 3 and answer.body == REPLY
