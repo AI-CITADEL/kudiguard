@@ -598,3 +598,9 @@
 - {lang: "en", text: "Use your own bank app and pay into the account number the officer provided.", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: a supplied payee"}
 - {lang: "en", text: "Never pay into the account number the officer provided.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated supplied payee"}
 - {lang: "en", text: "Do not use your bank app to pay into the account the caller gave you.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated supplied payee"}
+- {lang: "en", text: "Don't forget to tell him \"my OTP is 553201\".", expect: "block", issue: "unsafe_instruction", note: "round 15 lead: an inverting verb after the negation"}
+- {lang: "en", text: "Don't hesitate to tell the agent \"here is my PIN 1234\".", expect: "block", issue: "unsafe_instruction", note: "round 15 lead: an inverting verb after the negation"}
+- {lang: "en", text: "Don't forget to text him \"my BVN is 22212345678\".", expect: "block", issue: "unsafe_instruction", note: "round 15 lead: an inverting verb after the negation"}
+- {lang: "en", text: "Never forget to tell the agent \"my OTP is 553201\" when he calls.", expect: "block", issue: "unsafe_instruction", note: "round 15 lead: an inverting verb after the negation"}
+- {lang: "en", text: "Don't ever tell him \"my OTP is 553201\".", expect: "pass", issue: "unsafe_instruction", note: "round 15 lead: a negated told-to-say"}
+- {lang: "en", text: "You must not tell them \"my PIN is 1234\".", expect: "pass", issue: "unsafe_instruction", note: "round 15 lead: a negated told-to-say"}

@@ -172,8 +172,10 @@ def _unify_quotes(text: str) -> str:
 
 
 # "never tell him", "do not text anyone", "you should never tell anyone"
+# ("don't forget / hesitate to tell him ..." inverts the negation: an instruction)
 _NEGATED_LEAD = re.compile(
-    r"\b(?:not|never|no|don't|dont)\s+(?:[\w']+\s+){0,2}?"
+    r"\b(?:not|never|no|don't|dont)\s+"
+    r"(?:(?!(?:forget|hesitate|fail|neglect|wait|delay|be|worry|panic|stop)\b)[\w']+\s+){0,2}?"
     r"(?:tell|say|reply|answer|text|write|message|type|send|respond|read)\b"
 )
 # an elided opener ("'cause", "'em", "'til") is an apostrophe, not a quotation mark
