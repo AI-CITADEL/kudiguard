@@ -1,106 +1,104 @@
 # Model answers for genuine-notices entries (id -> example), each at most 60 words: calm, plain English, says the
-# notice looks normal and gives the one check. Kept in a sibling file because the Entry model forbids unknown fields;
-# workstream E is adding an `example` field, after which these can move inline. Not read by the pack loader.
+# notice looks normal ONLY under a stated condition ("if you started it yourself...") and gives the one check. Kept in
+# a sibling file because the Entry model forbids unknown fields; workstream E is adding an `example` field, after which
+# these can move inline. Not read by the pack loader.
 notice-otp-own-transaction: >-
-  This looks normal. Your bank sends a code when you start a transfer yourself. Type it only into the app or page you
-  opened. Never read it to anyone who calls or chats with you, even someone claiming to be the bank. If
-  you did not start a payment, call your bank using the number on your card.
+  If you started this payment yourself just now, the code is normal. Check the amount and merchant in the message match
+  what you are paying. If a caller or chat told you to start it, stop. Never read the code to anyone, even someone
+  claiming to be the bank.
 notice-login-alert: >-
-  This looks normal if you just logged in. Banks send these alerts so you notice logins that were not you. Check that
-  the time in the alert matches when you opened your app. If it does not, change your password in your own app and
-  call your bank.
+  If you just logged in, this alert is normal. Check that the time matches when you opened your app. If it was not you,
+  change your password in your own app and call your bank using the number on the back of your card, not any number or
+  link in the alert.
 notice-new-device-alert: >-
-  This looks normal if you just set up your bank app on a new or reset phone. Since July 2026 the app works on one
-  phone at a time, so the bank checks you again. If you did not change phone today, call your bank using the number on
-  your card.
+  If you just set up your bank app on a new or reset phone, this alert is normal. If you did not change phone today,
+  call your bank using the number on the back of your card, not any number or link in the alert.
 notice-cbn-new-device-limit: >-
-  This looks normal. Since 1 July 2026, a CBN rule caps transfers at ₦20,000 for the first 24 hours after you set up
-  your bank app on a new phone. It ends by itself. Nobody needs a fee or a code to lift it. Wait, or visit your branch
-  for a bigger payment.
+  If you set up your bank app on a new phone in the last day, this is normal: a CBN rule caps transfers out at ₦20,000
+  for 24 hours. It ends by itself. A message asking you to click or pay to "unlock" your account is a scam.
 notice-new-account-app-limit: >-
-  This looks normal. A new bank or wallet app is limited to ₦20,000 in and out for its first 24 hours under a CBN rule.
-  It lifts by itself. Check the limit inside the official app, and do not pay anyone to remove it.
+  If you just opened this account, the limit is normal. A CBN rule caps money in and out at ₦20,000 for the first 24
+  hours on a new account. It lifts by itself. Check the limit inside the official app, and do not pay anyone to remove
+  it.
 notice-reversal-failed-transfer: >-
-  This looks like a normal reversal of your failed transfer. Check your balance in your own bank app or USSD, not the
-  SMS. If the money is there, nothing more is needed. If it is not back within 24 hours, complain to your bank with the
-  transaction reference.
+  If you had a failed transfer, a reversal is normal. Check your balance in your own bank app or USSD, not the SMS. If
+  the money is not back, complain to your bank with the transaction reference; it should be reversed within 24 hours of
+  your complaint.
 notice-atm-reversal: >-
-  This looks normal. When an ATM debits you without giving cash, the bank puts the money back, at once for your own
-  bank's ATM or within 48 hours for another bank's. Check your balance in your own app. If it is late, complain to your
-  bank with the date and ATM location.
+  If an ATM debited you without giving cash, a reversal is normal: at once for your own bank's ATM, within 48 hours for
+  another bank's. Check your balance in your own app. If it is late, complain to your bank with the date and ATM
+  location.
 notice-transfer-pending: >-
-  This is common when the bank network is slow. Most pending transfers complete or are reversed within 24 hours. Do
-  not send the money again. Check the status in your own app's history, and complain to your bank if it is still
-  pending after a day.
+  If you sent this transfer, "pending" usually means the network is slow; most complete or reverse within 24 hours. Do
+  not send it again. Check the status in your own app. If someone paying you says it is pending, wait until it shows in
+  your balance.
 notice-sms-alert-charge: >-
-  This looks like a normal SMS alert charge. Banks may charge the cost of sending you transaction alerts. Check the
-  narration and amount in your app history; it should be small and similar to past months. Email alerts should be
-  free if you prefer them.
+  If the narration says SMS charge and the amount is small, this is likely a normal alert fee. Check that it matches past
+  months in your app history. Email alerts should be free if you prefer them.
 notice-stamp-duty: >-
-  This looks normal. Since January 2026 the sender pays a ₦50 stamp duty on transfers of ₦10,000 or more. Check your
-  app history for one ₦50 debit beside a transfer of ₦10,000 or more that you sent. If it was taken on money you
-  received, ask your bank.
+  If you sent a transfer of ₦10,000 or more, a ₦50 stamp duty is normal since January 2026; the sender pays it. Check
+  your app history for one ₦50 debit beside that transfer. If it was taken on money you received, ask your bank.
 notice-card-maintenance-fee: >-
-  Card fees are ordinary bank charges, but under the CBN's 2026 guide banks should no longer charge monthly
-  fees on naira cards. Check the narration in your app, then ask your bank in its app or at a branch, not through
-  someone who called you.
+  Card fees are ordinary bank charges, but from 1 May 2026 banks should no longer charge monthly fees on naira cards.
+  Check the narration in your app, then ask your bank in its app or at a branch, not through someone who called you.
 notice-card-issuance-fee: >-
-  This looks normal if you asked for a card or your old one expired. Banks may charge up to ₦1,500 for a new or
+  If you asked for a card or your old one expired, this is normal. Banks may charge up to ₦1,500 for a new or
   replacement naira card. If you did not ask for a card, ask your bank at a branch or in its app.
 notice-airtime-data-debit: >-
-  This looks like a normal debit for airtime or data. Check your phone: the airtime or data should be on the line you
-  chose and the amount should match. If you did not buy it, look for an auto-renewal in your app.
+  If you bought airtime or data, this debit is normal. Check your phone: it should be on the line you chose and the
+  amount should match. If you did not buy it, look for an auto-renewal in your app.
 notice-account-maintenance-fee: >-
-  This looks like a normal account maintenance fee on a current account. In 2026 it is capped at 50 kobo per ₦1,000
-  you sent out, and the CBN plans to remove it in 2027. Check that it is small compared with your spending in your app
-  statement.
+  If you have a current account, a small maintenance fee is normal. In 2026 it is capped at 50 kobo per ₦1,000 you sent
+  out, and the CBN plans to remove it in 2027. Check that it is small compared with your spending in your app.
 notice-ussd-charge: >-
-  This looks normal. Your network may ask you to accept a small airtime charge, about ₦6.98 per session, when you dial
-  your bank's USSD code. Accept only if you dialled the code yourself. Type your PIN only inside the bank menu, never to
-  a person.
+  If you dialled your bank's USSD code yourself, this prompt is normal: your network charges about ₦6.98 airtime per
+  session. Accept only if you dialled it. Type your PIN only inside the bank menu, never to a person.
 notice-credit-alert: >-
-  This looks like a normal credit alert, but check before you spend or release goods. Open your own bank app or dial
-  your bank's USSD and see whether your balance went up. A fake SMS cannot change your real balance.
+  If you were expecting this money, check your balance in your own bank app or USSD before you spend or release goods. A
+  fake SMS cannot change your real balance. If a stranger says they sent money by mistake, do not send it back yourself;
+  tell your bank to reverse it.
 notice-e-statement: >-
-  This looks like a normal monthly statement email. A real one just attaches the statement and asks you to do nothing
-  else. Do not click any login link. Compare it with the history in your own app if you want to check.
+  If it simply attaches your monthly statement, this is normal. Do not click a login link, and do not open an
+  attachment that asks you to log in. Compare it with the history in your own app.
 notice-loan-repayment-reminder: >-
-  This looks like a normal reminder from your lender. Open the lender's own app and check that the amount and due date
-  match. Pay only inside that app or to the account shown there, never to an account a stranger sends.
+  If you borrowed from this lender, a reminder is normal. Open the lender's own app and check that the amount and due
+  date match. Pay only inside that app or to the account shown there, never to an account a stranger sends.
 notice-telco-bonus: >-
-  This looks like a normal promo message. A real bonus asks you for nothing: no fee, no code, no PIN. Check your
-  balance by dialling your network's balance code yourself. Ignore any promo that asks you to pay or share details.
+  A promo that asks for nothing can be normal. Check your balance by dialling your network's balance code yourself. If
+  it asks for a fee, a code, your PIN or BVN, it is a trick; ignore it.
 notice-delivery-for-your-order: >-
-  This looks like a normal delivery message for your order. Open the shop's own app or website yourself and check the
-  order number and status. Pay any balance only there or on delivery, never through a link in a message.
+  If you placed an order, a delivery message is normal. Open the shop's own app or website yourself and check the order
+  number. If you did not order anything, it is not yours. A "customs" or "redelivery" fee by link is a known trick.
 notice-ajo-reminder: >-
-  This looks like a normal contribution reminder. Pay the usual amount to the usual account. If anything changed, like
-  a new account number or a new collector, confirm it face to face or by calling the leader's usual number first.
+  If it is from your own group's leader with the usual amount and account, this reminder is normal. If anything changed,
+  like a new account or a new collector, confirm it face to face or by calling the leader's usual number first.
 notice-religious-school-account: >-
-  This looks normal if someone you know gave you the account. Before you confirm the transfer, check that the account
-  name shown is the church, mosque or school. If it shows a person's name, ask the office in person first.
+  If the account was announced in service or printed on the official bill or school portal, this is normal. Before you
+  confirm, check the account name shown is the church, mosque or school. If it shows a person's name, ask the office in
+  person first.
 notice-family-request-confirmed: >-
-  Since you called them on their usual number and they confirmed it, this looks normal. Before you send, check that
-  the account name shown matches their name.
+  If you dialled their usual number yourself and they confirmed, it is very likely theirs. Voices can be faked, so be
+  careful if they want it paid into someone else's account. Check that the account name matches their name.
 notice-tier-upgrade: >-
-  This looks normal if it is inside the app you opened yourself. Upgrading means adding your NIN or address there or at
-  a branch. A real upgrade never comes through a link, a caller, or an agent asking for a fee.
+  If it is inside the app you opened yourself, this is normal. Upgrading means adding your BVN or NIN, whichever is
+  missing, then an address, there or at a branch. A real upgrade never comes through a link, a caller, or an agent
+  asking for a fee.
 notice-bvn-nin-linkage: >-
-  This looks normal if the request is inside your bank's official app or at the branch. Open the app yourself and look
-  for it there. If it only came by SMS or WhatsApp with a link, ignore that message.
+  If the request is inside your bank's official app or at the branch, it is normal. Open the app yourself and look for
+  it there. If it only came by SMS or WhatsApp with a link, ignore that message.
 notice-bank-security-tips: >-
-  This looks like a normal security tips message. Real tips only warn you and ask you to do nothing. If it also has a
-  link, a number to call, or asks for details, ignore it.
+  If it only gives advice and asks you to do nothing, this is a normal security tips message. If it also has a link, a
+  number to call, or asks for details, ignore it.
 notice-dormant-reactivation: >-
-  This looks normal if you started it yourself at the branch or in the official app. The bank will check your ID and
-  BVN. Since March 2026 no affidavit is needed. A caller offering to reactivate your account for a fee is not your
-  bank.
+  If you started it yourself at the branch or in the official app, this is normal. The bank will check your ID and BVN.
+  No affidavit is needed since March 2026 unless the money already went to the CBN's unclaimed balances fund. A caller
+  offering this for a fee is not your bank.
 notice-card-expiry: >-
-  This looks normal. Banks remind you before your card expires. Check the expiry date on your own card and collect the
-  new one at your branch. Nobody needs your old card details or PIN to give you a new card.
+  If your card is near its expiry date, this reminder is normal. Check the date on your own card and collect the new one
+  at your branch. Nobody needs your old card details or PIN to give you a new card.
 notice-transfer-limit-set: >-
-  This looks normal if you changed your transfer limit yourself. Check the limit inside your own app. If you did not
-  change it, call your bank using the number on the back of your card.
+  If you changed your transfer limit yourself, this notice is normal. Check the limit inside your own app. If you did
+  not change it, call your bank using the number on the back of your card, not any number or link in the notice.
 notice-instant-transfer-opt-out: >-
-  This looks normal if you changed this setting yourself. Since July 2026 you can switch instant transfers off and on.
-  Check the setting in your own app. If you did not change it, call your bank.
+  If you changed this setting yourself, this notice is normal. Check the setting in your own app. If you did not, call
+  your bank using the number on the back of your card, not any number or link in the notice.
