@@ -350,7 +350,7 @@ class Conversation:
             if len(taken) >= MAX_COALESCED - 1:
                 break
             is_text = queued.kind is MessageKind.TEXT
-            match = self._matcher.match(queued.text) if is_text else Match()
+            match = self._matcher.match(_inbound(queued)) if is_text else Match()
             content = queued.kind is MessageKind.AUDIO or (
                 is_text and match.command is None and not match.language
             )

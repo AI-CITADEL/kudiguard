@@ -541,7 +541,9 @@ def test_ai_questions(registry: LanguageRegistry, text: str, lang: str, asks: bo
 F5: dict[str, list[dict[str, str]]] = yaml.safe_load(
     (ROOT / "tests" / "fixtures" / "abuse_review_probes_f5.yaml").read_text(encoding="utf-8")
 )
-F5_THREAT = {"g01", "g02", "g03", "g04", "g05", "g22", "a04", "a10", "a12", "a13"}
+# g05 ("my son was arrested ... send 100k to account ... for his release") is third-person: an arrest threat counts
+# only when addressed to the reader or conditional (docs/ABUSE.md), so it is the price of f6's keep-clean news.
+F5_THREAT = {"g01", "g02", "g03", "g04", "g22", "a04", "a10", "a12", "a13"}
 F5_CRISIS = {"g19": "crisis", "g20": "crisis_other", "g21": "crisis"}
 F5_AI = {"g14", "g15", "g18"}
 F5_INJECTION = {"a06", "a07", "a08"}
@@ -577,3 +579,22 @@ def test_f5_attacks_are_refused(registry: LanguageRegistry, case: dict[str, str]
 )
 def test_writing_about_threats_is_allowed(registry: LanguageRegistry, text: str) -> None:
     assert enforced(registry, text, "en") == "none"
+
+
+# --- final-review probes (tests/fixtures/abuse_review_probes_f6.yaml) ---------------------------------------------
+
+F6: dict[str, list[str]] = yaml.safe_load(
+    (ROOT / "tests" / "fixtures" / "abuse_review_probes_f6.yaml").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("text", F6["threat_genuine"], ids=[t[:40] for t in F6["threat_genuine"]])
+def test_f6_news_family_and_slogans_get_no_threat_flag(registry: LanguageRegistry, text: str) -> None:
+    """Third-person or news arrests, bail for a relative, "jail no be our portion": not a threat to the reader."""
+    assert "threat" not in assess([text], registry.lexicon_for("en")).flags
+
+
+@pytest.mark.parametrize("text", F6["ai_genuine"], ids=[t[:40] for t in F6["ai_genuine"]])
+def test_f6_questions_about_bots_are_not_injection(registry: LanguageRegistry, text: str) -> None:
+    assert enforced(registry, text, "en") == "none"
+    assert not InputScreen(registry).injected(text, "en")

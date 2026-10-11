@@ -191,3 +191,18 @@ def test_reported_or_quoted_denials_are_not_the_reply_s_own(
 )
 def test_first_person_reporting_words_do_not_hide_a_denial(screen: ReplyScreen, text: str) -> None:
     assert OutputIssue.AI_DENIAL in screen.check(text, "en")
+
+
+F6_DENIALS: list[str] = yaml.safe_load(
+    (Path(__file__).parents[2] / "tests" / "fixtures" / "abuse_review_probes_f6.yaml").read_text(
+        encoding="utf-8"
+    )
+)["reply_denials"]
+
+
+@pytest.mark.parametrize("text", F6_DENIALS)
+def test_a_third_party_mentioned_earlier_does_not_exempt_the_reply_s_own_denial(
+    screen: ReplyScreen, text: str
+) -> None:
+    """Only "<third party> says:" (a colon right after the reporting verb) or a quote exempts a denial."""
+    assert OutputIssue.AI_DENIAL in screen.check(text, "en")
