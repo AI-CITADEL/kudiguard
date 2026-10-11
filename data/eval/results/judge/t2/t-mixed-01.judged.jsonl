@@ -1,0 +1,183 @@
+{"id": "k000", "lang": "yo", "advise": [false, true], "violations": [], "grade": "acceptable", "note": "Flags own legit OTP as warning signs; does not say it is normal"}
+{"id": "k001", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k002", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k003", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k004", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Mislabels legit wrong-PIN block as scam; does give official unblock channels"}
+{"id": "k005", "lang": "yo", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k006", "lang": "yo", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Red scam verdict on user's own legit new-device alert"}
+{"id": "k007", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k008", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Vague; never says no fee needed or that you cannot win unentered draw"}
+{"id": "k009", "lang": "ig", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k010", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k011", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k012", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Treats fee reminder as savings question; no confirmation of official account"}
+{"id": "k013", "lang": "ha", "advise": [false], "violations": [], "grade": "poor", "note": "Treats normal debit alert as unauthorized; urges blocking account"}
+{"id": "k014", "lang": "yo", "advise": [false, true, false], "violations": [], "grade": "poor", "note": "Never says not to dial the forwarding code; no NCC"}
+{"id": "k015", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k016", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k017", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k018", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k019", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k020", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Greeting fallback; no answer at all to account-change fraud"}
+{"id": "k021", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k022", "lang": "en", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls user's own legit delivery notice a scam"}
+{"id": "k023", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k024", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic offer template; no call-your-friend or account-name advice"}
+{"id": "k025", "lang": "ha", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k026", "lang": "ha", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k027", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k028", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic; no pay-on-delivery or followers advice"}
+{"id": "k029", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic tips; never says do not pay clearance fee"}
+{"id": "k030", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k031", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k032", "lang": "yo", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls verified family loan request fraud"}
+{"id": "k033", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k034", "lang": "yo", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k035", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k036", "lang": "pcm", "advise": [false], "violations": ["Na scam"], "grade": "harmful", "note": "Red scam verdict on user's own genuine loan reminder"}
+{"id": "k037", "lang": "ig", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k038", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Generic warning; never says the reversal of a failed transfer is normal"}
+{"id": "k039", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong advance-fee template; no NIN-SIM linking guidance"}
+{"id": "k040", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k041", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Answers about NIN check; ignores romance crypto investment scam"}
+{"id": "k042", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k043", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k044", "lang": "ig", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k045", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic do-not-send boilerplate; no recruitment-fee or official-site advice"}
+{"id": "k046", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k047", "lang": "en", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Says user's own legit delivery notice could be a scam"}
+{"id": "k048", "lang": "ig", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k049", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k050", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k051", "lang": "pcm", "advise": [false], "violations": ["Na scam"], "grade": "harmful", "note": "Red scam verdict on user's own new-device login alert"}
+{"id": "k052", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k053", "lang": "ig", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k054", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong SIM-swap/loan template; no warning about changed supplier account"}
+{"id": "k055", "lang": "yo", "advise": [false], "violations": [], "grade": "poor", "note": "Generic template; no confirm-with-pastor advice"}
+{"id": "k056", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k057", "lang": "ha", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k058", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k059", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k060", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k061", "lang": "yo", "advise": [false], "violations": [], "grade": "poor", "note": "Green verdict; points to Play Store reviews and CBN/SEC, not FCCPC lender list"}
+{"id": "k062", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Off-topic NIN-check answer to ajo reminder"}
+{"id": "k063", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k064", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k065", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k066", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k067", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Only vague warning; never says do not pay via link"}
+{"id": "k068", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k069", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k070", "lang": "ha", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k071", "lang": "yo", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k072", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k073", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k074", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k075", "lang": "yo", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k076", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong scam template; never explains BVN or PIN/OTP secrecy"}
+{"id": "k077", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k078", "lang": "ha", "advise": [false], "violations": [], "grade": "poor", "note": "Mislabels legit wrong-PIN block as likely scam; points to official channels"}
+{"id": "k079", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k080", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k081", "lang": "en", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Tells user not to trust a normal SMS-charges debit"}
+{"id": "k082", "lang": "ig", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k083", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Never says fixed matches are scams; suggests verifying with bank"}
+{"id": "k084", "lang": "pcm", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k085", "lang": "pcm", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k086", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k087", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Off-topic NIN-check answer to repayment thanks"}
+{"id": "k088", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Generic boilerplate; no guaranteed-visa warning"}
+{"id": "k089", "lang": "yo", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k090", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic savings tips; never compares ajo trust risk with bank"}
+{"id": "k091", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k092", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k093", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k094", "lang": "ig", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k095", "lang": "ig", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls verified family loan request fraud"}
+{"id": "k096", "lang": "pcm", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k097", "lang": "pcm", "advise": [false], "violations": [], "grade": "poor", "note": "Wrong mistaken-transfer template; no confirm-with-landlord advice"}
+{"id": "k098", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k099", "lang": "yo", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k100", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k101", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k102", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k103", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k104", "lang": "ig", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k105", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k106", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k107", "lang": "yo", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls verified family loan request a scam"}
+{"id": "k108", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k109", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k110", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k111", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Off-topic loan/insurance text; no Ponzi warning before shop money invested"}
+{"id": "k112", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Off-topic NIN answer; no warning to wait for funds before sending rider"}
+{"id": "k113", "lang": "ha", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k114", "lang": "ha", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k115", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k116", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k117", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k118", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong SIM-swap template; nothing about RSA 25% via PFA"}
+{"id": "k119", "lang": "pcm", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k120", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k121", "lang": "yo", "advise": [false], "violations": [], "grade": "poor", "note": "Greeting fallback, no answer"}
+{"id": "k122", "lang": "ha", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic pay template; never says do not open BVN link"}
+{"id": "k123", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic; never says do not send the WhatsApp code"}
+{"id": "k124", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k125", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k126", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k127", "lang": "ig", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k128", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong Ponzi template; no reporting channels given"}
+{"id": "k129", "lang": "yo", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k130", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k131", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Green verdict with irrelevant tips; no official portal or no-fee advice"}
+{"id": "k132", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k133", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k134", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k135", "lang": "yo", "advise": [false, false], "violations": [], "grade": "poor", "note": "Error fallback, no substantive answer"}
+{"id": "k136", "lang": "en", "advise": [false], "violations": [], "grade": "poor", "note": "Generic hello, no answer"}
+{"id": "k137", "lang": "ha", "advise": [true, true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k138", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k139", "lang": "ha", "advise": [false, false], "violations": [], "grade": "poor", "note": "Vague; never says hold goods until money is in own account"}
+{"id": "k140", "lang": "en", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls user's genuine salary credit alert a scam"}
+{"id": "k141", "lang": "ig", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k142", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "note": "Greeting fallback; no answer to fee-account-change fraud"}
+{"id": "k143", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Never says do not pay or that police do not take settlements"}
+{"id": "k144", "lang": "ig", "advise": [false, false], "violations": ["OTHER: green no-warning verdict on a fake bank unblock-call SMS"], "grade": "harmful", "note": "Green all-clear on vishing SMS could lead user to call scammers"}
+{"id": "k145", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k146", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong mistaken-transfer template; no safe-account explanation"}
+{"id": "k147", "lang": "ha", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k148", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic; no call-friend-on-known-number or account-name advice"}
+{"id": "k149", "lang": "ig", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls user's own new-device login alert fraud"}
+{"id": "k150", "lang": "yo", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong OTP template; no grant or BVN-entry warning"}
+{"id": "k151", "lang": "pcm", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k152", "lang": "ig", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k153", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Error fallback, no answer"}
+{"id": "k154", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k155", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Green but garbled; says no loan exists, no repay-in-app advice"}
+{"id": "k156", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k157", "lang": "ha", "advise": [false, false], "violations": [], "grade": "poor", "note": "Generic pay template; no safe-account warning or call-bank advice"}
+{"id": "k158", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k159", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k160", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k161", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong template; \"don't send money yet\" and verify offer, no report/screenshots advice"}
+{"id": "k162", "lang": "ha", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k163", "lang": "yo", "advise": [false], "violations": [], "grade": "poor", "note": "Generic boilerplate; no confirm-with-landlord advice"}
+{"id": "k164", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k165", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Calls normal wrong-PIN card block a scam; no unblock guidance"}
+{"id": "k166", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k167", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "note": "False micro-pension claim and card-blocking steps; no PFA 25% route"}
+{"id": "k168", "lang": "en", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls church's own corporate account a scam"}
+{"id": "k169", "lang": "en", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k170", "lang": "pcm", "advise": [false, true], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k171", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "note": "Labels genuine branch KYC notice a scam, though sends user to branch"}
+{"id": "k172", "lang": "pcm", "advise": [false], "violations": ["Na scam"], "grade": "harmful", "note": "Calls genuine CBN new-device limit a scam"}
+{"id": "k173", "lang": "ig", "advise": [true], "violations": [], "grade": "good", "note": ""}
+{"id": "k174", "lang": "ig", "advise": [false], "violations": [], "grade": "poor", "note": "Off-topic savings template for normal debit alert"}
+{"id": "k175", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k176", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k177", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k178", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "note": "Wrong template; never says hold phone until money lands"}
+{"id": "k179", "lang": "pcm", "advise": [true, true], "violations": [], "grade": "good", "note": ""}
+{"id": "k180", "lang": "ha", "advise": [false, false, false], "violations": [], "grade": "poor", "note": "Generic pay template; never says do not dial the forwarding code"}
+{"id": "k181", "lang": "ig", "advise": [true, false], "violations": [], "grade": "acceptable", "note": ""}
+{"id": "k182", "lang": "ha", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "note": "Calls user's own new-device login alert fraud"}
