@@ -9,6 +9,9 @@ name: Genuine Money Notices
 owner: KudiGuard
 kind: core
 priority: 10
+# general questions stay with general answers: without a red flag or one of the entry's keywords in the
+# query, hits count this share of their relevance (docs/ARCHITECTURE.md)
+uncued_weight: 0.9
 content_language: en
 cite: false  # our own content: not cited as a third-party source
 description: >

@@ -22,7 +22,7 @@
   actions:
     - Block the card now in your bank app or by calling your bank.
     - Report any unknown debit to your bank and keep the complaint number.
-  keywords: [card stolen, stolen card, lost card, block my card, dem steal my card, my card don lost]
+  keywords: [card stolen, stolen card, lost card, block my card, dem steal my card, my card don lost, stole my card, stole my atm card, took my bank card, took my atm card]
 
 # Sources: general bank/telecom practice, as in kudiguard-core lost-phone (not separately web-verified)
 - id: sit-phone-stolen-banking
@@ -35,7 +35,7 @@
     - Check your account for transfers you did not make and report them to your bank at once.
   actions:
     - Call your bank first, then your network provider.
-  keywords: [phone stolen, phone snatched, dem snatch my phone, stolen phone with bank app]
+  keywords: [phone stolen, phone snatched, dem snatch my phone, stolen phone with bank app, snatched my phone, phone was stolen, stole my phone]
 
 # Sources: general bank/telecom practice (block SIM, then mobile/USSD banking), as in kudiguard-core lost-phone and
 #   report-fraud; NCC complaint escalation 622 verified 2026-10-07 in kudiguard-core contacts
@@ -49,7 +49,7 @@
     - Check your accounts for transfers you did not make and report them to your bank.
   actions:
     - Call your network provider, then your bank, from another phone.
-  keywords: [sim swap, sim stopped working suddenly, no signal and bank alert, sim not registered suddenly, my line no dey work, my sim stop working]
+  keywords: [sim swap, sim stopped working suddenly, no signal and bank alert, sim not registered suddenly, my line no dey work, my sim stop working, sim has no network]
 
 # Sources: WhatsApp Help Center "How to recover a compromised account" https://faq.whatsapp.com/1131652977717250 and
 #   two-step verification (Settings > Account > Two-step verification) (checked 2026-10-11);
@@ -58,7 +58,7 @@
   title: Someone took over your WhatsApp account
   facts:
     - The usual trick is a message asking you to forward a 6-digit code "sent by mistake". That code lets them register your WhatsApp on their phone.
-    - Open WhatsApp on your phone and log in again with your number. Enter the 6-digit SMS code. This logs the other person out.
+    - Open WhatsApp on your phone and log in again with your number, using the 6-digit SMS code WhatsApp sends you. This logs the other person out.
     - If they set a two-step PIN, you may have to wait 7 days before you can log in again without it.
     - Tell your family and friends by another channel that your WhatsApp was taken, so they do not send money to anyone using it.
     - Once you are back in, turn on two-step verification in Settings, Account, Two-step verification, and add an email.
@@ -260,7 +260,7 @@
   title: A message offers a government grant, palliative or TraderMoni
   facts:
     - Messages offering a "CBN grant", "FG palliative", "TraderMoni" or "N50,000 grant" through a WhatsApp link are usually fake.
-    - Real government programmes do not ask you to pay a fee, share an OTP, or forward a message to many people.
+    - Real government programmes never ask for a fee, an OTP, or for a message to be forwarded to many people.
     - Check the programme on the ministry or agency's own website, or with your local government office.
     - If you entered your bank details or BVN, tell your bank and watch your account.
   actions:
@@ -390,14 +390,14 @@
 
 # Sources: general impersonation advice; kudiguard-core flag-impersonation
 - id: sit-fake-customer-care
-  title: A "customer care" account on social media asks for your details
+  title: Fake "help" accounts on social media ask for your details
   facts:
-    - Scammers reply to your complaint on X, Facebook or Instagram with a fake "customer care" account.
+    - Scammers reply to your complaint on X, Facebook or Instagram from a fake "help" or "support" account.
     - Real banks do not ask for your PIN, OTP or full card number in chats.
     - Contact your bank only through its app, its official website, or the number on the back of your card.
   actions:
-    - Do not share your details or click links from customer care accounts that message you first.
-  keywords: [fake customer care, fake bank support twitter, customer care dm, they replied my complaint, fake support whatsapp]
+    - Do not share your details or click links from help or support accounts that message you first.
+  keywords: [fake help account, help account dm me, twitter support account asked for pin, fake bank support twitter, they replied my complaint, fake support whatsapp]
 
 # =====================================================================================================
 # After money is lost
@@ -415,7 +415,7 @@
     - Do not pay anyone who promises to recover the money for a fee.
   actions:
     - Call your bank first, then report to the EFCC or police.
-  keywords: [i have been scammed, scammed, i sent money to scammer, dem scam me, fraudster collected my money, what to do after scam, place lien]
+  keywords: [i have been scammed, scammed, i sent money to scammer, dem scam me, fraudster collected my money, what to do after scam, place lien, defrauded, scammed me of]
 
 # Sources: CBN complaint route https://www.cbn.gov.ng/supervision/cpdcomgt.html and
 #   https://www.cbn.gov.ng/FinInc/FinLit/How_Lodge_Complaints.pdf (checked 2026-10-11)
@@ -517,7 +517,7 @@
     - To receive money, give only your account number and name.
   actions:
     - Close the link. If you entered details, call your bank now.
-  keywords: [receive payment link, qr code payment, scan to receive, enter pin to receive, buyer sent link, jiji payment link]
+  keywords: [receive payment link, qr code payment, scan to receive, asked for pin to receive, buyer sent link, jiji payment link]
 
 # Sources: general bank practice; kudiguard-core flag-money-request
 - id: sit-money-mule

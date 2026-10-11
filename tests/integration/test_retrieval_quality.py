@@ -30,6 +30,9 @@ PRODUCTION = tuple(
     and (m := yaml.safe_load((d / "pack.yaml").read_text(encoding="utf-8"))).get("enabled", True)
     and not m.get("sample", False)
 )
+# The pack set the blind labels were frozen with (2026-10-10): its floors stay measured on it, since the labels
+# predate genuine-notices and situations (all-pack numbers are reported only).
+FROZEN_PACKS = ("kudiguard-core", "money-skills")
 
 
 async def evaluate(embedder: Embedder | None, cases: list[dict] = CASES) -> tuple[float, float, float]:  # type: ignore[type-arg]
@@ -131,7 +134,7 @@ async def test_blind_set_pipeline_hybrid() -> None:
 
 
 def test_production_pack_set() -> None:
-    assert PRODUCTION == ("kudiguard-core", "money-skills")
+    assert PRODUCTION == ("genuine-notices", "kudiguard-core", "money-skills", "situations")
 
 
 async def test_money_skills_reachable_bm25() -> None:
@@ -156,8 +159,8 @@ async def test_blind_set_with_production_packs_bm25() -> None:
 
     Accepted: one blind question now gets a money-skills entry in the top 3 instead of a core one. The blind set is
     frozen, so content is never tuned on it; the floors leave one miss of headroom."""
-    top1, top3 = await evaluate_pipeline(None, BLIND, PRODUCTION)
-    print(f"\nBlind, production packs (BM25): top1={top1:.0%} top3={top3:.0%}")
+    top1, top3 = await evaluate_pipeline(None, BLIND, FROZEN_PACKS)
+    print(f"\nBlind, frozen pack set (BM25): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.6
     assert top3 >= 0.7
 
@@ -169,10 +172,26 @@ async def test_blind_set_with_production_packs_hybrid() -> None:
     Accepted -1 top-1 versus core: "keep small small money aside every week" now ranks irregular-income above
     saving-basics (both in the top 3)."""
 
-    top1, top3 = await evaluate_pipeline(local_fast_embedder(), BLIND, PRODUCTION)
-    print(f"\nBlind, production packs (hybrid): top1={top1:.0%} top3={top3:.0%}")
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), BLIND, FROZEN_PACKS)
+    print(f"\nBlind, frozen pack set (hybrid): top1={top1:.0%} top3={top3:.0%}")
     assert top1 >= 0.58  # one miss below the measured 15/24
     assert top3 >= 0.9
+
+
+async def test_blind_set_with_all_packs_reported_bm25() -> None:
+    """Reported only: the blind labels predate genuine-notices and situations, so a better sit-*/notice-* answer
+    counts as a miss here. Measured on 2026-10-11 (docs/SPIKES.md); never tune on it."""
+    top1, top3 = await evaluate_pipeline(None, BLIND, PRODUCTION)
+    print(f"\nBlind, all production packs (BM25, reported): top1={top1:.0%} top3={top3:.0%}")
+    assert 0 <= top1 <= top3 <= 1
+
+
+@pytest.mark.live
+async def test_blind_set_with_all_packs_reported_hybrid() -> None:
+    """Reported only (see the BM25 twin)."""
+    top1, top3 = await evaluate_pipeline(local_fast_embedder(), BLIND, PRODUCTION)
+    print(f"\nBlind, all production packs (hybrid, reported): top1={top1:.0%} top3={top3:.0%}")
+    assert 0 <= top1 <= top3 <= 1
 
 
 async def test_pipeline_accuracy_bm25_production() -> None:
@@ -205,3 +224,64 @@ async def test_extra_packs_never_displace_core_red_flag_guidance() -> None:
     first, second = result.entries[:2]
     assert (first.entry.id, second.entry.id) == ("flag-guaranteed-returns", "flag-upfront-fee")
     assert {first.source_id, second.source_id} == {"kudiguard-core"}
+
+
+# --- probes for the situations and genuine-notices packs (production pack set, rules flags as in production) --------
+
+
+async def _top(query: str, embedder: Embedder | None) -> list[str]:
+    from kudiguard.knowledge.service import KnowledgeBase
+    from kudiguard.languages import LanguageRegistry
+    from kudiguard.safety.scam_rules import assess
+
+    lexicon = LanguageRegistry.load(ROOT / "data" / "languages").lexicon_for("en")
+    kb = KnowledgeBase(
+        [FilePackSource.load(ROOT / "data" / "packs" / pack, embedder=embedder) for pack in PRODUCTION],
+        embedder=embedder,
+    )
+    result = await kb.search(Query(text=query, flags=assess([query], lexicon).flags))
+    return [item.entry.id for item in result.entries if item.relevance is not None]  # search hits, best first
+
+
+PROBES_FOUND = [
+    ("my card was stolen", "sit-card-stolen"),
+    (
+        "I just made a transfer in my app and got an OTP SMS for it, is it normal?",
+        "notice-otp-own-transaction",
+    ),
+    ("a twitter support account asked for my pin in DM after my complaint", "sit-fake-customer-care"),
+    ("the woman collecting our daily contribution has disappeared", "sit-ajo-collector-disappears"),
+]
+CUSTOMER_CARE = "what is my bank's customer care number?"
+
+
+@pytest.mark.parametrize(("query", "entry"), PROBES_FOUND)
+async def test_situation_and_notice_probes_bm25(query: str, entry: str) -> None:
+    assert entry in await _top(query, None)
+
+
+@pytest.mark.live
+@pytest.mark.parametrize(("query", "entry"), PROBES_FOUND)
+async def test_situation_and_notice_probes_hybrid(query: str, entry: str) -> None:
+    assert entry in await _top(query, local_fast_embedder())
+
+
+async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_bm25() -> None:
+    assert (await _top(CUSTOMER_CARE, None))[0] != "sit-fake-customer-care"
+
+
+@pytest.mark.live
+async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_hybrid() -> None:
+    assert (await _top(CUSTOMER_CARE, local_fast_embedder()))[0] != "sit-fake-customer-care"
+
+
+PARAPHRASE_PROBES_BM25 = [  # review of 53bdeed: inflected wording must still cue the situational entry
+    ("Someone stole my ATM card at the market", "sit-card-stolen"),
+    ("thieves took my bank card from my bag", "sit-card-stolen"),
+    ("I was defrauded of 200k yesterday", "sit-lost-money-now"),
+]
+
+
+@pytest.mark.parametrize(("query", "entry"), PARAPHRASE_PROBES_BM25)
+async def test_paraphrase_probes_bm25(query: str, entry: str) -> None:
+    assert entry in (await _top(query, None))[:3]

@@ -81,6 +81,9 @@ class Entry(_Strict):
     actions: tuple[Long, ...] = Field(default=(), max_length=8)
     flags: tuple[Flag, ...] = ()
     keywords: tuple[Short, ...] = ()
+    # A model answer for a typical message on this topic: shown to COMPOSE (top entry only) as something to adapt,
+    # never to copy (``prompts.compose_request``; copy guard in ``engine``). Not indexed for search.
+    example: Long | None = None
 
 
 class PackKind(StrEnum):
@@ -143,6 +146,10 @@ class PackManifest(_Strict):
     sample: bool = False  # fictional demo content; never present as real
     cite: bool = True  # partner facts carry "(source: <name>)" in prompts; False for KudiGuard's own packs
     description: Annotated[str, StringConstraints(max_length=500)] = ""
+    # Situational packs (specific scams, genuine notices): their search hits count this much of their relevance when
+    # the query has no red flag and contains none of the entry's keywords, so general questions ("how do I save?")
+    # stay with general answers (docs/ARCHITECTURE.md "Advice quality"). 1 = no down-weighting.
+    uncued_weight: float = Field(default=1.0, gt=0, le=1)
     source: Annotated[FilesSourceSpec | HttpSourceSpec, Field(discriminator="type")] = FilesSourceSpec()
 
     @model_validator(mode="after")
@@ -202,3 +209,28 @@ class KnowledgeResult:
     entries: tuple[SourcedEntry, ...] = ()
     contacts: tuple[Contact, ...] = ()
     failed_sources: tuple[str, ...] = ()
+    dense: bool = False  # hit relevance is cosine similarity (embeddings on), else squashed BM25
+
+
+@dataclass(frozen=True, slots=True)
+class Relevance:
+    """A relevance level on both scales a hit can carry (``Hit.relevance``)."""
+
+    dense: float  # cosine similarity (bge-small-en-v1.5)
+    bm25: float  # squashed BM25, score / (score + 3)
+
+    def met(self, relevance: float | None, *, dense: bool) -> bool:
+        """None (an unscored hit, e.g. from a partner API) never meets a level."""
+        return relevance is not None and relevance >= (self.dense if dense else self.bm25)
+
+
+# Defaults for the advice-quality levels (settings ``KUDIGUARD_*``; docs/ARCHITECTURE.md "Advice quality"), chosen on
+# the dev retrieval sets with all four packs.
+# Search hits below this never reach COMPOSE: the highest level that keeps every correct top-3 hit.
+MIN_RELEVANCE = Relevance(dense=0.62, bm25=0.60)
+# Genuine notices (pack entries "notice-*": the user's own OTP, a login alert, a reversal): measured on the dev
+# retrieval sets with all packs (docs/ARCHITECTURE.md, "Advice quality"), 7% / 5% of wrong hits reach this level.
+NOTICE_MIN = Relevance(dense=0.80, bm25=0.84)
+# An entry's model answer is used only when that entry is the top hit at this level (conservative: above the 0.62 /
+# 0.60 cut-off; on the dev sets, all packs, it keeps 85% / 81% of correct top-3 hits and 51% / 55% of wrong ones).
+EXAMPLE_MIN = Relevance(dense=0.70, bm25=0.70)

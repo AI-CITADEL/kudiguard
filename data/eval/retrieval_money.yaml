@@ -6,7 +6,7 @@
 - {q: "why everything is costing more every month and my savings is not enough", want: [inflation]}
 - {q: "what does compound interest mean", want: [interest-basics, faq-interest]}
 - {q: "is it wise to join thrift contribution in my street", want: [savings-groups]}
-- {q: "the woman collecting our daily contribution has disappeared", want: [faq-ajo-collector-ran, savings-groups]}
+- {q: "the woman collecting our daily contribution has disappeared", want: [faq-ajo-collector-ran, savings-groups, sit-ajo-collector-disappears]}  # 2026-10-11 accepted sit-ajo-collector-disappears: the exact situation with steps
 - {q: "how do I join a cooperative society at work", want: [cooperatives]}
 - {q: "if my microfinance bank closes will I lose my money", want: [deposit-insurance]}
 - {q: "is it okay to keep my money in a savings app that pays interest", want: [savings-apps]}

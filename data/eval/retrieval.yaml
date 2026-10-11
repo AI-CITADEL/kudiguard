@@ -7,12 +7,12 @@
 - {q: "how can i know my bvn number", want: [bvn-basics]}
 - {q: "How do I check my NIN?", want: [nin-basics]}
 - {q: "Is it wise to borrow from a loan app?", want: [loan-apps]}
-- {q: "the loan app people are calling my family to shame me", want: [loan-apps]}
-- {q: "My transfer failed but I was debited", want: [failed-transfer]}
-- {q: "my money no reach the person but they debited me", want: [failed-transfer]}
-- {q: "the transfer is still pending since yesterday", want: [failed-transfer]}
+- {q: "the loan app people are calling my family to shame me", want: [loan-apps, sit-loan-app-shaming]}  # 2026-10-11 accepted sit-loan-app-shaming: loan-app shaming steps
+- {q: "My transfer failed but I was debited", want: [failed-transfer, sit-debited-not-received]}  # 2026-10-11 accepted sit-debited-not-received: debited-but-not-received steps
+- {q: "my money no reach the person but they debited me", want: [failed-transfer, sit-debited-not-received]}  # 2026-10-11 accepted sit-debited-not-received: debited-but-not-received steps
+- {q: "the transfer is still pending since yesterday", want: [failed-transfer, notice-transfer-pending]}  # 2026-10-11 accepted notice-transfer-pending: the pending-transfer notice answers exactly this
 - {q: "What is SIM swap fraud?", want: [faq-sim-swap]}
-- {q: "my network suddenly stopped and i cant make calls", want: [faq-sim-swap]}
+- {q: "my network suddenly stopped and i cant make calls", want: [faq-sim-swap, sit-sim-swap]}  # 2026-10-11 accepted sit-sim-swap: SIM-swap situation with ordered steps
 - {q: "How do I use a POS agent safely?", want: [pos-safety]}
 - {q: "someone used my card at the pos and i did not get it back", want: [pos-safety]}
 - {q: "How do I make a budget?", want: [budgeting]}
@@ -26,26 +26,26 @@
 - {q: "Is USSD banking safe?", want: [faq-ussd-safe]}
 - {q: "Will my bank call me to ask for my PIN?", want: [faq-bank-calls, flag-asks-credentials]}
 # --- dev set 1: paraphrases written after content was frozen (partly tuned on since); see blind.yaml for held-out ---
-- {q: "they took money from my account but my brother never received it", want: [failed-transfer]}
+- {q: "they took money from my account but my brother never received it", want: [failed-transfer, sit-debited-not-received]}  # 2026-10-11 accepted sit-debited-not-received: debited-but-not-received steps
 - {q: "i want to put small small money away for my children's school fees", want: [saving-basics, budgeting, saving-for-a-goal]}
 - {q: "a man at the market collected my atm and gave me another one", want: [pos-safety]}
 - {q: "how do i stop someone from entering my account", want: [protect-account]}
-- {q: "they keep sending me messages saying i owe them and threatening me", want: [loan-apps]}
+- {q: "they keep sending me messages saying i owe them and threatening me", want: [loan-apps, sit-loan-app-shaming]}  # 2026-10-11 accepted sit-loan-app-shaming: debt-collection harassment steps
 - {q: "what number do i dial to see my identity number", want: [nin-basics, bvn-basics]}
 - {q: "i was cheated online, who can help me", want: [report-fraud, faq-recover]}
 - {q: "how much extra will i pay if i collect credit", want: [faq-interest, loan-apps]}
 # --- dev set 2: written by the M2 reviewer; content was later tuned on it, so it is NOT held out (data review) ---
 - {q: "abeg how i fit check my bvn for phone", want: [bvn-basics]}
-- {q: "someone sent me alert of 50k but my balance did not increase", want: [flag-fake-payment]}
-- {q: "the loan app added my contacts and is sending them messages that i am a thief", want: [loan-apps]}
+- {q: "someone sent me alert of 50k but my balance did not increase", want: [flag-fake-payment, sit-fake-buyer-paid, notice-credit-alert]}  # 2026-10-11 accepted sit-fake-buyer-paid, notice-credit-alert: both say alerts can be fake and to check the balance in the own app
+- {q: "the loan app added my contacts and is sending them messages that i am a thief", want: [loan-apps, sit-loan-app-shaming]}  # 2026-10-11 accepted sit-loan-app-shaming: loan-app shaming steps
 - {q: "how can i plan my money so it last till month end", want: [budgeting]}
 - {q: "i lost my phone and my bank app is on it what do i do", want: [lost-phone, protect-account]}
-- {q: "my sim card stopped working suddenly and now i see debit alerts", want: [faq-sim-swap, unauthorised-debit]}
+- {q: "my sim card stopped working suddenly and now i see debit alerts", want: [faq-sim-swap, unauthorised-debit, sit-sim-swap]}  # 2026-10-11 accepted sit-sim-swap: SIM-swap situation incl. blocking banking
 - {q: "the pos man said the network failed but money left my account", want: [failed-transfer, pos-safety, unauthorised-debit]}
 - {q: "i want to join ajo contribution with my colleagues is it good", want: [saving-basics, savings-groups]}
-- {q: "which company can i trust to invest my money", want: [flag-guaranteed-returns, investing-basics]}
-- {q: "how do i know if an investment company is registered", want: [flag-guaranteed-returns]}
-- {q: "my bank did not solve my complaint where else can i go", want: [failed-transfer, report-fraud, unauthorised-debit]}
+- {q: "which company can i trust to invest my money", want: [flag-guaranteed-returns, investing-basics, sit-ponzi-double-money]}  # 2026-10-11 accepted sit-ponzi-double-money: Ponzi signs + check SEC registration, as flag-guaranteed-returns
+- {q: "how do i know if an investment company is registered", want: [flag-guaranteed-returns, sit-check-company]}  # 2026-10-11 accepted sit-check-company: how to check CAC/SEC registration
+- {q: "my bank did not solve my complaint where else can i go", want: [failed-transfer, report-fraud, unauthorised-debit, sit-dispute-debit]}  # 2026-10-11 accepted sit-dispute-debit: escalation to CBN Consumer Protection
 - {q: "what is the meaning of interest rate on a loan", want: [faq-interest, loan-apps]}
 - {q: "what does nin mean", want: [nin-basics]}
 - {q: "can somebody steal my money with only my bvn", want: [bvn-basics]}

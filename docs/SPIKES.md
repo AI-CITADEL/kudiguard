@@ -906,3 +906,21 @@ in a direct Hausa reply would go unnoticed, so native-speaker review of Hausa re
 
 Status: yo/ig stay **beta** (Hausa `stable`): coverage is up but still below Hausa-direct, and no native speaker has
 reviewed a reply, a translation, a lexicon term or a negator list.
+
+## R — Retrieval with the genuine-notices and situations packs (11 Oct 2026, workstream E2)
+
+The frozen blind set (`data/eval/retrieval_blind.yaml`) was labelled before the genuine-notices and situations packs
+existed, so a better `notice-*`/`sit-*` answer counts as a miss there. Its floors stay measured on the pack set it was
+frozen with (`kudiguard-core` + `money-skills`); the all-pack number is reported only (labels unchanged).
+
+| Blind set, rules + search | BM25 top-1 / top-3 | Hybrid top-1 / top-3 |
+|---|---|---|
+| frozen pack set (core + money-skills), floor-tested | 67% / 75% | 62% / 96% |
+| all four production packs, reported only | 50% / 67% | 42% / 67% |
+
+Dev sets: 15 `notice-*`/`sit-*` ids were added as accepted alternatives to 14 queries in `retrieval.yaml` /
+`retrieval_money.yaml`, each judged on the merits and commented inline ("2026-10-11 accepted ..."). Production-pack
+floors still fail after that (BM25 dev top-1 67% vs 75%, hybrid 72% vs 85%; money-skills BM25 59% vs 72%, hybrid
+77% vs 80%): the remaining misses are new entries winning queries they do not answer (e.g.
+`notice-account-maintenance-fee` for "plan my money so it lasts till month end"), a real ranking regression, not
+stale labels.

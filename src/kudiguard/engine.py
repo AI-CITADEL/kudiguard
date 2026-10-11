@@ -17,6 +17,7 @@ import dataclasses
 import logging
 import re
 import time
+import unicodedata
 from collections.abc import Callable, Coroutine, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -24,15 +25,16 @@ from pathlib import Path
 from typing import Any
 
 from kudiguard.commands import CommandMatcher
-from kudiguard.domain import Flag, LanguageCode, Outcome, Verdict
+from kudiguard.domain import Flag, LanguageCode, Outcome, ScamAssessment, Verdict
 from kudiguard.i18n import Messages, Msg
-from kudiguard.knowledge.models import Contact, KnowledgeResult, Query
+from kudiguard.knowledge.models import EXAMPLE_MIN, NOTICE_MIN, Contact, KnowledgeResult, Query, Relevance
 from kudiguard.knowledge.service import KnowledgeBase
 from kudiguard.languages import PIVOT, LanguageRegistry
 from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_within
 from kudiguard.prompts import (
     MAX_ENTRIES,
     MAX_STEPS,
+    PIDGIN_NAME,
     SYSTEM_PROMPTS,
     Analysis,
     Intent,
@@ -40,10 +42,16 @@ from kudiguard.prompts import (
     clean_reply,
     clean_translation,
     compose_request,
+    entry_example,
+    example_overlap,
+    facts_block,
     parse_analysis,
+    reads_as_hausa_yoruba_igbo,
     steps_request,
+    strip_contacts,
     translate_request,
     warn_family_request,
+    worked_example_reply,
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.reply_translation import (
@@ -79,7 +87,7 @@ from kudiguard.safety.grounding import (
 from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier, is_pidgin
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.safety.reply_screen import ReplyScreen
-from kudiguard.safety.scam_rules import assess
+from kudiguard.safety.scam_rules import Lexicon, assess
 from kudiguard.speech.base import ASR, AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult, transcribe_upload
 from kudiguard.text import normalize
@@ -99,6 +107,28 @@ MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
 MIN_TRANSLATE_S = 5.0
 SHADOW_DRAIN_S = 1.0  # shutdown wait for shadow checks when the checker has no budget
 MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
+
+
+# The only model flags a genuine notice may carry and still be lowered: a bank alert reads as urgent, official and
+# private. Any other flag (a code, money or details to send, a link, a fee, a threat) keeps the model's verdict.
+NOTICE_SOFT_FLAGS = frozenset({Flag.URGENCY, Flag.IMPERSONATION, Flag.SECRECY})
+
+
+@dataclass(frozen=True, slots=True)
+class AdvicePolicy:
+    """How COMPOSE is grounded (settings ``KUDIGUARD_COMPOSE_EXAMPLES`` …; docs/ARCHITECTURE.md "Advice quality").
+
+    ``examples``: show the top entry's model answer to COMPOSE (when it is the top hit at ``example_min``); a reply sharing more than ``example_copy_max`` of
+    its word trigrams with it is composed again without it. ``notice_prefix``/``notice_min``: a top hit on a genuine
+    notice caps model-only suspicion (empty prefix = off). ``pidgin_replies``: Pidgin input gets a Pidgin reply.
+    """
+
+    examples: bool = True
+    example_min: Relevance = EXAMPLE_MIN
+    example_copy_max: float = 0.5
+    notice_prefix: str = "notice-"
+    notice_min: Relevance = NOTICE_MIN
+    pidgin_replies: bool = False
 
 
 class AnswerKind(StrEnum):
@@ -195,6 +225,7 @@ class Engine:
         reply_screen: ReplyScreen | None = None,
         transcripts: TranscriptFilter | None = None,
         crisis_similarity: CrisisSimilarity | None = None,
+        advice: AdvicePolicy | None = None,
     ) -> None:
         """``compose_policy``: direct or English-first replies per language (default:
         ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct).
@@ -232,6 +263,7 @@ class Engine:
         self.transcripts = transcripts or TranscriptFilter(registry)
         # second crisis layer (embedding similarity; shadow by default; None = off or no embedding model)
         self.crisis_similarity = crisis_similarity
+        self.advice = advice or AdvicePolicy()
 
     @property
     def has_speech(self) -> bool:
@@ -331,6 +363,7 @@ class Engine:
         knowledge = await self._knowledge.search(
             Query(text=analysis.english, flags=assessment.flags, language=language)
         )
+        assessment, knowledge = self._genuine_notice(text, analysis, assessment, knowledge, lexicon)
         verdict = assessment.verdict
         contacts = tuple(c for c in knowledge.contacts if c.verified) if verdict in REPORT_VERDICTS else ()
         generation = _Generation(unavailable=model_down)
@@ -341,6 +374,7 @@ class Engine:
             generation = await self._compose(
                 language, analysis.english, verdict, assessment.flags, knowledge, deadline, evidence, turn_id,
                 sources=(text, analysis.english),
+                pidgin=self.advice.pidgin_replies and language == PIVOT and is_pidgin(text),
             )  # fmt: skip
             report, grounding_ms = generation.report, generation.grounding_ms
             if generation.text is not None:
@@ -386,6 +420,46 @@ class Engine:
             screen_action=action,
             preface=crisis_text,
         )
+
+    def _genuine_notice(
+        self,
+        text: str,
+        analysis: Analysis,
+        assessment: ScamAssessment,
+        knowledge: KnowledgeResult,
+        lexicon: Lexicon,
+    ) -> tuple[ScamAssessment, KnowledgeResult]:
+        """Model-only suspicion on a genuine notice (the user's own OTP, a login alert) is lowered only when ALL hold:
+        the best search hit is a notice at a high score; the rules found no flag at all; the message has no link,
+        phone or account number to act on; the model saw no request to send money, codes or details (only urgency,
+        impersonation or secrecy). Then: no red flags if the analysis says the user started it (``user_initiated``;
+        ANALYSE no longer asks for it, so in practice at most caution),
+        else at most caution. Notice keywords overlap scam wording, so retrieval alone never lowers a verdict;
+        when in doubt the model's verdict stands."""
+        prefix = self.advice.notice_prefix
+        top = next((item for item in knowledge.entries if item.relevance is not None), None)
+        if (
+            not prefix
+            or assessment.verdict not in (Verdict.LIKELY_SCAM, Verdict.CAUTION)
+            or top is None
+            or not top.entry.id.startswith(prefix)
+            or not self.advice.notice_min.met(top.relevance, dense=knowledge.dense)
+            or assess([text, analysis.english], lexicon).flags
+            or _has_contact(text)
+            or not NOTICE_SOFT_FLAGS.issuperset(analysis.flags)
+        ):
+            return assessment, knowledge
+        flags: tuple[Flag, ...] = ()
+        if analysis.user_initiated:
+            verdict = Verdict.NO_FLAGS
+            # the notice leads; red-flag entries for flags no longer reported would contradict it
+            knowledge = dataclasses.replace(
+                knowledge, entries=tuple(item for item in knowledge.entries if item.relevance is not None)
+            )
+        else:
+            verdict, flags = Verdict.CAUTION, assessment.flags
+        log.info("genuine notice %s: verdict %s -> %s", top.entry.id, assessment.verdict, verdict)
+        return dataclasses.replace(assessment, verdict=verdict, flags=flags), knowledge
 
     async def analyse(
         self, text: str, language: LanguageCode, *, deadline: float | None = None
@@ -486,23 +560,58 @@ class Engine:
         turn_id: str | None = None,
         *,
         sources: Sequence[str] = (),
+        pidgin: bool = False,
     ) -> _Generation:
         """The reply body: composed in ``language`` (direct) or in English, checked, then translated.
 
         English-first: the output guard and the classifier in enforce mode run on the English draft inside
         ``_generate(…, PIVOT)``; grounding in enforce mode runs on it here (unsupported steps trimmed from the English
-        before translating); shadow-mode checks run in ``check`` on ``_Generation.english``."""
+        before translating); shadow-mode checks run in ``check`` on ``_Generation.english``. ``pidgin``: the message
+        is Nigerian Pidgin (language "en"): the reply is asked for in Pidgin."""
         direct = self.compose_policy.for_language(language) is ComposeStrategy.DIRECT
-        target = self.registry.get(language).name
-        request = compose_request(
-            language_name=target if direct else self.registry.get(PIVOT).name,
-            english=english,
-            verdict=verdict,
-            flags=flags,
-            knowledge=knowledge,
-        )
+        target = PIDGIN_NAME if pidgin else self.registry.get(language).name
+        example = self._example(knowledge)
+
+        # the example the model is shown (the entry's, else the fixed worked example), for the copy check
+        compose_language = target if direct else self.registry.get(PIVOT).name
+        english_name = self.registry.get(PIVOT).name
+
+        def shown_for(language_name: str) -> str:
+            """The example the request shows (the entry's, else the fixed one for that language): copy check."""
+            return example or worked_example_reply(verdict, flags, knowledge, language_name)
+
+        def build(
+            model_answer: str | None, worked_example: bool = True, language_name: str | None = None
+        ) -> ChatRequest:
+            return compose_request(
+                language_name=language_name or compose_language,
+                english=english,
+                verdict=verdict,
+                flags=flags,
+                knowledge=knowledge,
+                example=model_answer,
+                worked_example=worked_example,
+            )
+
+        request = build(example)
         if direct:
             generation = await self._generate(request, language, deadline, sources)
+            # At most one extra compose per turn (latency): the Pidgin language retry, else the copy retry.
+            if pidgin and generation.text is not None and reads_as_hausa_yoruba_igbo(generation.text):
+                # asked for Pidgin, got Hausa/Yoruba/Igbo: once more with the plain English instruction and no
+                # example at all (nothing left to copy)
+                log.info("compose: Pidgin input got a reply in another language, retrying in English")
+                retry = await self._generate(
+                    build(None, worked_example=False, language_name=english_name), language, deadline, sources
+                )
+                retry.ms += generation.ms
+                retry.issues = generation.issues + retry.issues
+                generation = retry
+            else:
+                generation = await self._unless_copied(
+                    generation, shown_for(compose_language), knowledge, build(None, worked_example=False),
+                    language, deadline, sources,
+                )  # fmt: skip
             return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
         if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
             # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
@@ -511,6 +620,15 @@ class Engine:
             # Not a model failure: no call is made for lack of time; "unavailable" gives the same fixed-text path.
             return _Generation(unavailable=True, rejections=("no_time",))
         draft = await self._generate(request, PIVOT, deadline, sources)
+        draft = await self._unless_copied(
+            draft,
+            shown_for(compose_language),
+            knowledge,
+            build(None, worked_example=False),
+            PIVOT,
+            deadline,
+            sources,
+        )
         draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
         if draft.text is None:
             return draft
@@ -522,6 +640,43 @@ class Engine:
         translated.english = draft.text
         translated.report, translated.grounding_ms = draft.report, draft.grounding_ms
         return translated
+
+    def _example(self, knowledge: KnowledgeResult) -> str | None:
+        """The top entry's model answer, only when that entry is a search hit at ``example_min`` (a red-flag entry
+        or a weak hit leads: no example, the fixed worked example is used)."""
+        if not self.advice.examples or not knowledge.entries:
+            return None
+        top = knowledge.entries[0]
+        return (
+            entry_example(knowledge)
+            if self.advice.example_min.met(top.relevance, dense=knowledge.dense)
+            else None
+        )
+
+    async def _unless_copied(
+        self,
+        generation: _Generation,
+        example: str,
+        knowledge: KnowledgeResult,
+        without_example: ChatRequest,
+        language: LanguageCode,
+        deadline: float | None,
+        sources: Sequence[str],
+    ) -> _Generation:
+        """A reply that copies the example it was shown (the entry's model answer or the fixed worked example) is
+        composed once more with no example at all (Igbo once copied a fixed example in 42% of replies; live, a
+        caution reply copied the fixed scam example word for word); that reply stands, or fixed text if it fails."""
+        if generation.text is None:
+            return generation
+        facts, actions = facts_block(knowledge)
+        overlap = example_overlap(generation.text, example, " ".join((*facts, *actions)))
+        if overlap <= self.advice.example_copy_max:
+            return generation
+        log.info("compose copied the model answer (overlap %.2f): composing again without it", overlap)
+        retry = await self._generate(without_example, language, deadline, sources)
+        retry.ms += generation.ms
+        retry.issues = generation.issues + retry.issues
+        return retry
 
     async def _enforce_grounding(
         self,
@@ -828,6 +983,12 @@ class Engine:
 # "real?", "is it a scam?", "na scam?": an injected message that also asks for a check still gets the rules' verdict
 _ASKS_IF_REAL = re.compile(r"\b(?:real|scam|legit\w*|genuine|true|fake|safe)\W*\?")
 _NO_ANALYSIS = Analysis(english="", intent=Intent.OTHER, flags=(), untranslated=True)
+
+
+def _has_contact(text: str) -> bool:
+    """A link, email, phone or account number in the message (something to act on)."""
+    canonical = " ".join(unicodedata.normalize("NFKC", text).split())
+    return strip_contacts(canonical) != canonical
 
 
 def _actions(knowledge: KnowledgeResult) -> tuple[str, ...]:

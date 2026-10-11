@@ -14,6 +14,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from kudiguard.hosting import StorageLocation
+from kudiguard.knowledge.models import EXAMPLE_MIN, MIN_RELEVANCE, NOTICE_MIN
 from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
@@ -80,6 +81,20 @@ class Settings(BaseSettings):
     # direct (compose in the user's language), with per-language overrides. Default "english_first,ha=direct":
     # Yoruba/Igbo English-first, Hausa direct (docs/SPIKES.md H); English is always direct.
     compose_strategy: str = DEFAULT_COMPOSE_STRATEGY
+    # Advice quality (docs/ARCHITECTURE.md, "Advice quality"; thresholds chosen on the dev retrieval sets).
+    # Search hits below these relevance levels are not passed to COMPOSE (red-flag entries always are);
+    # 0 = keep every hit. Dense = cosine (embeddings on), bm25 = squashed BM25 (embeddings off).
+    knowledge_min_relevance_dense: float = Field(default=MIN_RELEVANCE.dense, ge=0, lt=1)
+    knowledge_min_relevance_bm25: float = Field(default=MIN_RELEVANCE.bm25, ge=0, lt=1)
+    compose_examples: bool = True  # show the top entry's model answer to COMPOSE
+    # the model answer is used only when its entry is the top hit at this relevance
+    compose_example_min_relevance_dense: float = Field(default=EXAMPLE_MIN.dense, ge=0, lt=1)
+    compose_example_min_relevance_bm25: float = Field(default=EXAMPLE_MIN.bm25, ge=0, lt=1)
+    compose_example_copy_max: float = Field(default=0.5, gt=0, le=1)  # trigram share that counts as a copy
+    notice_prefix: str = "notice-"  # genuine-notice entries (empty = no notice handling)
+    notice_min_relevance_dense: float = Field(default=NOTICE_MIN.dense, gt=0, lt=1)
+    notice_min_relevance_bm25: float = Field(default=NOTICE_MIN.bm25, gt=0, lt=1)
+    pidgin_replies: bool = False  # Pidgin reply instruction + retry: off by default (dev2: ~+3 s p50 for Pidgin, replies still mostly English)
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)

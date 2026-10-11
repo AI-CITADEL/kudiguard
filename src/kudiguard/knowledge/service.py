@@ -15,6 +15,7 @@ import asyncio
 import dataclasses
 import logging
 import os
+import re
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -38,9 +39,11 @@ from kudiguard.knowledge.models import (
     KnowledgeResult,
     PackKind,
     Query,
+    Relevance,
     SourcedEntry,
     SourceResult,
 )
+from kudiguard.text import normalize
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +95,18 @@ def _trim(item: SourcedEntry, budget: int) -> SourcedEntry:
     return dataclasses.replace(item, entry=trimmed)
 
 
+_KEYWORD_SPLIT = re.compile(r"[^a-z0-9]+")
+
+
+def _cued(entry: Entry, text: str) -> bool:
+    """One of the entry's keywords appears in the query (``text``: normalised words, space-padded)."""
+    return any(
+        f" {phrase} " in text
+        for keyword in entry.keywords
+        if (phrase := " ".join(_KEYWORD_SPLIT.split(normalize(keyword))).strip())
+    )
+
+
 def _sourced(source: KnowledgeSource, entry: Entry, relevance: float | None = None) -> SourcedEntry:
     m = source.manifest
     return SourcedEntry(entry, m.id, m.name, m.sample, relevance, m.kind, m.cite)
@@ -105,7 +120,10 @@ class KnowledgeBase:
         embedder: Embedder | None = None,
         deadline_s: float = 1.5,
         limits: Limits = DEFAULT_LIMITS,
+        min_relevance: Relevance | None = None,
     ) -> None:
+        """``min_relevance``: search hits below it are dropped (None = keep every hit the index returns). Red-flag
+        entries are never dropped: they match the message's flags, not its wording."""
         ids = [s.manifest.id for s in sources]
         if len(ids) != len(set(ids)):
             raise KnowledgeConfigError(f"duplicate knowledge source ids in {ids}")
@@ -115,6 +133,7 @@ class KnowledgeBase:
         self._embedder = embedder
         self._deadline_s = deadline_s
         self._limits = limits
+        self._min_relevance = min_relevance
         self._partner_floor = DENSE_MIN if embedder is not None else PARTNER_MIN_BM25_RELEVANCE
         self._query_cache: OrderedDict[str, NDArray[np.float32]] = OrderedDict()
         self._safety_order = sorted(
@@ -145,13 +164,16 @@ class KnowledgeBase:
         answers = await asyncio.gather(*(self._ask(s, query) for s in active))
         results = {s.manifest.id: a for s, a in zip(active, answers, strict=True) if a is not None}
         answered = [s for s in self._safety_order if s.manifest.id in results]
+        dense = query.vector is not None
+        hits = self._best_hits(answered, results, query)
+        if (floor := self._min_relevance) is not None:
+            hits = [h for h in hits if floor.met(h.relevance, dense=dense)]
 
         return KnowledgeResult(
-            entries=self._within_budget(
-                self._flag_entries(answered, results), self._best_hits(answered, results)
-            ),
+            entries=self._within_budget(self._flag_entries(answered, results), hits),
             contacts=self._contacts(answered, results, query),
             failed_sources=tuple(s.manifest.id for s in active if s.manifest.id not in results),
+            dense=dense,
         )
 
     # --- merging --------------------------------------------------------------------------------------
@@ -164,11 +186,13 @@ class KnowledgeBase:
         return round_robin[: self._limits.flag_entries]
 
     def _best_hits(
-        self, answered: Sequence[KnowledgeSource], results: Mapping[str, SourceResult]
+        self, answered: Sequence[KnowledgeSource], results: Mapping[str, SourceResult], query: Query
     ) -> list[SourcedEntry]:
         # Each source's own order (BM25 + dense fusion) is kept; relevance only decides which source's next hit
         # comes first, so fusion quality is never thrown away by re-sorting on raw cosine.
         queues: list[list[SourcedEntry]] = []
+        weight: dict[str, float] = {}  # entry id -> uncued weight (situational packs only)
+        text = f" {' '.join(_KEYWORD_SPLIT.split(normalize(query.text)))} "
         for source in sorted(answered, key=lambda s: self._rank_of[s.manifest.id]):
             is_core = source.manifest.kind is PackKind.CORE
             queues.append(
@@ -178,11 +202,18 @@ class KnowledgeBase:
                     if is_core or (hit.relevance is not None and hit.relevance >= self._partner_floor)
                 ]
             )
+            if (w := source.manifest.uncued_weight) < 1 and not query.flags:
+                for hit in results[source.manifest.id].hits:
+                    if not _cued(hit.entry, text):
+                        weight[hit.entry.id] = w
 
         def head_score(queue: list[SourcedEntry]) -> float:
             head = queue[0]
             bonus = PARTNER_MARGIN if head.source_id in self._core_ids else 0.0
-            return (head.relevance if head.relevance is not None else 0.0) + bonus
+            relevance = (head.relevance if head.relevance is not None else 0.0) * weight.get(
+                head.entry.id, 1.0
+            )
+            return relevance + bonus
 
         merged: list[SourcedEntry] = []
         while len(merged) < self._limits.hits and (live := [q for q in queues if q]):
@@ -271,13 +302,16 @@ def knowledge_base_from_packs(
     deadline_s: float = 1.5,
     limits: Limits = DEFAULT_LIMITS,
     screen: ContentScreen | None = None,
+    min_relevance: Relevance | None = None,
 ) -> KnowledgeBase:
     """The supported way to wire a KnowledgeBase: one embedder shared by every index and the query path."""
     sources = build_sources(
         packs_dir, client=client, include=include, embedder=embedder, allow_samples=allow_samples,
         allow_live=allow_live, screen=screen,
     )  # fmt: skip
-    return KnowledgeBase(sources, embedder=embedder, deadline_s=deadline_s, limits=limits)
+    return KnowledgeBase(
+        sources, embedder=embedder, deadline_s=deadline_s, limits=limits, min_relevance=min_relevance
+    )
 
 
 def build_sources(
