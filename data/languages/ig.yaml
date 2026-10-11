@@ -6,7 +6,9 @@ native_name: Igbo
 order: 3
 status: beta
 asr_model: NCAIR1/Igbo-ASR
-asr_whisper_language: null  # Whisper has no Igbo token: the fine-tuned model decides
+# Whisper has no Igbo token. Left on auto, the NCAIR1 Igbo model detects "yo" on every FLEURS clip (p ~1.0), so
+# forcing "yo" gives identical transcripts (10/10) and skips detection: ~3 s faster (docs/SPIKES.md H, 10 Oct 2026).
+asr_whisper_language: yo
 review:
   lexicon: pending-native-review
   strings: pending-native-review
@@ -27,18 +29,27 @@ output_guard:
     - 'enweghi m ike inyere'
 
 lexicon:
+  # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
+  # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     urgency:
       - 'ngwa ngwa'
+      - 'ozugbo ozugbo'  # H: "immediately, immediately"
     asks_credentials:
       - '(?:zitere|zite|ziga|nye)\W+(?:ya|ha|anyi|m|mu)\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin|okwuntughe)'
+      - '(?:agwa|gwa|agwaghi)\W+(?:ya|ha|anyi|m|mu)\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin|okwuntughe)'  # H: "tell him the code"
     account_threat:
       - '(?:akauntu|account)\W+(?:\w+\W+){0,4}?(?:emechi|akpochi|mechie|kpochie)'
       - '(?:emechi|akpochi|mechie|kpochie)\W+(?:\w+\W+){0,1}?(?:akauntu|account)'
     guaranteed_returns:
       - 'okpukpu (?:abuo|ato)'
+      # H: "if I put in ... I/they will get/give ... within N weeks/months" (mirrors the English pivot term)
+      - 'tinye\W+(?:\w+\W+){0,6}?(?:ga-enweta|ga-enye|ga-anata|ga enweta|ga enye|ga anata)\W+(?:\w+\W+){0,6}?(?:n\Wime|kwa) (?:\w+\W+){0,1}?(?:izu|onwa|ubochi)'
     upfront_fee:
       - 'kwu\w*\W+(?:\w+\W+){0,4}?(?:tupu|ka i nweta|ka i nata)'
+      - 'ugwo (?:ndebanye aha|nhazi|registration|processing)'  # H: "registration/processing fee"
+    prize_lottery:
+      - 'meriri\W+(?:\w+\W+){0,2}?(?:ego|onyinye|nrite)'  # H: "won money/a prize"
     secrecy:
       - 'agwala onye (?:obula|o bula)'
   check_intent:

@@ -62,6 +62,7 @@ class Record:
     llm_ms: int = 0
     grounding_ms: int | None = None
     sources: list[str] = field(default_factory=list)
+    reply_english: str = ""  # english_first: the checked English reply the body translates
 
     @property
     def scored(self) -> bool:
@@ -97,6 +98,7 @@ class Record:
             llm_ms=answer.llm_ms,
             grounding_ms=result.grounding_ms,
             sources=list(answer.sources),
+            reply_english=answer.reply_english,
         )
 
     @classmethod

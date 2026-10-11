@@ -39,9 +39,17 @@ from kudiguard.prompts import (
     parse_analysis,
     steps_request,
     translate_request,
+    translation_example,
     warn_family_request,
 )
 from kudiguard.render import REPORT_VERDICTS
+from kudiguard.reply_translation import (
+    ComposePolicy,
+    ComposeStrategy,
+    reply_translate_request,
+    strip_reply_tags,
+    translation_problems,
+)
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
@@ -54,6 +62,7 @@ RETRY_TEMPERATURE = 0.5  # a retry at the base temperature (0, greedy) would rep
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
 MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
+MIN_TRANSLATE_S = 3.0  # english_first: translating a reply takes ~1-3 s (docs/SPIKES.md H)
 
 
 class AnswerKind(StrEnum):
@@ -77,6 +86,7 @@ class Answer:
     sources: tuple[str, ...] = ()  # knowledge entry ids used for grounding
     issues: tuple[OutputIssue, ...] = ()  # output-guard findings that forced a retry or fallback
     llm_ms: int = 0
+    reply_english: str = ""  # english_first: the checked English reply that ``body`` translates ("" = direct)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +102,7 @@ class _Generation:
     ms: int = 0
     issues: tuple[OutputIssue, ...] = ()
     unavailable: bool = False  # the model could not be reached (skip further calls this turn)
+    english: str | None = None  # english_first: the checked English reply that was translated
 
 
 class Engine:
@@ -105,7 +116,10 @@ class Engine:
         ffmpeg: str | None = None,
         temp_dir: Path | None = None,
         max_concurrent_transcriptions: int = 4,
+        compose_policy: ComposePolicy | None = None,
     ) -> None:
+        """``compose_policy``: direct or English-first replies per language (default: English-first for every
+        non-English language; ``reply_translation``)."""
         self.registry = registry
         self.messages = Messages(registry)
         # One limit for every caller (WhatsApp, API, web): decoding + recognition are CPU-bound. A transcription
@@ -118,6 +132,7 @@ class Engine:
         self._temp_dir = temp_dir
         self._guard = OutputGuard(registry)
         self._matcher = CommandMatcher(registry)
+        self.compose_policy = compose_policy or ComposePolicy()
 
     @property
     def has_speech(self) -> bool:
@@ -175,14 +190,9 @@ class Engine:
         contacts = tuple(c for c in knowledge.contacts if c.verified) if verdict in REPORT_VERDICTS else ()
         generation = _Generation(unavailable=model_down)
         if analysis.english and not model_down:
-            request = compose_request(
-                language_name=self.registry.get(language).name,
-                english=analysis.english,
-                verdict=verdict,
-                flags=assessment.flags,
-                knowledge=knowledge,
+            generation = await self._compose(
+                language, analysis.english, verdict, assessment.flags, knowledge, deadline
             )
-            generation = await self._generate(request, language, deadline)
         body, outcome = generation.text, Outcome.ANSWERED
         if body is None:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
@@ -200,6 +210,7 @@ class Engine:
             sources=tuple(item.entry.id for item in knowledge.entries[:MAX_ENTRIES]),
             issues=generation.issues,
             llm_ms=ms + generation.ms,
+            reply_english=generation.english or "",
         )
 
     async def analyse(
@@ -239,6 +250,75 @@ class Engine:
             budget = min(request.timeout_s or DEFAULT_TIMEOUTS[request.purpose], left)
             request = dataclasses.replace(request, timeout_s=budget)
         return await self._llm.complete(request)
+
+    # --- compose strategies (reply_translation) ---------------------------------------------------------------
+
+    async def _compose(
+        self,
+        language: LanguageCode,
+        english: str,
+        verdict: Verdict,
+        flags: tuple[Flag, ...],
+        knowledge: KnowledgeResult,
+        deadline: float | None,
+    ) -> _Generation:
+        """The reply body: composed in ``language`` (direct) or in English, checked, then translated."""
+        direct = self.compose_policy.for_language(language) is ComposeStrategy.DIRECT
+        target = self.registry.get(language).name
+        request = compose_request(
+            language_name=target if direct else self.registry.get(PIVOT).name,
+            english=english,
+            verdict=verdict,
+            flags=flags,
+            knowledge=knowledge,
+        )
+        if direct:
+            return await self._generate(request, language, deadline)
+        if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
+            # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
+            # (the user chose a language) or a translation cut off by the deadline.
+            log.warning("english_first: %.1fs left, using fixed text", deadline - time.monotonic())
+            return _Generation(unavailable=True)
+        # Hook: every check of the English reply (output guard, workstream B's classifier and grounding) runs here,
+        # in ``_generate`` on the English text, before anything is translated.
+        draft = await self._generate(request, PIVOT, deadline)
+        if draft.text is None:
+            return draft
+        example = translation_example(verdict, flags, target)
+        translated = await self._translate_reply(
+            reply_translate_request(draft.text, target, example), draft.text, language, deadline
+        )
+        translated.ms += draft.ms
+        translated.issues = draft.issues + translated.issues
+        translated.english = draft.text
+        return translated
+
+    async def _translate_reply(
+        self, request: ChatRequest, english: str, language: LanguageCode, deadline: float | None
+    ) -> _Generation:
+        """The English reply in ``language``: cleaned, guarded (the language's patterns: a second net) and checked
+        for fidelity (``translation_problems``); one warmer retry, then None (fixed text)."""
+        result = _Generation()
+        for attempt in range(2):
+            current = request if attempt == 0 else dataclasses.replace(request, temperature=RETRY_TEMPERATURE)
+            try:
+                completion = await self._complete(
+                    current, deadline, MIN_TRANSLATE_S if attempt == 0 else MIN_RETRY_S
+                )
+            except LLMError as exc:
+                log.warning("reply translation failed: %s", exc)
+                result.unavailable = True
+                return result
+            result.ms += completion.latency_ms + completion.queued_ms
+            text = clean_reply(strip_reply_tags(completion.text), truncated=completion.truncated)
+            issues = self._guard.check(text, language)
+            problems = translation_problems(english, text)
+            if not issues and not problems:
+                result.text = text
+                return result
+            result.issues += issues
+            log.info("reply translation rejected (attempt %d): %s %s", attempt + 1, issues, problems)
+        return result
 
     async def _generate(
         self, request: ChatRequest, language: LanguageCode, deadline: float | None = None

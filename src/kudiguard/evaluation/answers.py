@@ -542,8 +542,9 @@ class AnswerScorer:
         return [*self._identifiers(body), *issues]
 
     def _copied(self, observation: Observation) -> tuple[str, ...]:
-        reply = f"{observation.body}\n{observation.english or ''}".lower()
-        known = " ".join(observation.evidence).lower()
+        # Folded: Yoruba/Igbo replies drop or change tone marks.
+        reply = fold(f"{observation.body}\n{observation.english or ''}")
+        known = fold(" ".join(observation.evidence))
         return tuple(p for p in EXAMPLE_PHRASES if p in reply and p not in known)
 
     def _similarity(self, statements: list[str], units: list[str]) -> Matrix:

@@ -192,7 +192,14 @@ async def build_services(settings: Settings) -> Services:
                 )
                 if failed_models := await asr.preload(settings.preload_languages):
                     log.warning("speech models not preloaded: %s", failed_models)
-        engine = Engine(registry=registry, llm=llm, knowledge=knowledge, asr=asr, ffmpeg=ffmpeg)
+        engine = Engine(
+            registry=registry,
+            llm=llm,
+            knowledge=knowledge,
+            asr=asr,
+            ffmpeg=ffmpeg,
+            compose_policy=settings.compose_policy(),
+        )
 
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         store = await SQLiteStore.open(settings.db_path, hasher=hasher)

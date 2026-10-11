@@ -36,6 +36,7 @@ from kudiguard.evaluation.answers import (
     words_in,
 )
 from kudiguard.languages import LanguageRegistry
+from kudiguard.text import fold
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES_FILE = ROOT / "data" / "eval" / "answers.yaml"
@@ -402,9 +403,20 @@ def test_must_not_has_no_negation(item: AnswerCase) -> None:
     assert not any(negated(s) for s in item.must_not), item.must_not
 
 
-def test_each_example_phrase_belongs_to_exactly_one_worked_example() -> None:
+def test_each_example_phrase_belongs_to_exactly_one_kind_of_worked_example() -> None:
+    """A phrase marks one kind of example (credentials, fee, question) in any language, so a reply that copies
+    another kind's example is detected whichever language's example it was shown."""
     for phrase in prompts.EXAMPLE_PHRASES:
-        assert sum(phrase in e.reply.lower() for e in prompts.WORKED_EXAMPLES) == 1, phrase
+        kinds = {e.kind for e in prompts.WORKED_EXAMPLES if phrase in fold(e.reply)}
+        assert len(kinds) == 1, phrase
+    for example in prompts.WORKED_EXAMPLES:
+        assert example.phrase in prompts.EXAMPLE_PHRASES
+
+
+def test_example_copy_ignores_tone_marks(scorer: AnswerScorer) -> None:
+    """Yoruba/Igbo replies drop or change tone marks: the copied-example check compares folded text."""
+    reply = "Báǹkì yín kò ní béèrè kóòdù tí wọn fi ránṣẹ́ sí fóònù yín."  # under-dots dropped on "wọ́n"
+    assert scorer.score(case(), seen(reply)).example_copied == ("koodu ti won fi ranse si foonu yin",)
 
 
 def test_load_cases_rejects_duplicate_ids(tmp_path: Path) -> None:

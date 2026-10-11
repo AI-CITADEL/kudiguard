@@ -28,18 +28,29 @@ output_guard:
     - 'mi o le ran'
 
 lexicon:
+  # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
+  # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     urgency:
       - 'kiakia'
+      - 'ni (?:bayii|bayi) (?:bayii|bayi)'  # H: "right now right now"
     asks_credentials:
       - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
       - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
     account_threat:
       - '(?:akaunti|account)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo|o) (?:di|dina|pa)'
+      - '(?:ti|maa|yoo|o) (?:di|dina|pa)\W+(?:\w+\W+){0,1}?(?:akaunti|akanti|account|bvn|sim)'  # H: "will block the account"
     guaranteed_returns:
       - 'ilopo (?:meji|meta)'
+      - 'ere\W+(?:\w+\W+){0,1}?(?:ti o daju|to daju)'  # H: "sure/guaranteed profit"
+      # H: "(if I) put/invest ... I will receive ... within a week/month" (mirrors the English pivot term)
+      - '(?:fi|nawo|dokowo)\W+(?:\w+\W+){0,4}?(?:sile|si i|sinu)\W+(?:\w+\W+){0,4}?(?:maa|yoo|o maa|a maa|wa maa) (?:ri|gba)\W+(?:\w+\W+){0,4}?(?:laarin|ni|lehin) (?:ose|osu|ojo)\w*'
     upfront_fee:
       - 'san\W+(?:\w+\W+){0,4}?ki (?:o|e|a) (?:to|too) (?:gba|ri)'
+      - 'gbodo (?:koko )?san\W+(?:\w+\W+){0,6}?ki (?:n|o|e|a|won) (?:to|too)'  # H: "must (first) pay ... before"
+      - 'owo (?:iforukosile|registration|processing)'  # H: "registration/processing fee"
+    prize_lottery:
+      - 'mo (?:ti )?je ebun|(?:o|e) ti je ebun'  # H: "I/you won a prize" (not "o je ebun": "it is a gift")
     secrecy:
       - '(?:ma|e ma) (?:se )?so fun enikeni'
   check_intent:

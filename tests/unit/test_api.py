@@ -56,7 +56,12 @@ class Api:
 
 
 async def _start(registry: LanguageRegistry, config: Settings, *, speech: bool = True) -> AsyncIterator[Api]:
-    llm = FakeLLM(analyse=analysis("x", "scam_check"), compose="1. Do not share the code.", translate="x")
+    llm = FakeLLM(
+        analyse=analysis("x", "scam_check"),
+        compose="1. Do not share the code.",
+        translate="x",
+        reply_translate="1. Kada ka bayar da lambar.",
+    )
     asr = FakeASR(OTP_SCAM)
     hasher = UserHasher(b"s" * MIN_SECRET_BYTES)
     store = MemoryStore(hasher)

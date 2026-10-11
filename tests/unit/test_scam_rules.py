@@ -1,10 +1,13 @@
 import time
+from pathlib import Path
 
 import pytest
 
+from kudiguard import prompts
 from kudiguard.domain import Flag, Verdict
+from kudiguard.evaluation.answers import entry_texts, pack_entries
 from kudiguard.languages import LanguageRegistry
-from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess
+from kudiguard.safety.scam_rules import WEIGHTS, Lexicon, assess, compile_term
 from kudiguard.text import normalize
 
 
@@ -304,3 +307,89 @@ def test_native_terms_and_review_false_positives(
     registry: LanguageRegistry, lang: str, text: str, flagged: bool
 ) -> None:
     assert bool(assess([text], registry.lexicon_for(lang)).flags) is flagged
+
+
+# --- Yoruba/Igbo parity terms (workstream H; DRAFT, pending native review) ------------------------------------
+
+PACKS = Path(__file__).resolve().parents[2] / "data" / "packs"
+
+
+def native(registry: LanguageRegistry, code: str) -> Lexicon:
+    """The language's own terms, without the English pivot (so a test proves the native term fires)."""
+    spec = registry.get(code).lexicon
+    return Lexicon.from_terms(spec.flags, spec.check_intent)
+
+
+# One realistic message per added term (accented as users type; English gloss in the comment).
+@pytest.mark.parametrize(
+    ("lang", "flag", "text"),
+    [
+        # pay it right now right now
+        ("yo", Flag.URGENCY, "Wọ́n ní kí n san owó náà ní báyìí báyìí."),
+        # they will block my account
+        ("yo", Flag.ACCOUNT_THREAT, "Wọ́n ní àwọn yóò dí àkáǹtì mi tí mi ò bá fèsì."),
+        # he says it is a sure profit
+        ("yo", Flag.GUARANTEED_RETURNS, "Ó ní èrè tó dájú ni, kò sí ìṣòro."),
+        # if I put down 50k, I will get 150k within a week
+        ("yo", Flag.GUARANTEED_RETURNS, "Tí mo bá fi 50k sílẹ̀, màá rí 150k gbà láàrin ọ̀sẹ̀ kan."),
+        # I must first pay N5,000 before they send the money
+        ("yo", Flag.UPFRONT_FEE, "Mo gbọ́dọ̀ kọ́kọ́ san ẹgbẹ̀rún márùn-ún náírà kí wọ́n tó fi owó náà ránṣẹ́."),
+        # pay the registration fee today
+        ("yo", Flag.UPFRONT_FEE, "Wọ́n ní kí n san owó ìforúkọsílẹ̀ lónìí."),
+        # I won a N100,000 prize
+        ("yo", Flag.PRIZE_LOTTERY, "Wọ́n ní mo ti jẹ ẹ̀bùn ẹgbẹ̀rún lọ́nà ọgọ́rùn-ún náírà."),
+        ("ig", Flag.URGENCY, "Ha sị m zitere ya ozugbo ozugbo."),  # send it immediately immediately
+        # he wants me to tell him the OTP
+        ("ig", Flag.ASKS_CREDENTIALS, "Ọ chọrọ ka m gwa ya OTP ha zitere m."),
+        # if I put in 50k, I will get 150k within one week
+        ("ig", Flag.GUARANTEED_RETURNS, "Ọ bụrụ na m tinye 50k, m ga-enweta 150k n'ime otu izu."),
+        # I must pay a registration fee
+        ("ig", Flag.UPFRONT_FEE, "Ha sị na m ga-akwụ ụgwọ ndebanye aha."),
+        ("ig", Flag.PRIZE_LOTTERY, "Ha sị na m meriri ego puku naira nari."),  # I won N100,000
+    ],
+)
+def test_native_parity_terms_fire(registry: LanguageRegistry, lang: str, flag: Flag, text: str) -> None:
+    assert flag in assess([text], native(registry, lang)).flags
+    assert flag not in assess([text], registry.lexicon_for("en")).flags  # the pivot alone would miss it
+
+
+@pytest.mark.parametrize(
+    ("lang", "text"),
+    [
+        # this money is a gift from my father
+        ("yo", "Ẹ̀bùn ni owó yìí, ó jẹ́ ẹ̀bùn láti ọ̀dọ̀ bàbá mi."),
+        # I get my salary next week
+        ("yo", "Mo fi owó pamọ́ sí báǹkì, màá rí owó oṣù mi gbà ní ọ̀sẹ̀ tó ń bọ̀."),
+        # what must I do before opening an account
+        ("yo", "Kí ni mo gbọ́dọ̀ ṣe kí n tó ṣí àkáǹtì tuntun?"),
+        # my mother gave me money for my birthday
+        ("ig", "Nne m nyere m onyinye ego maka ụbọchị ọmụmụ m."),
+        # how do I put money in savings monthly
+        ("ig", "Kedu ka m ga-esi tinye ego n'akaụntụ nchekwa kwa ọnwa?"),
+    ],
+)
+def test_native_parity_terms_spare_ordinary_messages(
+    registry: LanguageRegistry, lang: str, text: str
+) -> None:
+    assert assess([text], native(registry, lang)).flags == ()
+
+
+# Pre-H term, known: warn_family_fallback paraphrases the scam ("never pay money before you receive money").
+KNOWN_SAFE_TEXT_HITS = {("yo", "upfront_fee", "warn_family_fallback")}
+
+
+@pytest.mark.parametrize("lang", ["ha", "yo", "ig"])
+def test_native_terms_never_fire_on_safe_advice(registry: LanguageRegistry, lang: str) -> None:
+    """Pack facts/actions, the language's fixed strings and the worked-example replies are safe advice."""
+    config = registry.get(lang)
+    corpus = [("pack", t) for t in entry_texts(pack_entries(PACKS).values())]
+    corpus += list(config.strings.items())
+    corpus += [(f"example:{e.language}:{e.kind}", e.reply) for e in prompts.WORKED_EXAMPLES]
+    hits = {
+        (lang, flag, key)
+        for flag, terms in config.lexicon.flags.items()
+        for term in terms
+        for key, text in corpus
+        if compile_term(term).search(normalize(text))
+    }
+    assert hits == {h for h in KNOWN_SAFE_TEXT_HITS if h[0] == lang}

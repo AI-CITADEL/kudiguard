@@ -414,6 +414,54 @@
     - {point: "If you do not understand how the money is made, do not invest.", from: investing-basics}
   must_not: ["Every registered company is guaranteed to pay."]
 
+# Workstream H (2026-10-10): yo/ig parity with the Hausa set. Same situations as ha-prize-fee, ha-fake-alert-goods,
+# ha-adashe/ha-budget and ha-phone-stolen, so the three languages can be compared case for case. DRAFT wording,
+# pending native-speaker review (docs/NATIVE_REVIEW.md); dev set, never the frozen blind scenarios.
+- id: yo-prize-fee
+  lang: yo
+  kind: scam
+  text: "Wọ́n fi àtẹ̀jíṣẹ́ ránṣẹ́ sí mi pé mo jẹ ẹ̀bùn ẹgbẹ̀rún lọ́nà ọgọ́rùn-ún náírà nínú promo MTN, ṣùgbọ́n mo gbọ́dọ̀ kọ́kọ́ san ẹgbẹ̀rún márùn-ún náírà fún registration kí wọ́n tó fi ránṣẹ́."
+  verdicts: [likely_scam, caution]
+  note: "They texted me that I won N100,000 in an MTN promo, but I must first pay N5,000 for registration before they send it."
+  must:
+    - {point: "You cannot win a promo or lottery you did not enter.", from: flag-prize-lottery}
+    - {point: "Do not pay any fee to claim a prize.", from: flag-prize-lottery}
+  must_not: ["Pay the registration fee to collect the prize."]
+
+- id: yo-fake-alert-goods
+  lang: yo
+  kind: scam
+  text: "Oníbàárà kan fi screenshot alert ẹgbẹ̀rún lọ́nà ọgọ́ta náírà hàn mí, ó ní kí n fún òun ní ọjà náà báyìí, ṣùgbọ́n owó náà kò tíì wọlé sí àkáǹtì mi."
+  verdicts: [likely_scam, caution]
+  note: "A customer showed me a screenshot of a N60,000 alert and said I should give him the goods now, but the money has not entered my account yet."
+  must:
+    - {point: "A screenshot or SMS is not proof of payment; only your bank balance is.", from: flag-fake-payment}
+    - {point: "Check your balance in your bank app before you release the goods.", from: flag-fake-payment}
+  must_not: ["Give him the goods now."]
+
+- id: yo-ajo
+  lang: yo
+  kind: question
+  text: "Mo fẹ́ dara pọ̀ mọ́ ẹgbẹ́ àjọ kan ní ọjà. Kí ni kí n ṣàyẹ̀wò kí n tó dara pọ̀?"
+  verdicts: [not_a_check, no_flags]
+  note: "I want to join an ajo group at the market. What should I check before I join?"
+  must:
+    - {point: "Join groups where you know the members and the collector personally.", from: savings-groups}
+    - {point: "Ask for the rules, the collection order and a written record of every payment.", from: savings-groups}
+    - {point: "The biggest risk is a collector who disappears with the money.", from: savings-groups}
+  must_not: ["Ajo groups are completely safe."]
+
+- id: yo-phone-stolen
+  lang: yo
+  kind: follow_up
+  text: "Wọ́n jí fóònù mi lánàá, app báǹkì mi sì wà nínú rẹ̀. Kí ni kí n ṣe báyìí?"
+  verdicts: [not_a_check, no_flags, caution]
+  note: "My phone was stolen yesterday and my bank app is on it. What should I do now?"
+  must:
+    - {point: "Call your bank immediately from another phone and ask them to block mobile and USSD banking.", from: lost-phone}
+    - {point: "Ask your network provider to block the SIM.", from: lost-phone}
+  must_not: ["Wait a few days to see if the phone is found."]
+
 # --- Igbo (ig) - DRAFT wording ----------------------------------------------------------------------------
 - id: ig-investment-triple
   lang: ig
@@ -496,3 +544,49 @@
     - {point: "Decide in advance how much you can give each month.", from: family-support}
     - {point: "Giving away all your savings can leave you unable to handle your own emergencies.", from: family-support}
   must_not: ["Give your family all your savings."]
+
+# Workstream H: the Hausa situations in Igbo (see the Yoruba block above). DRAFT, pending native review.
+- id: ig-otp-blocked
+  lang: ig
+  kind: scam
+  text: "Otu onye kpọrọ m sị na ọ bụ onye ọrụ ụlọ akụ, sị na a ga-emechi akaụntụ m ma ọ bụrụ na m agwaghị ya OTP ha zitere m ugbu a."
+  verdicts: [likely_scam, caution]
+  note: "Someone called me saying he is a bank worker, that my account will be closed unless I tell him the OTP they just sent me."
+  must:
+    - {point: "Your bank will never ask for your OTP by phone or message.", from: flag-asks-credentials}
+    - {point: "Do not share the code. End the call.", from: flag-asks-credentials}
+    - {point: "Contact your bank yourself using its official number.", from: flag-account-threat}
+  must_not: ["Tell the caller the OTP."]
+
+- id: ig-fake-alert-goods
+  lang: ig
+  kind: scam
+  text: "Otu onye na-azụ ahịa gosiri m foto alert nke puku naira iri isii, sị m nye ya ngwa ahịa ugbu a, mana ego ahụ abatabeghị n'akaụntụ m."
+  verdicts: [likely_scam, caution]
+  note: "A buyer showed me a picture of a N60,000 alert and told me to give him the goods now, but the money has not entered my account."
+  must:
+    - {point: "A screenshot or SMS is not proof of payment; only your bank balance is.", from: flag-fake-payment}
+    - {point: "Check your balance in your bank app before you release the goods.", from: flag-fake-payment}
+  must_not: ["Give him the goods now."]
+
+- id: ig-budget
+  lang: ig
+  kind: question
+  text: "Kedu ka m ga-esi hazie ego m na-enweta kwa ọnwa ka ọ ghara ịgwụ tupu ngwụcha ọnwa?"
+  verdicts: [not_a_check, no_flags]
+  note: "How do I plan the money I earn each month so it does not run out before the end of the month?"
+  must:
+    - {point: "Write down what you earn and what you spend each month.", from: budgeting}
+    - {point: "Separate needs such as food, rent and transport from wants.", from: budgeting}
+    - {point: "Decide how much to save before you spend on wants.", from: budgeting}
+
+- id: ig-phone-stolen
+  lang: ig
+  kind: follow_up
+  text: "E zuru ekwentị m ụnyaahụ, app ụlọ akụ m dịkwa n'ime ya. Gịnị ka m ga-eme ugbu a?"
+  verdicts: [not_a_check, no_flags, caution]
+  note: "My phone was stolen yesterday and my bank app is on it. What should I do now?"
+  must:
+    - {point: "Call your bank immediately from another phone and ask them to block mobile and USSD banking.", from: lost-phone}
+    - {point: "Ask your network provider to block the SIM.", from: lost-phone}
+  must_not: ["Wait a few days to see if the phone is found."]

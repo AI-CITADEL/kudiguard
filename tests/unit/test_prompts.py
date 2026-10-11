@@ -3,8 +3,10 @@ from collections.abc import Callable
 
 import pytest
 
+from kudiguard import prompts
 from kudiguard.domain import Flag, Verdict
 from kudiguard.knowledge.models import Contact, ContactKind, Entry, KnowledgeResult, PackKind, SourcedEntry
+from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import DEFAULT_SEED, DEFAULT_TEMPERATURE, ChatRequest
 from kudiguard.prompts import (
     ANALYSIS_SCHEMA,
@@ -22,6 +24,7 @@ from kudiguard.prompts import (
     translate_request,
     warn_family_request,
 )
+from kudiguard.text import fold
 
 
 def sourced(
@@ -225,6 +228,72 @@ def test_exactly_one_matching_example(verdict: Verdict, flags: tuple[Flag, ...],
     messages = compose(verdict, flags)
     assert len(messages) == 4  # system, one example (user + assistant), real request
     assert marker in messages[1]
+
+
+def compose_in(language: str, verdict: Verdict, flags: tuple[Flag, ...] = ()) -> list[str]:
+    req = compose_request(
+        language_name=language, english="x", verdict=verdict, flags=flags, knowledge=KNOWLEDGE
+    )
+    return [m["content"] for m in req.messages]
+
+
+@pytest.mark.parametrize(
+    ("verdict", "flags", "marker"),
+    [
+        (Verdict.LIKELY_SCAM, (Flag.ASKS_CREDENTIALS,), {"Yoruba": "kóòdù", "Igbo": "koodu e zitere"}),
+        (Verdict.CAUTION, (Flag.PRIZE_LOTTERY,), {"Yoruba": "Ìfilọ̀ tòótọ́", "Igbo": "Ezigbo ohere"}),
+        (Verdict.NOT_A_CHECK, (), {"Yoruba": "Ẹ lè rí NIN yín", "Igbo": "Ị nwere ike ịhụ NIN"}),
+    ],
+)
+@pytest.mark.parametrize("language", ["Yoruba", "Igbo"])
+def test_native_examples(
+    language: str, verdict: Verdict, flags: tuple[Flag, ...], marker: dict[str, str]
+) -> None:
+    """Direct Yoruba compose gets its native example (exactly one; the example request stays English data); every
+    native example is the one-shot example of the English-first translation."""
+    messages = compose_in("Yoruba", verdict, flags)
+    assert len(messages) == 4
+    assert messages[1].startswith("Reply in Yoruba.\n") and marker["Yoruba"] in messages[2]
+    assert messages[-1].startswith("Reply in Yoruba.\n")
+    english, native = prompts.translation_example(verdict, flags, language) or ("", "")
+    assert marker[language] in native
+    assert english == prompts.translation_example(verdict, flags, "Yoruba")[0]  # type: ignore[index]
+    assert english in compose_in("English", verdict, flags)[2]
+
+
+def test_translation_example_only_for_languages_with_examples() -> None:
+    assert prompts.translation_example(Verdict.NOT_A_CHECK, (), "Hausa") is None
+    assert prompts.translation_example(Verdict.NOT_A_CHECK, (), "English") is None
+
+
+@pytest.mark.parametrize("language", ["Hausa", "English", "Pidgin", "Igbo"])
+def test_languages_without_their_own_examples_use_english(language: str) -> None:
+    messages = compose_in(language, Verdict.LIKELY_SCAM, (Flag.ASKS_CREDENTIALS,))
+    assert messages[1].startswith("Reply in English.\n")
+    assert messages[2].startswith("This is a scam.")
+
+
+def test_localised_examples_mirror_the_english_ones() -> None:
+    """Same kinds, verdicts, flags, facts and actions in every language: only the reply's language differs, and
+    every reply keeps the English one's shape (one situation line, then the same number of steps)."""
+    english = {e.kind: e for e in prompts.WORKED_EXAMPLES if e.language == "English"}
+    assert set(english) == set(prompts.ExampleKind)
+    for example in prompts.WORKED_EXAMPLES:
+        twin = english[example.kind]
+        assert (example.message, example.flags, example.verdict, example.facts, example.actions) == (
+            twin.message,
+            twin.flags,
+            twin.verdict,
+            twin.facts,
+            twin.actions,
+        )
+        assert len(example.reply.splitlines()) == len(twin.reply.splitlines())
+        assert example.phrase == fold(example.phrase) and example.phrase in fold(example.reply)
+
+
+def test_example_languages_are_registry_names(registry: LanguageRegistry) -> None:
+    names = {lang.name for lang in registry.enabled}
+    assert {e.language for e in prompts.WORKED_EXAMPLES} <= names
 
 
 def test_general_question_task_never_mentions_scams() -> None:
