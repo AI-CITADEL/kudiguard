@@ -108,15 +108,19 @@ LEXICAL: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
 )
 _CUES = frozenset({"credential", "payment", "untrusted", "access", "endorsement", "imperative"})
 
-# Nigerian Pidgin markers (folded text); one is enough: English replies do not use them.
+# Nigerian Pidgin markers (folded text). A reply is Pidgin when it has at least PIDGIN_MARKERS of them: one word ("oga",
+# "wahala", a quoted "abeg") turns up in English replies too.
 _PIDGIN = re.compile(
-    r"(?<![\w'])(?:dey|una|wetin|abeg|oya|wey|sabi|wahala|comot|abi|sef|shey|pikin|dem|no be|na im"
-    r"|make you|e don|don do|for una|wan)(?![\w'])"
+    r"(?<![\w'])(?:dey|una|wetin|abeg|oya|wey|sabi|wahala|comot|abi|sef|shey|pikin|dem|na|no be|make you|e don"
+    r"|don do|wan|oga|am)(?![\w'])"
 )
+PIDGIN_MARKERS = 2
+_ENGLISH_AM = re.compile(r"(?<![\w'])i am(?![\w'])")
 
 
 def is_pidgin(text: str) -> bool:
-    return bool(_PIDGIN.search(fold(text)))
+    folded = _ENGLISH_AM.sub(" ", fold(text))  # "I am" is English; Pidgin "am" is an object ("pay am")
+    return len(_PIDGIN.findall(folded)) >= PIDGIN_MARKERS
 
 
 def lexical_features(text: str) -> Vector:
@@ -141,6 +145,7 @@ _LATER_UNTRUSTED = re.compile(
     r"\b(?:to|into|with|for)\s+(?:him|her|them|the\s+(?:agent|caller|man|woman|person|officer))\b"
     r"|\b(?:he|she|they|someone)\s+(?:sent|gave|shared)\b|\b(?:link|page|form)\b"
 )
+_PERSON_AFTER = re.compile(rf"{_PERSON.pattern}|\bsafe\s+account\b|\bwhile\b|\b(?:he|she|they|someone)\b")
 # BVN and NIN (identity numbers, not secrets) handed to staff inside the branch: the regex guard allows these too
 _IDENTITY_AT_BRANCH = re.compile(
     r"^(?!.*\b(?:otp|pin|password|passcode|cvv|code|token)\b).*\b(?:bvn|nin)\b.*"
@@ -157,7 +162,11 @@ def left_to_the_regex(text: str) -> bool:
     if _IDENTITY_AT_BRANCH.search(folded):
         return True
     match = _TRUSTED_RECIPIENT.search(folded)
-    return match is not None and not _PERSON.search(folded[: match.start()])
+    if match is None or _PERSON.search(folded[: match.start()]):
+        return False
+    # a person, a "safe account" or "while he ..." after the trusted place: "with your bank app to the account the
+    # caller gave you", "in your bank app while the agent watches your screen"
+    return not _PERSON_AFTER.search(folded[match.end() :])
 
 
 def _suspicion(text: str) -> int:

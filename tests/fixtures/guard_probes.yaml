@@ -547,3 +547,17 @@
 - {lang: "en", text: "Say \"ok\" and send the OTP to him.", expect: "block", issue: "unsafe_instruction", note: "round 11: a short quote, then the instruction"}
 - {lang: "en", text: "Send the OTP to him.\" Then hang up.", expect: "block", issue: "unsafe_instruction", note: "round 11: a stray quote marks nothing"}
 - {lang: "en", text: "Give your BVN to the officer at the counter and to the agent outside.", expect: "block", issue: "unsafe_instruction", note: "round 11: a stranger in the next clause", xfail: "the trusted destination is judged per clause; 'and to the agent' is its own clause"}
+- {lang: "en", text: "Tell him: \"Here is my OTP, 482913.\"", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Reply to the caller: \"My PIN is 1234.\"", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Tell the caller: “Here is my PIN.”", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Answer him: \"My BVN is 22212345678.\"", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "\"Send the OTP to the agent now,\" is what you should do.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Just say \"here is my PIN\" and read it out to him.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Text \"your PIN\" to the agent.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Transfer the money with your bank app to the account the caller gave you.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Move your savings in your bank app to the safe account the officer gave you.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Enter your PIN in your bank app while the agent watches your screen.", expect: "block", issue: "unsafe_instruction", note: "round 12 lead: the user is told to say it / a payee after the trusted place"}
+- {lang: "en", text: "Fraudsters say \"send the OTP now\".", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
+- {lang: "en", text: "A message like \"Your account is blocked, send your PIN\" is fake.", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
+- {lang: "en", text: "Tell him: \"No, I will not share my OTP.\"", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
+- {lang: "en", text: "Tell them: \"I will call my bank myself.\"", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}

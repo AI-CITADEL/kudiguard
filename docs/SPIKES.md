@@ -227,7 +227,9 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
   claimed; the verifier measured p50 135 ms for 8 cue sentences and 334 ms for 20 because every unit was embedded).
   Fixes (structural, by class, not by sentence):
   * **Frozen training set** `data/guard/train_set.jsonl` (2,156 items, committed; the artefact records its SHA-256 and
-    a unit test checks it), so merges that add fixed strings or probes cannot move the model or the gate. Master's
+    a unit test checks it), so merges that add fixed strings or probes cannot move the model or the gate. The frozen
+    set predates the 14 round-11 and 14 round-12 probes (they test the regex; they are not training data). Adding
+    probes to training means re-freezing deliberately (`--freeze`), which changes the SHA and the split: record it. Master's
     new fixed strings (hosting disclosure, donation and consent texts, "Forward this to your family and friends") are
     negatives, and every fixed string is train-only. The live gate runs on the frozen dev rows with a band (recall
     -3 points, false positives +1 point vs the artefact's record) and says which half moved. The 6 items that were
@@ -239,7 +241,10 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
     0.9; 79% of dev items still have a train item at bge cosine >= 0.8, which for bge-small means "same topic" (at
     0.8, union-find puts 1,859 of 2,156 items in one cluster), not a duplicate.
   * **Threshold chosen out of fold**: 5 group folds over the training split, on the hand-written and probe items (1,135;
-    grammar and fixed strings are easy negatives), lowest threshold with combined false positives <= 2%: **0.945**.
+    grammar and fixed strings are easy negatives); the lowest threshold with combined false positives <= 2% is
+    0.945 ("strict"). **Round 12: the shipped operating point is 0.85** (held-out en+pcm at 0.85, verifier: ~70% recall
+    / 2.3% false positives, vs 81% / 12% for round 10 at 0.65); both points are recorded in the artefact
+    (`operating_points`).
     The out-of-fold curve reproduces the held-out picture (at 0.6: 11.5% false positives, cf. 11.8% held-out at the
     old 0.65), whereas the clean dev split is still easier (3.1% at 0.6). Curve (regex OR classifier):
 
@@ -248,11 +253,11 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
     | 0.60 | 94.4% / 11.5% | 95.0% / 3.1% |
     | 0.70 | 91.3% / 7.9% | 92.6% / 1.3% |
     | 0.80 | 87.7% / 4.5% | 87.6% / 0.6% |
-    | 0.85 | 84.0% / 3.7% | 84.3% / 0% |
-    | **0.945 (shipped)** | **~74% / 1.8%** | **74.4% / 0%** (regex alone 55.4% / 0%) |
+    | **0.85 (shipped, round 12)** | **84.2% / 3.7%** | **85.1% / 0%** |
+    | 0.945 (strict) | 74.5% / 1.8% | 75.2% / 0% (regex alone 56.2% / 0%) |
 
-    The shipped threshold trades recall for false positives; `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD` (e.g. 0.85) moves
-    along the curve. Expect the next independent set to land nearer the out-of-fold column than the dev column.
+    (Round-12 numbers for the shipped and strict rows: same weights, regex/gating of round 12.)
+    `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=0.945` selects the strict point; any value moves along the curve. Expect the next independent set to land nearer the out-of-fold column than the dev column.
   * **Scoring**: no keyword pre-filter (it dropped 17 of 32 en/pcm held-out misses before scoring: endorsements,
     permission/screen-share wording, websites, attachments, refunds/reversals, "DM/snap your card"). Every ungated unit
     of >= 3 words is a candidate; the 8 most suspicious (by lexical cues) are embedded in one batch, the rest counted
@@ -261,12 +266,19 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
     hand-written examples for each missed class and for the false-positive classes (payments to known people,
     BVN/NIN at the branch counter, WhatsApp in good advice, quoted scam scripts, Pidgin reported speech).
   * **Trusted-recipient skip narrowed**: a unit is left to the regex only when the verb's own recipient is the bank,
-    the authorities or the user's own app/phone with no person before it and no person, link or supplied page after
-    it ("Forward his message to your bank" skips; "...to the man at your bank", "...to the coordinator at your bank
-    branch", "let him have the code with your phone" are scored), or a BVN/NIN given at the counter/teller.
+    the authorities or the user's own app/phone with no person before it and none after it (round 12: also no "safe
+    account", "while ..." or "he/she/they" after it, so "...with your bank app to the account the caller gave you",
+    "...in your bank app to the safe account the officer gave you" and "...in your bank app while the agent watches
+    your screen" are scored; the regex now blocks these three too). "Forward his message to your bank" skips;
+    "...to the man at your bank", "...to the coordinator at your bank branch", "let him have the code with your
+    phone" are scored; a BVN/NIN given at the counter/teller skips.
   * **Gating**: units that start inside closed double quotes are quoted speech (and the regex no longer reads quoted
     speech after "say/write/like/message..." or opening a sentence as an instruction, while `Send "the OTP" to him`
-    still blocks and an unclosed quote hides nothing); Pidgin reported speech ("Dem go ask you...", "Dem fit talk
+    still blocks and an unclosed quote hides nothing). **Round 12 fix** (a regression in 45267d8: the regex is the only
+    blocking layer in shadow mode): a quote is speech only when someone else says it; when the clause tells the USER
+    to say/write it (tell/say/reply/answer/text/write/message/read out + recipient: `Tell him: "Here is my OTP,
+    482913."`, `Just say "here is my PIN" and read it out to him`, `Text "your PIN" to the agent`) or the quote is
+    adopted (`"Send the OTP to the agent now," is what you should do`), it is neither masked nor gated; Pidgin reported speech ("Dem go ask you...", "Dem fit talk
     say...", "Dem fit tell you make you...") and "He/They will (probably) ask you to..." are reported; text before a
     colon is gated only when it merely introduces ("Tell the caller this:", "Tell the agent:"), so "Reply to the agent
     with your card details: ..." is scored. Regex: BVN/NIN to the teller, at the counter or to staff in the banking
@@ -277,7 +289,8 @@ workstream D's answer evaluation. Run: `pytest -m live tests/integration/test_gr
     Enforce waits; shadow never delays an enforce call by more than one scoring. The artefact is validated at startup
     (weights checksum, feature names = code, embedding model name, embedding dimension); a mismatch disables the
     layer with one error. A per-variety mode (`KUDIGUARD_GUARD_CLASSIFIER_PIDGIN_MODE`, e.g. English enforce, Pidgin
-    shadow) uses a Pidgin marker check, since Pidgin arrives as `en`. An empty `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=`
+    shadow) uses a Pidgin marker check, since Pidgin arrives as `en` (round 12: at least 2 markers per reply, so one
+    "oga" or a quoted "abeg" in an English reply does not switch the mode). An empty `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=`
     in `.env` now means "unset" (it crashed startup).
   * **Latency, re-measured** (CPU, this dev machine, one batch, cap 8 units): typical reply p50 20-38 ms / p95 21-58
     ms; 8 cue sentences (10 units, 8 scored) p50 51-92 ms / p95 73-116 ms; 20 cue sentences (22 units, 8 scored) p50

@@ -48,8 +48,9 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
    regex verdict stands (fail-open counts by reason in the logs). Honest numbers (SPIKES S8, round 11): the round-10
    version scored 83% recall / **11.8% false positives** on the independent English held-out set (Pidgin 77% /
    14%), against 1.6% claimed on a leaky dev split; the current version is trained on a frozen set with a grouped
-   split and an out-of-fold threshold (out-of-fold ~74% recall / 1.8% false positives; clean dev 74% / 0%) and
-   awaits a new independent set. The artefact is validated at startup (checksum, features, embedding model and
+   split and an out-of-fold threshold. Shipped operating point **0.85**: out-of-fold 84% recall / 3.7% false
+   positives, clean dev 85% / 0%, independent held-out en+pcm ~70% / 2.3% (verifier); the "strict" point 0.945
+   (out-of-fold 74% / 1.8%) is recorded beside it and selectable with `KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD`. The artefact is validated at startup (checksum, features, embedding model and
    size). ha/yo/ig stay regex-only (held-out recall 0-21%).
 5. **Grounding check** (`safety/grounding.py`): each claim of an English reply is compared by meaning (bge-small)
    with same-polarity evidence sentences (facts, actions, verdict, flags, generic framing, reviewed fixed advice);

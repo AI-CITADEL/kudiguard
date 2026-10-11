@@ -81,7 +81,7 @@ class OutputGuard:
         one ("Tell him: no, ..."). An instruction before a colon ("Reply with your card details: ...") is scored."""
         patterns = self._registry.guard_patterns(language)
         folded = normalize(text)
-        quoted = _quoted_spans(folded)
+        quoted = _speech_spans(folded)
         units: list[Unit] = []
         for match in _SENTENCE.finditer(folded):
             raw, question = match.group(1), match.group(2).startswith("?")
@@ -123,21 +123,48 @@ def _first_word(text: str, position: int) -> int:
     return match.start() if match else position
 
 
-def _mask_speech(text: str) -> str:
-    """``text`` with quoted speech replaced by "quote": a closed quote that opens the text or a sentence or follows a
-    word that introduces speech ("say", "write", "like", "message"; see ``_INTRODUCERS``). Other quotes stay, so
-    quoting the object ("send \"the code\" to him") hides nothing."""
-    result, last = [], 0
+def _speech_spans(text: str) -> list[tuple[int, int]]:
+    """The closed quotes that are someone else's speech: a quote that opens a sentence or follows a word that
+    introduces speech ("say", "write", "like", "message"; see ``_INTRODUCERS``). Not speech: a quote the USER is told
+    to say ("Tell him: \"Here is my OTP\"", "Just say \"...\" and read it out", "Text \"your PIN\" to the agent" - the
+    clause opens with an imperative speech verb) or one followed by "is what you should do" / "and send it". Other
+    quotes are never speech, so quoting the object ("send \"the code\" to him") hides nothing."""
+    spans = []
     for start, end in sorted(_quoted_spans(text)):
         before = text[: start - 1].rstrip()
         words = _words(before[-40:])
-        if not before or before.endswith((".", "!", "?", ":", "\n")) or (words and words[-1] in _INTRODUCERS):
-            inner = text[start:end].rstrip()
-            ending = inner[
-                len(inner.rstrip(".!?")) :
-            ]  # keep a sentence end inside the quote: 'said: "Pay." Then'
-            result.append(text[last:start] + "quote" + ending)
-            last = end
+        introduced = (
+            not before or before.endswith((".", "!", "?", ":", "\n")) or (words and words[-1] in _INTRODUCERS)
+        )
+        clause = _CLAUSE_START.split(before)[-1]
+        told = _TOLD_TO_SAY.match(clause) is not None
+        if introduced and not told and not _ADOPTED.match(text, end + 1):
+            spans.append((start, end))
+    return spans
+
+
+# the clause tells the user to say or write the quote: "tell him:", "just say", "reply to the caller:", "read out"
+_CLAUSE_START = re.compile(r"[.!?\n]\s*")
+_TOLD_TO_SAY = re.compile(
+    r"\W*(?:(?:please|kindly|just|then|now|simply|quickly|so)\s+)*"
+    r"(?:tell|say|reply|answer|text|write|message|read(?:\s+out)?|type|send|respond)\b"
+)
+# '"Send the OTP to the agent now," is what you should do', '"..." and send it to him'
+_ADOPTED = re.compile(
+    r"\W*(?:is|are)\s+what\s+you\s+(?:should|must|need\s+to|have\s+to)\s+(?:do|say|send)"
+    r"|\W*and\s+(?:send|read|give|type|enter|forward)\s+(?:it|them|this)\b"
+)
+
+
+def _mask_speech(text: str) -> str:
+    """``text`` with quoted speech (``_speech_spans``) replaced by "quote", keeping a sentence end inside the quote
+    ('said: "Pay." Then ...')."""
+    result, last = [], 0
+    for start, end in _speech_spans(text):
+        inner = text[start:end].rstrip()
+        ending = inner[len(inner.rstrip(".!?")) :]
+        result.append(text[last:start] + "quote" + ending)
+        last = end
     return "".join(result) + text[last:]
 
 

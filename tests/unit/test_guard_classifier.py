@@ -61,8 +61,11 @@ def test_lexical_features_and_matrix() -> None:
 
 
 def test_pidgin_detection() -> None:
-    assert is_pidgin("Abeg no send the code.") and is_pidgin("Dem fit tell you make you pay.")
+    assert is_pidgin("Abeg no send the code, dem dey lie.") and is_pidgin("Dem fit tell you make you pay.")
     assert not is_pidgin("Do not send the code. Don't pay any fee.")
+    # one marker word is not enough: English replies use "oga", "wahala" or quote a scammer's "abeg"
+    assert not is_pidgin('This looks like a scam. The "oga" who called is not from your bank.')
+    assert not is_pidgin("I am sure this is a scam, the oga lied. Do not pay.")  # "I am" is English
 
 
 def test_model_round_trip_and_shape_check(tmp_path: Path) -> None:
@@ -160,6 +163,12 @@ def test_units_gate_quotes_and_reported_speech_but_not_instructions_before_a_col
     assert (
         intro["tell the agent"] and not intro["tell him your pin"]
     )  # a speech verb with no secret introduces
+    told = {u.text: u.gated for u in guard.units(
+        'Tell him: "Here is my OTP, 482913." Just say "here is my PIN" and read it out to him. '
+        '"Send the OTP to the agent now," is what you should do.', "en")}  # fmt: skip
+    # the user is told to say it, or the quote is adopted: not someone else's speech, so scored
+    assert not told['"here is my otp'] and not told['say "here is my pin"']
+    assert not told['"send the otp to the agent now," is what you should do']
     quoted_tail = {u.text: u.gated for u in guard.units('Tell him "here is my OTP" and hang up.', "en")}
     assert not quoted_tail['tell him "here is my otp"']  # starts outside the quotes: scored
 
@@ -184,6 +193,12 @@ def test_handover_to_a_person_at_the_bank_is_scored(registry: LanguageRegistry) 
     ):
         assert left_to_the_regex(text) and not model.score(text, "en").flagged, text
     assert not left_to_the_regex("Give your PIN to the officer at the counter.")  # a secret, not an ID number
+    for text in (  # a person, a supplied payee or a "safe account" after the trusted place
+        "Transfer the money with your bank app to the account the caller gave you.",
+        "Move your savings in your bank app to the safe account the officer gave you.",
+        "Enter your PIN in your bank app while the agent watches your screen.",
+    ):
+        assert not left_to_the_regex(text), text
     assert not left_to_the_regex("Send the code to your bank's agent.")  # bank staff are not the bank
 
 
@@ -304,6 +319,8 @@ def test_shipped_artefact_matches_the_frozen_training_set() -> None:
     meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
     assert model.weights.shape == (384 + len(LEXICAL),) and 0 < model.threshold < 1
     assert meta["embedding_model"] == "BAAI/bge-small-en-v1.5"
+    points = meta["operating_points"]
+    assert points["shipped"]["threshold"] == model.threshold == 0.85 and points["strict"]["threshold"] > 0.85
     assert meta["dev_combined"]["false_positive_rate"] <= meta["max_dev_false_positive_rate"]
     frozen = ROOT / meta["training_set"]
     digest = hashlib.sha256(frozen.read_bytes()).hexdigest()

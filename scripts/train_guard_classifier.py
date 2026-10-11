@@ -60,6 +60,10 @@ CLUSTER_COSINE = (
 CLUSTER_JACCARD = 0.6  # character trigrams: template variants (0.5 chains a third of the data together)
 DEV_SHARE = 0.2
 FOLDS = 5
+# The shipped operating point (round 12, lead's choice): out-of-fold ~84% recall / ~3.7% false positives, held-out
+# en+pcm ~70% / 2.3%. The "strict" point (<= MAX_DEV_FALSE_POSITIVE_RATE out of fold, ~0.945) is reported beside it;
+# set KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD to use it.
+SHIPPED_THRESHOLD = 0.85
 CURVE = (0.6, 0.7, 0.8, 0.85, 0.9, 0.95)  # reported: the recall/false-positive trade-off
 OUT = ROOT / "data" / "guard" / "en_classifier.npz"
 FROZEN = ROOT / "data" / "guard" / "train_set.jsonl"
@@ -313,7 +317,8 @@ def main() -> None:
         scorer = UnsafeAdviceClassifier(ClassifierModel(w, b, 0.5, "", {}), memo, guard, budget_s=None)
         for i in np.flatnonzero(pick & (fold == k)):
             out_of_fold[i] = scorer.score(data[i].text, "en").probability
-    threshold = choose_threshold(out_of_fold[pick], regex[pick], labels[pick])
+    strict = choose_threshold(out_of_fold[pick], regex[pick], labels[pick])
+    threshold = SHIPPED_THRESHOLD
     w, b = train(features[~dev], labels[~dev], weights[~dev])
     whole_sentence = 1.0 / (1.0 + np.exp(-(features @ w + b)))
     # the full decision as shipped: regex guard OR classifier (gated units), on the dev items
@@ -331,9 +336,15 @@ def main() -> None:
     }
     report = {
         "train": {"n": int((~dev).sum()), "positives": int(labels[~dev].sum())},
-        "threshold_chosen_on": {
-            "how": f"out-of-fold, {FOLDS} group folds of the training split, hand-written and probe items",
-            **metrics((regex[pick] | (out_of_fold[pick] >= threshold)).astype(int), labels[pick]),
+        # named operating points, both measured out of fold ({FOLDS} group folds of the training split, hand-written
+        # and probe items): "shipped" is the artefact's threshold, "strict" the lowest with <= 2% false positives
+        "operating_points": {
+            name: {
+                "threshold": t,
+                "out_of_fold": metrics((regex[pick] | (out_of_fold[pick] >= t)).astype(int), labels[pick]),
+                "dev": metrics((regex[dev] | (unit_best[dev] >= t)).astype(int), labels[dev]),
+            }
+            for name, t in (("shipped", SHIPPED_THRESHOLD), ("strict", strict))
         },
         "dev_leak_share": leak(texts, vectors, dev),
         # the model on each whole dev text, no gating or unit split (diagnostic; not the shipped decision)

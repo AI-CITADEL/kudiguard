@@ -10,7 +10,7 @@
       "false_positive_rate": 0.0,
       "n": 124,
       "precision": 1.0,
-      "recall": 0.5303
+      "recall": 0.7273
     },
     "packs": {
       "false_positive_rate": 0.0,
@@ -29,13 +29,13 @@
     "false_positive_rate": 0.0,
     "n": 281,
     "precision": 1.0,
-    "recall": 0.4793
+    "recall": 0.7107
   },
   "dev_combined": {
     "false_positive_rate": 0.0,
     "n": 281,
     "precision": 1.0,
-    "recall": 0.7438
+    "recall": 0.8512
   },
   "dev_leak_share": {
     "bge_cosine_0.8": 0.7936,
@@ -44,16 +44,16 @@
     "trigram_jaccard_0.6": 0.0
   },
   "dev_model_whole_text_ungated": {
-    "false_positive_rate": 0.0,
+    "false_positive_rate": 0.0187,
     "n": 281,
-    "precision": 1.0,
-    "recall": 0.4545
+    "precision": 0.9643,
+    "recall": 0.6694
   },
   "dev_regex_alone": {
     "false_positive_rate": 0.0,
     "n": 281,
     "precision": 1.0,
-    "recall": 0.5537
+    "recall": 0.562
   },
   "embedding_model": "BAAI/bge-small-en-v1.5",
   "lexical_features": [
@@ -68,15 +68,40 @@
     "imperative"
   ],
   "max_dev_false_positive_rate": 0.02,
-  "seed": 20261010,
-  "threshold": 0.945,
-  "threshold_chosen_on": {
-    "false_positive_rate": 0.0184,
-    "how": "out-of-fold, 5 group folds of the training split, hand-written and probe items",
-    "n": 1135,
-    "precision": 0.9731,
-    "recall": 0.7412
+  "operating_points": {
+    "shipped": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.8512
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0368,
+        "n": 1135,
+        "precision": 0.9536,
+        "recall": 0.8417
+      },
+      "threshold": 0.85
+    },
+    "strict": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.7521
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0184,
+        "n": 1135,
+        "precision": 0.9732,
+        "recall": 0.7449
+      },
+      "threshold": 0.945
+    }
   },
+  "seed": 20261010,
+  "threshold": 0.85,
   "threshold_curve": {
     "0.6": {
       "dev": {
@@ -125,13 +150,13 @@
         "false_positive_rate": 0.0,
         "n": 281,
         "precision": 1.0,
-        "recall": 0.843
+        "recall": 0.8512
       },
       "out_of_fold": {
         "false_positive_rate": 0.0368,
         "n": 1135,
-        "precision": 0.9535,
-        "recall": 0.8399
+        "precision": 0.9536,
+        "recall": 0.8417
       }
     },
     "0.9": {
@@ -139,13 +164,13 @@
         "false_positive_rate": 0.0,
         "n": 281,
         "precision": 1.0,
-        "recall": 0.8099
+        "recall": 0.8182
       },
       "out_of_fold": {
         "false_positive_rate": 0.0268,
         "n": 1135,
-        "precision": 0.9639,
-        "recall": 0.7952
+        "precision": 0.964,
+        "recall": 0.797
       }
     },
     "0.95": {
@@ -153,13 +178,13 @@
         "false_positive_rate": 0.0,
         "n": 281,
         "precision": 1.0,
-        "recall": 0.719
+        "recall": 0.7273
       },
       "out_of_fold": {
         "false_positive_rate": 0.0151,
         "n": 1135,
-        "precision": 0.9777,
-        "recall": 0.7337
+        "precision": 0.9778,
+        "recall": 0.7374
       }
     }
   },
