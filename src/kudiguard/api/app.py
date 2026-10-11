@@ -595,9 +595,10 @@ def _v1_router() -> APIRouter:
 
         async def gated() -> CheckResponse:
             user = _partner_gates(request, client)
-            _voice_allowed(request, services, user, None)  # before the upload is read
             async with _admitted(request, services, user):
-                # only after the key, end user, rate limit, voice budget and licence cap were checked
+                # after the key, end user, rate limit and licence cap (a refused request spends no voice budget);
+                # before the upload is read
+                _voice_allowed(request, services, user, None)
                 fields, audio = await _form(request)
                 if audio is None:
                     raise HTTPException(422, "missing 'audio' file")

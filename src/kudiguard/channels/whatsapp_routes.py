@@ -69,7 +69,7 @@ def whatsapp_router(
             return Response(status_code=400)
         for failure in parse_failed_deliveries(payload, phone_number_id=config.phone_number_id):
             # Never the wamid (it encodes the recipient's number, see privacy.py) nor the recipient: code and title only.
-            log.warning("WhatsApp could not deliver a reply: code %s %s", failure.code, failure.title)
+            log.warning("WhatsApp could not deliver a reply: meta_code=%s %s", failure.code, failure.title)
         for message in parse_webhook(payload, phone_number_id=config.phone_number_id):
             if not conversation.submit(message):
                 return Response(status_code=503)  # shutting down: Meta retries the delivery later

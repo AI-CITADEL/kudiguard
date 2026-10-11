@@ -569,6 +569,8 @@ def test_inputs_found_by_mutation_testing(raw: str, expected: str) -> None:
         ("id=" + "1" * 65 + " ok", "id=[number] ok"),
         ("xid=1234567890ab ok", "xid=[number]ab ok"),  # not a known key
         ("id=1234567890abx ok", "id=[number]abx ok"),  # not a whole id
+        ("WhatsApp API 429 (meta_code=131056), retrying", "WhatsApp API 429 (meta_code=131056), retrying"),
+        ("meta_code=08031234567 x", "meta_code=[number] x"),  # a phone number is never a Meta code
     ],
 )
 def test_log_id_fields(message: str, expected: str) -> None:

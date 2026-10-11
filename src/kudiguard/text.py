@@ -138,6 +138,7 @@ _CLOCK_AFTER = re.compile(r":\d\d")  # "…4567 10|:30"
 _ID_FIELD = re.compile(
     r"\b(?:turn|user|msg|message|interaction|review|sample|id|key|hash)="
     r"(?:(?=[0-9]*[a-f])[0-9a-f]{10,64}|[0-9]{32,64})\b"
+    r"|\bmeta_code=[0-9]{1,7}\b"  # Meta's API error codes (131026, 131056 ...): operators must tell them apart
 )
 
 

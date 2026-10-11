@@ -502,11 +502,12 @@ class WhatsAppMessenger:
                 error = _error_of(response)
                 if error.code in TOKEN_CODES:
                     log.error(
-                        "WhatsApp access token rejected (code %s): renew WHATSAPP_ACCESS_TOKEN", error.code
+                        "WhatsApp access token rejected (meta_code=%s): renew WHATSAPP_ACCESS_TOKEN",
+                        error.code,
                     )
                 if not self._retryable(error, idempotent) or attempt == self._retries:
                     raise error
-                log.warning("WhatsApp API %s (code %s), retrying", error.status, error.code)
+                log.warning("WhatsApp API %s (meta_code=%s), retrying", error.status, error.code)
             await asyncio.sleep(_retry_after(response) or self._backoff_s * 2**attempt)
         raise AssertionError("unreachable")  # pragma: no cover
 
