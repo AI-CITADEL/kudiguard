@@ -37,7 +37,9 @@ replies (rubric and process: [NATIVE_REVIEW.md](NATIVE_REVIEW.md)); the table is
 | Scam detection with N-ATLAS (full engine) | to be re-run live | the 8 Oct run predates greedy decoding, new lexicon terms and English-first replies |
 | Knowledge retrieval, 24 independent questions | right entry in top 3: 96% (top 1: 62%) | English questions only (assumes a perfect translation) |
 | Speech, FLEURS read sentences as WhatsApp audio (WER) | Hausa 28% (20 clips) · Yoruba 33% (10; 64% with tone marks) · Igbo 46% (10) | read speech, not voice notes; possible training overlap |
-| Frozen end-to-end set (366 cases, 49 scam types, 5 languages) | live: pending (run at 8e15852); rules-only floor: 88/196 scams flagged, 11/96 genuine flagged, flag recall 22%, flag precision ≥95% (lower bound) | ha/yo/ig cases near-parallel and DRAFT |
+| Frozen end-to-end set T v1 (366 cases, 49 scam types, 5 languages; live once at 8e15852) | pass 85%; scams flagged 178/196 (91%); genuine flagged 35/96 (36%); questions answered 72/74; p50 3.5 s, p95 8.3 s; 0 errors. Judged advice: 94 good, 108 acceptable, 131 poor, 33 harmful; 281/609 must_advise points (46%) | ha/yo/ig cases near-parallel and DRAFT; LLM judges, not people; 30 of the 33 harmful are genuine messages |
+| T v2 (5503deb): pending | pending | re-run after fixes informed by T v1's failure categories; **not an independent measurement** |
+| dev2 advice fixes (130 cases, not frozen) before e9fec66 → after 4abf148 | scams 48/50 → 48/50; genuine flagged 23/45 → 21/45; judged good 10 → 26, good+acceptable 45% → 57%, advice points 32% → 46% | dev set used to measure the fixes; ~22 of 45 genuine notices still judged harmful; ha/yo/ig/pcm DRAFT |
 
 ## End-to-end test set T (frozen, v2.1)
 **Set.** `data/eval/e2e/cases.yaml`: 366 cases (en 147, pcm 63, ha/yo/ig 52 each; 196 scam, 96 genuine, 74 question),
@@ -74,20 +76,85 @@ per-language scores are a consistency check, not independent evidence.
 (id, language, message, reply shown, must_advise, must_not; no label, verdict field or flags) for independent LLM
 judges.
 
-| T result (engine, live) | Value |
+**T v1: the official headline.** Live, once, at commit 8e15852 on the frozen set; results in
+`data/eval/results/e2e-live.jsonl`. Recompute: `PYTHONIOENCODING=utf-8 python scripts/eval_e2e.py --summary data/eval/results/e2e-live.jsonl`.
+
+| T v1 result (engine, live, 8e15852, n=366) | Value |
 |---|---|
-| Pass rate, label or accept (all / per language; worst case with errors as failures) | to be run |
-| Scam recall (all / per language) | to be run |
-| Genuine false-positive rate | to be run |
-| Questions answered | to be run |
-| Flag recall / precision (lower bound) | to be run |
-| Latency p50 / p95 | to be run |
-| Fallback / translation-rejection rate | to be run |
-| Judged: must_advise met / must_not violated | to be run |
+| Pass rate, label or accept (all; worst case with errors as failures) | **85%** (85%: 0 errors); en 86%, pcm 86%, ha 85%, ig 85%, yo 83% |
+| Scam recall | **178/196 (91%)**; en 91%, pcm 97%, ha 85%, ig 89%, yo 89% |
+| Genuine messages flagged (false-positive rate) | **35/96 (36%)**; en 32%, pcm 50%, ha 31%, ig 38%, yo 38% |
+| Questions answered | 72/74 (2 shown red; basis left to the judge) |
+| Flag recall / precision (lower bound) | 35% / ≥81% |
+| Latency p50 / p95 | 3.5 s / 8.3 s (Yoruba p95 11.5 s) |
+| Fallback / translation-rejection rate | 5% / 4% (Igbo 27% / 23%) |
+| yo/ig scam misses (6 of 54) | 2 never translated (classified as a greeting, fixed reply: ig-002, ig-026); 4 translated with no English rule cue, of which 1 lost a cue in translation (yo-002, "don't call me" became "my network is good") and 3 kept the cue but were not flagged (yo-008, yo-023, ig-001) |
+
+**Blind advice judging (T v1).** `data/eval/results/judge/e2e-e2e-live-0{1..4}.judged.jsonl`: 4 independent LLM
+judges, each on a quarter of the 366 replies, blind to the label, the verdict and the flags.
+
+| Judged (n=366 replies) | Value |
+|---|---|
+| Grades | good 94, acceptable 108, poor 131, **harmful 33** |
+| must_advise points conveyed | 281/609 (46%) |
+| Where the harm is | 30 of the 33 harmful replies are on **genuine** messages (27 of them were called scams); 3 on scams |
+
+Caveats: LLM judges, not people or native speakers; one judge per reply (no agreement measured); ha/yo/ig/pcm
+cases are DRAFT and the ha/yo/ig scams near-parallel templates; voice cases ran as text. The main failure is
+**false alarms on real bank notices** (36% of genuine messages flagged), not missed scams.
+
+**T v2 (5503deb): pending.** A re-run of T on master 5503deb after fixes informed by T v1's failure categories.
+It is **not an independent measurement**: T v1 above stays the headline.
+
+| T v2 result (engine, live, 5503deb) | Value |
+|---|---|
+| Pass rate / scams flagged / genuine flagged / questions answered | pending |
+| Latency p50 / p95 | pending |
+| Judged advice | pending |
 
 Deterministic safety floor (rules alone, no model; `--rules-only`, results in `data/eval/results/e2e-rules.jsonl`):
 88/196 scams flagged (45%), 11/96 genuine messages flagged (11%), 0/74 questions answered (no model, so only fixed
 text), flag recall 22%, flag precision ≥95% (a lower bound: the author's flag lists are not exhaustive).
+
+## Dev set dev2: advice fixes, before / after (not frozen)
+**Set.** `data/eval/dev2/cases.yaml`: 130 cases (en 60, pcm 25, ha/yo/ig 15 each; 50 scam, 45 genuine, 35 question),
+written blind by an independent author. It is a **dev set**, used to measure the advice fixes (workstream E2): not
+frozen, not a test set. Recompute any row with `PYTHONIOENCODING=utf-8 python scripts/eval_e2e.py --summary <file>`.
+
+| dev2 (n=130) | Before: master e9fec66 (`e2e-dev2-before.jsonl`) | After: 4abf148, merged as 5503deb (`e2e-dev2-after2.jsonl`) |
+|---|---|---|
+| Pass rate | 80% | 82% |
+| Scams flagged | 48/50 (96%) | 48/50 (96%) |
+| Genuine flagged | 23/45 (51%) | 21/45 (47%) |
+| Questions answered | 34/35 | 34/35 |
+| Latency p50 / p95 | 3.6 s / 8.6 s | 4.7 s / 10.2 s |
+
+A first "after" attempt (2747121, `e2e-dev2-after.jsonl`) dropped scams flagged to 42/50 (84%). The cause was a new
+`user_initiated` field in the ANALYSE step; it was reverted and nothing from that attempt was merged.
+
+**Blind mixed before/after judging.** `data/eval/results/judge/dev2/dev2-mixed-0{1..4}.judged.jsonl`: 260 replies
+(130 before + 130 after, shuffled), 4 independent LLM judges blind to the label, the verdict and which run a reply
+came from. The before/after key is kept privately, out of the repo, so the split below cannot be recomputed from the
+repo alone (the pooled totals can: good 36, harmful 48, 213/549 advice points).
+
+| Judged (130 cases each) | Before | After |
+|---|---|---|
+| good | 10 | 26 |
+| good + acceptable | 45% | 57% |
+| must_advise points conveyed | 32% | 46% |
+| harmful | 25 | 23 |
+| Per case | 37 better, 14 worse (rest unchanged) | |
+
+Caveats:
+- About 22 of the 45 genuine notices are still judged harmful: N-ATLAS still calls real bank notices scams. The
+  knowledge packs improved the advice, not that verdict.
+- Pidgin replies mostly come back in English. The Pidgin-reply feature is **off by default**: it added about 3 s p50
+  for no measured gain.
+- Latency rose (p50 3.6 → 4.7 s) with the retrieved model answers.
+- dev2's ha/yo/ig/pcm text is DRAFT and needs native review; n=130 (one scam = 2 points).
+
+**Knowledge base.** Grown from about 50 to about 126 entries, with two new packs: genuine-notices (30) and
+situations (46), each with model answers and fact-checked sources in comments.
 
 ## Speech on real voice notes (donated, opt-in)
 Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The transcription loop:

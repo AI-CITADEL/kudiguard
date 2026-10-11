@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -145,6 +146,9 @@ def report(path: Path, mode: str) -> None:
 
 
 def main() -> None:
+    # Windows consoles default to cp1252, which cannot print the summary's "≥".
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
