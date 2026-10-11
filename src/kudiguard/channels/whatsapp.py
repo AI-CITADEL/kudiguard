@@ -24,6 +24,7 @@ import hmac
 import logging
 import math
 import os
+import re
 import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ log = logging.getLogger(__name__)
 CHANNEL = "whatsapp"
 # Graph API v25 (Feb 2026), supported for two years; newer versions work via WHATSAPP_API_VERSION.
 DEFAULT_API_VERSION = "v25.0"
+_API_VERSION = re.compile(r"v\d{1,3}\.\d{1,3}")
 MAX_TEXT = 4096
 MAX_BUTTON_BODY = 1024
 MAX_LIST_BODY = 4096
@@ -88,6 +90,8 @@ class WhatsAppConfig:
         required = ("phone_number_id", "access_token", "app_secret", "verify_token")
         if missing := [name for name in required if not getattr(self, name)]:
             raise ValueError(f"WhatsApp config is missing {missing}")
+        if not _API_VERSION.fullmatch(self.api_version):  # it becomes part of every Graph API URL
+            raise ValueError(f"WHATSAPP_API_VERSION must look like v25.0, not {self.api_version!r}")
 
     def __repr__(self) -> str:  # never print secrets
         return f"WhatsAppConfig(phone_number_id={self.phone_number_id!r}, api_version={self.api_version!r})"
@@ -498,11 +502,12 @@ class WhatsAppMessenger:
                 error = _error_of(response)
                 if error.code in TOKEN_CODES:
                     log.error(
-                        "WhatsApp access token rejected (code %s): renew WHATSAPP_ACCESS_TOKEN", error.code
+                        "WhatsApp access token rejected (meta_code=%s): renew WHATSAPP_ACCESS_TOKEN",
+                        error.code,
                     )
                 if not self._retryable(error, idempotent) or attempt == self._retries:
                     raise error
-                log.warning("WhatsApp API %s (code %s), retrying", error.status, error.code)
+                log.warning("WhatsApp API %s (meta_code=%s), retrying", error.status, error.code)
             await asyncio.sleep(_retry_after(response) or self._backoff_s * 2**attempt)
         raise AssertionError("unreachable")  # pragma: no cover
 

@@ -411,3 +411,38 @@ async def test_the_crisis_screen_reads_the_same_capped_text_as_the_check(h: Harn
     texts = await h.say("a" * MAX_INBOUND_CHARS + " I want to kill myself.")
     assert h.t(Msg.CRISIS_REPLY) not in texts
     assert await h.say("   " + CRISIS) == [h.t(Msg.CRISIS_REPLY)]  # stripped first, as everywhere else
+
+
+# --- review R: crisis in merged follow-ons; a crisis message is not consent ----------------------------------------
+
+
+async def test_a_queued_crisis_text_gets_help_before_the_analysis(h: Harness) -> None:
+    """A crisis text merged into a later check (it queued behind a slow turn) is answered at once, once, and the
+    merged turn keeps no words (not in the log, the English field or the pattern library)."""
+    await h.onboard("en")
+    await _queue_behind_a_slow_turn(h, h.msg(OTP_SCAM), [h.msg(OTP_SCAM + " again"), h.msg(CRISIS)])
+    texts = h.messenger.texts
+    help_at = texts.index(h.t(Msg.CRISIS_REPLY))
+    assert texts.count(h.t(Msg.CRISIS_REPLY)) == 1
+    assert (
+        sum(t.startswith(h.t(Msg.VERDICT_LIKELY_SCAM)) for t in texts[help_at:]) == 1
+    )  # the merged check follows
+    first, merged = await interactions(h)
+    assert first["transcript"] == OTP_SCAM
+    assert merged["transcript"] is None and merged["english"] is None
+    assert all("kill" not in (p.get("text") or "") for p in await h.store.export_patterns())
+
+
+async def test_a_crisis_already_answered_is_not_repeated_for_a_merged_crisis(h: Harness) -> None:
+    await h.onboard("en")
+    await _queue_behind_a_slow_turn(h, h.msg(OTP_SCAM), [h.msg(CRISIS), h.msg("I want to die")])
+    assert h.messenger.texts.count(h.t(Msg.CRISIS_REPLY)) == 1
+
+
+async def test_a_crisis_message_is_not_consent(h: Harness) -> None:
+    """Welcomed but not yet consented: the crisis reply is the answer; consent stays unset, nothing is logged."""
+    await h.say("hello")
+    assert await h.say(CRISIS) == [h.t(Msg.CRISIS_REPLY)]
+    state = await user(h)
+    assert state.consented_at is None and state.consent_version is None
+    assert await interactions(h) == [] and h.llm.requests == []

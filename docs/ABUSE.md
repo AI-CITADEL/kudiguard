@@ -11,7 +11,7 @@ and the language registry compiles every phrase (a bad regex or accented term st
 
 | Defence | Module | Setting (default) | Why this default |
 |---|---|---|---|
-| Crisis reply | `safety/abuse.py` | `ABUSE_CRISIS_MODE=enforce` | First-person phrases (and a third-party variant: "my brother says he will kill himself" gets help framed for helping someone else), read through obfuscation (zero-width characters, look-alike letters, leetspeak); sent first, before any gate, on WhatsApp and for typed web text; the scam check still follows. A miss is far worse than a gentle reply sent by mistake |
+| Crisis reply | `safety/abuse.py` | `ABUSE_CRISIS_MODE=enforce` | First-person phrases (and a third-party variant: "my brother says he will kill himself" gets help framed for helping someone else), read through obfuscation (zero-width characters, look-alike letters, leetspeak); sent first, before any gate, on WhatsApp, for typed web text and on the partner API (after the key); the scam check still follows. A miss is far worse than a gentle reply sent by mistake |
 | Crisis similarity (second layer) | `safety/crisis_semantic.py` | `CRISIS_SEMANTIC_MODE=shadow`, threshold 0.82 | bge-small similarity to a few exemplars per language. Dev sets (my red-team + round-1 probes + dev inputs, not round 2): 27/50 crisis messages above 0.82, 0/494 genuine (top genuine 0.813, a thin margin; English recall 13/31, so it is a backstop, not a replacement). Shadow: scored after the reply (no added time; ~10 ms median, 23 ms p95 per message on this CPU) and logged as `crisis_semantic … score= hit=` (never the text), so real-traffic recall can be measured before promoting it |
 | Abuse/harassment reply | `safety/abuse.py` | `ABUSE_HARASSMENT_MODE=enforce` | Only when the rules find no red flag (forwarded sextortion/threat scams are still checked); a false positive costs a polite fixed reply |
 | Scam-tool refusal | `safety/abuse.py` | `ABUSE_SCAM_TOOL_MODE=enforce` | A false positive costs a refusal that offers a check instead |
@@ -102,7 +102,10 @@ injection; a reply repeating the system prompt is blocked by the reply screen.
   also when no licence cap is set: it is an anti-flood guard, not a licence measure. Crisis help takes no
   reservation (it is free, uses no model and stores nothing), so the admission reserves at most once per turn.
 * **Flood guard**: at most 10 queued messages per user; one "rate limited" notice per 10 minutes per user; 30 voice
-  notes per user per hour.
+  notes per user per hour. The voice budget is one object shared by WhatsApp, the web page (per browser session)
+  and the partner API (per end user): over it, web and API get 429 `voice_limit` with WhatsApp's message. The API
+  checks it before the upload is read; the web page sends text and voice in one multipart form, so it checks it
+  once the form is parsed, before transcription.
 * Existing: per-user hourly rate limit, global concurrency + waiting cap, 16 MB / 90 s voiced / 15 s decode
   timeout, ffmpeg format and protocol allowlists, web and API rate limits, 2,000-char prompt cap.
 
@@ -123,10 +126,18 @@ injection; a reply repeating the system prompt is blocked by the reply screen.
     news", "financial suicide", "my grandma wants to die rich" are not crises.
   * Before every gate. A typed crisis message gets the crisis reply before consent, the licence cap, the new-user
     gate, the rate limit and even a full per-user queue, on WhatsApp and on the web page (the web reads a small
-    typed form before its consent header, session, rate-limit and capacity checks; if any of them refuses, the
-    crisis reply is the answer). Nothing about the message is stored then. A brand-new WhatsApp user then gets the
-    welcome and language menu, so they can come back. A voice note is only known to be a crisis after
-    transcription, so the voice budget and rate limit still apply before it.
+    typed form before its consent header, session, rate-limit and capacity checks; if any of them refuses, or the
+    check fails for any reason, the crisis reply is the answer), and on the partner API (`/v1/check`, `/v1/ask`, and
+    typed text in a small `/v1/check/audio` form: after the API key, which still comes first with 401, and before
+    the end-user id, the rate limit and the licence cap; a refusal returns the crisis reply with 200). Nothing about
+    the message is stored then. A crisis message is not consent: a welcomed WhatsApp user who has not yet agreed
+    gets the crisis reply only, consent stays unset and no interaction is logged. A brand-new WhatsApp user then
+    gets the welcome and language menu, so they can come back. Typed messages that queued behind a slow turn and
+    are merged into its check are screened one by one: a crisis among them gets the reply at once (once per turn)
+    and the merged turn keeps no words. A voice note is only known to be a crisis after transcription, so the voice
+    budget and rate limit still apply before it. Web requests without a Content-Length (chunked) are not read before
+    the gates (that would let any client stream up to 17 MB before consent or rate limits); browsers always send
+    one, and a chunked crisis message is still answered by the engine's crisis screen once it passes the gates.
   * Then the normal check continues (the model reads the message: a victim who "gave them my OTP" needs it; live,
     the rules alone missed that case). If it finds something to warn about, the verdict, contacts and Report
     button follow the crisis reply; otherwise the crisis reply stands alone. The message's words are kept nowhere:
@@ -297,6 +308,22 @@ don't want to live like this anymore" got the crisis reply alone.
   promote phrases that prove precise.
 * This version has no out-of-sample measurement: both reviewer probe sets are now in-sample (see Measurements).
 * ha/yo/ig phrases and all non-English fixed replies, including the crisis reply, are DRAFT: native review needed.
+* **English-only nets in native-language text.** The ha/yo/ig files have no native terms for these keys, so in
+  Hausa, Yoruba or Igbo text only the English/Pidgin terms apply (every language's lexicon and guard are merged with
+  the English ones, so code-switched English words in a native message are still read):
+  * scam flags `fake_payment`, `impersonation`, `money_request`, `remote_access`, `suspicious_link`,
+    `wrong_transfer` (6 of the 13; native terms exist for the other 7);
+  * abuse lists `asr_alone`, `injection_suspect` (shadow), `pack_instructions`, `scam_tool_defensive`;
+  * the 11 output-guard lists `condition_breaks`, `credentials`, `hedges_after`, `hedges_before`,
+    `means_instructions`, `negations_after`, `outcome_claims`, `pronoun_instructions`, `reported_speech`,
+    `segment_instructions`, `speech_commands`.
+
+  What softens this: a native message is also translated into English (by the analysis step, or the rules-only
+  translation under an injection) and the full English lexicon runs on the translation, so the 6 flags fire on a
+  correct translation when the model is up; with the model down, only the original text is read. Yoruba and Igbo
+  replies are written in English first and the full English output guard runs on the English draft; Hausa replies
+  are written directly in Hausa, so for Hausa the 11 guard lists act only on English words in the reply. These
+  native terms were not invented here: they need native speakers (docs/NATIVE_REVIEW.md).
 * A voice-note crisis meets the voice budget and rate limit before transcription; only typed crisis messages bypass
   every gate (WhatsApp and web).
 * The similarity layer is weak in English (13/31 at its threshold on dev) and near-useless for ha/yo/ig with

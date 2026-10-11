@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -258,16 +259,19 @@ async def test_build_services_fails_fast_and_cleans_up(tmp_path: Path) -> None:
 
 async def test_purge_loop_runs_and_survives_errors() -> None:
     calls: list[str] = []
+    second_pass = asyncio.Event()
 
     class Store:
         async def purge_before(self, cutoff: object) -> int:
             calls.append("purge")
             if len(calls) == 1:
                 raise RuntimeError("locked")
+            second_pass.set()
             return 3
 
     task = asyncio.create_task(purge_loop(Store(), 90, interval_s=0.01))  # type: ignore[arg-type]
-    await asyncio.sleep(0.05)
+    async with asyncio.timeout(10):  # waits for the second pass, not a fixed time: no flake under load
+        await second_pass.wait()
     task.cancel()
     assert len(calls) >= 2
 
@@ -679,6 +683,22 @@ def test_env_example_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert blank.guard_classifier_threshold is None and blank.guard_classifier_pidgin_mode is None
     env.write_text(example + "\nKUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=0.7\n", encoding="utf-8")
     assert Settings(_env_file=env).guard_classifier_threshold == 0.7  # type: ignore[call-arg]
+
+
+def test_env_example_documents_every_operator_setting() -> None:
+    """Review R: each setting an operator may need appears in .env.example (commented lines show the default), and
+    every KUDIGUARD_* name there is a real setting."""
+    example = (Path(__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8")
+    named = {m.lower() for m in re.findall(r"^#? ?KUDIGUARD_([A-Z0-9_]+)=", example, flags=re.MULTILINE)}
+    assert named <= set(Settings.model_fields), named - set(Settings.model_fields)
+    required = {
+        "trust_proxy_headers", "public_url", "active_user_cap", "web_session_cap", "per_user_per_hour",
+        "api_rate_per_minute", "web_rate_per_minute", "turn_deadline_s", "db_path", "embeddings_cache", "ffmpeg",
+        "data_dir", "packs", "allow_sample_packs", "llm_api_key", "model_cache", "guard_classifier_path", "speech",
+        "preload_languages", "default_language", "whatsapp_enabled",
+    }  # fmt: skip
+    assert required <= named, required - named
+    assert "Cloudflare" in example and not re.search(r"^HF_HOME=", example, flags=re.MULTILINE)
 
 
 async def test_grounding_warm_up_failure_is_not_fatal(
