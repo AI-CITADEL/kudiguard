@@ -46,6 +46,7 @@ from kudiguard.prompts import (
     example_overlap,
     facts_block,
     parse_analysis,
+    reads_as_hausa_yoruba_igbo,
     steps_request,
     strip_contacts,
     translate_request,
@@ -579,9 +580,11 @@ class Engine:
         # the example the model is shown (the entry's, else the fixed worked example), for the copy check
         shown = example or worked_example_reply(verdict, flags, knowledge)
 
-        def build(model_answer: str | None, worked_example: bool = True) -> ChatRequest:
+        def build(
+            model_answer: str | None, worked_example: bool = True, language_name: str | None = None
+        ) -> ChatRequest:
             return compose_request(
-                language_name=target if direct else self.registry.get(PIVOT).name,
+                language_name=language_name or (target if direct else self.registry.get(PIVOT).name),
                 english=english,
                 verdict=verdict,
                 flags=flags,
@@ -596,6 +599,15 @@ class Engine:
             generation = await self._unless_copied(
                 generation, shown, knowledge, build(None, worked_example=False), language, deadline, sources
             )
+            if pidgin and generation.text is not None and reads_as_hausa_yoruba_igbo(generation.text):
+                # asked for Pidgin, got Hausa/Yoruba/Igbo: once more with the plain English instruction
+                log.info("compose: Pidgin input got a reply in another language, retrying in English")
+                retry = await self._generate(
+                    build(example, language_name=self.registry.get(PIVOT).name), language, deadline, sources
+                )
+                retry.ms += generation.ms
+                retry.issues = generation.issues + retry.issues
+                generation = retry
             return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
         if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
             # Not enough time for both steps: fixed text in the user's language now, rather than an English reply

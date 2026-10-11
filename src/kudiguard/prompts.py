@@ -192,6 +192,32 @@ _EXAMPLE_QUESTION = _Example(
     actions=(),
     reply="You can see your NIN from your phone.\n1. Dial *346# from the phone number linked to your NIN.",
 )
+# Pidgin input (live: "Reply in Nigerian Pidgin" alone sometimes got Hausa or Yoruba): the scam example, answered in
+# Pidgin. Only for Pidgin input.
+_EXAMPLE_PIDGIN = _Example(
+    message=_EXAMPLE_SCAM.message,
+    flags=_EXAMPLE_SCAM.flags,
+    verdict=_EXAMPLE_SCAM.verdict,
+    facts=_EXAMPLE_SCAM.facts,
+    actions=_EXAMPLE_SCAM.actions,
+    reply="E be like scam. Real offer no dey ask you to pay first.\n"
+    "1. No pay anything.\n"
+    "2. Stop to reply dem.\n"
+    "3. Check the offer only for the official place.",
+)
+# Words and letters of Hausa, Yoruba and Igbo that Pidgin and English do not use (a reply to Pidgin in one of them)
+_OTHER_LANGUAGE_WORDS = re.compile(
+    r"\b(?:wannan|kada|idan|zamba|kuma|bankin|nan take|mase|maṣe|wọn|nipasẹ|ndị|nke|gị|unu|biko|ọ bụ)\b",
+    re.IGNORECASE,
+)
+_OTHER_LANGUAGE_LETTERS = re.compile(r"[ẹọṣɗƙɓịụ]", re.IGNORECASE)
+
+
+def reads_as_hausa_yoruba_igbo(text: str) -> bool:
+    """A reply that reads as Hausa, Yoruba or Igbo rather than Pidgin or English (two markers or more)."""
+    return len(_OTHER_LANGUAGE_WORDS.findall(text)) + len(_OTHER_LANGUAGE_LETTERS.findall(text)) >= 2
+
+
 WORKED_EXAMPLES = (_EXAMPLE_CREDENTIALS, _EXAMPLE_SCAM, _EXAMPLE_QUESTION)
 # One phrase unique to each example's reply: seen in a reply whose facts lack it, it shows a copied example (evals).
 EXAMPLE_PHRASES = ("code sent to your phone", "real offers do not ask", "*346#")
@@ -431,7 +457,8 @@ def compose_request(
     facts, actions = facts_block(knowledge)
     worked: tuple[dict[str, str], ...] = ()
     if not example and worked_example:
-        shot = _example_for(verdict, flags, bool(facts))
+        pidgin_scam = language_name == PIDGIN_NAME and verdict in (Verdict.LIKELY_SCAM, Verdict.CAUTION)
+        shot = _EXAMPLE_PIDGIN if pidgin_scam else _example_for(verdict, flags, bool(facts))
         worked = (
             {
                 "role": "user",

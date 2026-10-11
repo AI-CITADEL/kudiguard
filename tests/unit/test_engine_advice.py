@@ -368,3 +368,91 @@ def test_rule_requests(registry: LanguageRegistry, text: str, flag: Flag, expect
     from kudiguard.safety.scam_rules import assess
 
     assert (flag in assess([text], registry.lexicon_for("en")).flags) is expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("what is my bank's customer care number?", False),
+        ("How do I reach GTBank customer care?", False),
+        ("This is GTBank customer care, your account will be blocked", True),
+        ("A man called me, he said he is from customer care and needs my OTP", True),
+        ("Customer care called me and asked for my PIN", True),
+        ("one man call me say him be customer care", True),
+    ],
+)
+def test_impersonation_needs_a_claim(registry: LanguageRegistry, text: str, expected: bool) -> None:
+    from kudiguard.safety.scam_rules import assess
+
+    assert (Flag.IMPERSONATION in assess([text], registry.lexicon_for("en")).flags) is expected
+
+
+# --- situational packs in general search ---------------------------------------------------------------------------
+
+
+def _two_packs(tmp_path: Path) -> list[FilePackSource]:
+    core, situational = tmp_path / "core", tmp_path / "sit"
+    for folder, extra, topics in (
+        (
+            core,
+            "kind: core\npriority: 10\n",
+            "- id: saving\n  title: Saving money every month\n  facts: [Save a little money every month.]\n",
+        ),
+        (
+            situational,
+            "kind: core\npriority: 10\nuncued_weight: 0.5\n",
+            "- id: sit-fee\n  title: Monthly account fee on your money\n  facts: [Banks take a small fee from your money every month.]\n"
+            "  keywords: [maintenance fee]\n",
+        ),
+    ):
+        folder.mkdir()
+        (folder / "pack.yaml").write_text(
+            f"id: {folder.name}\nname: {folder.name}\nowner: KudiGuard\n{extra}", encoding="utf-8"
+        )
+        (folder / "topics.yaml").write_text(topics, encoding="utf-8")
+    return [FilePackSource.load(core), FilePackSource.load(situational)]
+
+
+@pytest.mark.parametrize(
+    ("text", "flags", "top"),
+    [
+        ("money every month fee", (), "saving"),  # no cue: the situational hit is down-weighted
+        ("why is there a maintenance fee on my money every month", (), "sit-fee"),  # its keyword is a cue
+        ("money every month fee", (Flag.UPFRONT_FEE,), "sit-fee"),  # a red flag: no down-weighting
+    ],
+)
+async def test_situational_hits_need_a_cue_in_general_search(
+    tmp_path: Path, text: str, flags: tuple[Flag, ...], top: str
+) -> None:
+    from kudiguard.knowledge.service import KnowledgeBase
+
+    kb = KnowledgeBase(_two_packs(tmp_path))
+    result = await kb.search(Query(text=text, flags=flags))
+    assert next(item.entry.id for item in result.entries if item.relevance is not None) == top
+
+
+# --- Pidgin: worked example and the wrong-language retry -----------------------------------------------------------
+
+
+async def test_pidgin_scam_gets_the_pidgin_worked_example(registry: LanguageRegistry) -> None:
+    llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=REPLY)
+    await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    assert "Real offer no dey ask you to pay first" in llm.calls(Purpose.COMPOSE)[0].messages[2]["content"]
+
+
+async def test_pidgin_input_with_a_hausa_reply_is_retried_in_english(registry: LanguageRegistry) -> None:
+    hausa = "Wannan zamba ne. Kada ka ba su lambar."
+    llm = FakeLLM(analyse=analysis(), compose=[hausa, REPLY])
+    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    first, second = llm.calls(Purpose.COMPOSE)
+    assert last_user(first).startswith("Reply in Nigerian Pidgin") and last_user(second).startswith(
+        "Reply in English."
+    )
+    assert answer.body == REPLY and answer.llm_ms == 300
+
+
+def test_reads_as_hausa_yoruba_igbo() -> None:
+    from kudiguard.prompts import reads_as_hausa_yoruba_igbo
+
+    assert reads_as_hausa_yoruba_igbo("Wannan naa jẹ aṣiwere. Banki rẹ ko beere OTP")
+    assert not reads_as_hausa_yoruba_igbo("Na scam be this. Your bank no go ever ask you for your OTP.")

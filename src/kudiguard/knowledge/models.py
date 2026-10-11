@@ -146,6 +146,10 @@ class PackManifest(_Strict):
     sample: bool = False  # fictional demo content; never present as real
     cite: bool = True  # partner facts carry "(source: <name>)" in prompts; False for KudiGuard's own packs
     description: Annotated[str, StringConstraints(max_length=500)] = ""
+    # Situational packs (specific scams, genuine notices): their search hits count this much of their relevance when
+    # the query has no red flag and contains none of the entry's keywords, so general questions ("how do I save?")
+    # stay with general answers (docs/ARCHITECTURE.md "Advice quality"). 1 = no down-weighting.
+    uncued_weight: float = Field(default=1.0, gt=0, le=1)
     source: Annotated[FilesSourceSpec | HttpSourceSpec, Field(discriminator="type")] = FilesSourceSpec()
 
     @model_validator(mode="after")

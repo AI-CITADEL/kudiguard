@@ -137,15 +137,6 @@ def test_production_pack_set() -> None:
     assert PRODUCTION == ("genuine-notices", "kudiguard-core", "money-skills", "situations")
 
 
-NEW_PACKS_REGRESSION = pytest.mark.xfail(
-    strict=True,
-    reason="known ranking regression with the genuine-notices and situations packs (docs/SPIKES.md R, 2026-10-11): "
-    "general questions now get sit-*/notice-* hits that do not answer them (e.g. notice-account-maintenance-fee for "
-    "saving questions). Floors kept, not lowered; remove this mark when the ranking is fixed",
-)
-
-
-@NEW_PACKS_REGRESSION
 async def test_money_skills_reachable_bm25() -> None:
     """Dev set (written with the pack, not blind): every entry must stay reachable."""
     top1, top3 = await evaluate_pipeline(None, MONEY, PRODUCTION)
@@ -155,7 +146,6 @@ async def test_money_skills_reachable_bm25() -> None:
 
 
 @pytest.mark.live
-@NEW_PACKS_REGRESSION
 async def test_money_skills_reachable_hybrid() -> None:
 
     top1, top3 = await evaluate_pipeline(local_fast_embedder(), MONEY, PRODUCTION)
@@ -204,7 +194,6 @@ async def test_blind_set_with_all_packs_reported_hybrid() -> None:
     assert 0 <= top1 <= top3 <= 1
 
 
-@NEW_PACKS_REGRESSION
 async def test_pipeline_accuracy_bm25_production() -> None:
     """Dev set with the production pack set (money-skills ids accepted where they answer better)."""
     top1, top3 = await evaluate_pipeline(None, CASES, PRODUCTION)
@@ -214,7 +203,6 @@ async def test_pipeline_accuracy_bm25_production() -> None:
 
 
 @pytest.mark.live
-@NEW_PACKS_REGRESSION
 async def test_pipeline_accuracy_hybrid_production() -> None:
 
     top1, top3 = await evaluate_pipeline(local_fast_embedder(), CASES, PRODUCTION)
@@ -261,6 +249,8 @@ PROBES_FOUND = [
         "I just made a transfer in my app and got an OTP SMS for it, is it normal?",
         "notice-otp-own-transaction",
     ),
+    ("a twitter support account asked for my pin in DM after my complaint", "sit-fake-customer-care"),
+    ("the woman collecting our daily contribution has disappeared", "sit-ajo-collector-disappears"),
 ]
 CUSTOMER_CARE = "what is my bank's customer care number?"
 

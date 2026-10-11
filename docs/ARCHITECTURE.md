@@ -136,6 +136,18 @@ Settings in `.env.example` ("Advice quality"); code in `knowledge/service.py` (c
   non-scams flagged 2/21 -> 2/21; prompts.yaml scams 17/18 -> 17/18 (asks_credentials 5 -> 5), non-scams 2/16 ->
   2/16; own-OTP / wrong-transfer probes: scams 3/5 -> 5/5, genuine notices flagged 3/4 -> 1/4 (the remaining one is
   `impersonation` on a bank name).
+* **Situational packs in general search** (`uncued_weight` in pack.yaml; 0.9 for genuine-notices and situations, 1 =
+  off): when the query has no red flag and contains none of the entry's own keywords, those packs' hits count 0.9 of
+  their relevance when the merged hit list is ranked, so general questions ("keep money aside every month") stay with
+  general answers. Dev sets, all four packs, rules + search, top-1 / top-3 before -> after: production pipeline BM25
+  67%/91% -> 83%/96%, hybrid 72%/93% -> 89%/96%; money-skills BM25 59%/95% -> 77%/100%, hybrid 77%/91% -> 86%/95%;
+  core-only sets unchanged. The 15 accepted sit-*/notice-* alternatives: 15/15 in the top 3 with BM25, 13/15 hybrid.
+* **Impersonation needs a claim**: "customer care/service/support" flags only as a claim ("this is X customer care",
+  "he said he is from customer care", "him be customer care") or as the one who contacted the user ("customer care
+  called/asked/DMed"), not in a question ("what is my bank's customer care number?"). Rules-only on the dev sets:
+  impersonation on scams answers.yaml 3/20 -> 3/20, prompts.yaml 5/18 -> 5/18; customer-care questions 2/2 -> 0/2.
+* **Pidgin, stabilised**: Pidgin input with a scam verdict gets a Pidgin worked example; a reply to Pidgin input that
+  reads as Hausa, Yoruba or Igbo (`prompts.reads_as_hausa_yoruba_igbo`) is composed once more in English.
 * **Pidgin replies** (`KUDIGUARD_PIDGIN_REPLIES`): Pidgin arrives as language `en`; when
   `guard_classifier.is_pidgin` detects it, COMPOSE is asked to "Reply in Nigerian Pidgin".
 * **Stock answer fix**: the fixed question example (NIN, "dial *346#") was the only worked example for every

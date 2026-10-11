@@ -451,7 +451,10 @@ lexicon:
       - '(?:click|via|through|visit|open|use) (?:on )?(?:this|the) link'
       - 'download (?:this|the) app'
     impersonation:
-      - 'customer (?:care|service|support)'
+      # a CLAIM to be customer care, or customer care contacting the user, not a question that mentions it
+      # ("what is my bank's customer care number?")
+      - '(?:this is|i am|im|we are|calling from|called from|call(?:ed|ing)? (?:me )?from|claim\w* to be|pretend\w* to be|posing as|(?:he|she|they|it) (?:is|was|are|were)|(?:him|she|dem|e) be|(?:a|one|some|wani) (?:man|woman|person|guy|lady)? ?(?:from )?)\W+(?:\w+\W+){0,3}?customer (?:care|service|support)'
+      - 'customer (?:care|service|support)\W+(?:\w+\W+){0,3}?(?:called|calls|calling|call me|texted|messaged|sent|said|says|told|tells|asked|asks|dm\w*|reached out|contacted|replied|kira|pe|kporo)'
       - 'bank (?:staff|official|manager|agent|officer)'
       - '(?:gt ?bank|gtco|access|zenith|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic)\w* ?(?:support|care|help|team)'
       - 'on (?:twitter|x|telegram|facebook|instagram)'
