@@ -1,0 +1,65 @@
+{"id": "j195", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j196", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No essential-costs listing or spending tracking."}
+{"id": "j197", "lang": "yo", "advise": [false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Legit statement email labelled scam; irrelevant mistaken-transfer advice."}
+{"id": "j198", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Generic ajo caution; never says reminder is normal or to pay usual account."}
+{"id": "j199", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "NDPC not given as reporting channel for data misuse."}
+{"id": "j200", "lang": "en", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Calls real statement notice phishing, tells user to uninstall bank app."}
+{"id": "j201", "lang": "ig", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No warning about entering card details."}
+{"id": "j202", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Doesn't say customs never collects into personal accounts."}
+{"id": "j203", "lang": "en", "advise": [false, false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Off-topic NIN USSD answer to blocked card question."}
+{"id": "j204", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Doesn't say bail is free or agencies don't collect by phone."}
+{"id": "j205", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Plain English to Pidgin user; no PIN-sharing warning."}
+{"id": "j206", "lang": "en", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Genuine tier upgrade labelled scam with irrelevant investment advice."}
+{"id": "j207", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j208", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Wrongly frames question as scam; no 'free/no lawyer/evidence' guidance."}
+{"id": "j209", "lang": "en", "advise": [true, true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Odd green verdict; no CBN escalation or reference number."}
+{"id": "j210", "lang": "pcm", "advise": [false, true, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "English to Pidgin user; no urgent fraud-line hold or recovery-scam warning."}
+{"id": "j211", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j212", "lang": "pcm", "advise": [true, false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Generic prevention template for victim; English to Pidgin user."}
+{"id": "j213", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Greeting only; message not answered."}
+{"id": "j214", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No warning against entering NIN/BVN on sites."}
+{"id": "j215", "lang": "en", "advise": [false, true, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Real CBN new-device limit called scam."}
+{"id": "j216", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Generic; no POS dashboard check or reversal explanation."}
+{"id": "j217", "lang": "yo", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j218", "lang": "pcm", "advise": [false, false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Harassment case mislabelled scam; 'do not pay anything' ignores real debt."}
+{"id": "j219", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No mention of free official NELFUND portal or the link."}
+{"id": "j220", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No warning about personal-account payment requests."}
+{"id": "j221", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j222", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Greeting only; message not answered."}
+{"id": "j223", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Mentions security but then irrelevant NIN steps; no CBN 24h rule."}
+{"id": "j224", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Confirms delivery; irrelevant savings-group text, no extra-fee warning."}
+{"id": "j225", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Says can pay but drifts into savings planning."}
+{"id": "j226", "lang": "ha", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Red scam headline on info question; CAC point missing."}
+{"id": "j227", "lang": "en", "advise": [true, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Normal pending-transfer notice labelled scam."}
+{"id": "j228", "lang": "yo", "advise": [false, true], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Says scam/don't pay; no Ponzi explanation or SEC check."}
+{"id": "j229", "lang": "ig", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No police report mentioned."}
+{"id": "j230", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No warning against entering NIN/BVN on sites."}
+{"id": "j231", "lang": "en", "advise": [false, true, true], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No screenshot/NDPC; mislabels as scam."}
+{"id": "j232", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Says never share BVN; misses licensed-lender nuance and OTP point."}
+{"id": "j233", "lang": "en", "advise": [false, true, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Only FCCPC; no screenshots, NDPC or official repayment."}
+{"id": "j234", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Legit school fee answered with transfer-recall steps."}
+{"id": "j235", "lang": "pcm", "advise": [false, false, false], "violations": [], "grade": "poor", "reply_lang_ok": false, "note": "Garbled language; no recovery, 2FA or warn-contacts steps."}
+{"id": "j236", "lang": "en", "advise": [false, true], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Contradictory: says call brother again and request recall before sending."}
+{"id": "j237", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No warning about entering NIN/BVN."}
+{"id": "j238", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": "Odd bank-complaint step but fine."}
+{"id": "j239", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Never explicitly says don't release USDT; no platform appeal."}
+{"id": "j240", "lang": "pcm", "advise": [false, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "User's own login alert labelled scam; English to Pidgin user."}
+{"id": "j241", "lang": "en", "advise": [true, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Normal pending-transfer notice labelled scam."}
+{"id": "j242", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No platform appeal or fake receipt warning."}
+{"id": "j243", "lang": "yo", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "Green 'no scam' verdict, misreads as received money; steps okay."}
+{"id": "j244", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No mention of driver pressure tactic."}
+{"id": "j245", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Greeting only; message not answered."}
+{"id": "j246", "lang": "en", "advise": [false, false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Invented WhatsApp password step; misses reinstall, 2FA, warn contacts."}
+{"id": "j247", "lang": "ig", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Blocked card mislabelled scam with mistaken-transfer advice."}
+{"id": "j248", "lang": "yo", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Greeting only; message not answered."}
+{"id": "j249", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Legit school fee answered with transfer-recall steps."}
+{"id": "j250", "lang": "en", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Greeting only; message not answered."}
+{"id": "j251", "lang": "ha", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Generic caution; no call-back on usual number or voice-fake warning."}
+{"id": "j252", "lang": "ig", "advise": [false, true], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No coverage amounts by licence type."}
+{"id": "j253", "lang": "en", "advise": [true, false], "violations": ["This is a scam"], "grade": "harmful", "reply_lang_ok": true, "note": "Genuine salary alert labelled scam."}
+{"id": "j254", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Loan-rights question mislabelled scam with mistaken-transfer advice."}
+{"id": "j255", "lang": "en", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "No bank-recall route for genuine mistaken transfer."}
+{"id": "j256", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
+{"id": "j257", "lang": "pcm", "advise": [true, false], "violations": [], "grade": "acceptable", "reply_lang_ok": true, "note": "English to Pidgin user; 'verify before paying' softer than never pay."}
+{"id": "j258", "lang": "pcm", "advise": [false, false], "violations": [], "grade": "poor", "reply_lang_ok": true, "note": "Mistaken-transfer template; no call-pastor or person-name red flag."}
+{"id": "j259", "lang": "en", "advise": [true, true], "violations": [], "grade": "good", "reply_lang_ok": true, "note": ""}
