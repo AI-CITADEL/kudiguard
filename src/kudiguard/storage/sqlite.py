@@ -612,6 +612,10 @@ def _reredact(db: sqlite3.Connection) -> None:
             "INSERT INTO meta VALUES ('redaction_version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
             (str(REDACTION_VERSION),),
         )
+    # secure_delete overwrites freed cells, but old values can still sit in a page's unallocated space: VACUUM
+    # rebuilds the file once, then the WAL it wrote is checkpointed and truncated too.
+    _checkpoint(db)
+    db.execute("VACUUM")
     _checkpoint(db)
 
 

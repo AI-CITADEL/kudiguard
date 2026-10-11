@@ -278,7 +278,7 @@ max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min**
 |---|---|---|---|---|
 | `safety/scam_rules.py` | 119 (+33 in annotations) | 86.6% | **95.0%** | 6 |
 | `safety/decision.py` | 116 (+11) | 76.7% | **93.1%** | 8 |
-| `text.py` (redact) | 99 → 2,121 ¹ | 55.6% | **86.0% → ~92.7%** ³ | 297 → 156 |
+| `text.py` (redact) | 99 → 2,121 ¹ | 55.6% | **86.0%** measured (1,824 of 2,121) ³ | 297 |
 | `privacy.py` | 80 | 65.0% | **93.8%** | 5 |
 | `donation.py` | 474 (+33) | 77.2% | **90.1%** | 47 |
 | `commands.py` | 80 (+11) | 70.0% | **85.0%** | 12 |
@@ -289,24 +289,25 @@ max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min**
 | **All ten** | **2,034 → 2,852** (round 3) | **75.3%** | **93.1%** (round 3) ⁵ | 197 (round 3) |
 | `storage/export.py` ² | 48 (+33) | – | **100%** | 0 |
 | `storage/sqlite.py` ² | 486 (+110) | – | **92.8%** | 35 |
-| `storage/legacy.py` ² | 153 | – | **73.2%** ⁴ | 41 |
+| `storage/legacy.py` ² | 153 | – | **73.2%** measured ⁴ | 41 |
 
 ¹ After the redaction rebuilds below (round 4: a new, larger module, so more mutants). ² Added with the rebuild
-(re-redaction of stored rows). ³ Measured 86.0% on the round-4 code (1,794 killed + 30 timeouts of 2,121); the 297
+(re-redaction of stored rows). ³ Measured 86.0% on the round-4 code (1,794 killed + 30 timeouts = 1,824 of 2,121); the 297
 survivors were then triaged *differentially*: each survivor's `redact` was run against the original on the corpus,
 the review probes, 50,000 joined cases, 3,000 mixed texts and 120,000 random token mixes. 135 behaved differently on
 some input (65 of them leaked a digit the original masks); the shortest such input of each is now a test
 (`tests/fixtures/redaction_mutation_cases.json`, 76 inputs) and every one of the 135 was re-run against them and fails;
 7 more (the log filter's `id=` field bounds and the uvicorn-name check) are killed by new filter tests. The module was
-not re-run through cosmic-ray after that (wrap-up), so 92.7% is computed, not measured. The 156 left behave
-identically on all 170,000 inputs: `is` for `==` on interned strings and small ints; `<` → `!=` on indexes that step
-by one to their bound; `*` → `/` in keyword-only signatures; `REDACTION_VERSION` ± 1; look-behind windows wider or
-narrower than any prefix that matches (`start - 4` for a currency, `- 16` for "IP", `- 2` for a clock); regex bounds
-the run pattern cannot reach (an empty decimal tail, `{0,3}` separators); the USSD look-behind (one start per code:
-it keeps the scan linear — the "ngn6.78287,16,4178 0055" leak the verifier found for it in c9c0fdd is now a test and
-masked by the rewrite); arithmetic in `_widen`'s bracket balance (a masked span holds at most one unbalanced bracket);
-the email blanking loop (an address's digits are inside its `[email]` span either way). They are not individually
-proven equivalent; the list is in `var/mutation/text-survivors.txt`. ⁴ `legacy.py` is the frozen b4f96f8 code plus
+not re-run through cosmic-ray after that, so **the measured figure stays 86.0%**; a computed 92.7% would assume every
+remaining survivor is equivalent, and that does not hold: the verifier spot-checked 12 of the 156 that behaved
+identically on all 170,000 inputs and found 4 that are *not* equivalent (an IPv4 written with spaces after "IP", the
+16-character "IP" window, a dotted time of three groups before a mobile number, a list of small numbers joined by ","
+without a space); all four are now tests, and none was a leak of the current code (each mutant masks less). The
+other 152 are unclassified: likely-equivalent kinds are `is` for `==` on interned strings and small ints, `<` → `!=`
+on indexes that step by one to their bound, `*` → `/` in keyword-only signatures and `REDACTION_VERSION` ± 1; the
+rest (window sizes of the look-behind searches, regex bounds, the USSD look-behind, `_widen`'s bracket arithmetic,
+the email blanking loop) are *not* shown equivalent — they only showed no difference on the inputs tried. The list
+is in `var/mutation/text-survivors.txt`. ⁴ `legacy.py` is the frozen b4f96f8 code plus
 the leftover-digit merge; measured with the golden fixture (`legacy_v1_golden.json`: b4f96f8's own output for 1,784
 inputs); its remaining survivors are regex bounds and look-behinds of the frozen v1 patterns that no recorded input
 distinguishes (they would only change which old example matches which check, in databases written by b4f96f8), the
@@ -398,7 +399,7 @@ number takes its `+`, brackets and keycaps along.
 32,000-character realistic message (phone, account, amount, time, date and email repeated) `redact` takes ~48 ms; the
 verifier's 30 pathological shapes of 32,000 characters (`perf2.py`) take 32–97 ms each (the slowest: a run of times),
 and runs of 3,000 dates, times or years (33,000 characters, `rec.py`) under 55 ms. The unit test bounds runs of dates, ranges, times, years,
-amounts, comma lists, decimals and numbers of 64,000 characters at 1 s each (they take < 0.2 s). Inbound text is cut
+amounts, comma lists, decimals and numbers of 64,000 characters at 3 s each (they take < 0.2 s). Inbound text is cut
 to `MAX_INBOUND_CHARS` = 8,000 in the pipeline before it is matched, checked, redacted or stored (the engine reads
 only the first `MAX_INPUT_CHARS` = 2,000 and WhatsApp sends at most 4,096, so the scam semantics do not change): a
 message costs at most ~26 ms (8,000 characters of times; ~12 ms realistic), five merged messages ~130 ms.
@@ -417,8 +418,12 @@ derives it; an example without a source (history already erased or expired) is d
 including the hosts of links an older release reduced (`[link: pay-0803.123.4567.ng]` → `[link]`) and addresses
 before them (`j @ [link: x.com]` → `[email]`). Checked on a database written by b4f96f8's own code
 (`tests/fixtures/legacy_b4f96f8.db`: two users, 22 checks with every spelling the old patterns missed): after the open
-no identifier, `@` or digit in a link host is left at rest (only amounts, years, dates and times; the files' free pages
-and WAL included), and DELETE removes 22 of 22 examples. The memory store holds nothing older than the process.
+no identifier, `@` or digit in a link host is left in the stored values (only amounts, years, dates and times), and
+DELETE removes 22 of 22 examples. **Correction (round-4 verification):** c2b323e claimed free pages were clean, but
+with secure_delete alone 44 of the 88 rewritten old values were still in the file's bytes (unallocated space of a
+page that kept live rows). The open now runs `VACUUM` once after the rewrite (WAL checkpointed before and after), and
+the test scans every byte of the database, WAL and shared-memory files right after the open for every rewritten old
+value (it finds the 44 without the VACUUM). The memory store holds nothing older than the process.
 
 Logs: **correction** — c9c0fdd put `RedactingFilter` on the root logger's handlers only, but uvicorn's own loggers
 (`uvicorn`, `uvicorn.error`, `uvicorn.access`) do not propagate to the root, so an ASGI exception traceback or an
@@ -430,7 +435,7 @@ checks a traceback quoting 08031234567 and an access path. The filter formats th
 exception and stack text, and never raises (a record whose arguments do not fit is replaced by a fixed line).
 
 **Old-vs-new check (mandatory before a redaction change):** `tests/fixtures/redaction_corpus.yaml` holds every probe
-of the three reviews and of the unit tests (507 cases, `expect: masked|kept`, digits allowed to remain listed); a unit
+of the three reviews and of the unit tests (532 cases, `expect: masked|kept`, digits allowed to remain listed); a unit
 test asserts each. `python scripts/redaction_compare.py` compares b4f96f8's `redact` with the current one on the
 corpus (every digit the old one masked must stay masked, except 10 cases marked `changed:` with the reason: years, two
 dates, a date and a time, the minutes or hour of a time next to a masked number, a date after a masked number) and
@@ -444,6 +449,19 @@ currency sign ("₦ 8 031 234 567") or like a dotted quad after "IP" is read as 
 with a fully written date followed by a space and a group of 3+ digits ("2001.03.05 0234 5678 90") keeps the date
 part (b4f96f8 kept "2001.03." and masked the rest): undecidable from "10-10-2026 0803 123 4567", which must keep the
 date.
+
+**Round-4 verification fixes (c2b323e → this commit).** "X at Y" is an address only when Y is a mail provider or
+written with " dot " ("Login at gtbank-verify.com", "Apply at bit.ly/…" stay links; c2b323e read them as emails), and
+`deidentify` reads "X at [link: …]" as an address only for a provider. One-time codes: "code", "verification code"
+and "one-time password" name a secret, and a value before its name counts ("Use 652-137 as your one-time
+password", "482913 is your code", "Ur code: 48 29 13", "verification code 4829"); amounts and times next to them are
+kept ("N5,000 is your code", "code expires at 10:30"); a promo code with digits ("promo code 2024") is masked too.
+Log ids are exempt only with a hex letter or 16+ characters ("id=08031234567" is masked). **Still open, documented:**
+runs of 9 digits or fewer ("0803 12 34 5"), a 13-digit number written as a comma amount ("1,234,567,890,123"), groups
+split by letters or HTML tags ("a0803 b123 c4567", "<b>0803</b>123…"), digits split by emoji or bullets
+("0803😊123😊4567", "0803 • 123 • 4567"), percent-encoded digits in access-log paths, "₦5,000.00 482913" (masked,
+but the amount's decimals go with the code), "Expires 10/2026" (masked as a card expiry even without card words),
+and `legacy._absorb` merging only digits joined by spaces or "-".
 
 **Equivalent or accepted survivors** (197 in the ten modules): *identity-equivalent* — `is`/`==` on enums, interned literals and small
 ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`

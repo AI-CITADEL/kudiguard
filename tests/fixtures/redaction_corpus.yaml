@@ -587,7 +587,7 @@
 - text: acct 123456 ok
   expect: masked
 - text: code 12345 ok
-  expect: kept
+  expect: masked
 - text: acct 1234567890 kindly
   expect: masked
 - text: N 0803123456
@@ -1001,7 +1001,51 @@
   expect: masked
 - text: ade@gmail
   expect: masked
-- text: 3fa9ec8201bd
+- text: turn=12345678ab ok
+  expect: masked
+- text: turn=1234567ab ok
+  expect: masked
+- text: turn=1234567890123456 ok
+  expect: masked
+- text: id=08031234567 ok
+  expect: masked
+- text: xid=1234567890ab ok
+  expect: masked
+- text: id=1234567890abx ok
+  expect: masked
+- text: Login at gtbank-verify.com to unlock
+  expect: kept
+- text: register at cbn-grant.ng
+  expect: kept
+- text: Apply at bit.ly/fg-grant
+  expect: kept
+- text: mail ade at gmail.com
+  expect: masked
+- text: mail john at company dot com
+  expect: masked
+- text: Use 652-137 as your one-time password
+  expect: masked
+- text: Your verification code is 5 8 7 2 8 4
+  expect: masked
+- text: 'Ur code: 48 29 13'
+  expect: masked
+- text: Code 4829-13 expires in 10 minutes
+  expect: masked
+  keep:
+  - '10'
+- text: verification code 4829
+  expect: masked
+- text: your code is 48291
+  expect: masked
+- text: 482913 is your code
+  expect: masked
+- text: code expires at 10:30
+  expect: kept
+- text: N5,000 is your code
+  expect: kept
+- text: pay 5000 using code
+  expect: kept
+- text: 10:30 is the code time
   expect: kept
 - text: call 8 031 234 567 now
   expect: masked
@@ -1106,6 +1150,22 @@
   - '1.5'
 - text: call 8 031 234 567
   expect: masked
+- text: 12 apples and [number]
+  expect: masked
+  keep:
+  - '12'
+- text: '[number] now and 1234'
+  expect: masked
+  keep:
+  - '1234'
+- text: 1234 [number]
+  expect: masked
+  keep:
+  - '1234'
+- text: '[number] 1234'
+  expect: masked
+  keep:
+  - '1234'
 - text: kira sifili takwas sifili uku daya biyu uku hudu biyar shida bakwai
   expect: masked
 - text: pe òdo ẹ̀jọ òdo ẹ̀ta ọ̀kan èjì ẹ̀ta ẹ̀rin àrún ẹ̀fà èje

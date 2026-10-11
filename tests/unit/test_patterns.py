@@ -365,6 +365,9 @@ def test_digit_runs_redact_keeps_are_masked_in_hosts() -> None:
         ("john(at)[link: gmail.com]", "[email]"),
         ("ade at [link: yahoo.com] now", "[email] now"),
         ("see [link: x.com] now", "see [link: x.com] now"),
+        ("Login at gtbank-verify.com to unlock", "Login at [link: gtbank-verify.com] to unlock"),
+        ("Apply at bit.ly/fg-grant", "Apply at [link: bit.ly]"),
+        ("pay at [link: gtb.com] ok", "pay at [link: gtb.com] ok"),  # a word before "at" is not an address
         (
             "see [link: x.com] call 08031234567 now",
             "see [link: x.com] call [number] now",

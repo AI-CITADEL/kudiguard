@@ -173,6 +173,11 @@ async def test_a_database_from_an_older_release_is_redacted_again_on_open(tmp_pa
     assert not files_containing(tmp_path, b"031 234 567")  # nor in free pages or the WAL file
 
 
+def all_bytes(folder: Path) -> bytes:
+    """The database, WAL and shared-memory files, raw."""
+    return b"".join(f.read_bytes() for f in sorted(folder.glob("kg.db*")))
+
+
 def files_containing(folder: Path, needle: bytes) -> list[Path]:
     return [f for f in folder.glob("kg.db*") if needle in f.read_bytes()]
 
@@ -320,25 +325,46 @@ LEGACY_SECRETS = (
 )  # fmt: skip
 
 
+LEGACY_COLUMNS = (
+    ("interactions", "transcript, english, reply, error"),
+    ("voice_samples", "hypothesis"),
+    ("scam_patterns", "text, english"),
+)
+
+
+def stored_values(db: Path) -> list[str]:
+    with sqlite3.connect(db) as raw:
+        values = [
+            value
+            for table, columns in LEGACY_COLUMNS
+            for row in raw.execute(f"SELECT {columns} FROM {table}")
+            for value in row
+            if value
+        ]
+    raw.close()
+    return values
+
+
 async def test_a_database_written_by_the_b4f96f8_release_is_migrated(tmp_path: Path) -> None:
-    """Built with b4f96f8's own code (two users, 22 checks with every spelling the old patterns missed): after the
-    open nothing identifying is at rest, and DELETE removes every example taken from each user's messages."""
+    """Built with b4f96f8's own code (two users, 22 checks with every spelling the old patterns missed): right after
+    the open no old value that was rewritten is left anywhere in the files (database, WAL, shared memory: free pages
+    and unallocated space included), nothing identifying is at rest, and DELETE removes every example taken from
+    each user's messages."""
     db = tmp_path / "kg.db"
     db.write_bytes(LEGACY_DB.read_bytes())
+    old = stored_values(db)
     store = await SQLiteStore.open(db, hasher=UserHasher(b"k" * 32))
     try:
+        texts = stored_values(db)
+        rewritten = sorted({v for v in old if v not in texts and v not in "".join(texts)})
+        assert len(rewritten) >= 40
+        raw_bytes = all_bytes(tmp_path)
+        assert [v for v in rewritten if v.encode("utf-8") in raw_bytes] == []
+        identifiers = [
+            s for s in LEGACY_SECRETS if len(s) > 1
+        ]  # a lone "@" or digit also occurs in page headers
+        assert not [s for s in identifiers if s.encode("utf-8") in raw_bytes]
         with sqlite3.connect(db) as raw:
-            texts = [
-                value
-                for table, columns in (
-                    ("interactions", "transcript, english, reply, error"),
-                    ("voice_samples", "hypothesis"),
-                    ("scam_patterns", "text, english"),
-                )
-                for row in raw.execute(f"SELECT {columns} FROM {table}")
-                for value in row
-                if value
-            ]
             patterns = raw.execute("SELECT count(*) FROM scam_patterns").fetchone()[0]
         raw.close()
         assert patterns == 22 and len(texts) == 140

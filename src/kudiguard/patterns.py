@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from kudiguard.domain import Flag, LanguageCode, Verdict
-from kudiguard.text import redact
+from kudiguard.text import _PROVIDERS, redact
 
 PATTERN_RETENTION_DAYS = 730
 MAX_PATTERN_CHARS = 2000
@@ -46,9 +46,12 @@ _MASKED_URL = re.compile(
     r"(?i)\b(?:https?|ftp)://(?:\S*\[email\]|[^\s/?#]*\[number\])\S*"
 )  # credentials, a number in the host
 _LINK_MARKER = re.compile(r"(\[link(?:: [^\]\s]*)?\])")  # a link already reduced: not read as text again
-# An address whose domain an older release reduced to a link ("j @ [link: x.com]", "john(at)[link: gmail.com]").
+# An address whose domain an older release reduced to a link ("j @ [link: x.com]", "john(at)[link: gmail.com]"),
+# "ade at [link: gmail.com]" only with a mail provider: never "login at [link: x.com]".
 _EMAIL_BEFORE_LINK = re.compile(
-    r"(?i)(?<![\w.+-])(?:[\w.+-]+|\"[^\"\n]+\")(?:\s*(?:@|\(at\)|\[at\]|\{at\}|<at>)\s*|\s+at\s+)\[link: [^\]\s]*\]"
+    r"(?i)(?<![\w.+-])(?:[\w.+-]+|\"[^\"\n]+\")(?:\s*(?:@|\(at\)|\[at\]|\{at\}|<at>)\s*\[link: |\s+at\s+\[link: (?="
+    + _PROVIDERS
+    + r"\.))[^\]\s]*\]"
 )
 
 

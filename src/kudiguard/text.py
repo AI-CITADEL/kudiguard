@@ -55,7 +55,9 @@ _AT = r"(?:@|\(at\)|\[at\]|\{at\}|<at>)"
 _DOT = r"(?:\.|,|\(dot\)|\[dot\]|\{dot\}|<dot>)"
 _EMAIL = re.compile(
     rf"(?<![\w.+-])(?:[\w.+-]+|\"[^\"\n]+\")\s*{_AT}\s*(?:[\w-]+(?:\s*{_DOT}\s*[\w-]+)+|\[[\d.:a-f]+\]|{_PROVIDERS}\b)"
-    rf"|(?<![\w.+-])[\w.+-]+\s+at\s+[\w-]+(?:(?:\s+dot\s+|\.)[\w-]+)*(?:\s+dot\s+|\.){_TLD}(?![\w-])"
+    # "X at Y" only with a mail provider or a spelled " dot ": never "login at gtbank-verify.com", "apply at bit.ly"
+    rf"|(?<![\w.+-])[\w.+-]+\s+at\s+(?:{_PROVIDERS}(?:(?:\s+dot\s+|\.)[\w-]+)*(?:\s+dot\s+|\.){_TLD}"
+    rf"|[\w-]+(?:\s+dot\s+[\w-]+)*\s+dot\s+{_TLD})(?![\w-])"
 )  # on the view: "john(at)gmail.com", "j @ x.com", "ade@gmail.com" in full width, "ade@gmail,com", "… at gmail dot com", "ade@gmail"
 _ZERO_WIDTH_CATEGORIES = frozenset({"Cc", "Cf"})
 _MINUS = chr(0x2212)
@@ -75,14 +77,19 @@ _WORD = "|".join(
 _SPELLED_DIGITS = re.compile(rf"(?<![a-z0-9])(?:{_WORD}|\d+)(?:[ ,.\-]+(?:{_WORD}|\d+))+(?![a-z0-9])")
 _SPELLED_TOKEN = re.compile(rf"{_WORD}|\d+")
 _MIN_SPELLED_DIGITS = 7
-# Short secrets named as such: "cvv 123", "PIN: 1234", "pin na 1 2 3 4", "OTP is 482-913", "token 4829", "exp 09/28".
+# Short secrets named as such: "cvv 123", "PIN: 1234", "pin na 1 2 3 4", "OTP is 482-913", "token 4829", "exp 09/28",
+# codes ("verification code 4829", "Ur code: 48 29 13", "Use 652-137 as your one-time password").
 _SECRET = re.compile(
-    r"(?<![a-z0-9\]])(?:cvv2?|cvc2?|pin|otp|password|passcode|pass code|security code|token)[\s:=#-]*"
+    r"(?<![a-z0-9\]])(?:cvv2?|cvc2?|pin|otp|password|passcode|pass code|security code|token|code"
+    r"|one[ -]time password)[\s:=#-]*"
     r"(?:(?:is|was|na|be|dey|e)\s+)?(?P<value>\d(?:[ .\-]?\d){2,}|(?:"
     + _WORD
     + r")(?:[ ,\-]+(?:"
     + _WORD
     + r")){2,})"
+    # the value before its name: "Use 652-137 as your one-time password", "482913 is your code"
+    r"|(?<![\w.,])(?P<before>\d(?:[ .\-]?+\d){2,11}+)\s+(?:(?:is|as)\s+)?(?:(?:your|the)\s+)?"
+    r"(?:one[ -]time password|otp|code|pin|passcode|password|token)(?![a-z])"
     r"|(?<![a-z0-9\]])(?:exp|expiry|expires|expiry date)[\s:.-]*(?P<expiry>\d\d?\s?/\s?\d\d(?:\d\d)?)(?!\d)"
 )
 # USSD codes ("*737*1*500000#"): one start per code (the look-behind), fields without trailing spaces: linear.
@@ -120,7 +127,11 @@ _IP_BEFORE = re.compile(
 _TOKEN_BREAK = re.compile(r"[ ]*,[ ]+|[ ]+")
 _CLOCK_BEFORE = re.compile(r"\d:$")  # "10:|30 0803…"
 _CLOCK_AFTER = re.compile(r":\d\d")  # "…4567 10|:30"
-_ID_FIELD = re.compile(r"\b(?:turn|user|msg|message|interaction|review|sample|id|key|hash)=[0-9a-f]{10,64}\b")
+# A hashed id after a known key: hex with a letter, or 16+ characters; never a number ("id=08031234567").
+_ID_FIELD = re.compile(
+    r"\b(?:turn|user|msg|message|interaction|review|sample|id|key|hash)="
+    r"(?:(?=[0-9]*[a-f])[0-9a-f]{10,64}|[0-9a-f]{16,64})\b"
+)
 
 
 def _detection_chars(ch: str) -> str:
@@ -411,7 +422,7 @@ def _number_spans(view: str) -> list[tuple[int, int]]:
         if count >= _MIN_SPELLED_DIGITS and not all(t.isdigit() for t in tokens):
             spans.append((spelled.start(), spelled.end()))
     for secret in _SECRET.finditer(view):
-        name = "value" if secret["value"] else "expiry"
+        name = next(n for n in ("value", "before", "expiry") if secret[n])
         spans.append((secret.start(name), secret.end(name)))
     return spans
 
