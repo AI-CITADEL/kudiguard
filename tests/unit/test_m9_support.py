@@ -259,16 +259,19 @@ async def test_build_services_fails_fast_and_cleans_up(tmp_path: Path) -> None:
 
 async def test_purge_loop_runs_and_survives_errors() -> None:
     calls: list[str] = []
+    second_pass = asyncio.Event()
 
     class Store:
         async def purge_before(self, cutoff: object) -> int:
             calls.append("purge")
             if len(calls) == 1:
                 raise RuntimeError("locked")
+            second_pass.set()
             return 3
 
     task = asyncio.create_task(purge_loop(Store(), 90, interval_s=0.01))  # type: ignore[arg-type]
-    await asyncio.sleep(0.05)
+    async with asyncio.timeout(10):  # waits for the second pass, not a fixed time: no flake under load
+        await second_pass.wait()
     task.cancel()
     assert len(calls) >= 2
 
