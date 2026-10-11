@@ -903,3 +903,30 @@ async def test_licence_cap_is_project_wide(h: Harness) -> None:
             )
         )
     assert await h.say("hello") == [h.t(Msg.AT_CAPACITY)]
+
+
+async def test_grounding_hook_gets_a_hashed_turn_id_never_the_provider_id(
+    h: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    from kudiguard.api.services import log_grounding
+    from kudiguard.safety.grounding import GroundingReport
+
+    class Stub:
+        def supports(self, language: str) -> bool:
+            return True
+
+        async def check(self, *args: object, **kwargs: object) -> GroundingReport:
+            return GroundingReport("x", ())
+
+    seen: list[str | None] = []
+    h.engine.grounding = Stub()  # type: ignore[assignment]
+    h.engine.on_grounding = lambda turn_id, report, ms: (
+        seen.append(turn_id),
+        log_grounding(turn_id, report, ms),
+    )
+    await h.onboard()
+    with caplog.at_level("INFO"):
+        await h.conversation.handle(h.msg(OTP_SCAM, message_id="wamid.HBgNMjM0ODAzMTIzNDU2NxUCABIYFjNFQjA"))
+        await h.engine.aclose()
+    assert seen == [h.hasher.message_key("whatsapp", "wamid.HBgNMjM0ODAzMTIzNDU2NxUCABIYFjNFQjA")]
+    assert "wamid" not in caplog.text and "2348031234567" not in caplog.text

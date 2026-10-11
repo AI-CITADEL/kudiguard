@@ -25,6 +25,20 @@ output_guard:
     - 'enweghi ihe ize ndu'
   refusals:
     - 'enweghi m ike inyere'
+  # DRAFT, native review pending. Positive imperatives only: negative ones are different words ("enyela", "akwula").
+  unsafe_instructions:
+    - '(?:zite|ziga|nye|gwa)\W+(?:(?:ha|ya|onye)\W+)?(?:\w+\W+)?(?:otp|pin|bvn|koodu|okwuntughe|code)'
+    - 'kwuo\W+(?:\w+\W+)?(?:fee|ugwo nhazi|ugwo ndebanye)'
+    - '(?:pia|meghe)\W+(?:\w+\W+)?link'
+    - '(?:budata|wunye)\W+(?:anydesk|teamviewer|\w*apk)'
+    - '(?:budata|wunye)\W+(?:\w+\W+)?app(?!.*(?:play store|app store|google play|ulo aku))'
+    - '(?:zighachi|weghachi|nyeghachi)\W+(?:\w+\W+)?ego'
+  instruction_prefixes:
+    - '(?:biko|ugbu|ozugbo)'
+  negations:
+    - '(?:ekwela|agaghi|ebula)'
+  clause_breaks:
+    - '(?:mana)'
 
 lexicon:
   flags:

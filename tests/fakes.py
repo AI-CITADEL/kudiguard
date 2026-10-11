@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+import zlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from kudiguard.domain import InboundMessage
+from kudiguard.knowledge.embeddings import Matrix, l2_normalize
 from kudiguard.llm.base import ChatRequest, Completion, LLMError, Purpose
 from kudiguard.pipeline import Outbound
 from kudiguard.speech.base import Audio, Transcript
@@ -65,6 +70,30 @@ class FakeLLM:
 
     async def ready(self) -> bool:
         return True
+
+
+class BagOfWordsEmbedder:
+    """Embedder stand-in: hashed bag of lower-case words, L2-normalised. Same words -> cosine 1, none shared -> 0."""
+
+    DIM = 512
+
+    def __init__(self) -> None:
+        self.batches: list[list[str]] = []
+
+    def _vector(self, text: str) -> Matrix:
+        vector = np.zeros(self.DIM, dtype=np.float32)
+        for word in re.findall(r"\w+", text.lower()):
+            vector[zlib.crc32(word.encode()) % self.DIM] += 1.0
+        return vector
+
+    def embed_documents(self, texts: Sequence[str]) -> Matrix:
+        self.batches.append(list(texts))
+        if not texts:
+            return np.zeros((0, 0), dtype=np.float32)
+        return l2_normalize(np.stack([self._vector(t) for t in texts]))
+
+    def embed_query(self, text: str) -> Matrix:
+        return l2_normalize(self._vector(text))
 
 
 class FakeASR:

@@ -26,6 +26,21 @@ output_guard:
     - 'ko si ewu'
   refusals:
     - 'mi o le ran'
+  # DRAFT, native review pending. "e"/"o" + verb at the clause start; negated forms ("e ma se fi") do not match.
+  unsafe_instructions:
+    - '(?:e|o)\W+fi\W+(?:\w+\W+){0,2}?(?:koodu|otp|pin|bvn|oro asina|code)\W+(?:\w+\W+)?ranse'
+    - '(?:e|o)\W+fun\W+(?:won|un|oun|enikeni)\W+ni\W+(?:\w+\W+)?(?:koodu|otp|pin|bvn|oro asina|code)'
+    - '(?:e|o)\W+san\W+(?:\w+\W+){0,3}?fees?'
+    - '(?:e|o)\W+(?:te|si)\W+(?:ori\W+)?(?:\w+\W+)?link'
+    - '(?:e|o)\W+(?:download|gba|ko)\W+(?:anydesk|teamviewer|\w*apk)'
+    - '(?:e|o)\W+(?:download|gba|ko)\W+(?:\w+\W+)?app(?!.*(?:play store|app store|google play|banki yin))'
+    - '(?:e|o)\W+(?:da|fi)\W+(?:\w+\W+){0,2}?owo\W+(?:naa\W+)?pada'
+  instruction_prefixes:
+    - '(?:jowo|bayi|lesekese|nisisiyi)'
+  negations:
+    - '(?:ma|se|mase|ko|kii)'
+  clause_breaks:
+    - '(?:ati|sugbon)'
 
 lexicon:
   flags:

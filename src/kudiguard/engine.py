@@ -4,8 +4,10 @@ Stateless and channel-agnostic: WhatsApp, the web page, the public REST API and 
 the same engine. Conversation state, consent, commands and rendering live in ``kudiguard.pipeline``.
 
 Flow (PLAN §3): greeting/content-free shortcut → ANALYSE (N-ATLAS, JSON) → translate fallback → deterministic verdict
-policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → fixed
-fallback text. The model never decides the verdict and never writes contacts; it can only make the answer better.
+policy (``safety.decision``) → knowledge search → COMPOSE (N-ATLAS) → clean + output guard, retry once → grounding
+check (``safety.grounding``; shadow: run after the reply, logged; enforce: unsupported steps dropped or fixed
+text, no retry).
+The model never decides the verdict and never writes contacts; it can only make the answer better.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import asyncio
 import dataclasses
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -26,7 +28,7 @@ from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.models import Contact, KnowledgeResult, Query
 from kudiguard.knowledge.service import KnowledgeBase
 from kudiguard.languages import PIVOT, LanguageRegistry
-from kudiguard.llm.base import DEFAULT_TIMEOUTS, LLM, ChatRequest, Completion, LLMError
+from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_within
 from kudiguard.prompts import (
     MAX_ENTRIES,
     MAX_STEPS,
@@ -43,17 +45,29 @@ from kudiguard.prompts import (
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
+from kudiguard.safety.grounding import (
+    GroundingChecker,
+    GroundingMode,
+    GroundingReport,
+    evidence_for,
+    without_unsupported_steps,
+)
+from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier, is_pidgin
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
 from kudiguard.speech.base import ASR
 from kudiguard.speech.service import SpeechResult, transcribe_upload
 
 log = logging.getLogger(__name__)
 
+GroundingHook = Callable[[str | None, GroundingReport | None, int], None]
+
 RETRY_TEMPERATURE = 0.5  # a retry at the base temperature (0, greedy) would repeat the blocked output exactly
 # Minimum time left in the turn to start a model step (else: skip it and use the deterministic/fixed path).
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
 MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
+SHADOW_DRAIN_S = 1.0  # shutdown wait for shadow checks when the checker has no budget
+MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
 
 
 class AnswerKind(StrEnum):
@@ -77,6 +91,9 @@ class Answer:
     sources: tuple[str, ...] = ()  # knowledge entry ids used for grounding
     issues: tuple[OutputIssue, ...] = ()  # output-guard findings that forced a retry or fallback
     llm_ms: int = 0
+    grounding_ms: int = 0  # wall time the grounding check added (0 = not run), separate from model time
+    grounded: bool | None = None  # grounding verdict on the composed reply (None = not checked)
+    unsupported_claims: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +122,12 @@ class Engine:
         ffmpeg: str | None = None,
         temp_dir: Path | None = None,
         max_concurrent_transcriptions: int = 4,
+        grounding: GroundingChecker | None = None,
+        grounding_mode: GroundingMode = GroundingMode.SHADOW,
+        on_grounding: GroundingHook | None = None,
+        classifier: UnsafeAdviceClassifier | None = None,
+        classifier_mode: ClassifierMode = ClassifierMode.SHADOW,
+        classifier_pidgin_mode: ClassifierMode | None = None,
     ) -> None:
         self.registry = registry
         self.messages = Messages(registry)
@@ -117,6 +140,20 @@ class Engine:
         self._ffmpeg = ffmpeg
         self._temp_dir = temp_dir
         self._guard = OutputGuard(registry)
+        self.grounding = grounding if grounding_mode is not GroundingMode.OFF else None
+        self.grounding_mode = grounding_mode
+        # Hook for persisting results (e.g. onto the stored interaction): called with (turn_id, report, ms) after
+        # every check, also the shadow checks that finish after the reply was sent.
+        self.on_grounding = on_grounding
+        # Pidgin replies arrive as "en": ``classifier_pidgin_mode`` (None = the same mode) lets them run in shadow
+        # while English is enforced, or the other way round
+        self.classifier_mode = classifier_mode
+        self.classifier_pidgin_mode = (
+            classifier_mode if classifier_pidgin_mode is None else classifier_pidgin_mode
+        )
+        modes = {self.classifier_mode, self.classifier_pidgin_mode}
+        self.classifier = classifier if modes != {ClassifierMode.OFF} else None
+        self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
 
     @property
@@ -151,7 +188,9 @@ class Engine:
 
     # --- check --------------------------------------------------------------------------------------------
 
-    async def check(self, text: str, language: LanguageCode, *, deadline: float | None = None) -> Answer:
+    async def check(
+        self, text: str, language: LanguageCode, *, deadline: float | None = None, turn_id: str | None = None
+    ) -> Answer:
         """``deadline`` (``time.monotonic()`` seconds): model steps that no longer fit are skipped, so the
         deterministic verdict with fixed text is always delivered in time."""
         lexicon = self.registry.lexicon_for(language)
@@ -174,6 +213,8 @@ class Engine:
         verdict = assessment.verdict
         contacts = tuple(c for c in knowledge.contacts if c.verified) if verdict in REPORT_VERDICTS else ()
         generation = _Generation(unavailable=model_down)
+        report: GroundingReport | None = None
+        grounding_ms = 0
         if analysis.english and not model_down:
             request = compose_request(
                 language_name=self.registry.get(language).name,
@@ -183,6 +224,25 @@ class Engine:
                 knowledge=knowledge,
             )
             generation = await self._generate(request, language, deadline)
+            if generation.text is not None:
+                evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
+                self._classify_in_background(generation.text, language, turn_id)
+                if self.grounding_mode is GroundingMode.SHADOW:
+                    self._ground_in_background(generation.text, language, evidence, analysis.english, turn_id)
+                else:
+                    report, grounding_ms = await self._ground(
+                        generation.text, language, evidence, analysis.english, deadline, turn_id
+                    )
+                if (
+                    report is not None
+                    and not report.grounded
+                    and self.grounding_mode is GroundingMode.ENFORCE
+                ):
+                    generation.issues += (OutputIssue.UNGROUNDED,)
+                    trimmed = (
+                        without_unsupported_steps(generation.text, report) if language == PIVOT else None
+                    )
+                    generation.text = trimmed  # None: fixed fallback text
         body, outcome = generation.text, Outcome.ANSWERED
         if body is None:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
@@ -200,6 +260,9 @@ class Engine:
             sources=tuple(item.entry.id for item in knowledge.entries[:MAX_ENTRIES]),
             issues=generation.issues,
             llm_ms=ms + generation.ms,
+            grounding_ms=grounding_ms,
+            grounded=None if report is None else report.grounded,
+            unsupported_claims=0 if report is None else len(report.unsupported),
         )
 
     async def analyse(
@@ -232,13 +295,7 @@ class Engine:
 
     async def _complete(self, request: ChatRequest, deadline: float | None, minimum_s: float) -> Completion:
         """One model call capped to the time left; raises ``LLMError`` without calling when too little is left."""
-        if deadline is not None:
-            left = deadline - time.monotonic()
-            if left < minimum_s:
-                raise LLMError(f"{request.purpose}: skipped, {left:.1f}s left in the turn")
-            budget = min(request.timeout_s or DEFAULT_TIMEOUTS[request.purpose], left)
-            request = dataclasses.replace(request, timeout_s=budget)
-        return await self._llm.complete(request)
+        return await complete_within(self._llm, request, deadline, minimum_s)
 
     async def _generate(
         self, request: ChatRequest, language: LanguageCode, deadline: float | None = None
@@ -258,12 +315,128 @@ class Engine:
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(completion.text, truncated=completion.truncated)
             issues = self._guard.check(text, language)
-            if not issues:
+            if not any(self._blocks(i) for i in issues) and await self._classified_unsafe(text, language):
+                issues += (OutputIssue.CLASSIFIED_UNSAFE,)
+            if not any(self._blocks(i) for i in issues):
+                if issues:  # outcome claims outside enforce mode: recorded, not blocking (yet)
+                    log.info("%s outcome claim (log only): %s", request.purpose, issues)
+                    result.issues += issues
                 result.text = text
                 return result
             result.issues += issues
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
+
+    def _classifier_mode(self, text: str, language: LanguageCode) -> ClassifierMode:
+        if self.classifier is None or not self.classifier.supports(language):
+            return ClassifierMode.OFF
+        return self.classifier_pidgin_mode if is_pidgin(text) else self.classifier_mode
+
+    async def _classified_unsafe(self, text: str, language: LanguageCode) -> bool:
+        """Enforce mode only: the learned layer's verdict on a reply the regex guard let through. Waits in the
+        classifier's queue within its budget, then fails open."""
+        if self.classifier is None or self._classifier_mode(text, language) is not ClassifierMode.ENFORCE:
+            return False
+        try:
+            verdict = await self.classifier.check(text, language, wait=True)
+        except Exception as exc:  # optional layer: the regex verdict stands
+            log.warning("guard classifier not run, regex verdict only: %s", exc)
+            return False
+        log.info("guard_classifier mode=enforce flagged=%s p=%.2f ms=%d units=%d unscored=%d", verdict.flagged,
+                 verdict.probability, verdict.ms, verdict.scored, verdict.unscored)  # fmt: skip
+        return verdict.flagged
+
+    def _classify_in_background(self, text: str, language: LanguageCode, turn_id: str | None) -> None:
+        """Shadow mode: score the sent reply after the fact and log it (counts only, never the text)."""
+        classifier = self.classifier
+        if classifier is None or self._classifier_mode(text, language) is not ClassifierMode.SHADOW:
+            return
+
+        async def run() -> None:
+            try:
+                verdict = await classifier.check(text, language, wait=False)
+            except Exception as exc:
+                log.warning("guard classifier not run (shadow): %s", exc)
+                return
+            log.info("guard_classifier turn=%s mode=shadow flagged=%s p=%.2f ms=%d units=%d unscored=%d", turn_id,
+                     verdict.flagged, verdict.probability, verdict.ms, verdict.scored, verdict.unscored)  # fmt: skip
+
+        task = asyncio.create_task(run())
+        self._shadow.add(task)
+        task.add_done_callback(self._shadow.discard)
+
+    def _ground_in_background(
+        self, text: str, language: LanguageCode, evidence: Sequence[str], message: str, turn_id: str | None
+    ) -> None:
+        """Shadow mode: the check runs after the reply is sent, so it adds no time to the turn."""
+        if self.grounding is None or not self.grounding.supports(language):
+            return
+
+        async def run() -> None:
+            await self._ground(text, language, evidence, message, None, turn_id)
+
+        task = asyncio.create_task(run())
+        self._shadow.add(task)
+        task.add_done_callback(self._shadow.discard)
+
+    async def aclose(self) -> None:
+        """Let running shadow checks finish (bounded by the check's budget) before the checker shuts down."""
+        if self._shadow:
+            budgets = [getattr(self.grounding, "budget_s", None), getattr(self.classifier, "budget_s", None)]
+            budget = max((b for b in budgets if b), default=SHADOW_DRAIN_S)
+            _, pending = await asyncio.wait(set(self._shadow), timeout=budget)
+            for task in pending:  # shutting down: a check past its budget is not worth waiting for
+                task.cancel()
+
+    async def _ground(
+        self,
+        text: str,
+        language: LanguageCode,
+        evidence: Sequence[str],
+        message: str,
+        deadline: float | None,
+        turn_id: str | None = None,
+    ) -> tuple[GroundingReport | None, int]:
+        """The grounding check and its wall time in ms; None when it is off, unsupported, out of time or failed.
+
+        Fails open: the reply already passed cleaning and the output guard, so a check that cannot run must not
+        replace a good answer. An ungrounded reply is not retried: the same facts tend to produce the same invention
+        (and a warmer retry invents more); the fixed text is safe and immediate.
+        """
+        if self.grounding is None or not self.grounding.supports(language):
+            return None, 0
+        if deadline is not None and deadline - time.monotonic() < MIN_GROUNDING_S:
+            log.warning("grounding check skipped: too little time left in the turn")
+            return None, 0
+        start = time.perf_counter()
+        report: GroundingReport | None = None
+        try:
+            report = await self.grounding.check(text, language, evidence, message=message, deadline=deadline)
+        except Exception as exc:  # optional step: any failure (incl. its time cap) sends the guarded reply
+            if self.grounding_mode is GroundingMode.SHADOW:  # the reply has already gone out
+                log.warning("grounding check not run (shadow): %s", exc)
+            else:
+                log.warning("grounding check failed, sending the guarded reply: %s", exc)
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        log.info(
+            "grounding_ms=%d language=%s mode=%s grounded=%s unsupported=%d/%d min_support=%.2f",
+            elapsed_ms,
+            language,
+            self.grounding_mode,
+            None if report is None else report.grounded,
+            0 if report is None else len(report.unsupported),
+            0 if report is None else len(report.claims),
+            min((c.support for c in report.claims), default=1.0) if report else 0.0,
+        )
+        if self.on_grounding is not None:
+            try:
+                self.on_grounding(turn_id, report, elapsed_ms)
+            except Exception:
+                log.exception("grounding hook failed")
+        return report, elapsed_ms
+
+    def _blocks(self, issue: OutputIssue) -> bool:
+        return issue is not OutputIssue.OUTCOME_CLAIM or self.grounding_mode is GroundingMode.ENFORCE
 
     def _fallback_body(self, verdict: Verdict, language: LanguageCode) -> str:
         if verdict in REPORT_VERDICTS:

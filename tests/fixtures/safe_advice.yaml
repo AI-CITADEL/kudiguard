@@ -1,0 +1,51 @@
+# Safe advice restated in each language (from kudiguard-core actions): the output guard must never block these.
+# DRAFT: ha/yo/ig written by a non-native author, native review pending. Used by tests/unit/test_output_guard_unsafe.py.
+en:
+  - Do not share the code. End the call or chat.
+  - If you already shared it, call your bank immediately using the number on the back of your card.
+  - Change your PIN and password.
+  - Do not install the app. If you installed it, uninstall it now.
+  - Do not pay. Check if the company is registered on the SEC Nigeria website.
+  - Do not send any money back yourself.
+  - Check your balance in your bank app or by USSD, not from an SMS.
+  - Do not click. Type the official website yourself or use the official app.
+  - Never download apps from links. Use the Play Store or App Store.
+  - Tell someone you trust before you send money.
+ha:
+  - Kada ku ba da lambar. Ku katse kiran ko hirar.
+  - Idan kun riga kun bayar da ita, ku kira bankinku nan take ta lambar da ke bayan katinku.
+  - Ku canza PIN da kalmar sirrinku.
+  - Kada ku sauke manhajar. Idan kun sauke ta, ku cire ta yanzu.
+  - Kada ku biya. Ku duba ko kamfanin ya yi rajista a shafin SEC Nigeria.
+  - Kada ku mayar da wani kudi da kanku.
+  - Ku duba kudin da ke asusunku a manhajar bankinku ko ta USSD, ba daga SMS ba.
+  - Kada ku danna. Ku rubuta adireshin shafin hukuma da kanku ko ku yi amfani da manhajar hukuma.
+  - Kada ku taba sauke manhaja daga link. Ku yi amfani da Play Store ko App Store.
+  - Ku gaya wa wanda kuka amince da shi kafin ku tura kudi.
+  - Ku sauke manhajar bankinku daga Play Store kawai.
+  - Ku biya kudin makaranta da wuri.
+  - Ku tura lambar asusunku ga masu biyanku kawai.
+yo:
+  - Ẹ má ṣe fi kóòdù náà fún ẹnikẹ́ni. Ẹ pa ìpè tàbí ìfọ̀rọ̀wérọ̀ náà.
+  - Tí ẹ bá ti fi ránṣẹ́, ẹ pe báǹkì yín lẹ́sẹ̀kẹsẹ̀ ní nọ́ńbà tó wà lẹ́yìn káàdì yín.
+  - Ẹ yí PIN àti ọ̀rọ̀ aṣínà yín padà.
+  - Ẹ má ṣe gba app náà sílẹ̀. Tí ẹ bá ti gbà á, ẹ yọ ọ́ kúrò báyìí.
+  - Ẹ má ṣe sanwó. Ẹ ṣàyẹ̀wò bóyá ilé-iṣẹ́ náà forúkọ sílẹ̀ lórí ìkànnì SEC Nigeria.
+  - Ẹ má ṣe dá owó kankan padà fúnra yín.
+  - Ẹ wo iye owó tó wà nínú àkọọ́lẹ̀ yín nínú app báǹkì yín tàbí USSD, kì í ṣe láti SMS.
+  - Ẹ má ṣe tẹ̀ ẹ́. Ẹ tẹ àdírẹ́sì ìkànnì ìjọba fúnra yín tàbí kí ẹ lo app wọn.
+  - Ẹ má ṣe gba app láti inú link. Ẹ lo Play Store tàbí App Store.
+  - Ẹ sọ fún ẹni tí ẹ fọkàn tán kí ẹ tó fi owó ránṣẹ́.
+  - E gba app banki yin lati Play Store nikan.
+ig:
+  - Enyela koodu ahụ. Kwụsị oku ma ọ bụ mkparịta ụka ahụ.
+  - Ọ bụrụ na i nyelarị ya, kpọọ ụlọ akụ gị ozugbo site na nọmba dị n'azụ kaadị gị.
+  - Gbanwee PIN na okwuntughe gị.
+  - Ebudatala app ahụ. Ọ bụrụ na i budatala ya, wepụ ya ugbu a.
+  - Akwụla ụgwọ. Lelee ma ụlọ ọrụ ahụ debanyere aha na weebụsaịtị SEC Nigeria.
+  - Ezighachila ego ọ bụla n'onwe gị.
+  - Lelee ego dị n'akaụntụ gị n'ime app ụlọ akụ gị ma ọ bụ USSD, ọ bụghị site na SMS.
+  - Apịala ya. Pịnye adreesị weebụsaịtị gọọmentị n'onwe gị ma ọ bụ jiri app ha.
+  - Ebudatala app site na link. Jiri Play Store ma ọ bụ App Store.
+  - Gwa onye i tụkwasịrị obi tupu i zipu ego.
+  - Budata app ulo akụ gị na Play Store.

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -26,6 +27,9 @@ from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
+from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
+from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
+from kudiguard.safety.output_guard import OutputGuard
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
@@ -160,6 +164,90 @@ async def _purge_once(
     return removed
 
 
+def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) -> None:
+    """Per-turn grounding result for the shadow review (>= 100 real replies before enforce): counts only, no text.
+
+    ``turn_id`` is the hashed message key (``UserHasher.message_key``), never a raw provider id.
+    TODO(merge with E's pipeline): store grounded / unsupported_claims / grounding_ms on the turn's interaction row
+    (needs a store migration); until then the logs carry them, keyed by the hashed message key.
+    """
+    if report is None:
+        log.info("grounding turn=%s checked=no ms=%d", turn_id, ms)
+    else:
+        log.info("grounding turn=%s grounded=%s unsupported_claims=%d claims=%d ms=%d", turn_id, report.grounded,
+                 len(report.unsupported), len(report.claims), ms)  # fmt: skip
+
+
+def build_guard_classifier(
+    settings: Settings, registry: LanguageRegistry, embedder: Embedder | None
+) -> UnsafeAdviceClassifier | None:
+    """The learned second guard layer (English), reusing the knowledge-search embedder; None when off/unavailable.
+
+    The artefact is validated here once (checksum, features, embedding model and dimension): a mismatch disables
+    the layer with one error at startup, never one per reply."""
+    pidgin = settings.guard_classifier_pidgin_mode or settings.guard_classifier_mode
+    if {settings.guard_classifier_mode, pidgin} == {"off"}:
+        return None
+    if embedder is None:
+        log.warning("guard classifier disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
+        return None
+    try:
+        model = ClassifierModel.load(settings.guard_classifier_path)
+        classifier = UnsafeAdviceClassifier(
+            model,
+            embedder,
+            OutputGuard(registry),
+            threshold=settings.guard_classifier_threshold,
+            budget_s=settings.guard_classifier_budget_ms / 1000,
+        )
+    except Exception as exc:  # optional layer: a bad artefact or embedder must not stop the service
+        log.error(
+            "guard classifier disabled: no usable artefact at %s (%s)", settings.guard_classifier_path, exc
+        )
+        return None
+    log.info("guard classifier (%s, Pidgin %s): version %s", settings.guard_classifier_mode, pidgin,
+             model.version)  # fmt: skip
+    return classifier
+
+
+async def build_grounding(
+    settings: Settings, registry: LanguageRegistry, embedder: Embedder | None, knowledge: KnowledgeBase
+) -> GroundingChecker | None:
+    """The live grounding check (English only, no extra model call), reusing the knowledge-search embedder.
+
+    Pack facts are embedded once here, so a turn embeds only the reply and the user's message (knowledge-index
+    vectors are per entry, not per sentence, and cannot be reused). Partner API entries are cached on first use.
+    """
+    if GroundingMode(settings.grounding_mode) is GroundingMode.OFF:
+        return None
+    if embedder is None:
+        log.warning("grounding check disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
+        return None
+    grounding = GroundingChecker(
+        None,
+        embedder,
+        registry,
+        threshold=settings.grounding_threshold,
+        budget_s=settings.grounding_budget_ms / 1000,
+        wait_when_busy=GroundingMode(settings.grounding_mode) is GroundingMode.ENFORCE,
+    )
+    texts = [
+        text
+        for source in knowledge.sources
+        for entry in getattr(source, "entries", ())
+        for text in (*entry.facts, *entry.actions)
+    ]
+    started = time.perf_counter()
+    try:
+        warmed = await asyncio.to_thread(grounding.warm, texts)
+    except Exception as exc:  # not fatal: evidence is then embedded (and cached) on first use
+        log.warning("grounding evidence not pre-embedded: %s", exc)
+    else:
+        log.info("grounding (%s): %d evidence sentences embedded in %.1f s", settings.grounding_mode, warmed,
+                 time.perf_counter() - started)  # fmt: skip
+    return grounding
+
+
 async def build_services(settings: Settings) -> Services:
     """Production wiring. Fails fast on missing secrets or broken configuration."""
     from kudiguard.channels.whatsapp import WhatsAppConfig, WhatsAppMessenger
@@ -170,7 +258,7 @@ async def build_services(settings: Settings) -> Services:
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
     try:
-        knowledge, _ = await build_knowledge(settings, client)
+        knowledge, embedder = await build_knowledge(settings, client)
         api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
         llm = OpenAICompatLLM(settings.llm_url, client=client, api_key=api_key)
 
@@ -192,7 +280,30 @@ async def build_services(settings: Settings) -> Services:
                 )
                 if failed_models := await asr.preload(settings.preload_languages):
                     log.warning("speech models not preloaded: %s", failed_models)
-        engine = Engine(registry=registry, llm=llm, knowledge=knowledge, asr=asr, ffmpeg=ffmpeg)
+        grounding = await build_grounding(settings, registry, embedder, knowledge)
+        if grounding is not None:
+            closers.append(grounding.aclose)
+        classifier = build_guard_classifier(settings, registry, embedder)
+        if classifier is not None:
+            closers.append(classifier.aclose)
+        engine = Engine(
+            registry=registry,
+            llm=llm,
+            knowledge=knowledge,
+            asr=asr,
+            ffmpeg=ffmpeg,
+            grounding=grounding,
+            grounding_mode=GroundingMode(settings.grounding_mode),
+            on_grounding=log_grounding,
+            classifier=classifier,
+            classifier_mode=ClassifierMode(settings.guard_classifier_mode),
+            classifier_pidgin_mode=(
+                ClassifierMode(settings.guard_classifier_pidgin_mode)
+                if settings.guard_classifier_pidgin_mode
+                else None
+            ),
+        )
+        closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         store = await SQLiteStore.open(settings.db_path, hasher=hasher)

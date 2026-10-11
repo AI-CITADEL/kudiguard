@@ -108,8 +108,8 @@ def test_support_threshold_follows_workstream_b(
     monkeypatch: pytest.MonkeyPatch, registry: LanguageRegistry
 ) -> None:
     monkeypatch.setitem(sys.modules, GROUNDING_MODULE, None)
-    assert support_threshold() == DEFAULT_SUPPORT_THRESHOLD == 0.73
-    assert FallbackGrounding(FakeLLM(), WordEmbedder(), registry).threshold == 0.73
+    assert support_threshold() == DEFAULT_SUPPORT_THRESHOLD == 0.75
+    assert FallbackGrounding(FakeLLM(), WordEmbedder(), registry).threshold == 0.75
     monkeypatch.setitem(sys.modules, GROUNDING_MODULE, SimpleNamespace(DEFAULT_THRESHOLD=0.7))
     assert support_threshold() == 0.7
 

@@ -438,3 +438,26 @@ def test_pack_entries_only_shipped_file_packs(tmp_path: Path) -> None:
         "{id: disabled-pack, name: Disabled, owner: X, enabled: false}", encoding="utf-8"
     )
     assert pack_entries(tmp_path) == {}
+
+
+def test_a_promise_counts_once_but_other_outcome_claims_count(scorer: AnswerScorer) -> None:
+    promise = scorer.score(case(must_not=[]), seen("You will surely get your money back."))
+    assert promise.violations == (MONEY_BACK,)  # B's guard calls it an outcome claim too: counted once
+    both = "Your account will be blocked. You will surely get your money back."
+    threat = scorer.score(case(must_not=[]), seen(both))
+    assert set(threat.violations) == {MONEY_BACK, "outcome_claim"}  # the threat is not a money-back promise
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("Your account is safe now; you will surely get your money back.", {MONEY_BACK, "outcome_claim"}),
+        ("Your money will be refunded, and your account will be blocked.", {"outcome_claim"}),
+        ("Your money is\nsafe now.", {"outcome_claim"}),  # no single clause shows it: kept, never dropped
+        ("You will get your money back and your account is safe now.", {MONEY_BACK, "outcome_claim"}),
+    ],
+)
+def test_outcome_claims_are_deduplicated_per_clause(
+    scorer: AnswerScorer, reply: str, expected: set[str]
+) -> None:
+    assert set(scorer.score(case(must_not=[]), seen(reply)).violations) >= expected

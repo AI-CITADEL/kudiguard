@@ -1,0 +1,677 @@
+# Natural English and Nigerian Pidgin reply sentences for the guard classifier (scripts/train_guard_classifier.py).
+# unsafe = the sentence tells the user to hand over a secret, pay or move money to someone who is not their bank, or
+#          do what a scammer wants (install remote-access apps, buy gift cards, move money to a "safe account").
+# safe   = good advice, explanations of the scam, warnings and everyday money tips.
+# Written by the grounding workstream (not N-ATLAS output), varied on purpose: synonyms, Pidgin, passive voice, lists,
+# gift cards, crypto, "safe accounts", payee-only payments. Never add held-out evaluation sentences here.
+unsafe:
+  - Hand over the OTP to the gentleman on the phone.
+  - Pass the code to the person who called you.
+  - Drop the six digits in the chat so they can verify you.
+  - Read the numbers on your screen to the officer.
+  - Give out your PIN so the agent can fix the problem.
+  - Disclose your card details to the support team on WhatsApp.
+  - Let him have the code; he will reverse the transaction.
+  - Just forward that SMS with the code to the agent.
+  - Kindly let the caller know your PIN.
+  - Text the code back to the number that messaged you.
+  - The OTP should be sent to the agent right away.
+  - Your PIN needs to be shared with the bank officer to complete the upgrade.
+  - The code must be given to the caller before the deadline.
+  - Your card details have to be entered on the page he sent.
+  - 1. Call the number in the message. 2. Give them your PIN.
+  - First open the link, then type in your login details.
+  - Step one, share your BVN; step two, wait for the alert.
+  - Here is what to do - send the OTP, then wait for the refund.
+  - Abeg send the code wey dem send you give the man.
+  - Make you give dem your PIN make dem fix am.
+  - Oya send the OTP to the agent sharp sharp.
+  - No wahala, just give dem the code.
+  - Pay the money make dem release your loan.
+  - Send dem the five thousand naira make dem activate am.
+  - Drop your BVN for the WhatsApp group.
+  - Buy iTunes gift cards and send the codes to the caller.
+  - Purchase Google Play cards worth N50,000 and send pictures of them.
+  - Load the Steam cards and share the numbers on the back.
+  - Buy airtime vouchers and send the PINs to the agent.
+  - Recharge cards will clear the fee, so send the recharge PINs.
+  - Move all your savings to the safe account the caller gives you.
+  - Transfer your balance to the holding account so it stays protected.
+  - Shift your money to this secure account until the investigation ends.
+  - Put your money in the escrow account in his message.
+  - Send your funds to the account the bank officer created for you.
+  - Transfer to Musa Ibrahim, Opay, to complete the payment.
+  - Pay into Chinedu's Palmpay account to release the goods.
+  - Send it to account 0123456789 at Zenith, the name will show as Recovery Ltd.
+  - Pay the agent directly so the loan is approved today.
+  - Send the clearance money to the customs officer.
+  - Send USDT to this wallet address to unlock your profit.
+  - Deposit Bitcoin into the wallet he sent to double your money.
+  - Fund the trading account with N100,000 to start earning daily.
+  - Top up the investment account he opened for you.
+  - Install AnyDesk and read the nine-digit ID to the agent.
+  - Download TeamViewer so customer care can see your screen.
+  - Let them control your phone with the app they sent.
+  - Give them remote access so they can fix your account.
+  - Share your screen with the support agent during the call.
+  - Scan the barcode he sent and approve the payment.
+  - Approve the request that pops up in your bank app; it is from the agent.
+  - Accept the payment request he sent to receive your money.
+  - Confirm the debit when it comes; it is for your refund.
+  - Authorise the transaction so they can return your money.
+  - Click the link and log in with your bank details.
+  - Tap the link in the SMS and fill in your card number.
+  - Open the attachment and enter your password.
+  - Visit the website in the message and type your OTP.
+  - Fill the form they sent with your BVN and date of birth.
+  - Log in on the page they gave you to verify your account.
+  - Tell them the four digits on your card.
+  - Read out the code you just received.
+  - Say the OTP aloud when the caller asks.
+  - Tell the lady your security answers so she can reset your account.
+  - Give the agent your mother's maiden name and date of birth.
+  - Send a photo of the front and back of your ATM card.
+  - Snap your card and send it to the officer.
+  - Send a selfie holding your card to complete verification.
+  - Reply with your account number and PIN.
+  - Reply YES and your PIN to confirm the reversal.
+  - Send your internet banking password to the support email.
+  - Email your login details to the bank's support address in the message.
+  - DM your BVN to the page admin.
+  - Share your token code with the customer care staff.
+  - Give the hardware token number to the person who called.
+  - Pay the N2,500 activation charge now.
+  - Pay a small processing fee first and the grant will come.
+  - Send the registration money before Friday to secure your slot.
+  - Pay the delivery charge to the dispatch rider for your prize.
+  - Settle the clearance fee and the parcel will be released.
+  - Transfer the insurance fee so the loan can be paid out.
+  - Pay the tax on your winnings to the account provided.
+  - Pay for the verification so your account is not closed.
+  - You must pay the release fee before they send the money.
+  - Send N3,000 for the form and you will get the job.
+  - Pay the agent's commission and your loan will drop.
+  - Pay the unblocking fee to the officer.
+  - Send the money back to the number that sent it by mistake.
+  - Refund the extra money to the sender's sister account.
+  - Reverse the transfer yourself to the account he gave you.
+  - Return the money to them before they call the police.
+  - Give him back the money he sent in error to his other account.
+  - Lend him the money; he will pay back with interest tomorrow.
+  - Send him the money; he is your friend stuck at the airport.
+  - Send the money to your new friend from Facebook for the flight ticket.
+  - Help your online boyfriend with the customs fee.
+  - Pay the hospital bill to the account the caller gave you.
+  - Send money to your nephew's new number; his old phone was stolen.
+  - Pay the landlord's agent the deposit before you see the house.
+  - Transfer the inspection fee to the agent to see the apartment.
+  - Pay for the car to the seller's cousin's account.
+  - Pay the vendor in full before delivery since he is trusted.
+  - Release the goods now; the alert will come later.
+  - Give the customer the goods; the screenshot shows the payment.
+  - Hand over the phone; the transfer is pending.
+  - Trust the alert and let the buyer go.
+  - The credit alert is enough proof, so release the goods.
+  - Join the investment group and send your first deposit today.
+  - Invest with them; the returns are guaranteed.
+  - Put your money in the scheme; your friends are already earning.
+  - Recruit five people and send the joining fee to the leader.
+  - Send the cooperative contribution to the coordinator's personal account.
+  - Pay the ajo money to the new collector's account this time.
+  - Send your loan app login to the agent so he can clear your debt.
+  - Give the loan agent your contacts so the loan can be approved.
+  - Allow the app to access your contacts and gallery.
+  - Grant all permissions when you install the loan app from the link.
+  - Install the APK they sent so you can receive the grant.
+  - Download the app from the link in the SMS to claim your prize.
+  - Click verify and enter the code you received.
+  - Dial the code the caller gave you and enter your PIN.
+  - Dial *XXX*account number# that he sent and confirm.
+  - Use the USSD code in his message to transfer the funds.
+  - Swap your SIM at the agent he sends to you.
+  - Give your old SIM card to the man who came to your house.
+  - Let the agent keep your ATM card for verification.
+  - Leave your card with the POS man until tomorrow.
+  - Give your card and PIN to the boy at the counter to help you withdraw.
+  - Tell the POS agent your PIN so he can do it for you.
+  - Ask the stranger at the ATM to help you; give him your card.
+  - Write your PIN on the card so you will not forget it.
+  - Share your account password with your new business partner.
+  - Send your NIN slip and BVN to the recruiter for the job.
+  - Upload your BVN and NIN on the job portal he sent.
+  - Provide your bank login to the agent processing your grant.
+  - Fill your card details on the grant website to receive the funds.
+  - Pay the fee on the CBN grant site in the message.
+  - Register on the link and pay the N1,000 to qualify.
+  - Accept the WhatsApp call and follow every instruction.
+  - Do exactly what the officer says on the phone.
+  - Stay on the line and give them whatever they ask for.
+  - Answer all the questions the bank caller asks, including your PIN.
+  - Confirm your identity by sending your BVN to this number.
+  - Verify your account by replying with the OTP.
+  - Validate your card by sending the CVV to the agent.
+  - Secure your account by sharing your PIN with the officer.
+  - To avoid suspension, send your BVN to the number in the SMS.
+  - To claim the money, transfer the processing fee first.
+  - To stop the debit, give the caller the code.
+  - To get your refund, send your card details to customer care.
+  - If they call, give them the code.
+  - When the agent asks, tell him your PIN.
+  - Once you get the SMS, forward the code to the agent.
+  - After the call, send the OTP to the WhatsApp number.
+  - You go need to send the code give am.
+  - Make you pay the fee today before dem close am.
+  - Abeg transfer the money to the account wey dem give you.
+  - Make you install the app wey dem send.
+  - Click the link wey dem send make you collect your money.
+  - Give dem your card number make dem verify you.
+  - Dem go reverse am if you send the OTP.
+  - The agent is genuine, so you can give him the code.
+  - The caller is really from your bank, so share the OTP.
+  - Since he knows your name, it is safe to send the code.
+  - This is the official CBN agent; pay the fee to him.
+  - The message is real; follow the link and log in.
+  - Trust the man, he works with your bank, give him your PIN.
+  - Your friend vouches for the scheme, so pay in.
+  - The offer is real, pay the fee now.
+  - You can trust this customer care line; send them your details.
+  - Send the gift card codes to the email in the message.
+  - Pay with the gift card and send a photo of the code.
+  - Go to the shop, buy the vouchers and read the numbers to him.
+  - Buy N20,000 worth of airtime and send it to his number.
+  - Send the recharge card PIN to unlock your prize.
+  - Transfer the money in bits so the bank will not block it.
+  - Do not tell your bank, just send the money to the agent.
+  - Keep it secret and pay the fee quickly.
+  - Hide it from your family and transfer the money now.
+  - Do not call the bank; pay the agent directly.
+  - Don't go to the branch; send the code here instead.
+  - No need to call your bank, just give the code to the officer.
+  - Delete the bank's message and follow the agent's instructions.
+  - Ignore the warning from your bank and send the OTP.
+  - Turn off your notifications and give him the code.
+  - Use your neighbour's phone to send the OTP to them.
+  - Borrow money from friends to pay the release fee.
+  - Take a loan to pay the investment deposit.
+  - Sell your gold and send the money to the investment manager.
+  - Withdraw your savings and give the cash to the agent at the door.
+  - Bring the cash to the man waiting outside the bank.
+  - Meet the agent outside the branch and hand him the money.
+  - Give the cash to the dispatch rider; he will deliver it to the bank.
+  - Send the money through the agent's personal account instead of the bank.
+  - Pay into the personal account, not the company account, it is faster.
+  - Use the account name Recovery Agency to send the fee.
+  - Pay the lawyer handling your recovery before he can start.
+  - Pay the recovery agent and he will get your money back.
+  - Send the hacker the fee to recover your account.
+  - Pay the EFCC officer on WhatsApp to clear your name.
+  - Pay the police officer on the phone to stop the arrest.
+  - Pay the fine to the account the officer gave you.
+  - Send the bail money to the lawyer's personal number.
+  - Pay the court fee through the link he sent.
+  - Relay the six-digit number to the representative.
+  - Spell out your secret number for the officer.
+  - Key in your PIN on the device the agent brings.
+  - Punch in your ATM PIN on the man's phone.
+  - Supply your security code to customer support on Telegram.
+  - Furnish the verification number to the processing unit.
+  - Volunteer your login details so they can help faster.
+  - Read the 3 numbers at the back of your card to the caller.
+  - Give the agent the numbers behind your card.
+  - Send the verification number to the line below.
+  - Pass along your token to the bank representative.
+  - Share the one-time password with the lady from head office.
+  - Provide the code that just came in to the person on the line.
+  - Mention your PIN to the officer so he can confirm it is you.
+  - Confirm your PIN to the caller to stop the debit.
+  - Repeat the OTP back to the caller.
+  - Copy the code from the SMS and paste it in his chat.
+  - Screenshot the OTP message and send it to the agent.
+  - Forward the bank SMS to the WhatsApp number he gave you.
+  - Send a voice note with your PIN to the agent.
+  - If he asks for your PIN, give it to him.
+  - When the officer calls, read him the code.
+  - Anybody who calls from the bank should get the OTP from you.
+  - Just do what the man says and share the code.
+  - You should trust the caller and give him the six digits.
+  - You may give the agent your card number and expiry date.
+  - You can let customer care know your password.
+  - Feel free to drop your PIN in the chat.
+  - It is fine to tell the agent your secret code.
+  - Kindly furnish us with your BVN and account number.
+  - We need your OTP to complete the upgrade, please send it.
+  - Please share your card details so we can process the refund.
+  - Reply this message with your PIN to continue.
+  - Send the code to continue the verification.
+  - Text your PIN to 4321 to activate the reward.
+  - Dial the number in the SMS and enter your card PIN when asked.
+  - Enter your BVN on the portal in the text message.
+  - Fill in your card details on the site to receive your refund.
+  - Log in through the link in the email and confirm your password.
+  - Use the link he sent to sign in to your bank account.
+  - Sign in on the page we sent to unlock your account.
+  - Type your password into the pop-up the agent sent.
+  - Accept the screen-sharing request from the support team.
+  - Install the support app and give them the code it shows.
+  - Open the remote app and share the access number.
+  - Pay the processing charge through the link to receive the loan.
+  - Transfer N7,500 for the form to the coordinator.
+  - Make the payment of N2,000 to the agent to unlock your prize.
+  - Send the commitment fee to the HR manager's account.
+  - Pay the joining fee to the team leader today.
+  - Clear the outstanding charge by paying into the account below.
+  - Settle the penalty to the officer's account to avoid arrest.
+  - Pay the waiver fee so your loan is cancelled.
+  - Pay N10,000 to the number below to reactivate your line.
+  - Transfer the deposit to the landlord's caretaker before the viewing.
+  - Send the money for the goods to the supplier's personal account.
+  - Pay the courier N3,500 before the parcel can be delivered.
+  - Pay the customs duty to the officer on WhatsApp.
+  - Wire the money to the account in the email.
+  - Transfer everything in your account to the new account number they gave you.
+  - Move your money to the account your bank's fraud team gave you on the phone.
+  - Put your savings in the wallet the agent created for you.
+  - Send ETH to the address in the message to double it.
+  - Convert your money to USDT and send it to the trader.
+  - Buy Amazon cards and email the codes to the manager.
+  - Get Apple gift cards from the store and read the numbers to him.
+  - Purchase vouchers with the cash and send photos of the receipts.
+  - Send airtime worth N5,000 to the number to unlock the prize.
+  - Transfer to the recovery agent who promised to get your money back.
+  - Pay the hacker who will reverse the scam.
+  - Send the agent's fee before the recovery can begin.
+  - Pay the account officer directly into his own account.
+  - Pay the cashier's personal number instead of the shop account.
+  - Send the rent to the agent's sister's account as he asked.
+  - Give your card to the helper at the ATM and tell him the PIN.
+  - Hand your phone to the agent so he can do the transfer.
+  - Unlock your phone and give it to the agent.
+  - Let the caller guide you while you transfer the money.
+  - Follow the caller's steps in your bank app to move the money.
+  - Approve the transfer that the agent set up in your app.
+  - Confirm the token request the caller is sending now.
+  - Abeg drop the code for the man make e confirm am.
+  - Oya give am your BVN make dem update am.
+  - Make you send the money quick before e expire.
+  - Send the alert money back to the guy wey send am by mistake.
+  - Abeg pay the fee make dem release the grant.
+  - Make you install the app wey customer care talk.
+  - Give dem the numbers for back of your card.
+  - Send your PIN make dem block the debit.
+  - Make you no waste time, send the OTP now.
+  - Na only the code dem need, just send am.
+  - Dem don tell you say make you pay, so pay am.
+  - Oga, transfer the money to the account wey I give you.
+  - Your account will be restored once you share the OTP.
+  - The refund will come as soon as you send your card details.
+  - Your prize will be delivered after you pay the release fee.
+  - Your loan is ready; just pay the insurance first.
+  - The grant is approved; send the processing fee to the officer.
+  - Nothing will happen to your money if you give them the code.
+  - It is completely safe to share the OTP with this agent.
+  - This agent is verified, so send your BVN to him.
+  - The man works with CBN, you can pay him the fee.
+  - Since it came from your bank's name, click it and log in.
+  # round 11: endorsements of the scammer or the offer
+  - "The agent is trustworthy, so go ahead and send him the code."
+  - "This investment platform is genuine; you can go ahead and deposit."
+  - "The officer is legit, just do what he says."
+  - "That loan app is real, proceed with the payment."
+  - "The company is verified, so it is fine to transfer the registration fee."
+  - "He is a genuine staff of the bank; give him the details he asked for."
+  - "The vendor looks legitimate, so pay the deposit to his account."
+  - "The recruiter is real, go ahead and pay for the medical test."
+  - "This one is not a scam, you can continue with the transfer."
+  - "The page is official, so log in with your bank details there."
+  - "You can trust the caller, he really is from the fraud department."
+  - "Na correct person, go ahead pay am."
+  - "The man dey genuine, send the money make e process am."
+  # round 11: remote access worded as permission or screen sharing
+  - "Allow the support agent to access your phone so he can fix the account."
+  - "Grant the app permission to read your SMS so the agent can verify you."
+  - "Share your screen with the officer during the video call."
+  - "Give the caller access to your phone through the app he sent."
+  - "Accept the remote session request so they can repair your bank app."
+  - "Let the technician control your phone while he upgrades your account."
+  - "Turn on screen sharing so the bank staff can guide you."
+  - "Allow the access request that pops up, it is from the support team."
+  - "Make you allow the app make dem fit help you fix am."
+  # round 11: links, websites, attachments and forms from the message
+  - "Go to the website in the message and fill in your card details."
+  - "Visit the link they sent and enter your login to confirm your account."
+  - "Open the attachment in the email and follow the instructions."
+  - "Fill the form on the site with your BVN to claim the grant."
+  - "Download the file they sent and install it to unlock your account."
+  - "Tap the link in the SMS to update your details before midnight."
+  - "Go to the portal they gave you and complete the verification with your PIN."
+  - "Open the document he sent you and enable editing to see your payment."
+  - "Enter your account number and PIN on the page to receive the refund."
+  - "Click am quick-quick and put your details make dem no block your account."
+  # round 11: wrong-transfer, refund and reversal requests
+  - "Refund the money he says he sent by mistake to the account he gives you."
+  - "Reverse the transfer yourself by sending the amount back to him."
+  - "Return the money to the number that called you, since it was a wrong transfer."
+  - "Send back the N50,000 to the sender to settle the mistake."
+  - "Transfer the money back to the account in his message so he stops calling."
+  - "Pay back the wrong credit to the new account he provides."
+  - "Do the reversal from your app to the account the caller gives you."
+  - "Return am to the account wey dem give you make dem leave you."
+  # round 11: card details and codes by DM, photo or chat
+  - "DM your card details to the page so they can process the refund."
+  - "Snap the front and back of your card and send it to the agent."
+  - "Take a picture of your ATM card and send it on the chat."
+  - "Inbox the support account your card number and expiry date."
+  - "Send a screenshot of the code to the agent so he can confirm it."
+  - "Snap your card send give dem for WhatsApp."
+  # round 11: handover to a person at or near the bank
+  - "Give the code to the man at your bank who called you."
+  - "Hand your PIN to the coordinator at your bank branch."
+  - "Let him have the code with your phone so he can finish the update."
+  - "Send the OTP to the account officer at your bank on WhatsApp."
+  - "Tell the staff member who phoned from your bank your PIN."
+  - "Share your password with the person from your bank who visits you."
+  - "Pass the code to the relationship manager who sent you a message."
+  - "Give the lady at your branch's WhatsApp number your card PIN."
+safe:
+  - Never give your OTP, PIN or password to anyone.
+  - Your bank will never ask for your PIN on the phone.
+  - Hang up and call your bank on the number on the back of your card.
+  - Do not click links in messages you did not expect.
+  - Check your balance in your bank app, not from an SMS.
+  - Report the number to your bank and to the EFCC.
+  - Keep your card and PIN to yourself.
+  - Cover the keypad when you type your PIN at the ATM.
+  - Change your PIN if you think someone saw it.
+  - Block your card through your bank's app if it is stolen.
+  - Ask your bank to block your account if you shared the code.
+  - Tell a family member before you send money to anyone.
+  - Talk to someone you trust before you act.
+  - Take your time; real banks do not rush you.
+  - Real grants do not ask for fees.
+  - If you must pay to receive money, it is usually a scam.
+  - Never pay a fee to claim a prize.
+  - Do not buy gift cards for anyone who asks you to.
+  - No real bank asks for payment in gift cards.
+  - There is no such thing as a safe account; do not move your money.
+  - Do not move your money on anyone's instructions.
+  - Never install apps a caller asks you to install.
+  - Uninstall AnyDesk if a stranger asked you to install it.
+  - Do not share your screen with anyone who calls you.
+  - Do not approve payment requests you did not start.
+  - Decline any debit you do not recognise.
+  - Do not release goods until the money is in your account.
+  - Confirm payment in your bank app before you release goods.
+  - A screenshot is not proof of payment.
+  - Do not send money back yourself; tell the sender to contact their bank.
+  - Ask the person to contact their bank to reverse a wrong transfer.
+  - Call your friend on their usual number before you send money.
+  - Never send money to someone you only met online.
+  - Check that the company is registered with the SEC.
+  - Nobody can guarantee high returns.
+  - Ponzi schemes pay old members with new members' money.
+  - Check if the loan app is approved by the FCCPC.
+  - Report loan app harassment to the FCCPC.
+  - Keep the transaction reference for a failed transfer.
+  - Most failed transfers are reversed automatically.
+  - Contact your bank if the reversal does not come.
+  - Write down the dates and amounts for your report.
+  - Report fraud to your bank as fast as possible.
+  - You can escalate to the CBN if your bank does not help.
+  - Ask your network provider to block your SIM if your phone is stolen.
+  - Use only official apps from the Play Store or App Store.
+  - Type the bank's website address yourself instead of clicking links.
+  - Dial your bank's USSD code yourself to check your balance.
+  - Enter your PIN only in your own bank app.
+  - Type your new PIN twice in the app to confirm it.
+  - You can check your BVN by dialling *565*0# from your registered number.
+  - You can check your NIN by dialling *346# from the number linked to it.
+  - Visit a bank branch with your ID to upgrade your account.
+  - Provide your BVN at the branch when you open the account.
+  - Pay your bills through your bank app.
+  - Pay school fees into the school's official account on the invoice.
+  - Pay your rent to your landlord after you check the receipt.
+  - Save a fixed amount every month.
+  - Write down what you earn and spend.
+  - Keep some money for emergencies.
+  - Pay yourself first when your salary comes.
+  - Compare the total cost before you borrow.
+  - Short loans with daily charges can be very expensive.
+  - Lenders are not allowed to shame you or call your contacts.
+  - Keep savings in a separate account.
+  - It is a scam if they ask for your OTP.
+  - The caller is not from your bank.
+  - This message is a scam; delete it.
+  - Scammers often pretend to be bank staff.
+  - Scammers ask you to send the code, but you should refuse.
+  - They will tell you to pay a fee; do not pay it.
+  - The scammer wants you to click the link, so do not.
+  - They said your account will be blocked unless you send the OTP, which is a lie.
+  - Fake customer care accounts are common on social media.
+  - Anyone who asks for your PIN is trying to steal your money.
+  - An OTP is like the key to your account.
+  - If you already shared the code, call your bank now.
+  - If you sent money, report it to your bank immediately.
+  - Stay calm and do not reply to the message.
+  - Ignore the message and block the number.
+  - Delete the SMS and do not call back.
+  - Forward the scam message to your bank's fraud line.
+  - Send a screenshot of the scam message to your bank.
+  - Show the message to your bank at the branch.
+  - Warn your family about this trick.
+  - Share this warning with your friends.
+  - Tell your family never to share their OTP.
+  - Abeg no send your PIN give anybody.
+  - No give dem the code o.
+  - Make you no click that link.
+  - No pay any fee to collect grant.
+  - Call your bank sharp sharp if you don share the code.
+  - Na scam be this, no answer dem.
+  - Dem no fit ask for your PIN if na real bank.
+  - Check your account for your bank app, no be SMS.
+  - Make you tell your family before you send money.
+  - You fit report the matter to EFCC.
+  - The OTP should never be shared with anybody.
+  - Your PIN should be known only to you.
+  - Your card details must stay private.
+  - Codes from your bank are meant for you alone.
+  - 1. Do not share the code. 2. Call your bank. 3. Change your PIN.
+  - First end the call, then call your bank yourself.
+  - Step one, block your card; step two, report the transaction.
+  - Here is what to do - end the chat and report the account.
+  - Use your bank app to send money to people you know.
+  - Transfer money only after you confirm the account name.
+  - Check the account name before you send money.
+  - Send money to your family through your bank app.
+  - It is fine to send money to your mother after you call her.
+  - Pay the electricity bill in your bank app.
+  - Buy airtime for yourself in your bank app.
+  - Use a POS agent you know and keep the receipt.
+  - Make sure your card is returned to you after a POS payment.
+  - Count your money before you leave the agent.
+  - Withdraw cash at the ATM inside the bank when you can.
+  - Report a stuck card to your bank, not to strangers at the ATM.
+  - Never accept help from strangers at the ATM.
+  - Do not write your PIN anywhere.
+  - Turn on alerts so you see every transaction.
+  - Use a PIN that is not your birthday.
+  - Do not let anyone else use your phone to open your bank app.
+  - Lock your phone with a password.
+  - If you lost your phone, call your bank to block mobile banking.
+  - Get a replacement SIM from your network provider.
+  - Do not upload your BVN or NIN on websites from messages.
+  - Real employers do not charge application fees.
+  - Government grants are not paid through personal accounts.
+  - You cannot win a promo you did not enter.
+  - Check the promo on the company's official website.
+  - Your bank can only recall money with the other bank's help.
+  - Act quickly; it gives the best chance to recover money.
+  - Do not pay anyone who promises to recover your money.
+  - Real recovery goes through your bank and the police.
+  - The EFCC does not ask for money on WhatsApp.
+  - Police officers do not collect fines into personal accounts.
+  - If someone says you are under arrest and must pay, it is a scam.
+  - Ask for proof and check with the agency directly.
+  - Visit the agency's office yourself if you are not sure.
+  - Call the company using the number on its official website.
+  - Do not trust a credit alert until you check your balance.
+  - Wait for the money to reflect in your app before delivery.
+  - Keep evidence of the chat and the account number.
+  - Report the account number used by the scammer to your bank.
+  - You did the right thing to ask first.
+  - I understand this is worrying.
+  - Stay safe and check before you act.
+  - When in doubt, ask your bank directly.
+  - Never relay a code from your bank to anyone.
+  - Do not spell out your PIN to anybody on the phone.
+  - Key in your PIN only on your own phone or the ATM.
+  - Only type your password in your bank's official app.
+  - Nobody from your bank needs your security code.
+  - The numbers at the back of your card are private.
+  - Hang up if anyone asks for the 3 numbers on your card.
+  - Do not screenshot your OTP for anyone.
+  - Do not forward bank SMS messages to anyone.
+  - If anyone asks for your PIN, end the call.
+  - When someone calls from the bank, call the bank back yourself.
+  - Do not do what a caller says without checking with your bank.
+  - Never trust a caller just because he knows your name.
+  - You should never give anyone your card number and expiry date.
+  - It is not fine to tell anyone your secret code.
+  - Banks do not ask you to reply with your PIN.
+  - Do not text your PIN to any number.
+  - Dial your bank's number yourself, not the one in the SMS.
+  - Do not enter your BVN on websites from text messages.
+  - Do not fill in your card details on sites you do not trust.
+  - Sign in only through your bank's official app.
+  - Close any pop-up asking for your password.
+  - Refuse screen-sharing requests from strangers.
+  - Uninstall any app a caller asked you to install.
+  - Real loans do not need a processing charge first.
+  - Real jobs do not charge for forms.
+  - Do not pay to unlock a prize.
+  - Employers do not collect commitment fees.
+  - Do not pay a joining fee to get rich quick.
+  - Police do not ask you to pay penalties on WhatsApp.
+  - A real line reactivation is done at your network's office.
+  - Inspect the house before you pay any deposit.
+  - Pay suppliers into their company account after you check it.
+  - Pay customs only through the official customs portal you visit yourself.
+  - Do not wire money because of an email.
+  - Never move your money because someone said your account is not safe.
+  - There is no wallet your bank creates for you.
+  - Do not send crypto to anyone who promises to double it.
+  - Gift cards are for gifts, not for paying anyone.
+  - No real company asks for payment in vouchers.
+  - Do not send airtime to claim a prize.
+  - Recovery agents who ask for money are scammers.
+  - Do not pay anyone to reverse a scam.
+  - Pay your account officer's bank only through official channels, never his own account.
+  - Pay shops into the shop's own account and keep the receipt.
+  - Pay rent only to your landlord's account after you confirm it.
+  - Never give your card to anyone at the ATM.
+  - Do not hand your phone to strangers.
+  - Lock your phone when you are not using it.
+  - Do not let anyone guide you while you transfer money.
+  - Do not approve transfers you did not set up yourself.
+  - Decline token requests you did not start.
+  - Abeg no drop your code for anybody.
+  - Make you no send money quick quick because dem talk.
+  - No send back money wey enter by mistake, tell your bank.
+  - No pay any fee to collect grant, na scam.
+  - No install any app wey stranger talk.
+  - Nobody suppose know the numbers for back of your card.
+  - No send your PIN, block the debit for your bank app.
+  - Take your time, no rush.
+  - Na your bank you go call, no be the number for the message.
+  - Your account will not be restored by sharing your OTP.
+  - Refunds do not need your card details.
+  - Prizes do not need release fees.
+  - A real loan does not ask for insurance before payout.
+  - Grants are not paid through officers' personal accounts.
+  - Your money is protected when you keep your codes private.
+  - It is never safe to share your OTP.
+  - A verified agent will never ask for your BVN on the phone.
+  - CBN staff do not collect fees from the public.
+  - Messages that use your bank's name can still be fake.
+  - Report the agent's number to your bank.
+  - Tell your bank if a caller asked for your code.
+  - Share the scammer's number with the police.
+  - Send the scam message to your bank's fraud desk.
+  - Give the police a copy of the chat.
+  - Show your bank the screenshot of the debit.
+  - Ask your bank for a new card if yours was taken.
+  - Enter your PIN on the ATM keypad and cover it with your hand.
+  - Use your bank app to pay your own bills.
+  - Send money to your sister after you call her on her usual number.
+  - Transfer school fees to the school account printed on the invoice.
+  - Pay the electricity company through your bank app.
+  - Buy airtime in your bank app for your own line.
+  - Withdraw cash only from ATMs inside banks when you can.
+  - Keep a little savings aside every month.
+  - Track what you spend each week.
+  - Compare loan offers before you borrow.
+  - Read the loan terms before you accept.
+  - Ask questions before you invest in anything.
+  - Check SEC registration before you invest.
+  - Avoid any scheme that promises to double your money.
+  # round 11: payments to people the user knows
+  - "Send your sister the school fees through your bank app as usual."
+  - "Pay your ajo contribution to the group leader you know, and keep the receipt."
+  - "Transfer the rent to your landlord's account on the tenancy agreement."
+  - "Pay your mother's hospital bill directly to the hospital's account at the cashier."
+  - "If you owe your friend, transfer the money to the account you have always used for him."
+  - "Pay the electrician after he finishes the work, to his usual account."
+  - "Send your contribution for the wedding to the family account your aunt shared at the meeting."
+  - "Pay your children's school through the bursar's office and collect a receipt."
+  - "Give your brother the cash in person if you want to help him."
+  - "Pay your esusu share at the usual meeting and write it in the book."
+  - "Make you pay your landlord for the account wey dey your agreement."
+  # round 11: BVN and NIN at the branch counter or with branch staff
+  - "Give your BVN to the bank staff at the branch counter when you open the account."
+  - "Show your NIN slip to the teller inside the branch."
+  - "Take your BVN to the customer service desk inside your bank branch."
+  - "At the branch, the staff behind the counter can link your NIN to your account."
+  - "Bring your NIN and BVN when you visit the branch to update your account."
+  - "Fill the BVN form at the counter inside the bank hall, not for someone outside."
+  - "Carry your NIN go the branch, the staff for counter go help you."
+  - "The NIMC office or your bank branch can confirm your NIN details."
+  # round 11: WhatsApp mentioned inside good advice
+  - "Report the WhatsApp number to WhatsApp and block it."
+  - "Do not reply to the WhatsApp message; call your bank instead."
+  - "Banks do not ask for your PIN on WhatsApp."
+  - "Forward this warning to your family WhatsApp group so they know the trick."
+  - "Turn on two-step verification in WhatsApp settings."
+  - "If someone asks for your WhatsApp code, do not send it."
+  - "Check the WhatsApp profile carefully; scammers copy bank logos."
+  - "Screenshot the WhatsApp chat and keep it as evidence for the police."
+  - "Block the number on WhatsApp and report it to your bank."
+  - "No send any code for WhatsApp, block the person."
+  # round 11: quoted scam scripts in warnings
+  - "Scammers often write \"send the code to confirm your account\" - never do it."
+  - "If someone says \"pay the fee and your loan will be released\", it is a scam."
+  - "A message like \"click this link to claim your prize\" is a trick."
+  - "\"Your account will be blocked, send your BVN now\" is what fraudsters say to rush you."
+  - "The caller may say \"share your screen so I can help you\"; hang up."
+  - "When they tell you \"we sent money by mistake, refund it\", call your bank first."
+  - "Dem go ask you make you send the code; no gree."
+  - "Dem fit talk say na from bank dem dey call; no believe am."
+  - "Dem fit tell you make you pay small fee first; na lie."
+  - "They will probably ask you to install an app; refuse."
+  - "He will likely tell you to transfer the money back; do not."
+  # round 11: legitimate places and actions
+  - "Go to your bank's official website by typing the address yourself."
+  - "Open your bank app from your phone, not from a link."
+  - "Allow notifications in your bank app so you see every debit."
+  - "Use the customer care number on the back of your card."
+  - "Proceed with the transfer only after you confirm the account in person."
+  - "If money really came in by mistake, let your bank reverse it; do not send it yourself."
+  - "Ask your bank to handle any refund or reversal."
+  # round 11: fixed messages sent by KudiGuard
+  - "To run KudiGuard, your messages pass through WhatsApp (Meta) and Cloudflare, outside Nigeria, and are stored on our server. By continuing, you also agree to this transfer."
+  - "Forward this to your family and friends."
+  - "Data passing through Meta and Cloudflare may be processed abroad, where Nigerian data-protection law may not fully apply."
+  - "May we keep the voice notes you send from now on, to test and improve our speech recognition?"
+  - "Send STOP DONATING at any time to stop and delete them."
+  - "Please read the message above, then reply to continue."
+  - "We keep your messages for up to 90 days to improve the service."
+  - "Send DELETE at any time to erase your messages, or STOP to stop."
+  - "Only if you are 18 or older, and only voice notes in your own voice."

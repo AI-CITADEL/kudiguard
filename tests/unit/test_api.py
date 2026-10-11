@@ -632,3 +632,20 @@ async def test_burst_cannot_overshoot_the_share_with_sqlite(
 
                 codes = await asyncio.gather(*(new_session(n) for n in range(8)))
     assert codes.count(200) == 2 and codes.count(503) == 6
+
+
+async def test_check_passes_a_hashed_turn_id(api: Api, monkeypatch: pytest.MonkeyPatch) -> None:
+    services = api.app.state.services
+    seen: list[object] = []
+    original = services.engine.check
+
+    async def spy(*args: object, **kwargs: object) -> object:
+        seen.append(kwargs.get("turn_id"))
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(services.engine, "check", spy)
+    assert (await api.check()).status_code == 200
+    (turn_id,) = seen
+    # the stored row keeps the same hashed key (storage.protect), so logs and evidence can be joined later
+    stored = list(api.store._interactions.values())[-1]  # type: ignore[attr-defined]
+    assert isinstance(turn_id, str) and len(turn_id) == 32 and turn_id == stored.message_id
