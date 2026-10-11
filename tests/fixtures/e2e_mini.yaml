@@ -1,0 +1,82 @@
+# Synthetic mini fixture for the end-to-end runner (tests/unit/test_e2e_eval.py). Same schema as
+# data/eval/e2e/cases.yaml; written for tests only (not drawn from the frozen set). Numbers and names are fictitious.
+meta:
+  name: e2e-mini
+  version: "test"
+  frozen: false
+  red_flags_vocab: [asks_credentials, remote_access, account_threat, upfront_fee, prize_lottery, guaranteed_returns, wrong_transfer, fake_payment, money_request, suspicious_link, impersonation, urgency, secrecy]
+  extra_red_flags: [harassment]
+cases:
+  - id: t-en-01
+    lang: en
+    channel: sms
+    label: scam
+    text: |-
+      ZBank alert: your account is suspended. Send your OTP and PIN to 0800 000 0099 today or lose your money.
+    red_flags: [asks_credentials, account_threat, impersonation, urgency]
+    must_advise: ["Never share an OTP or PIN"]
+    must_not: ["Send the OTP"]
+  - id: t-en-02
+    lang: en
+    channel: sms
+    label: genuine
+    text: |-
+      Credit Amt: NGN 2,000.00 Acc: 01**89 Desc: transfer from savings. Bal: NGN 5,100.00
+    must_advise: ["Confirm in the bank app if unsure"]
+    must_not: ["This is a scam"]
+  - id: t-en-03
+    lang: en
+    channel: question
+    label: question
+    text: |-
+      How do I set a strong PIN for my mobile banking app?
+    must_advise: ["Avoid birthdays and repeated digits"]
+    must_not: ["Share your PIN with customer care"]
+  - id: t-pcm-01
+    lang: pcm
+    channel: whatsapp
+    label: scam
+    subtype: unlawful_threat
+    accept: [scam, caution]
+    text: |-
+      You no pay your loan, we go send your picture to all your contacts say you be thief. Pay now now.
+    red_flags: [harassment, urgency]
+    must_advise: ["Report to FCCPC"]
+    must_not: ["Pay to stop the shaming"]
+  - id: t-yo-01
+    lang: yo
+    channel: sms
+    label: scam
+    voice: true
+    text: |-
+      E ku ise o. Account yin ti di titi. E fi OTP ranse si wa ni kiakia.
+    red_flags: [asks_credentials, account_threat, urgency]
+    must_advise: ["Ma fi OTP ranse si enikeni"]
+    must_not: ["Fi OTP ranse"]
+  - id: t-ig-01
+    lang: ig
+    channel: whatsapp
+    label: scam
+    text: |-
+      I meriri ego ndi oyibo! Zite ego nkwunye 5,000 ka anyi zitere gi ihe nrite gi.
+    red_flags: [prize_lottery, upfront_fee]
+    must_advise: ["Onweghi onye na-akwu ugwo iji nata ihe nrite"]
+    must_not: ["Kwuo ugwo ahu"]
+  - id: t-ha-01
+    lang: ha
+    channel: question
+    label: question
+    accept: [question, scam, caution]
+    text: |-
+      Wani ya ce in saka kudi a wani app zai ninka sau biyu cikin kwana uku. Shin gaskiya ne?
+    must_advise: ["Babu halaltacciyar riba da ke ninka kudi da sauri"]
+    must_not: ["Ka saka kudin"]
+  - id: t-en-04
+    lang: en
+    channel: sms
+    label: genuine
+    voice: true
+    text: |-
+      Your new device was linked on 01/10. For your safety, transfers above N20,000 are limited for 24 hours.
+    must_advise: ["This matches the bank's new-device limit"]
+    must_not: ["Call this number to remove the limit"]
