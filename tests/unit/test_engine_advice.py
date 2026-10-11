@@ -436,14 +436,14 @@ async def test_situational_hits_need_a_cue_in_general_search(
 
 async def test_pidgin_scam_gets_the_pidgin_worked_example(registry: LanguageRegistry) -> None:
     llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=REPLY)
-    await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    await engine(registry, llm, StubKnowledge((OTHER, 0.9)), pidgin_replies=True).check(PIDGIN, "en")
     assert "Real offer no dey ask you to pay first" in llm.calls(Purpose.COMPOSE)[0].messages[2]["content"]
 
 
 async def test_pidgin_input_with_a_hausa_reply_is_retried_in_english(registry: LanguageRegistry) -> None:
     hausa = "Wannan zamba ne. Kada ka ba su lambar."
     llm = FakeLLM(analyse=analysis(), compose=[hausa, REPLY])
-    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9)), pidgin_replies=True).check(PIDGIN, "en")
     first, second = llm.calls(Purpose.COMPOSE)
     assert last_user(first).startswith("Reply in Nigerian Pidgin") and last_user(second).startswith(
         "Reply in English."
@@ -465,14 +465,14 @@ async def test_a_copied_pidgin_worked_example_is_composed_again(registry: Langua
     copied = worked_example_reply(Verdict.LIKELY_SCAM, (), knowledge.result, PIDGIN_NAME)
     assert "no dey ask" in copied
     llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=[copied, REPLY])
-    answer = await engine(registry, llm, knowledge).check(PIDGIN, "en")
+    answer = await engine(registry, llm, knowledge, pidgin_replies=True).check(PIDGIN, "en")
     assert len(llm.calls(Purpose.COMPOSE)) == 2 and answer.body == REPLY
 
 
 async def test_at_most_one_extra_compose_for_pidgin(registry: LanguageRegistry) -> None:
     """The English retry for Pidgin input has no example at all (nothing to copy), and no copy retry follows."""
     llm = FakeLLM(analyse=analysis(), compose=["Wannan zamba ne. Kada ka ba su lambar.", REPLY, "unused"])
-    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9)), pidgin_replies=True).check(PIDGIN, "en")
     _first, second = llm.calls(Purpose.COMPOSE)
     assert len(second.messages) == 2 and "<model_answer>" not in last_user(second)
     assert answer.body == REPLY

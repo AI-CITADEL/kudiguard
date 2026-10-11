@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     notice_prefix: str = "notice-"  # genuine-notice entries (empty = no notice handling)
     notice_min_relevance_dense: float = Field(default=NOTICE_MIN.dense, gt=0, lt=1)
     notice_min_relevance_bm25: float = Field(default=NOTICE_MIN.bm25, gt=0, lt=1)
-    pidgin_replies: bool = True  # Nigerian Pidgin messages get a reply in Pidgin
+    pidgin_replies: bool = False  # Pidgin reply instruction + retry: off by default (dev2: ~+3 s p50 for Pidgin, replies still mostly English)
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)

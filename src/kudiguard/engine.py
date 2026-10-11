@@ -128,7 +128,7 @@ class AdvicePolicy:
     example_copy_max: float = 0.5
     notice_prefix: str = "notice-"
     notice_min: Relevance = NOTICE_MIN
-    pidgin_replies: bool = True
+    pidgin_replies: bool = False
 
 
 class AnswerKind(StrEnum):
