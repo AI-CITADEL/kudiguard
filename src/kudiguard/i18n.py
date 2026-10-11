@@ -73,6 +73,8 @@ class Msg(StrEnum):
     ABUSE_REPLY = "abuse_reply"
     SCAM_TOOL_REPLY = "scam_tool_reply"
     NEW_USERS_BUSY = "new_users_busy"
+    NEW_USERS_BUSY_TODAY = "new_users_busy_today"
+    SCREEN_NEUTRAL = "screen_neutral"
     VOICE_LIMIT = "voice_limit"
 
 

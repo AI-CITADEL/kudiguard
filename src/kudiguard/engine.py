@@ -56,7 +56,14 @@ from kudiguard.reply_translation import (
     translation_problems,
 )
 from kudiguard.reply_translation import SYSTEM_PROMPTS as TRANSLATION_PROMPTS
-from kudiguard.safety.abuse import Category, InputScreen, ScreenMode, TranscriptFilter, log_screening
+from kudiguard.safety.abuse import (
+    INJECTIONS,
+    Category,
+    InputScreen,
+    ScreenMode,
+    TranscriptFilter,
+    log_screening,
+)
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
 from kudiguard.safety.grounding import (
     GroundingChecker,
@@ -97,9 +104,9 @@ class AnswerKind(StrEnum):
     SCREENED = "screened"
 
 
-# The fixed reply for each screen that answers with one (injection is answered by the rules instead).
+# The fixed reply for each screen that answers with it alone (crisis: the crisis reply first, then the rules'
+# check if the message is also a scam; injection: the rules' answer).
 SCREEN_REPLY: dict[Category, Msg] = {
-    Category.CRISIS: Msg.CRISIS_REPLY,
     Category.ABUSE: Msg.ABUSE_REPLY,
     Category.SCAM_TOOL: Msg.SCAM_TOOL_REPLY,
 }
@@ -131,6 +138,8 @@ class Answer:
     # abuse-screen categories found in the message (shadow and enforce), in priority order
     screened: tuple[str, ...] = ()
     screen_action: str | None = None  # the category acted on (enforce mode), e.g. "crisis", "injection"
+    # sent before `body` (the crisis reply, when a crisis message is also a scam to warn about); "" = none
+    preface: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,16 +281,27 @@ class Engine:
             body = self.messages.text(language, key)
             return Answer(language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=body, screened=screened,
                           screen_action=action)  # fmt: skip
-        if (
-            screening.enforced is Category.INJECTION
-        ):  # the rules answer alone (with a translation for the rules)
+        # Crisis: the full check continues after the crisis reply (a victim who "gave them my OTP" needs the model's
+        # reading of the message: the rules alone missed it live); only a message with nothing to warn about gets
+        # the crisis reply alone.
+        crisis = screening.enforced is Category.CRISIS
+        if screening.enforced in INJECTIONS:
+            # The rules answer alone (with a translation for the rules): an injected message never reaches a model
+            # that writes the reply.
             analysis, ms = await self._rules_only_analysis(text, language, deadline)
-            model_down = True  # no compose: the model never writes this reply
+            model_down = True
         else:
             analysis, ms, model_down = await self.analyse(text, language, deadline=deadline)
         assessment = decide(text, analysis, lexicon)
+        if (
+            crisis and assessment.verdict not in REPORT_VERDICTS
+        ):  # nothing to warn about: the crisis reply alone
+            body = self.messages.text(language, Msg.CRISIS_REPLY)
+            return Answer(language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=body, screened=screened,
+                          screen_action=action, llm_ms=ms)  # fmt: skip
         if screening.enforced is Category.INJECTION and assessment.verdict is Verdict.NO_FLAGS:
-            # A message that tries to steer the checker is itself a warning sign: never "no red flags".
+            # A message that clearly tries to steer the checker is itself a warning sign: never "no red flags".
+            # (Not for the broad, suspect phrases: genuine messages use them too.)
             assessment = dataclasses.replace(assessment, verdict=Verdict.CAUTION)
         if analysis.intent is Intent.GREETING and not assessment.flags:
             return Answer(
@@ -314,9 +334,9 @@ class Engine:
                     self._ground_in_background(checked, checked_language, evidence, analysis.english, turn_id)
         if generation.text is not None:
             body, outcome = generation.text, Outcome.ANSWERED
-        elif screening.enforced is Category.INJECTION and verdict is Verdict.NOT_A_CHECK:
-            # not "try again later": a retry of the same message is screened again
-            body, outcome = self.messages.text(language, Msg.GREETING_REPLY), Outcome.FIXED_REPLY
+        elif screening.enforced in INJECTIONS and verdict is Verdict.NOT_A_CHECK:
+            # not "try again later" (a retry is screened again) and not the greeting (it would look ignored)
+            body, outcome = self.messages.text(language, Msg.SCREEN_NEUTRAL), Outcome.FIXED_REPLY
         else:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
         return Answer(
@@ -340,6 +360,7 @@ class Engine:
             translation_rejections=generation.rejections,
             screened=screened,
             screen_action=action,
+            preface=self.messages.text(language, Msg.CRISIS_REPLY) if crisis else "",
         )
 
     async def analyse(

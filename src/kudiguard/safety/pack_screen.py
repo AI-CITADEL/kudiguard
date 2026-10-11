@@ -36,10 +36,24 @@ class Quarantined:
     reason: str
 
 
+MAX_REPORTED = 500  # distinct items kept in the report (a live partner API re-sends the same entries)
+
+
 @dataclass(slots=True)
 class ScreenReport:
+    """Distinct items only (each logged once), bounded: live partner searches repeat the same entries."""
+
     quarantined: list[Quarantined] = field(default_factory=list)  # removed (enforce)
     flagged: list[Quarantined] = field(default_factory=list)  # would be removed (shadow)
+    seen: set[Quarantined] = field(default_factory=set)
+
+    def add(self, record: Quarantined, kept: bool) -> bool:
+        """Record `record`; False if it was already reported (or the report is full): do not log it again."""
+        if record in self.seen or len(self.seen) >= MAX_REPORTE***REMOVED***
+            return False
+        self.seen.add(record)
+        (self.flagged if kept else self.quarantined).append(record)
+        return True
 
 
 class PackScreen:
@@ -104,12 +118,12 @@ class PackScreen:
             return True
         record = Quarantined(manifest.id, item_id, reason)
         if mode is ScreenMode.SHADOW:
-            self.report.flagged.append(record)
-            log.warning(
-                "pack_screen mode=shadow source=%s item=%s reason=%s (kept)", manifest.id, item_id, reason
-            )
+            if self.report.add(record, kept=True):
+                log.warning(
+                    "pack_screen mode=shadow source=%s item=%s reason=%s (kept)", manifest.id, item_id, reason
+                )
             return True
-        self.report.quarantined.append(record)
-        log.warning("pack_screen mode=enforce source=%s item=%s reason=%s (quarantined)", manifest.id, item_id,
+        if self.report.add(record, kept=False):
+            log.warning("pack_screen mode=enforce source=%s item=%s reason=%s (quarantined)", manifest.id, item_id,
                     reason)  # fmt: skip
         return False

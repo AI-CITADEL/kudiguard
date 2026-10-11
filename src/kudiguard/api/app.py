@@ -386,7 +386,7 @@ async def _check_in_slot(
                 outcome=answer.outcome,
                 intent=answer.intent.value if answer.intent else None,
                 transcript=None if answer.screen_action == "crisis" else text,  # sensitive: not kept
-                english=answer.english or None,
+                english=None if answer.screen_action == "crisis" else answer.english or None,
                 verdict=answer.verdict if answer.kind is AnswerKind.CHECK else None,
                 flags=answer.flags,
                 reply=answer.body,
@@ -413,8 +413,8 @@ def _check_response(
         explanation = messages.text(language, Msg.GREETING_REPLY)
     elif answer.kind is AnswerKind.CONTENT_FREE:
         explanation = messages.text(language, Msg.NOT_UNDERSTOOD)
-    else:
-        explanation = answer.body
+    else:  # a crisis message that is also a scam: the crisis reply first (docs/ABUSE.md)
+        explanation = "\n\n".join(p for p in (answer.preface, answer.body) if p)
     headline_key = VERDICT_HEADLINE.get(answer.verdict) if answer.kind is AnswerKind.CHECK else None
     return CheckResponse(
         verdict=answer.verdict.value if answer.kind is AnswerKind.CHECK else "not_a_check",
@@ -560,11 +560,13 @@ async def _admit_web_session(services: Services, settings: Settings, session: st
     if full:
         message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
         raise HTTPException(503, {"problem": "at_capacity", "message": message})
-    if not services.new_users.admit(services.hasher.user_id(f"web:{session}")):  # minted sessions (ABUSE.md)
-        message = plain_text(services.engine.messages.text(settings.default_language, Msg.NEW_USERS_BUSY))
+    if limit := services.new_users.refusal(key := services.hasher.user_id(f"web:{session}")):  # ABUSE.md
+        busy = Msg.NEW_USERS_BUSY if limit == "hour" else Msg.NEW_USERS_BUSY_TODAY
+        message = plain_text(services.engine.messages.text(settings.default_language, busy))
         raise HTTPException(
             503, {"problem": "busy_new_users", "message": message}, headers={"Retry-After": "3600"}
         )
+    services.new_users.reserve(key)
     pending.add(session)
     return True
 

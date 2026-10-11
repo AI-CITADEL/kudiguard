@@ -66,7 +66,7 @@ async def test_spoken_commands_never_act(h: Harness, case: dict[str, Any]) -> No
 async def test_crisis_reply_keeps_no_text_and_learns_nothing(h: Harness) -> None:
     await h.onboard("en")
     texts = await h.say(CRISIS)
-    assert texts == [h.t(Msg.CRISIS_REPLY)] and h.llm.requests == []
+    assert texts == [h.t(Msg.CRISIS_REPLY)] and not h.llm.calls(Purpose.COMPOSE)
     assert not h.messenger.sent[-1][1].buttons
     [row] = await interactions(h)
     assert row["intent"] == "screen:crisis" and row["transcript"] is None and row["verdict"] is None
@@ -246,6 +246,94 @@ async def test_unsupported_message_kinds_are_not_screened(h: Harness) -> None:
 
 def test_conversation_defaults_are_production_defaults(h: Harness) -> None:
     conversation = h.conversation
-    assert conversation._new_users.per_hour == 40 and conversation._new_users.per_day == 200
+    assert conversation._new_users.per_hour == 100 and conversation._new_users.per_day == 300
     assert conversation._flood.max_queued == 10 and conversation._learning.mode is ScreenMode.ENFORCE
     assert dataclasses.is_dataclass(Limits())
+
+
+# --- crisis before every gate; crisis that is also a scam --------------------------------------------------------
+
+CRISIS_SCAM = "I wan kill myself. Somebody text me say make I send BVN and OTP to unlock my account."
+
+
+async def test_crisis_as_the_first_ever_message(h: Harness) -> None:
+    """Before consent, the welcome and the language menu: the help comes first, and nothing is stored."""
+    assert await h.say(CRISIS) == [h.t(Msg.CRISIS_REPLY)]
+    assert await user(h) is None and await interactions(h) == [] and h.llm.requests == []
+
+
+async def test_crisis_from_a_new_user_in_hausa_gets_hausa_help(h: Harness) -> None:
+    assert await h.say("Sun cinye duk kudina, ina so in kashe kaina.") == [h.t(Msg.CRISIS_REPLY, "ha")]
+
+
+async def test_crisis_when_kudiguard_is_full_or_busy(h: Harness) -> None:
+    wire(h, limits=Limits(active_user_cap=1))
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert await h.say(CRISIS, user=OTHER) == [h.t(Msg.CRISIS_REPLY)]  # at capacity: help, not "full"
+    wire(h, new_users=NewUserGate(per_hour=1))
+    await h.say("hello", user="+2348000000001")
+    assert await h.say(CRISIS, user="+2348000000002") == [h.t(Msg.CRISIS_REPLY)]  # new-user gate
+
+
+async def test_crisis_from_a_rate_limited_user(h: Harness) -> None:
+    wire(h, limits=Limits(per_user_per_hour=1))
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert await h.say(CRISIS) == [h.t(Msg.CRISIS_REPLY)]  # no "rate limited" notice instead of help
+    assert len(await interactions(h)) == 1  # nothing stored for the crisis message
+
+
+async def test_crisis_that_is_also_a_scam_gets_help_then_the_check(h: Harness) -> None:
+    await h.onboard("en")
+    texts = await h.say(CRISIS_SCAM)
+    assert texts[0] == h.t(Msg.CRISIS_REPLY) and texts[1].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
+    assert texts.count(h.t(Msg.CRISIS_REPLY)) == 1
+    buttons = [b.id.split(":")[0] for b in h.messenger.sent[1][1].buttons]
+    assert Action.REPORT.value in buttons
+    [row] = await interactions(h)
+    assert row["intent"] == "screen:crisis" and row["transcript"] is None and row["english"] is None
+    assert await h.store.export_patterns() == []
+
+
+async def test_spoken_crisis_that_is_also_a_scam_is_not_echoed(h: Harness) -> None:
+    await h.onboard("en")
+    h.asr.text = CRISIS_SCAM
+    texts = await h.say(audio=VOICE_NOTE.read_bytes())
+    assert texts[1] == h.t(Msg.CRISIS_REPLY) and "kill myself" not in texts[2]
+    assert texts[2].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
+
+
+async def test_new_users_beyond_the_daily_cap_are_told_later(h: Harness) -> None:
+    wire(h, new_users=NewUserGate(per_hour=5, per_day=1))
+    await h.say("hello")
+    assert await h.say("hello", user=OTHER) == [h.t(Msg.NEW_USERS_BUSY_TODAY)]
+
+
+async def test_a_failed_pattern_write_uses_no_quota(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    gate = LearningGate(per_user_per_day=1)
+    wire(h, learning=gate, limits=Limits(per_user_per_hour=100))
+    await h.onboard("en")
+    original = h.store.add_pattern
+
+    async def broken(pattern: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(h.store, "add_pattern", broken)
+    await h.say(OTP_SCAM)
+    monkeypatch.setattr(h.store, "add_pattern", original)
+    await h.say("Someone asked me for my PIN on WhatsApp, is this a scam?")
+    assert len(await h.store.export_patterns()) == 1
+
+
+async def test_record_pattern_failure_without_a_gate(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime
+
+    from kudiguard.pipeline import record_pattern
+
+    async def broken(pattern: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(h.store, "add_pattern", broken)
+    answer = await h.engine.check(OTP_SCAM, "en")
+    await record_pattern(h.store, "whatsapp", answer, OTP_SCAM, datetime.now(UTC))  # never raises

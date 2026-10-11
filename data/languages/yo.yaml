@@ -63,8 +63,9 @@ abuse:
     - 'alert\W+iro'
     - 'ran\W+mi\W+lowo\W+(?:lati\W+)?ko\W+ifiranse\W+pe'
   injection:
+    - 'system\W*prompt\W+(?:re|e)\b'
     - 'gbagbe\W+(?:gbogbo\W+)?(?:awon\W+)?ilana'
-    - 'ma\W+(?:se\W+)?tele\W+(?:\w+\W+){0,1}?ofin'
+    - 'ma\W+(?:se\W+)?tele\W+ofin\W+(?:re|e|yin)\b'
     - 'iwo\W+ni\W+(?:osise|asoju|customer\W+care)\W+(?:\w+\W+){0,2}?(?:bayi|nisisiyi)'
     - 'se\W+bi\W+enipe\W+iwo\W+ni'
     - 'ilana\W+(?:\w+\W+){0,1}?ti\W+won\W+fun\W+e'
@@ -73,7 +74,9 @@ abuse:
     - 'lati\W+(?:isiyi|bayi)\W+lo\W+(?:dahun|so)'
     - 'so\W+pe\W+(?:ifiranse\W+)?(?:yi\W+|yii\W+|eleyi\W+)?(?:ki\W+i\W+se\W+(?:jibiti|etan)|dara|je\W+ooto)'
   asr_hallucinations:
-    - 'orin|e\W+se\W+fun\W+wiwo'
+    - 'e\W+se\W+fun\W+wiwo'
+  asr_annotations:
+    - 'orin'
   persona_claims:
     - '(?:emi\W+ni|awa\W+ni)\W+(?:osise|asoju)\W+(?:\w+\W+){0,1}?banki'
 
@@ -185,14 +188,17 @@ strings:
   risk_nigeria: "Dátà tí ó ń kọjá láàárín Meta àti Cloudflare lè jẹ́ ṣíṣe lókè òkun, níbi tí òfin ààbò dátà Nàìjíríà lè má ṣiṣẹ́ pátápátá."
   # Sent before the welcome reached the user: not taken as consent. DRAFT.
   read_welcome: "☝️ Ẹ jọ̀ọ́ ẹ ka ọ̀rọ̀ tí ó wà lókè, lẹ́yìn náà ẹ fèsì láti tẹ̀síwájú."
-  # Malicious-use screens. DRAFT, pending native review. Help numbers verified 2026-10-10: see en.yaml crisis_reply.
+  # Help numbers verified 2026-10-11 (sources and dates: en.yaml crisis_reply). DRAFT wording, pending native
+  # review; respectful "ẹ" forms throughout.
   crisis_reply: |-
-    💛 Ó dùn mí gidigidi fún ohun tí ò ń là kọjá. O ṣe pàtàkì, o kò sì dá wà.
-    Tí o bá lè ṣe ara rẹ léṣe tàbí tí o bá wà nínú ewu báyìí, pe *112* (nọ́mbà pàjáwìrì ọ̀fẹ́) tàbí lọ sí ilé-ìwòsàn tó sún mọ́ ọ jù.
-    O lè bá ẹnìkan sọ̀rọ̀ lórí ìlà ìrànlọ́wọ́ *SURPIN*, ọ̀fẹ́ àti ṣíṣí fún wákàtí 24: *0800 078 7746*.
-    Jọ̀wọ́ sọ fún ẹnìkan tí o gbẹ́kẹ̀lé bí ara rẹ ṣe rí lónìí.
-    Nígbà tí o bá ṣetán, mo lè ràn ọ́ lọ́wọ́ pẹ̀lú ọ̀rọ̀ owó náà: pe báǹkì rẹ lórí nọ́mbà tó wà lórí káàdì rẹ kí o sì sọ ohun tó ṣẹlẹ̀ fún wọn.
+    💛 Ó dùn mí gidigidi fún ohun tí ẹ ń là kọjá. Ẹ ṣe pàtàkì, ẹ kò sì dá wà.
+    Tí ẹ bá rò pé ẹ lè ṣe ohun tí ẹ ń rò yìí, tàbí tí ẹ bá wà nínú ewu, ẹ pe *112* (nọ́mbà pàjáwìrì ọ̀fẹ́) tàbí kí ẹ lọ sí ilé-ìwòsàn tó sún mọ́ yín jù.
+    Ẹ lè bá ẹnìkan sọ̀rọ̀ lórí ìlà ìrànlọ́wọ́ *SURPIN*, tí ó ṣí fún wákàtí 24: *0800 078 7746* (ọ̀fẹ́), tàbí *0903 440 0009* / *0908 021 7555*.
+    Ẹ jọ̀wọ́ sọ fún ẹnìkan tí ẹ gbẹ́kẹ̀lé bí ara yín ṣe rí lónìí.
+    Nígbà tí ẹ bá ṣetán, mo lè ràn yín lọ́wọ́ pẹ̀lú ọ̀rọ̀ owó náà: ẹ pe báǹkì yín lórí nọ́mbà tó wà lórí káàdì yín kí ẹ sì sọ ohun tó ṣẹlẹ̀ fún wọn.
   abuse_reply: "🙏 Mo wà níbí láti ràn ọ́ lọ́wọ́ nípa ààbò owó. Jọ̀wọ́ jẹ́ kí ọ̀rọ̀ wa jẹ́ ti ọ̀wọ̀. Fi ọ̀rọ̀ tí o kò dá lójú ránṣẹ́ sí mi, tàbí béèrè ìbéèrè nípa owó."
   scam_tool_reply: "🚫 Mi ò lè kọ, túmọ̀ tàbí tún ọ̀rọ̀ tí ó ń díbọ́n pé òun jẹ́ báǹkì tàbí ilé-iṣẹ́ ṣe, tàbí èyí tí ó ń béèrè owó tàbí kóòdù lọ́wọ́ ènìyàn. Mo lè ṣàyẹ̀wò ọ̀rọ̀ kan fún ọ, tàbí ṣàlàyé bí o ṣe lè dáàbò bo ara rẹ."
   new_users_busy: "⏳ Ọ̀pọ̀ àwọn olùmúlò tuntun ló wà lórí KudiGuard báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn wákàtí kan."
+  new_users_busy_today: "⏳ KudiGuard ti gba ọ̀pọ̀ olùmúlò tuntun lónìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i nígbà míì."
+  screen_neutral: "ℹ️ Mo máa ń ṣàyẹ̀wò ọ̀rọ̀ tí ẹ kò dá lójú, mo sì ń dáhùn ìbéèrè nípa owó; mi ò lè yí bí mo ṣe ń ṣiṣẹ́ padà. Ẹ fi ọ̀rọ̀ tí ẹ fẹ́ kí n ṣàyẹ̀wò ránṣẹ́."
   voice_limit: "🎧 O ti fi ọ̀pọ̀ ohùn ránṣẹ́ láàárín àkókò kúkúrú. Jọ̀wọ́ dúró díẹ̀, tàbí kọ ọ̀rọ̀ rẹ."

@@ -275,6 +275,7 @@ def build_abuse_screens(settings: Settings, registry: LanguageRegistry) -> dict[
         scam_tool=ScreenMode(settings.abuse_scam_tool_mode),
         abuse=ScreenMode(settings.abuse_harassment_mode),
         injection=ScreenMode(settings.abuse_injection_mode),
+        injection_suspect=ScreenMode(settings.abuse_injection_suspect_mode),
     )
     log.info("abuse screens: %s, replies %s, transcripts %s", modes, settings.reply_screen_mode,
              settings.asr_hallucination_mode)  # fmt: skip

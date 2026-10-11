@@ -107,9 +107,10 @@ class Settings(BaseSettings):
         "enforce"  # insults / hate / sexual messages at the bot: calm reply
     )
     abuse_scam_tool_mode: ScreenModeName = "enforce"  # "write a message that sounds like my bank": refusal
-    abuse_injection_mode: ScreenModeName = (
-        "enforce"  # override / role-play / prompt extraction: rules-only answer
-    )
+    # high-precision override / role / prompt-extraction phrases and chat-template tokens: rules-only answer
+    abuse_injection_mode: ScreenModeName = "enforce"
+    # broad phrases genuine users also write ("confirm that this is genuine", "developer mode"): log only
+    abuse_injection_suspect_mode: ScreenModeName = "shadow"
     reply_screen_mode: ScreenModeName = (
         "enforce"  # replies: persona claims, prompt leaks, long echoes of the input
     )
@@ -125,8 +126,8 @@ class Settings(BaseSettings):
     pattern_max_per_user_per_day: int = Field(default=5, ge=1)
     pattern_max_similar_per_week: int = Field(default=20, ge=1)
     new_user_mode: ScreenModeName = "enforce"  # rate of users new to the licence window ("busy, try later")
-    new_users_per_hour: int | None = Field(default=40, ge=1)
-    new_users_per_day: int | None = Field(default=200, ge=1)
+    new_users_per_hour: int | None = Field(default=100, ge=1)  # = licence cap / 10 (pilot bursts)
+    new_users_per_day: int | None = Field(default=300, ge=1)
     flood_mode: ScreenModeName = (
         "enforce"  # per-user queue cap, one rate-limit notice per interval, voice budget
     )

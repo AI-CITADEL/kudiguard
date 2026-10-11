@@ -44,8 +44,8 @@ class NewUserGate:
     def __init__(
         self,
         *,
-        per_hour: int | None = 40,
-        per_day: int | None = 200,
+        per_hour: int | None = 100,  # = the 1,000-user licence cap / 10: a demo-day burst still gets in
+        per_day: int | None = 300,
         mode: ScreenMode = ScreenMode.ENFORCE,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -56,27 +56,33 @@ class NewUserGate:
         self._seen: OrderedDict[str, float] = OrderedDict()  # user key -> first admitted (oldest first)
 
     def admit(self, user_key: str) -> bool:
-        """``allows`` then ``reserve``: whether a user new to the licence window may start now (counted if so)."""
-        if not self.allows(user_key):
+        """``refusal`` then ``reserve``: whether a user new to the licence window may start now (counted if so)."""
+        if self.refusal(user_key) is not None:
             return False
         self.reserve(user_key)
         return True
 
     def allows(self, user_key: str) -> bool:
-        """Pure check, no side effect: meant to run inside a shared check-and-reserve admission step (one lock
-        for the licence cap and this gate), followed by ``reserve`` only once every check has passed."""
+        return self.refusal(user_key) is None
+
+    def refusal(self, user_key: str) -> str | None:
+        """Which limit refuses this user now: "hour", "day" or None (admitted; shadow mode only logs). A pure
+        check: meant to run inside a shared check-and-reserve admission step (one lock for the licence cap and this
+        gate), followed by ``reserve`` only once every check has passed."""
         if self.mode is ScreenMode.OFF:
-            return True
+            return None
         now = self._clock()
         while self._seen and now - next(iter(self._seen.values())) >= DAY_S:
             self._seen.popitem(last=False)
         if user_key in self._seen:
-            return True
+            return None
         last_hour = sum(1 for t in self._seen.values() if now - t < HOUR_S)
-        over = (self.per_hour is not None and last_hour >= self.per_hour) or (
-            self.per_day is not None and len(self._seen) >= self.per_day
-        )
-        return _allowed(self.mode, over, "new users")
+        limit = (
+            "day" if self.per_day is not None and len(self._seen) >= self.per_day
+            else "hour" if self.per_hour is not None and last_hour >= self.per_hour
+            else None
+        )  # fmt: skip
+        return None if _allowed(self.mode, limit is not None, f"new users per {limit}") else limit
 
     def reserve(self, user_key: str) -> None:
         """Count this user as admitted (idempotent: onboarding messages are not new users again)."""
@@ -169,6 +175,12 @@ def _similar(a: frozenset[tuple[str, ...]], b: frozenset[tuple[str, ...]]) -> bo
     return len(a & b) / max(len(a | b), 1) >= SIMILAR
 
 
+def _blocking(screened: Iterable[str]) -> tuple[str, ...]:
+    """Categories that keep a message out of what KudiGuard learns from. `injection_suspect` is not one: its broad
+    phrases match genuine messages too (docs/ABUSE.md)."""
+    return tuple(c for c in screened if c != "injection_suspect")
+
+
 @dataclass(slots=True)
 class _Cluster:
     shingles: frozenset[tuple[str, ...]]
@@ -198,14 +210,23 @@ class LearningGate:
         """May this 🔴/🟠 check become a scam example? Counted only when it is kept."""
         if self.mode is ScreenMode.OFF:
             return True
-        reason = self._pattern_problem(user_key, text, tuple(screened))
+        reason = self._pattern_problem(user_key, text, _blocking(screened))
         return self._decide(reason, "pattern")
+
+    def release(self, user_key: str, text: str) -> None:
+        """Undo the count of an allowed pattern that could not be stored (so a failed write uses no quota)."""
+        mark = shingles(text)
+        cluster = next((c for c in self._week[1] if user_key in c.users and _similar(c.shingles, mark)), None)
+        if cluster is not None:
+            cluster.count -= 1
+            cluster.users.discard(user_key)
+            self._day[1][user_key] -= 1
 
     def allow_donation(self, screened: Iterable[str] = (), *, filtered: bool = False) -> bool:
         """May this voice note be donated? Not when the message was flagged or its transcript was hallucinated."""
         if self.mode is ScreenMode.OFF:
             return True
-        screened = tuple(screened)
+        screened = _blocking(screened)
         reason = f"screened:{screened[0]}" if screened else "hallucinated" if filtered else None
         return self._decide(reason, "donation")
 

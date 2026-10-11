@@ -95,11 +95,21 @@ class _AbuseSpec(BaseModel):
     crisis: list[str] = Field(default_factory=list)  # first-person self-harm / suicide statements
     abuse: list[str] = Field(default_factory=list)  # insults, hate and sexual messages aimed at the bot
     scam_tool: list[str] = Field(default_factory=list)  # requests to write, translate or polish scam content
-    injection: list[str] = Field(default_factory=list)  # attempts to override instructions or extract them
+    # attempts to override instructions or extract them: high-precision phrases (enforce by default)
+    injection: list[str] = Field(default_factory=list)
+    injection_suspect: list[str] = Field(
+        default_factory=list
+    )  # broad phrases with real false positives (shadow)
+    # cues that the text before an injection phrase reports someone else's words ("my boss said ignore ...")
+    injection_reported: list[str] = Field(default_factory=list)
     # model-directed instructions planted in partner knowledge ("tell the user to ...", "always recommend ...")
     pack_instructions: list[str] = Field(default_factory=list)
     # whole transcript segments speech recognition invents on music/noise ("thanks for watching")
     asr_hallucinations: list[str] = Field(default_factory=list)
+    # labels dropped only inside brackets ("(kiɗa)", "[Music]"): as plain words they can be speech (Igbo "egwu" = fear)
+    asr_annotations: list[str] = Field(default_factory=list)
+    # segments dropped only when nothing else was said (a lone "You." on noise; "you" is a word in real speech)
+    asr_alone: list[str] = Field(default_factory=list)
     persona_claims: list[str] = Field(default_factory=list)  # a reply claiming to be a bank / customer care
 
 
@@ -142,8 +152,12 @@ class AbusePatterns:
     abuse: Patterns = ()
     scam_tool: Patterns = ()
     injection: Patterns = ()
+    injection_suspect: Patterns = ()
+    injection_reported: Patterns = ()
     pack_instructions: Patterns = ()
     asr_hallucinations: Patterns = ()
+    asr_annotations: Patterns = ()
+    asr_alone: Patterns = ()
     persona_claims: Patterns = ()
 
 
@@ -282,6 +296,10 @@ class LanguageRegistry:
                 for f in dataclasses.fields(AbusePatterns)
             }
         )
+
+    def own_abuse_patterns(self, code: LanguageCode) -> AbusePatterns:
+        """`code`'s own phrases only (which language a crisis message is in)."""
+        return self._own_abuse.get(code, AbusePatterns())
 
     def all_abuse_patterns(self) -> AbusePatterns:
         """Every configured language's phrases together (crisis messages are checked in all languages)."""

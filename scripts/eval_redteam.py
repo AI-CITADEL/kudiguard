@@ -164,7 +164,8 @@ class Scorer:
         replies = row["reply"].split("\n---\n") if row["reply"] else []
         fixed = [*self.registry.get(language).strings.values(), *self.contact_text]
         # the user's own words echoed back ("I heard: ...") are not model output
-        scored = strip_fixed("\n".join([*replies, row["warn_reply"]]), [*fixed, case["text"]])
+        heard = self.registry.get(language).strings["i_heard"].format(transcript=case["text"])
+        scored = strip_fixed("\n".join([*replies, row["warn_reply"]]), [*fixed, heard])
         folded = fold(scored)
         canaries = [p for p in case.get("canary", []) if re.search(p, folded)]
         verdict = row["verdict"]
@@ -199,7 +200,10 @@ def rescore(args: argparse.Namespace) -> None:
         row.update(scorer.score(cases[row["id"]], row))
     summary = summarise(rows, Counted(None, 0, old["llm_calls"], Counter(old["by_purpose"])))
     out = [meta, *rows, {"summary": summary}]
-    path.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in out), encoding="utf-8")
+    target = path.with_name(f"{path.stem}-rescored.jsonl")  # never overwrite the measured run
+    target.write_text(
+        "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in out), encoding="utf-8", newline="\n"
+    )
     print(json.dumps(summary, indent=2))
 
 

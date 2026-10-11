@@ -14,6 +14,7 @@ from kudiguard.config import Settings
 from kudiguard.donation import DONATION_VERSION, Sealer, VoiceVault
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageRegistry
+from kudiguard.llm.base import Purpose
 from kudiguard.privacy import MIN_SECRET_BYTES
 from kudiguard.render import plain_text
 from kudiguard.safety.abuse import ScreenMode
@@ -53,7 +54,7 @@ async def test_web_crisis_reply_keeps_no_text(api: Api, registry: LanguageRegist
     assert body["verdict"] == "not_a_check" and body["headline"] is None
     assert body["explanation"] == plain_text(Messages(registry).text("en", Msg.CRISIS_REPLY))
     [row] = await api.store.export_interactions()
-    assert row["transcript"] is None and api.llm.requests == []
+    assert row["transcript"] is None and not api.llm.calls(Purpose.COMPOSE)
 
 
 async def test_web_pattern_flood_keeps_one_example(api: Api) -> None:
@@ -83,7 +84,7 @@ def test_settings_defaults_and_validation() -> None:
     assert (config.abuse_crisis_mode, config.abuse_injection_mode, config.reply_screen_mode) == (
         "enforce", "enforce", "enforce"
     )  # fmt: skip
-    assert config.pack_screen_core_mode == "shadow" and config.new_users_per_hour == 40
+    assert config.pack_screen_core_mode == "shadow" and config.new_users_per_hour == 100
     unset = Settings(_env_file=None, new_users_per_day="", voice_notes_per_user_per_hour=" ")  # type: ignore[call-arg, arg-type]
     assert unset.new_users_per_day is None and unset.voice_notes_per_user_per_hour is None
     with pytest.raises(ValidationError, match="cannot exceed"):
@@ -127,3 +128,25 @@ async def test_build_services_wires_the_defences(tmp_path: Path, monkeypatch: py
         assert services.engine.screen.modes.scam_tool is ScreenMode.SHADOW
     finally:
         await services.aclose()
+
+
+async def test_web_new_users_beyond_the_daily_cap(api: Api, registry: LanguageRegistry) -> None:
+    api.app.state.services.new_users = NewUserGate(per_hour=5, per_day=1)
+    assert (
+        await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(1))
+    ).status_code == 200
+    busy = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(2))
+    assert busy.json()["detail"]["message"] == plain_text(
+        Messages(registry).text("en", Msg.NEW_USERS_BUSY_TODAY)
+    )
+
+
+async def test_web_crisis_that_is_also_a_scam(api: Api, registry: LanguageRegistry) -> None:
+    message = "I wan kill myself. Somebody text me say make I send BVN and OTP to unlock my account."
+    body = (await api.client.post("/web/check", data={"text": message}, headers=WEB)).json()
+    messages = Messages(registry)
+    assert body["verdict"] == "likely_scam" and body["report_channels"]
+    assert body["explanation"].startswith(plain_text(messages.text("en", Msg.CRISIS_REPLY)))
+    [row] = await api.store.export_interactions()
+    assert row["transcript"] is None and row["english"] is None
+    assert await api.store.export_patterns() == []

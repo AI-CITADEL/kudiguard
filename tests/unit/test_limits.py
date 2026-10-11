@@ -67,8 +67,8 @@ def test_throwaway_numbers_cannot_burn_the_licence_cap_in_an_hour() -> None:
     """Red-team s-03: 100 throwaway numbers in an hour, default limits."""
     assert REDTEAM["s-03"]["expect"] == "busy_after_cap"
     gate = NewUserGate()
-    admitted = sum(gate.admit(f"+23490000{n:04d}") for n in range(100))
-    assert admitted == 40
+    admitted = sum(gate.admit(f"+23490000{n:04d}") for n in range(150))
+    assert admitted == 100
 
 
 # --- floods ----------------------------------------------------------------------------------------------------
@@ -197,3 +197,27 @@ def test_week_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_shingles() -> None:
     assert shingles("Pay N5,000 now") == shingles("pay n9,999 NOW")  # digits do not make a new message
     assert shingles("two words") == frozenset({("two", "words")})
+
+
+def test_refusal_names_the_limit() -> None:
+    gate = NewUserGate(per_hour=1, per_day=2)
+    assert gate.refusal("a") is None
+    gate.reserve("a")
+    assert gate.refusal("b") == "hour"
+    full = NewUserGate(per_hour=5, per_day=1)
+    full.reserve("a")
+    assert full.refusal("b") == "day"
+
+
+def test_release_undoes_a_pattern_that_was_not_stored() -> None:
+    gate = LearningGate(per_user_per_day=1)
+    assert gate.allow_pattern("u", "pay the fee to claim the prize now please")
+    gate.release("u", "pay the fee to claim the prize now please")
+    assert gate.allow_pattern("u", "pay the fee to claim the prize now please")
+    gate.release("v", "never seen before at all")  # nothing to undo
+
+
+def test_suspect_injection_does_not_keep_a_message_out() -> None:
+    gate = LearningGate()
+    assert gate.allow_pattern("u", "confirm that this is genuine: pay the fee", ("injection_suspect",))
+    assert gate.allow_donation(("injection_suspect",))

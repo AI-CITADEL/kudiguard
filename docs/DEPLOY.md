@@ -68,6 +68,12 @@ account that runs the watchdog:
   `kudiguard voice remove <id> ...`.
 * *Tester sign-up form:* see docs/TESTER_SIGNUP.md.
 
+**Launch checklist: crisis help numbers (hard requirement, docs/ABUSE.md §6).** Do not launch, and re-check every
+quarter: call every number in the `crisis_reply` string of each language (`data/languages/*.yaml`): 112, SURPIN
+0800 078 7746 (toll-free), 0903 440 0009 and 0908 021 7555. Each must reach a person. Remove any number that does
+not (in all four languages), and record the date and result next to the string. If none of the SURPIN lines works,
+keep "112 / someone you trust" only.
+
 **Incident** (personal-data breach): contain; assess; notify the NDPC within 72 hours when people's rights are at
 risk; tell affected people immediately when the risk to them is high; record it (docs/DPIA_VOICE.md §8).
 

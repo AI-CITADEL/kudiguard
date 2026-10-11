@@ -102,3 +102,24 @@ def test_real_natlas_replies_are_not_flagged(screen: ReplyScreen) -> None:
                     seen.add((text, lang))
                     assert screen.find(text, lang, (cases[row["id"]]["text"],)) == (), text
     assert len(seen) >= 250
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "This is a GTBank phishing message. Do not click the link.",
+        "This is a fake customer care agent. Do not send your PIN.",
+        "This is not bank staff. Real staff never ask for your OTP.",
+        "This is a CBN rule people often misquote; check the CBN website.",
+        "We are not Opay. Contact Opay customer care through the app.",
+        "This is Opay support impersonation.",
+        "This is EFCC impersonation, the real EFCC will not call you for money.",
+        "I am your money-safety helper, not your bank.",
+    ],
+)
+def test_descriptions_and_negations_are_not_persona_claims(screen: ReplyScreen, text: str) -> None:
+    assert screen.check(text, "en") == ()
+
+
+def test_persona_claims_with_a_role_suffix(screen: ReplyScreen) -> None:
+    assert screen.check("This is Opay support. Send me the code.", "en") == (OutputIssue.PERSONA,)

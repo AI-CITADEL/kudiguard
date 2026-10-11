@@ -41,7 +41,7 @@ from kudiguard.languages import LanguageStatus
 from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
 from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
-from kudiguard.safety.abuse import Category
+from kudiguard.safety.abuse import INJECTIONS, Category
 from kudiguard.safety.limits import FloodGuard, LearningGate, NewUserGate
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
@@ -183,6 +183,7 @@ class _Turn:
     calm_answer: bool = False  # answered, and not a scam warning: a fair moment to offer voice donation
     received_at: datetime | None = None  # when the turn started (donation consent must stand at this time)
     screened: tuple[str, ...] = ()  # abuse-screen categories of the checked message (never donated)
+    crisis_sent: bool = False  # the crisis reply already went out (before any gate), never twice
     # Own (not forwarded) voice notes of this turn with their transcripts, for donation after the reply.
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
 
@@ -439,6 +440,8 @@ class Conversation:
         if match.command is Command.STOP_DONATING:  # withdrawal works for everyone, at any time
             await self._withdraw_donation(turn, user)
             return
+        if message.kind is MessageKind.TEXT and await self._crisis_first(turn, user):
+            return
         if (refusal := await self._admission(turn)) is not None:
             await self._send(turn, self._messages.text(turn.language, refusal))
             return
@@ -452,6 +455,21 @@ class Conversation:
             await self._set_language(turn, user, chosen)
             return
         await self._dispatch(turn, dataclasses.replace(user, last_seen_at=self._clock()), match)
+
+    async def _crisis_first(self, turn: _Turn, user: UserState | None) -> bool:
+        """A typed crisis message gets the crisis reply at once, before consent, the licence cap, the new-user gate
+        and the rate limit (docs/ABUSE.md). Returns True when the turn ends here: the user could not be checked
+        now, and nothing about the message is stored. Otherwise the check follows (its crisis reply is not sent
+        twice); a voice note is only known to be a crisis after transcription, inside the check."""
+        text = turn.message.text or ""
+        if not self._engine.screen.crisis(text):
+            return False
+        if user is None or not user.language:  # first contact: answer in the language the message is in
+            turn.language = self._engine.screen.crisis_language(text) or turn.language
+        await self._send(turn, self._messages.text(turn.language, Msg.CRISIS_REPLY))
+        turn.crisis_sent = True
+        ready = user is not None and not user.stopped and _consented(user)
+        return not (ready and await self._admission(turn) is None and not await self._rate_limited(turn))
 
     async def _onboard(
         self, turn: _Turn, user: UserState | None, match: Match, chosen: LanguageCode | None
@@ -657,13 +675,22 @@ class Conversation:
             )
             return
 
+        # A crisis message that is also a scam: the crisis reply first, then the check. Its words are kept nowhere
+        # (not in the log, the English field, the "I heard" echo or the pattern library).
+        private = answer.screen_action == Category.CRISIS
+        echo = turn.transcript if turn.voice and not private else None
+        if private:
+            turn.transcript = None
+            answer = dataclasses.replace(answer, english="")
+        if answer.preface and not turn.crisis_sent:
+            await self._send(turn, answer.preface)
         turn.calm_answer = answer.verdict not in REPORT_VERDICTS
         reply = render_check_reply(
             self._messages,
             turn.language,
             verdict=answer.verdict,
             body=answer.body,
-            transcript=turn.transcript if turn.voice else None,
+            transcript=echo,
             contacts=answer.contacts,
         )
         intent = f"screen:{answer.screen_action}" if answer.screen_action else None
@@ -687,7 +714,7 @@ class Conversation:
         )
         if answer.verdict in REPORT_VERDICTS:
             # No "Warn my family" for a message with injected instructions: the model would write from it.
-            injected = answer.screen_action == Category.INJECTION
+            injected = answer.screen_action in INJECTIONS
             actions = tuple(
                 Button(button_id(action, interaction_id), self._messages.text(turn.language, title))
                 for action, title in (
@@ -715,7 +742,8 @@ class Conversation:
             reply=answer.body,
             intent=f"screen:{answer.screen_action}",
         )
-        await self._send(turn, answer.body)
+        if not (answer.screen_action == Category.CRISIS and turn.crisis_sent):
+            await self._send(turn, answer.body)
 
     async def _follow_up(self, turn: _Turn, parsed: tuple[Action, str] | None) -> None:
         if parsed is None or parsed[0] is Action.LANGUAGE:  # stale/unknown button, or an invalid language id
@@ -966,7 +994,10 @@ class Conversation:
         # sub-cap in the web endpoint, so they can never use up more than their share (review M9).
         if await self._store.count_active_users_since(since) >= cap:
             return Msg.AT_CAPACITY
-        return None if self._new_users.admit(turn.user_hash) else Msg.NEW_USERS_BUSY
+        if limit := self._new_users.refusal(turn.user_hash):
+            return Msg.NEW_USERS_BUSY if limit == "hour" else Msg.NEW_USERS_BUSY_TODAY
+        self._new_users.reserve(turn.user_hash)  # only after the cap passed: a refused user uses no quota
+        return None
 
     async def _rate_limited(self, turn: _Turn) -> bool:
         since = self._clock() - timedelta(hours=1)
@@ -1051,6 +1082,8 @@ async def record_pattern(
     """
     if answer.verdict not in REPORT_VERDICTS or channel not in PATTERN_CHANNELS or not text.strip():
         return
+    if answer.screen_action == Category.CRISIS:  # sensitive: never kept, whatever the learning gate's mode
+        return
     if gate is not None and not gate.allow_pattern(user_key, text, answer.screened):
         return
     try:
@@ -1063,6 +1096,8 @@ async def record_pattern(
         )  # fmt: skip
     except Exception:
         log.exception("could not record a scam pattern")
+        if gate is not None:
+            gate.release(user_key, text)  # counted only once it is really kept
 
 
 def _before_welcome(message: InboundMessage, user: UserState | None) -> bool:
