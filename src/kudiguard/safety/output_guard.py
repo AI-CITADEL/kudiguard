@@ -61,9 +61,13 @@ class OutputGuard:
             issues.append(OutputIssue.SAFETY_CLAIM)
         if any(p.search(folded) for p in patterns.refusals):
             issues.append(OutputIssue.REFUSAL)
-        # quoted speech ("Fraudsters say \"send your PIN\" to scare you") is not an instruction to the user
+        # quoted speech ("Fraudsters say \"send your PIN\" to scare you") is not an instruction to the user; a quote
+        # the user is told to say is also read as its own clause ('Write "here is my password" in the chat')
+        quoted = _unify_quotes(folded)
         unquoted = [
-            (m.group(1), m.group(2).startswith("?")) for m in _SENTENCE.finditer(_mask_speech(folded))
+            (m.group(1), m.group(2).startswith("?"))
+            for variant in (_mask_speech(quoted), _split_told(quoted))
+            for m in _SENTENCE.finditer(variant)
         ]
         if any(_unsafe_sentence(s, patterns) for s, question in unquoted if not question):
             issues.append(OutputIssue.UNSAFE_INSTRUCTION)
@@ -80,7 +84,7 @@ class OutputGuard:
         introduces what follows ("Scammers often say:", "Tell the caller this:") and quoted or negated scripts after
         one ("Tell him: no, ..."). An instruction before a colon ("Reply with your card details: ...") is scored."""
         patterns = self._registry.guard_patterns(language)
-        folded = normalize(text)
+        folded = _unify_quotes(normalize(text))
         quoted = _speech_spans(folded)
         units: list[Unit] = []
         for match in _SENTENCE.finditer(folded):
@@ -138,15 +142,42 @@ def _speech_spans(text: str) -> list[tuple[int, int]]:
         )
         clause = _CLAUSE_START.split(before)[-1]
         told = _TOLD_TO_SAY.match(clause) is not None
-        if introduced and not told and not _ADOPTED.match(text, end + 1):
+        refusal = (
+            _REFUSAL_SCRIPT.match(text, start) is not None
+        )  # 'Tell him "I don't give my PIN"': a refusal
+        if (introduced and not told and not _ADOPTED.match(text, end + 1)) or (told and refusal):
             spans.append((start, end))
     return spans
+
+
+def _split_told(text: str) -> str:
+    """``text`` with quoted speech masked and every other quote of 3+ words opened by ";" instead of its mark (and its
+    closing mark blanked), so it is checked as its own clause: the user is told to say it."""
+    chars = list(text)
+    speech = set(_speech_spans(text))
+    for start, end in _quoted_spans(text):
+        if (start, end) not in speech and len(_words(text[start:end])) >= 3:
+            chars[start - 1], chars[end] = ";", " "
+    return _mask_speech("".join(chars))
+
+
+def _unify_quotes(text: str) -> str:
+    """Single quotes used as quotation marks (folding turns curly ones into "'") become double quotes; apostrophes
+    ("don't", "the bank's") stay. Same length, so positions do not move."""
+    return _SINGLE_QUOTED.sub(lambda m: '"' + m.group(1) + '"', text)
+
+
+_SINGLE_QUOTED = re.compile(r"(?<![\w'])'(?=\w)([^\n]*?[\w.!?,])'(?![\w'])")
+_REFUSAL_SCRIPT = re.compile(
+    r"\W*(?:[\w']+\W+){0,3}?(?:no|not|never|don't|dont|won't|wont|can't|cannot|refuse)\b"
+)
 
 
 # the clause tells the user to say or write the quote: "tell him:", "just say", "reply to the caller:", "read out"
 _CLAUSE_START = re.compile(r"[.!?\n]\s*")
 _TOLD_TO_SAY = re.compile(
-    r"\W*(?:(?:please|kindly|just|then|now|simply|quickly|so)\s+)*"
+    r"\W*(?:(?:when|if|once|after|as\s+soon\s+as|before)\b[^,]*,\s*)?"
+    r"(?:(?:please|kindly|just|then|now|simply|quickly|so)\s+)*"
     r"(?:tell|say|reply|answer|text|write|message|read(?:\s+out)?|type|send|respond)\b"
 )
 # '"Send the OTP to the agent now," is what you should do', '"..." and send it to him'

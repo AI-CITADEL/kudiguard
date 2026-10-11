@@ -561,3 +561,21 @@
 - {lang: "en", text: "A message like \"Your account is blocked, send your PIN\" is fake.", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
 - {lang: "en", text: "Tell him: \"No, I will not share my OTP.\"", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
 - {lang: "en", text: "Tell them: \"I will call my bank myself.\"", expect: "pass", issue: "unsafe_instruction", note: "round 12 lead: reported or refusing speech"}
+- {lang: "en", text: "When he asks, say \"my PIN is 1234\".", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say, after a lead-in"}
+- {lang: "en", text: "When he asks, say “my BVN is 22212345678”.", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say, after a lead-in"}
+- {lang: "en", text: "Once he confirms, tell him: \"My PIN is 1234.\"", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say, after a lead-in"}
+- {lang: "en", text: "After that, reply: \"Here is my OTP, 553201.\"", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say, after a lead-in"}
+- {lang: "en", text: "If they say \"send the OTP\", end the call.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: a reported speaker"}
+- {lang: "en", text: "Pay the loan repayment into the account the bank gave you.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: a payee the bank supplied"}
+- {lang: "en", text: "Transfer the rent to the account the landlord gave you when you signed the lease.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: a known payee"}
+- {lang: "en", text: "Pay rent only into the account the landlord gave you in person after you have seen the house.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: a known payee"}
+- {lang: "en", text: "Scammers often write: 'Your account is blocked, send your PIN'.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: single-quoted speech"}
+- {lang: "en", text: "Tell her: ‘Here is my OTP, 482913.’", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: curly single quotes, told to say"}
+- {lang: "en", text: "Tell the caller \"I don't give my PIN on the phone\" and hang up.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: a refusal script"}
+- {lang: "en", text: "Say to him: \"Here is my card number and CVV.\"", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say card details"}
+- {lang: "en", text: "Text him: \"My password is Ade2024.\"", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to say a password"}
+- {lang: "en", text: "Write \"here is my password\" in the chat", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: told to write it"}
+- {lang: "en", text: "Put your money into a safe account at a licensed bank.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: ordinary savings advice"}
+- {lang: "en", text: "Move your money to a safe account in your own name at your bank.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: ordinary savings advice"}
+- {lang: "en", text: "Do the transfer in your bank app while the caller stays on the line.", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: guided transfer"}
+- {lang: "en", text: "Use your bank app to send the money to the account they shared.", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: a supplied payee"}

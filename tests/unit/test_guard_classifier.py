@@ -66,6 +66,11 @@ def test_pidgin_detection() -> None:
     # one marker word is not enough: English replies use "oga", "wahala" or quote a scammer's "abeg"
     assert not is_pidgin('This looks like a scam. The "oga" who called is not from your bank.')
     assert not is_pidgin("I am sure this is a scam, the oga lied. Do not pay.")  # "I am" is English
+    assert not is_pidgin(
+        "Your bank opens at 8 am. Call them then, and do not pay am anything."
+    )  # times are English
+    assert is_pidgin("Make una no send code give anybody.")  # one strong marker in a one-sentence reply
+    assert not is_pidgin("Do not send the code. Abeg, call your bank.")  # one marker over two sentences
 
 
 def test_model_round_trip_and_shape_check(tmp_path: Path) -> None:

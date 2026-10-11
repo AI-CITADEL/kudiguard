@@ -115,12 +115,17 @@ _PIDGIN = re.compile(
     r"|don do|wan|oga|am)(?![\w'])"
 )
 PIDGIN_MARKERS = 2
-_ENGLISH_AM = re.compile(r"(?<![\w'])i am(?![\w'])")
+# one of these is enough in a one-sentence reply ("Make una no send code give anybody.")
+_STRONG_PIDGIN = re.compile(r"(?<![\w'])(?:una|wetin|abeg|dey|wey|sabi|comot|pikin|oya)(?![\w'])")
+_ENGLISH_AM = re.compile(r"(?<![\w'])(?:i|\d+(?::\d+)?)\s*am(?![\w'])")  # "I am", "8 am", "8:30am"
 
 
 def is_pidgin(text: str) -> bool:
-    folded = _ENGLISH_AM.sub(" ", fold(text))  # "I am" is English; Pidgin "am" is an object ("pay am")
-    return len(_PIDGIN.findall(folded)) >= PIDGIN_MARKERS
+    folded = _ENGLISH_AM.sub(" ", fold(text))  # Pidgin "am" is an object ("pay am")
+    if len(_PIDGIN.findall(folded)) >= PIDGIN_MARKERS:
+        return True
+    one_sentence = len([s for s in re.split(r"[.!?\n]+", folded) if s.strip()]) == 1
+    return one_sentence and _STRONG_PIDGIN.search(folded) is not None
 
 
 def lexical_features(text: str) -> Vector:
