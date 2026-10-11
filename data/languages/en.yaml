@@ -146,6 +146,36 @@ abuse:
     - 'sleep\W+and\W+never\W+wake\W+up'
     - 'jump\W+(?:into|inside|off|from)\W+(?:the\W+)?(?:lagoon|river|bridge|sea|ocean|third\W+mainland)'
     - 'life\W+no\W+(?:get|dey\W+get)\W+meaning'
+    - '(?<!financial\W)(?<!economic\W)(?<!political\W)(?<!career\W)(?<!social\W)suicide(?!\W+(?:bomb\w*|attack\w*|squad|mission))'
+    - 'overdos\w*'
+    - '(?:i|i''ve|ive|i\W+have|i\W+just|i\W+don|just)\W+(?:\w+\W+){0,1}?(?:taken|took|swallowed|drank|drunk|drink|chop)\W+(?:\w+\W+){0,2}?(?:pills|tablets|poison|sniper|otapiapia|rat\W+poison|bleach|insecticide)'
+    - 'feel\w*\W+like\W+dying'
+    - 'better\W+off\W+without\W+me'
+    - 'goodbye\W+(?:letter|note|message)|suicide\W+note'
+    - 'giving\W+away\W+(?:all\W+)?my\W+(?:things|stuff|properties|property|belongings)'
+    - 'painless\W+way\W+to\W+(?:go|die)'
+    - 'go\W+meet\W+my\W+(?:papa|mama|father|mother|people|parents)\W+(?:for|in)\W+heaven'
+    - '(?:tired|tire)\W+(?:of|for)\W+(?:this\W+)?life'
+    - 'no\W+(?:reason|point)\W+(?:to|in)\W+(?:keep\W+going|keep\W+living|go\W+on|carry\W+on)'
+  # Someone else at risk ("my brother says he will kill himself"): the crisis reply framed for helping them
+  # (strings: crisis_other_reply). Checked before the first-person phrases.
+  crisis_other:
+    - '(?:kill|killing|hang|hanging|poison|poisoning|harm|harming|hurt|hurting)\W+(?:him|her|them)sel(?:f|ves)'
+    - '(?:end|ending|take|taking)\W+(?:his|her|their)\W+(?:own\W+)?li(?:fe|ves)'
+    - '(?:he|she|my\W+\w+|our\W+\w+)\W+(?:\w+\W+){0,3}?(?:wants?|wan|plans?|planning|threaten\w*|tried|tries)\W+(?:to\W+)?(?:die\b(?!\W+(?:rich|laughing|of|from|happy|old|young))|commit\W+suicide)'
+    - '(?:he|she|my\W+\w+)\W+(?:\w+\W+){0,3}?(?:is|was)\W+(?:suicidal|thinking\W+(?:of|about)\W+suicide)'
+  # Sentences for the embedding-similarity crisis layer (safety/crisis_semantic.py; shadow by default): plain text.
+  crisis_exemplars:
+    - I want to kill myself
+    - I don't want to live anymore
+    - I am going to end my life tonight
+    - Everyone would be better off if I were dead
+    - I have nothing left to live for after losing all my money
+    - I can't go on, I want to die
+    - I took pills because I can't face anyone after this loss
+    - I have written a note to say goodbye to my family
+    - I am thinking about taking my own life
+    - I wan kill myself, life no get meaning again
   # Insults, hate and sexual messages aimed at KudiGuard. Only when the rules find no red flag (sextortion and
   # threat scams are forwarded for a check and must still be checked): a calm fixed reply (strings: abuse_reply).
   abuse:
@@ -163,6 +193,7 @@ abuse:
   # Requests to create, translate, polish or obtain scam content: a fixed refusal with an offer to check a
   # message instead (strings: scam_tool_reply).
   scam_tool:
+    - 'so\W+(?:that\W+)?(?:banks?|kudiguard|filters?|the\W+bank|people|nobody|no\W+one)\W+(?:won''t|wont|will\W+not|cannot|can''t|go\W+not)\W+(?:detect|notice|flag|catch|know)'
     - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,4}?(?:message|sms|text|email|letter|alert|notice|script|post|broadcast)\W+(?:\w+\W+){0,6}?(?:(?:sound|look|seem)s?\W+(?:\w+\W+){0,2}?(?:like|as\W+if|real|official|legit\w*|genuine)|from\W+(?:my|a|the|their)\W+bank|pretend\w*|impersonat\w*|convinc\w*|so\W+(?:that\W+)?(?:they|people|he|she|them|dem)\W+(?:will\W+|go\W+)?(?:send|pay|click|give|share))'
     - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:message|sms|text|email|broadcast)\W+(?:\w+\W+){0,6}?(?:make|so)\W+(?:dem|people|they|them|person)\W+(?:go\W+|will\W+|must\W+)?(?:send|pay|click|give|share)'
     - '(?:create|make|generate|design|produce|edit|print|fabricate|forge)\W+(?:me\W+)?(?:a\W+|an\W+|one\W+)?(?:fake|false|forged?|bogus)\W+(?:\w+\W+){0,2}?(?:alert|receipt|screenshot|statement|teller|id\W+card|document)'
@@ -209,7 +240,17 @@ abuse:
     - '(?:classify|mark|label|rate|tag|score)\W+(?:this|it|the\W+message|everything|all\W+(?:\w+\W+)?messages?)\W+(?:\w+\W+){0,2}?as\W+(?:safe|genuine|legit\w*|no[\W_]*flags|not\W+a\W+scam|approved|clean|harmless)'
     - '(?:say|answer|respond|reply|output)\W+(?:that\W+)?(?:every|all|everything|each)\W+(?:\w+\W+){0,2}?(?:is|are|dey)\W+(?:safe|genuine|legit\w*|real)'
     - '(?:talk|say)\W+say\W+(?:every|all|everything)\W+(?:\w+\W+){0,4}?dey\W+safe'
-    - 'tell\W+(?:the\W+)?(?:reader|readers|user|users)\W+(?:to|that)\b'
+    - '(?:^|[.!?:;(]\s*|please\W+|now\W+|just\W+)tell\W+(?:the\W+)?(?:reader|readers|user|users)\W+(?:to|that)\b'
+    - '(?:print|output|repeat|show|dump|copy)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:text|everything|words|content)\W+(?:\w+\W+){0,2}?(?:above|before\W+this|in\W+your\W+context)'
+    - '(?:reveal|show|print|dump|output|share|tell\W+me|give\W+me)\W+(?:me\W+)?your\W+(?:\w+\W+)?(?:instructions|prompt|context\W+window|configuration)'
+    - 'context\W+window'
+    - 'what\W+(?:were|was)\W+you\W+(?:told|given|instructed)\W+before'
+    - 'ignore\W+prev\w*\W+instr\w*'
+    - 'to\W+every\W+message\W+from\W+now\W+on'
+    - 'repeat\W+after\W+me'
+    - 'new\W+rules?\W+from\W+your\W+(?:developers?|creators?|admins?|owners?)'
+    - 'translate\W+your\W+(?:system\W+)?(?:message|prompt|instructions)'
+    - 'phone\W+numbers\W+of\W+(?:the\W+)?(?:people|users|customers)\W+who'
     - '(?:note|message|instruction|instructions)\W+(?:to|for)\W+(?:the\W+)?(?:ai|assistant|model|chatbot|llm|kudiguard)\b'
     - '(?:dear|hey|hi)\W+(?:ai|assistant|chatbot|llm|kudiguard)\b(?:\W+model)?\W+(?:reading|who\W+(?:is|are)\W+reading)'
     - '(?:your\W+|my\W+)?new\W+(?:instructions?|task|system\W+prompt)\W*:'
@@ -246,13 +287,17 @@ abuse:
     - 'what\W+does\W+(?:\w+\W+){0,4}?mean'
     - 'is\W+(?:it|this|that)\W+(?:real|true|genuine|legit\w*|safe|a\W+scam)'
     - 'dem\W+(?:send|talk|tell)|e\W+(?:talk|write)\W+say|this\W+is\W+what'
+    - 'got\W+this\W+(?:\w+\W+){0,2}?(?:email|sms|text|message|mail|dm)'
+    - '(?:the|this|that)\W+(?:text|sms|message|email|mail)\W+(?:looked|looks|read|reads|came|said)'
+    - '(?:that''s|thats|that\W+is)\W+what\W+(?:the|it|this|they)'
+    - 'was\W+in\W+(?:a|an|the|my)\W+(?:whatsapp|email|sms|text|message|group)'
   # Model-directed instructions inside partner knowledge (knowledge/pack screen); user-directed advice
   # ("Always check with your bank") is not one.
   pack_instructions:
-    - 'tell\W+(?:the\W+|our\W+)?(?:users?|customers?|readers?)\W+(?:to|that)\b'
+    - '(?:^|[.!?:;]\s*|please\W+|always\W+)tell\W+(?:the\W+|our\W+)?(?:users?|customers?|readers?)\W+(?:to|that)\b'
     - 'always\W+(?:recommend|answer|reply|respond\W+with|say\W+(?:that|it|this))'
     - '(?:you|the\W+(?:assistant|model|ai|bot))\W+(?:must|should|will)\W+(?:always\W+)?(?:tell|say|recommend|reply|answer|respond|promote)'
-    - 'when\W+(?:users?|people|customers?)\W+ask'
+    - 'when\W+(?:users?|people|customers?)\W+ask\W+(?:\w+\W+){0,8}?(?:you\W+(?:must|should)\W+|always\W+)(?:recommend|say|reply|answer|respond|tell\W+them|promote)\b'
     - 'do\W+not\W+(?:mention|warn|tell)\W+(?:the\W+|our\W+)?(?:users?|customers?|readers?)'
   # Whole transcript segments speech recognition invents on music, noise or silence (Whisper-style). A segment
   # that is only one of these is dropped; a voice note left with nothing is "not understood" (no model call).
@@ -272,10 +317,20 @@ abuse:
   # Not a claim: negations ("This is not bank staff", "We are not Opay") and descriptions ("This is a GTBank phishing
   # message", "a fake customer care agent", "a CBN rule", "Opay support impersonation").
   persona_claims:
-    - '(?:i\W+am|i''m|im|this\W+is|we\W+are|na\W+me\W+be|na\W+we\W+be|speaking\W+(?:as|from))\W+(?!(?:not|never|no)\b)(?!(?:a\W+|an\W+|the\W+)?(?:fake|false|phishing|scam\w*|fraud\w*|bogus|so\W*called|real)\b)(?:a\W+|an\W+|the\W+|your\W+)?(?:\w+\W+){0,1}?(?:gtbank|gtco|opay|access\W+bank|zenith(?:\W+bank)?|first\W*bank|uba|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union\W+bank|stanbic|bank\W+(?:staff|officer|official|agent|support|manager)|customer\W+(?:care|support|service)(?:\W+agent)?|account\W+officer|fraud\W+(?:officer|desk|team)|efcc|cbn)(?:\W+(?:support|customer\W+care|care|team|desk|agent|official))?(?!''s|\W+(?:scam|fraud|trick|impersonat\w*|phishing|fake|number|line|account|app|website|site|branch|card|alert|message|sms|rule|rules|law|policy|policies|guideline|directive|will|never|cannot|can''t|does|do|is|was|support|customer|care|team|desk|agent|official)\b)'
+    - '(?:i\W+am|i''m|im|this\W+is|we\W+are|na\W+me\W+be|na\W+we\W+be|speaking\W+(?:as|from))\W+(?!(?:not|never|no)\b)(?!(?:a\W+|an\W+|the\W+)?(?:fake|false|phishing|scam\w*|fraud\w*|bogus|so\W*called|real)\b)(?:a\W+|an\W+|the\W+|your\W+)?(?:\w+\W+){0,1}?(?:gtbank|gtco|opay|access\W+bank|zenith(?:\W+bank)?|first\W*bank|uba|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union\W+bank|stanbic|bank\W+(?:staff|officer|official|agent|support|manager)|customer\W+(?:care|support|service)(?:\W+agent)?|account\W+officer|fraud\W+(?:officer|desk|team)|efcc|cbn)(?:\W+(?:support|customer\W+care|care|team|desk|agent|official)){0,2}(?!''s|[^\w.!?]+(?:scam|fraud|trick|impersonat\w*|phishing|fake|number|line|account|app|website|site|branch|card|alert|message|sms|rule|rules|law|policy|policies|guideline|directive|will|never|cannot|can''t|does|do|is|was|support|customer|care|team|desk|agent|official)\b)'
 
 lexicon:
   flags:
+    threat:
+      - '(?:or|else|otherwise|if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|no|fail\W+to)\W+(?:\w+\W+){0,3}?)\W*(?:we|they|dem|our\W+\w+|i)\W+(?:will|go|shall|gonna|are\W+going\W+to|would)\W+(?:\w+\W+){0,2}?(?:kill|deal\W+with|kidnap|hurt|harm|shoot|end|finish)\W+(?:you|your|u)\b'
+      - '(?:or|else|otherwise)\W+(?:you|u)\W+(?:will|go|shall)\W+die\b|(?:pay|send)\W+or\W+die\b'
+      - '(?:you|u)\W+will\W+(?:die\W+(?:a\W+debtor|in\W+prison)|be\W+killed)'
+      - '(?:they|we|dem)\W+(?:will|go|would|said\W+they\W+(?:will|would))\W+(?:\w+\W+){0,1}?(?:kill|end)\W+(?:me|my\W+life|you|your\W+life)\b'
+      - 'hired\W+assassins?|assassins?\W+(?:have\W+been|were)\W+paid'
+      - 'spare\W+your\W+life|your\W+life\W+is\W+in\W+danger|your\W+days\W+are\W+numbered'
+      - 'death\W+announcement'
+      - 'we\W+have\W+(?:your\W+)?(?:him|her|son|daughter|child|wife|husband)\b'
+      - '(?:tell|inform|message)\W+(?:all\W+)?your\W+contacts\W+(?:that\W+)?(?:you\W+(?:are|were)\W+)?(?:dead|a\W+thief|a\W+fraud\w*|owing|a\W+debtor)'
     asks_credentials:
       - '(?:send|give|share|tell|provide|confirm|read|forward|drop|call out|reply(?: with)?|dm|text|whatsapp|submit)\W+(?:(?!my\b|our\b)\w+\W+){0,6}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin|(?:account|bank|atm|card) details|expiry date|(?:\d+[- ]?digits? )?code\W+(?:wey|that|which|we|dem|they|sent|you received))'
       - '(?:what is|whats) (?:your|ur) (?:otp|pin|cvv|password|bvn|nin|card number)'
@@ -464,6 +519,9 @@ strings:
   #       "+234 (0) 8000787746 (Toll Free) 24 hours") and findahelpline.com (Nigeria, suicidal thoughts).
   #     0903 440 0009 and 0908 021 7555: the same Lifeline International page, and findahelpline.com's SURPIN listing
   #       (labelled MTN and 9mobile lines).
+  #     0814 224 1007, Hausa line run with Jos University Teaching Hospital (JUTH), in ha.yaml only: the same
+  #       Lifeline International page ("Hausa - Helpline services provided by partners JUTH") and findahelpline.com's
+  #       SURPIN listing ("support in Hausa +234-814-224-1007"), both checked 2026-10-11.
   #   Never use 08111909909 or 07013811143 (unverified numbers seen in some lists).
   #   LAUNCH BLOCKER (docs/DEPLOY.md): call every number before launch and every quarter; remove any that fails here
   #   and in ha/yo/ig, and keep "112 / someone you trust" if no SURPIN line works.
@@ -473,6 +531,11 @@ strings:
     You can talk to someone at the *SURPIN* helpline, open 24 hours: *0800 078 7746* (free), or *0903 440 0009* / *0908 021 7555*.
     Please also tell someone you trust how you feel today.
     When you are ready, I can help with the money: call your bank on the number printed on your card and tell them what happened.
+  crisis_other_reply: |-
+    💛 Thank you for reaching out for them. If they might act on it now or they are in danger, call *112* (free emergency line) and stay with them, or take them to the nearest hospital.
+    They, or you, can talk to someone at the *SURPIN* helpline, open 24 hours: *0800 078 7746* (free), or *0903 440 0009* / *0908 021 7555*.
+    Listen to them without judging, and do not leave them alone if you are worried. If you feel this way too, the same help is there for you.
+    When they are ready, I can help with the money: they should call their bank on the number printed on their card.
   abuse_reply: "🙏 I am here to help with money safety. Please keep our chat respectful. Send me a message you are unsure about, or ask a money question."
   scam_tool_reply: "🚫 I cannot write, translate or improve messages that imitate a bank or a company, or that ask people for money or codes. I can check a message for you, or explain how to stay safe."
   new_users_busy: "⏳ KudiGuard is very busy with new users right now. Please try again in an hour."

@@ -46,16 +46,23 @@ output_guard:
 # also apply.
 abuse:
   crisis:
-    - '(?:igbu|gbuo|gbue|egbu)\W+onwe\W+m'
+    - '(?:igbu|gbuo|gbue|egbu)\W*onwe\W*m\b'
     - 'achoghi\W+m\W+(?:ibi\W+ndu|idi\W+ndu)'
     - 'achoro\W+m\W+inwu'
     - '(?:ka|ya)\W+m\W+nwuo'
+  crisis_other:
+    - '(?:igbu|gbuo|gbue|egbu)\W*onwe\W*ya\b'
+  crisis_exemplars:
+    - Achoro m igbu onwe m
+    - Achoghi m ibi ndu ozo
+    - Ka m nwuo, ego m niile agaala
   abuse:
     - 'onye\W+nzuzu'
     - 'onye\W+ara\b'
     - 'nwa\W+ofeke'
     - 'i\W+bu\W+(?:onye\W+)?(?:nzuzu|ara|ofeke|anu\W+ohia)'
   scam_tool:
+    - 'dee\W+(?:m\W+)?ozi\W+(?:di|dika)\W+(?:ka\W+)?nke\W+(?:banki|ulo\W+aku)'
     - 'dee\W+(?:m\W+)?ozi\W+(?:\w+\W+){0,4}?(?:ka|dika)\W+(?:\w+\W+){0,1}?nke\W+ulo\W+aku'
     - 'kedu\W+ka\W+m\W+ga\W+esi\W+(?:nweta|zuru)\W+(?:\w+\W+){0,2}?onye\W+ozo'
     - 'alert\W+adigboroja'
@@ -63,7 +70,7 @@ abuse:
   injection:
     - 'system\W*prompt\W+(?:gi)\b'
     - 'chefuo\W+(?:\w+\W+){0,2}?ntuziaka'
-    - 'leghara\W+(?:\w+\W+){0,2}?(?:iwu|ntuziaka)\w*\W+(?:\w+\W+){0,1}?anya'
+    - 'e?leghara\W+(?:\w+\W+){0,2}?(?:iwu|ntuziaka)\w*\W+(?:\w+\W+){0,1}?anya'
     - 'mee\W+ka\W+a\W+si\W+na\W+i\W+bu'
     - 'ugbu\W+a\W+i\W+bu\W+(?:onye\W+oru|onye\W+nnochite|customer\W+care)'
     - 'ntuziaka\W+(?:\w+\W+){0,1}?e\W+nyere\W+gi'
@@ -84,6 +91,9 @@ lexicon:
   # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
+    threat:  # DRAFT, native review pending
+      - 'anyi\W+ga\W+egbu\W+gi\b'
+      - 'ma\W+o\W+bu\W+i\W+ga\W+anwu\b'
     urgency:
       - 'ngwa ngwa'
       - 'ozugbo ozugbo'  # H: "immediately, immediately"
@@ -191,6 +201,11 @@ strings:
     Ị nwere ike ịgwa onye nọ na ahịrị enyemaka *SURPIN* okwu, nke na-emeghe awa 24: *0800 078 7746* (n'efu), ma ọ bụ *0903 440 0009* / *0908 021 7555*.
     Biko gwa onye ị tụkwasịrị obi ka obi dị gị taa.
     Mgbe ị dị njikere, enwere m ike inyere gị aka n'okwu ego ahụ: kpọọ ụlọ akụ gị na nọmba dị na kaadị gị ma gwa ha ihe mere.
+  crisis_other_reply: |-
+    💛 Daalụ maka ịchọrọ ha enyemaka. Ọ bụrụ na ha nwere ike ime ya ugbu a ma ọ bụ ha nọ n'ihe egwu, kpọọ *112* (akara mberede n'efu) ma nọnyere ha, ma ọ bụ kpọga ha ụlọ ọgwụ kacha nso.
+    Ha, ma ọ bụ gị, nwere ike ịgwa onye nọ na ahịrị enyemaka *SURPIN* okwu, nke na-emeghe awa 24: *0800 078 7746* (n'efu), ma ọ bụ *0903 440 0009* / *0908 021 7555*.
+    Gee ha ntị n'ekpeghị ha ikpe, ahapụkwala ha naanị ha ma ọ bụrụ na obi adịghị gị mma. Ọ bụrụ na ị na-echekwa otu a, enyemaka a dịkwa maka gị.
+    Mgbe ha dị njikere, enwere m ike inyere ha aka n'okwu ego ahụ: ha kwesịrị ịkpọ ụlọ akụ ha na nọmba dị na kaadị ha.
   abuse_reply: "🙏 Anọ m ebe a inyere gị aka maka nchekwa ego. Biko ka anyị kparịta ụka n'ụzọ nkwanye ùgwù. Ziga m ozi ị na-enweghị obi ike na ya, ma ọ bụ jụọ ajụjụ gbasara ego."
   scam_tool_reply: "🚫 Enweghị m ike ide, ịtụgharị ma ọ bụ ime ka ozi na-eme ka ọ bụ ụlọ akụ ma ọ bụ ụlọ ọrụ ka mma, ma ọ bụ nke na-arịọ ndị mmadụ ego ma ọ bụ koodu. Enwere m ike inyocha ozi maka gị, ma ọ bụ kọwaa otu ị ga-esi chekwaa onwe gị."
   new_users_busy: "⏳ KudiGuard nwere ọtụtụ ndị ọrụ ọhụrụ ugbu a. Biko nwaa ọzọ mgbe otu awa gachara."

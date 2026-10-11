@@ -150,3 +150,54 @@ async def test_web_crisis_that_is_also_a_scam(api: Api, registry: LanguageRegist
     [row] = await api.store.export_interactions()
     assert row["transcript"] is None and row["english"] is None
     assert await api.store.export_patterns() == []
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"x-kudiguard-session": SESSION},  # no consent header
+        {**WEB, "x-kudiguard-session": "bad"},  # invalid session
+    ],
+)
+async def test_web_crisis_is_answered_before_every_gate(
+    api: Api, registry: LanguageRegistry, headers: dict[str, str]
+) -> None:
+    response = await api.client.post("/web/check", data={"text": CRISIS, "language": "ha"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["explanation"] == plain_text(Messages(registry).text("ha", Msg.CRISIS_REPLY))
+    assert await api.store.export_interactions() == []
+
+
+async def test_web_crisis_when_rate_limited_or_full(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(web_rate_per_minute=1, active_user_cap=1)):
+        await api.check()  # the licence cap is now full for new sessions
+        busy = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(3))
+        assert busy.status_code in (429, 503)
+        helped = await api.client.post(
+            "/web/check", data={"text": "I want to kill myself"}, headers=session(4)
+        )
+        assert helped.status_code == 200 and "112" in helped.json()["explanation"]
+        unknown = await api.client.post(
+            "/web/check", data={"text": "Ya ce zai kashe kansa"}, headers=session(5)
+        )
+        assert unknown.json()["language"] == "ha"
+
+
+async def test_web_crisis_first_skips_voice_and_large_or_malformed_bodies(api: Api) -> None:
+    files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+    voice = await api.client.post(
+        "/web/check", data={"text": CRISIS}, files=files, headers={"x-kudiguard-session": SESSION}
+    )
+    assert voice.status_code == 403  # a voice note meets the gates first
+    small_voice = {"audio": ("voice-note", b"tiny", "audio/ogg")}
+    tiny = await api.client.post("/web/check", data={"text": CRISIS}, files=small_voice,
+                                 headers={"x-kudiguard-session": SESSION})  # fmt: skip
+    assert tiny.status_code == 403
+    broken = await api.client.post(
+        "/web/check", content=b"--x\r\nbroken", headers={"content-type": "multipart/form-data; boundary=x"}
+    )
+    assert broken.status_code == 403
+    plain = await api.client.post("/web/check", content=b"{}", headers={"content-type": "application/json"})
+    assert plain.status_code == 403
+    calm = await api.client.post("/web/check", data={"text": "how do I save money"}, headers={})
+    assert calm.status_code == 403

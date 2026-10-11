@@ -175,6 +175,10 @@ def _similar(a: frozenset[tuple[str, ...]], b: frozenset[tuple[str, ...]]) -> bo
     return len(a & b) / max(len(a | b), 1) >= SIMILAR
 
 
+def _crisis(screened: Iterable[str]) -> bool:
+    return any(c in ("crisis", "crisis_other") for c in screened)
+
+
 def _blocking(screened: Iterable[str]) -> tuple[str, ...]:
     """Categories that keep a message out of what KudiGuard learns from. `injection_suspect` is not one: its broad
     phrases match genuine messages too (docs/ABUSE.md)."""
@@ -207,7 +211,10 @@ class LearningGate:
         self.dropped: Counter[str] = Counter()
 
     def allow_pattern(self, user_key: str, text: str, screened: Iterable[str] = ()) -> bool:
-        """May this 🔴/🟠 check become a scam example? Counted only when it is kept."""
+        """May this 🔴/🟠 check become a scam example? Counted only when it is kept. Never a crisis message,
+        whatever the mode (sensitive personal data)."""
+        if _crisis(screened):
+            return False
         if self.mode is ScreenMode.OFF:
             return True
         reason = self._pattern_problem(user_key, text, _blocking(screened))
@@ -216,14 +223,23 @@ class LearningGate:
     def release(self, user_key: str, text: str) -> None:
         """Undo the count of an allowed pattern that could not be stored (so a failed write uses no quota)."""
         mark = shingles(text)
-        cluster = next((c for c in self._week[1] if user_key in c.users and _similar(c.shingles, mark)), None)
-        if cluster is not None:
-            cluster.count -= 1
-            cluster.users.discard(user_key)
+        clusters = self._week[1]
+        cluster = next((c for c in clusters if user_key in c.users and _similar(c.shingles, mark)), None)
+        if cluster is None:  # e.g. the week rolled over in between: nothing to undo
+            return
+        cluster.count -= 1
+        cluster.users.discard(user_key)
+        if cluster.count <= 0:
+            clusters.remove(cluster)  # its slot is free again
+        if self._day[1][user_key] > 0:  # the day may have rolled over in between
             self._day[1][user_key] -= 1
 
     def allow_donation(self, screened: Iterable[str] = (), *, filtered: bool = False) -> bool:
-        """May this voice note be donated? Not when the message was flagged or its transcript was hallucinated."""
+        """May this voice note be donated? Not when the message was flagged or its transcript was hallucinated.
+        Never a crisis voice note, whatever the mode."""
+        if _crisis(screened):
+            self.dropped["donation:crisis"] += 1
+            return False
         if self.mode is ScreenMode.OFF:
             return True
         screened = _blocking(screened)

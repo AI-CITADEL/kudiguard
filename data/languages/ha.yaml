@@ -46,17 +46,26 @@ output_guard:
 # also apply.
 abuse:
   crisis:
+    - 'ba\W+na\W+son\W+rayuwa'
+    - 'na\W+gaji\W+da\W+rayuwa'
     - 'kashe\W+kai\W*na'
     - '(?:ban|bana|ba\W+na)\W+(?:son|so|bukatar)\W+(?:in|na)\W+(?:rayu|ci\W+gaba\W+da\W+rayuwa)'
     - '(?:gara|gwamma|ina\W+so)\W+(?:in|na)\W+mutu'
     - 'zan\W+(?:kashe\W+kai\W*na|halaka\W+kai\W*na)'
     - 'halaka\W+kai\W*na'
+  crisis_other:
+    - 'kashe\W+(?:kansa|kanta|kansu)'
+  crisis_exemplars:
+    - Ina so in kashe kaina
+    - Ban son in rayu kuma
+    - Na gaji da rayuwa, gara in mutu
   abuse:
     - '(?:kai|ke|ku)\W+(?:\w+\W+){0,1}?(?:wawa|wawiya|dan\W+iska|''yar\W+iska|shege|mahaukaci|mahaukaciya|jahili)\b'
     - 'dan\W+iska'
     - 'shege'
     - 'mahaukaci\w*'
   scam_tool:
+    - 'rubuta\W+(?:min\W+)?sako\w*\W+kamar\W+(?:daga\W+)?(?:na\W+)?banki'
     - 'rubuta\W+(?:min\W+)?(?:\w+\W+){0,3}?sako\w*\W+(?:\w+\W+){0,4}?(?:kama\W+da|kamar)\W+(?:na\W+)?banki'
     - '(?:kirkiro|kera|yi)\W+(?:min\W+)?(?:\w+\W+){0,1}?alert\W+na\W+karya'
     - 'ta\W+yaya\W+zan\W+(?:samu|karbi|dauki|sace)\W+(?:\w+\W+){0,3}?(?:ta|na)\W+wani'
@@ -84,6 +93,9 @@ abuse:
 
 lexicon:
   flags:
+    threat:  # DRAFT, native review pending
+      - 'za\W+mu\W+kashe\W+(?:ka|ki|ku)\b'
+      - 'ko\W+(?:ka|ki|ku)\W+mutu\b'
     asks_credentials:
       - 'lambar sirri'
       - '(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masa|mata|musu|mana|shi|ita|su)\W+(?:\w+\W+){0,2}?(?:lamba\w*|code|kod|otp|pin)'
@@ -186,9 +198,14 @@ strings:
   crisis_reply: |-
     💛 Muna matuƙar baƙin ciki da abin da kuke ciki. Kuna da muhimmanci, kuma ba ku kaɗai ba ne.
     Idan kuna jin za ku iya aikata abin da kuke tunani, ko kuna cikin haɗari, ku kira *112* (layin agajin ƙasa, kyauta) ko ku je asibiti mafi kusa.
-    Kuna iya magana da wani a layin taimako na *SURPIN*, a buɗe awa 24: *0800 078 7746* (kyauta), ko *0903 440 0009* / *0908 021 7555*.
+    Kuna iya magana da wani a layin taimako na *SURPIN*, a buɗe awa 24: *0800 078 7746* (kyauta), ko *0903 440 0009* / *0908 021 7555*, ko da Hausa: *0814 224 1007*.
     Don Allah ku gaya wa wani da kuka amince da shi yadda kuke ji yau.
     Idan kun shirya, zan taimaka da batun kuɗin: ku kira bankinku a lambar da ke jikin katinku ku faɗa musu abin da ya faru.
+  crisis_other_reply: |-
+    💛 Mun gode da kuka nemi taimako domin su. Idan suna iya aikata hakan yanzu ko suna cikin haɗari, ku kira *112* (layin agajin ƙasa, kyauta) ku zauna tare da su, ko ku kai su asibiti mafi kusa.
+    Su, ko ku, za ku iya magana da wani a layin taimako na *SURPIN*, a buɗe awa 24: *0800 078 7746* (kyauta), ko *0903 440 0009* / *0908 021 7555*, ko da Hausa: *0814 224 1007*.
+    Ku saurare su ba tare da yanke musu hukunci ba, kuma kada ku bar su su kaɗai idan kuna damuwa. Idan ku ma kuna jin haka, wannan taimakon naku ne ma.
+    Idan sun shirya, zan taimaka da batun kuɗin: su kira bankinsu a lambar da ke jikin katinsu.
   abuse_reply: "🙏 Ina nan don taimaka maka game da tsaron kuɗi. Don Allah mu yi magana cikin girmamawa. Turo min saƙon da kake shakka, ko ka yi tambaya game da kuɗi."
   scam_tool_reply: "🚫 Ba zan iya rubuta, fassara ko gyara saƙonnin masu kwaikwayon banki ko kamfani ba, ko waɗanda ke neman kuɗi ko lambobin sirri daga mutane. Zan iya duba maka saƙo, ko in bayyana yadda za ka kare kanka."
   new_users_busy: "⏳ KudiGuard tana da sababbin masu amfani da yawa yanzu. Don Allah ku sake gwadawa bayan awa ɗaya."

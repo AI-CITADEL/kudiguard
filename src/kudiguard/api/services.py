@@ -32,6 +32,7 @@ from kudiguard.privacy import UserHasher
 from kudiguard.prompts import SYSTEM_PROMPTS
 from kudiguard.reply_translation import SYSTEM_PROMPTS as TRANSLATION_PROMPTS
 from kudiguard.safety.abuse import InputScreen, ScreenMode, ScreenModes, TranscriptFilter
+from kudiguard.safety.crisis_semantic import CrisisSimilarity
 from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
 from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
 from kudiguard.safety.limits import FloodGuard, LearningGate, NewUserGate
@@ -289,6 +290,23 @@ def build_abuse_screens(settings: Settings, registry: LanguageRegistry) -> dict[
     }  # fmt: skip
 
 
+def build_crisis_similarity(
+    settings: Settings, registry: LanguageRegistry, embedder: Embedder | None
+) -> CrisisSimilarity | None:
+    """The second crisis layer, reusing the knowledge-search embedder; None when off or unavailable."""
+    mode = ScreenMode(settings.crisis_semantic_mode)
+    if mode is ScreenMode.OFF:
+        return None
+    if embedder is None:
+        log.warning("crisis similarity disabled: it needs the embedding model (KUDIGUARD_EMBEDDINGS)")
+        return None
+    try:
+        return CrisisSimilarity(registry, embedder, mode=mode, threshold=settings.crisis_semantic_threshold)
+    except Exception as exc:  # optional layer: the phrase screen stays
+        log.error("crisis similarity disabled: %s", exc)
+        return None
+
+
 def build_limits(settings: Settings) -> dict[str, Any]:
     """The new-user gate and the learning gate, shared by WhatsApp and the web page."""
     return {
@@ -359,6 +377,7 @@ async def build_services(settings: Settings) -> Services:
             ),
             compose_policy=settings.compose_policy([lang.code for lang in registry.enabled]),
             **build_abuse_screens(settings, registry),
+            crisis_similarity=build_crisis_similarity(settings, registry, embedder),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

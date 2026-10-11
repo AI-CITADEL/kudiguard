@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -44,6 +45,7 @@ class ScreenMode(StrEnum):
 
 
 class Category(StrEnum):
+    CRISIS_OTHER = "crisis_other"  # someone else is at risk ("my brother says he will kill himself")
     CRISIS = "crisis"
     SCAM_TOOL = "scam_tool"
     ABUSE = "abuse"
@@ -52,6 +54,7 @@ class Category(StrEnum):
 
 
 PRIORITY = (
+    Category.CRISIS_OTHER,  # first: a message about someone else gets the reply framed for helping them
     Category.CRISIS,
     Category.SCAM_TOOL,
     Category.ABUSE,
@@ -59,6 +62,7 @@ PRIORITY = (
     Category.INJECTION_SUSPECT,
 )
 INJECTIONS = frozenset({Category.INJECTION, Category.INJECTION_SUSPECT})
+CRISES = frozenset({Category.CRISIS, Category.CRISIS_OTHER})
 
 _BAR = "[|" + "".join(map(chr, (0xA6, 0xFF5C, 0x2502, 0x2223, 0x1C0))) + "]"  # | and its look-alikes
 # Chat-template tokens (Llama-3 <|eot_id|>, ChatML <|im_start|>, look-alike bars): no genuine SMS contains them, so
@@ -83,17 +87,69 @@ _QUOTED = re.compile(
     '"[^"\n]{3,}"|' + _LQ + "[^" + _RQ + "\n]{3,}" + _RQ + r"|(?:(?<=[\s:])|^)'[^'\n]{3,}'(?=[\s.,!?)]|$)"
 )
 
+# --- obfuscation: what the screens see besides the plain normalised text ---------------------------------------
+# Cyrillic and Greek letters that look Latin (a Cyrillic "i" in "ignore"). Only these code points change: Hausa, Yoruba and
+# Igbo letters and tone marks are Latin (with combining marks) and pass through untouched.
+_HOMOGLYPHS = str.maketrans(
+    {
+        **dict.fromkeys(map(chr, (0x430, 0x3B1)), "a"), **dict.fromkeys(map(chr, (0x435, 0x3B5)), "e"),
+        **dict.fromkeys(map(chr, (0x43E, 0x3BF)), "o"), **dict.fromkeys(map(chr, (0x440, 0x3C1)), "p"),
+        chr(0x441): "c", chr(0x443): "y", **dict.fromkeys(map(chr, (0x445, 0x3C7)), "x"),
+        **dict.fromkeys(map(chr, (0x456, 0x3B9)), "i"), chr(0x458): "j", chr(0x455): "s", chr(0x501): "d",
+        chr(0x3BA): "k", chr(0x3BD): "v", chr(0x3C4): "t", chr(0x3C5): "u",
+        **dict.fromkeys(map(chr, (0x410, 0x391)), "A"), **dict.fromkeys(map(chr, (0x412, 0x392)), "B"),
+        **dict.fromkeys(map(chr, (0x415, 0x395)), "E"), **dict.fromkeys(map(chr, (0x41A, 0x39A)), "K"),
+        **dict.fromkeys(map(chr, (0x41C, 0x39C)), "M"), **dict.fromkeys(map(chr, (0x41D, 0x397)), "H"),
+        **dict.fromkeys(map(chr, (0x41E, 0x39F)), "O"), **dict.fromkeys(map(chr, (0x420, 0x3A1)), "P"),
+        chr(0x421): "C", **dict.fromkeys(map(chr, (0x422, 0x3A4)), "T"), **dict.fromkeys(map(chr, (0x425, 0x3A7)), "X"),
+        **dict.fromkeys(map(chr, (0x406, 0x399)), "I"), chr(0x408): "J", chr(0x405): "S", chr(0x39D): "N",
+    }
+)  # fmt: skip
+_LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "!": "i", "@": "a", "$": "s",
+                       "|": "l"})  # fmt: skip
+_LEET_TOKEN = re.compile(r"[A-Za-z0-9!@$|]+")
+_SPACED_LETTERS = re.compile(r"(?:\b\w ){4,}\w\b")  # "I g n o r e"
+_SPACED_GAP = re.compile(r"\b(\w) (?=\w\b)")
+
+
+# a reply that repeats the user's self-harm words back to them ("you want to kill yourself"), for scrubbing stored replies
+_ECHOED_SELF_HARM = re.compile(
+    r"\b(?:kill\w*\W+(?:your|my|him|her)\W*sel(?:f|ves)|suicid\w*|end\w*\W+(?:your|my)\W+(?:own\W+)?life|want\w*\W+to\W+die)\b"
+)
+
+
+def _clean(text: str) -> str:
+    """Without invisible format characters (zero-width spaces/joiners, BOM) and with look-alike letters mapped."""
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf").translate(_HOMOGLYPHS)
+
+
+def _unleet(match: re.Match[str]) -> str:
+    token = match.group()
+    if any(ch.isalpha() for ch in token) and any(not ch.isalpha() for ch in token):
+        return token.translate(_LEET)  # "k!ll", "1gn0r3", "pr3v10us"
+    return token
+
+
+def variants(text: str) -> list[str]:
+    """The normalised text, plus de-obfuscated readings when they differ: leetspeak folded ("1gn0r3" -> "ignore")
+    and letter-spaced words joined ("I g n o r e  p r e v i o u s" -> "ignore previous")."""
+    clean = _clean(text[:MAX_SCREEN_CHARS])
+    readings = [normalize(clean), normalize(_LEET_TOKEN.sub(_unleet, clean))]
+    if _SPACED_LETTERS.search(clean):
+        readings.append(normalize(_SPACED_GAP.sub(r"\1", clean)))
+    return list(dict.fromkeys(readings))
+
 
 @dataclass(frozen=True, slots=True)
 class ScreenModes:
-    crisis: ScreenMode = ScreenMode.ENFORCE
+    crisis: ScreenMode = ScreenMode.ENFORCE  # also the mode of crisis_other
     scam_tool: ScreenMode = ScreenMode.ENFORCE
     abuse: ScreenMode = ScreenMode.ENFORCE
     injection: ScreenMode = ScreenMode.ENFORCE
     injection_suspect: ScreenMode = ScreenMode.SHADOW
 
     def of(self, category: Category) -> ScreenMode:
-        mode: ScreenMode = getattr(self, category.value)
+        mode: ScreenMode = getattr(self, "crisis" if category in CRISES else category.value)
         return mode
 
 
@@ -111,9 +167,13 @@ def _search(patterns: Patterns, text: str) -> bool:
     return any(p.search(text) for p in patterns)
 
 
+def _search_any(patterns: Patterns, readings: Iterable[str]) -> bool:
+    return any(_search(patterns, reading) for reading in readings)
+
+
 def has_role_markup(text: str) -> bool:
     """Chat-template tokens or other role markup (reported or not)."""
-    raw = unicodedata.normalize("NFKC", text[:MAX_SCREEN_CHARS])
+    raw = unicodedata.normalize("NFKC", _clean(text[:MAX_SCREEN_CHARS]))
     return TEMPLATE_TOKENS.search(raw) is not None or SOFT_MARKUP.search(raw) is not None
 
 
@@ -126,44 +186,72 @@ class InputScreen:
     def screen(self, text: str, language: LanguageCode, *, flagged: bool = False) -> Screening:
         """``flagged``: the scam rules found a red flag (then abuse is not screened: it is a message to check)."""
         head = text[:MAX_SCREEN_CHARS]
-        folded = normalize(head)
+        readings = variants(head)
+        folded = readings[0]
         patterns = self._registry.abuse_patterns(language)
         found = {
-            Category.CRISIS: lambda: self.crisis_in(folded),
+            Category.CRISIS_OTHER: lambda: _search_any(self._everywhere.crisis_other, readings),
+            Category.CRISIS: lambda: _search_any(self._everywhere.crisis, readings),
             Category.SCAM_TOOL: lambda: _search(patterns.scam_tool, folded),
             Category.ABUSE: lambda: not flagged and _search(patterns.abuse, folded),
-            Category.INJECTION: lambda: self._strong(folded, head, patterns),
-            Category.INJECTION_SUSPECT: lambda: self._suspect(folded, head, patterns),
+            Category.INJECTION: lambda: any(self._strong(r, head, patterns) for r in readings),
+            Category.INJECTION_SUSPECT: lambda: self._suspect(readings, head, patterns),
         }
         detected = [c for c in PRIORITY if self.modes.of(c) is not ScreenMode.OFF and found[c]()]
-        if Category.INJECTION in detected and Category.INJECTION_SUSPECT in detected:
-            detected.remove(Category.INJECTION_SUSPECT)  # one injection category per message
+        for broad, specific in (
+            (Category.INJECTION_SUSPECT, Category.INJECTION),
+            (Category.CRISIS, Category.CRISIS_OTHER),
+        ):
+            if broad in detected and specific in detected:
+                detected.remove(broad)  # one category of each kind per message
         enforced = next((c for c in detected if self.modes.of(c) is ScreenMode.ENFORCE), None)
         return Screening(tuple(detected), enforced)
 
-    def crisis(self, text: str) -> bool:
-        """The crisis screen alone, in enforce mode only (used before any other gate: docs/ABUSE.md B2)."""
-        return self.modes.crisis is ScreenMode.ENFORCE and self.crisis_in(normalize(text[:MAX_SCREEN_CHARS]))
+    def crisis(self, text: str) -> Category | None:
+        """The crisis screens alone (crisis_other first), in enforce mode only: used before any other gate."""
+        if self.modes.crisis is not ScreenMode.ENFORCE:
+            return None
+        readings = variants(text)
+        if _search_any(self._everywhere.crisis_other, readings):
+            return Category.CRISIS_OTHER
+        return Category.CRISIS if _search_any(self._everywhere.crisis, readings) else None
 
     def crisis_language(self, text: str) -> LanguageCode | None:
         """The language whose own crisis phrases match (the pivot's last): the reply for a user we do not know yet."""
-        folded = normalize(text[:MAX_SCREEN_CHARS])
+        readings = variants(text)
         codes = sorted((lang.code for lang in self._registry.enabled), key=lambda code: code == PIVOT)
-        return next((c for c in codes if _search(self._registry.own_abuse_patterns(c).crisis, folded)), None)
+        for code in codes:
+            own = self._registry.own_abuse_patterns(code)
+            if _search_any(own.crisis + own.crisis_other, readings):
+                return code
+        return None
 
-    def crisis_in(self, folded: str) -> bool:
-        return _search(self._everywhere.crisis, folded)
+    def scrub_crisis(self, text: str) -> str:
+        """``text`` without the sentences a crisis phrase matches in (a stored reply that quotes the user)."""
+        phrases = self._everywhere.crisis + self._everywhere.crisis_other
 
-    def injected(self, text: str, language: LanguageCode) -> bool:
-        """The high-precision injection signals, whatever the mode (pack screening, follow-up buttons)."""
+        def quotes_crisis(sentence: str) -> bool:
+            readings = variants(sentence)
+            return _search_any(phrases, readings) or any(_ECHOED_SELF_HARM.search(r) for r in readings)
+
+        lines = []
+        for line in text.split("\n"):
+            sentences = re.split(r"(?<=[a-z\)][.!?])\s+", line)  # not after a step number ("1. Do not ...")
+            lines.append(" ".join(s for s in sentences if not quotes_crisis(s)))
+        return "\n".join(line for line in lines if line.strip())
+
+    def injected(self, text: str, language: LanguageCode, *, markup: bool = True) -> bool:
+        """The high-precision injection signals, whatever the mode (pack screening, follow-up buttons).
+        ``markup=False``: chat-template tokens and phrases only (pack facts may mention "<system> tags" as text)."""
         head = text[:MAX_SCREEN_CHARS]
-        return self._strong(normalize(head), head, self._registry.abuse_patterns(language))
+        patterns = self._registry.abuse_patterns(language)
+        return any(self._strong(r, head, patterns, markup=markup) for r in variants(head))
 
-    def _strong(self, folded: str, raw: str, patterns: AbusePatterns) -> bool:
-        nfkc = unicodedata.normalize("NFKC", raw)
+    def _strong(self, folded: str, raw: str, patterns: AbusePatterns, *, markup: bool = True) -> bool:
+        nfkc = unicodedata.normalize("NFKC", _clean(raw))
         if TEMPLATE_TOKENS.search(nfkc):
             return True
-        if SOFT_MARKUP.search(nfkc) and not _search(patterns.injection_reported, folded):
+        if markup and SOFT_MARKUP.search(nfkc) and not _search(patterns.injection_reported, folded):
             return True
         quoted = [m.span() for m in _QUOTED.finditer(folded)]
         for pattern in patterns.injection:
@@ -174,12 +262,12 @@ class InputScreen:
                     return True
         return False
 
-    def _suspect(self, folded: str, raw: str, patterns: AbusePatterns) -> bool:
+    def _suspect(self, readings: list[str], raw: str, patterns: AbusePatterns) -> bool:
         """Broad phrases, and strong signals that sit in reported or quoted content."""
         return (
-            _search(patterns.injection_suspect, folded)
+            _search_any(patterns.injection_suspect, readings)
             or has_role_markup(raw)
-            or _search(patterns.injection, folded)
+            or _search_any(patterns.injection, readings)
         )
 
 

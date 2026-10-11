@@ -63,6 +63,7 @@ FLAG_TEXT: Mapping[Flag, str] = {
     Flag.IMPERSONATION: "pretends to be a bank, government agency or customer care",
     Flag.URGENCY: "pressures you to act fast",
     Flag.SECRECY: "asks you to keep it secret",
+    Flag.THREAT: "threatens death, violence or public shame unless you pay",
 }
 
 # Phrased as instructions, not descriptions: a descriptive line ("This is a general money question") was echoed

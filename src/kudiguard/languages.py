@@ -93,6 +93,11 @@ class _AbuseSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     crisis: list[str] = Field(default_factory=list)  # first-person self-harm / suicide statements
+    crisis_other: list[str] = Field(
+        default_factory=list
+    )  # someone else at risk ("my brother will kill himself")
+    # sentences for the embedding-similarity crisis layer (safety/crisis_semantic.py): plain text, not patterns
+    crisis_exemplars: list[str] = Field(default_factory=list)
     abuse: list[str] = Field(default_factory=list)  # insults, hate and sexual messages aimed at the bot
     scam_tool: list[str] = Field(default_factory=list)  # requests to write, translate or polish scam content
     # attempts to override instructions or extract them: high-precision phrases (enforce by default)
@@ -149,6 +154,7 @@ class GuardPatterns:
 @dataclass(frozen=True, slots=True)
 class AbusePatterns:
     crisis: Patterns = ()
+    crisis_other: Patterns = ()
     abuse: Patterns = ()
     scam_tool: Patterns = ()
     injection: Patterns = ()

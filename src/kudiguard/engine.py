@@ -15,8 +15,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+import re
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -57,13 +58,16 @@ from kudiguard.reply_translation import (
 )
 from kudiguard.reply_translation import SYSTEM_PROMPTS as TRANSLATION_PROMPTS
 from kudiguard.safety.abuse import (
+    CRISES,
     INJECTIONS,
     Category,
     InputScreen,
+    Screening,
     ScreenMode,
     TranscriptFilter,
     log_screening,
 )
+from kudiguard.safety.crisis_semantic import CrisisSimilarity
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
 from kudiguard.safety.grounding import (
     GroundingChecker,
@@ -78,6 +82,7 @@ from kudiguard.safety.reply_screen import ReplyScreen
 from kudiguard.safety.scam_rules import assess
 from kudiguard.speech.base import ASR, AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult, transcribe_upload
+from kudiguard.text import normalize
 
 log = logging.getLogger(__name__)
 
@@ -106,6 +111,10 @@ class AnswerKind(StrEnum):
 
 # The fixed reply for each screen that answers with it alone (crisis: the crisis reply first, then the rules'
 # check if the message is also a scam; injection: the rules' answer).
+def crisis_message(category: Category | None) -> Msg:
+    return Msg.CRISIS_OTHER_REPLY if category is Category.CRISIS_OTHER else Msg.CRISIS_REPLY
+
+
 SCREEN_REPLY: dict[Category, Msg] = {
     Category.ABUSE: Msg.ABUSE_REPLY,
     Category.SCAM_TOOL: Msg.SCAM_TOOL_REPLY,
@@ -185,6 +194,7 @@ class Engine:
         screen: InputScreen | None = None,
         reply_screen: ReplyScreen | None = None,
         transcripts: TranscriptFilter | None = None,
+        crisis_similarity: CrisisSimilarity | None = None,
     ) -> None:
         """``compose_policy``: direct or English-first replies per language (default:
         ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct).
@@ -220,6 +230,8 @@ class Engine:
         self.screen = screen or InputScreen(registry)
         self.reply_screen = reply_screen or ReplyScreen(registry, SYSTEM_PROMPTS + TRANSLATION_PROMPTS)
         self.transcripts = transcripts or TranscriptFilter(registry)
+        # second crisis layer (embedding similarity; shadow by default; None = off or no embedding model)
+        self.crisis_similarity = crisis_similarity
 
     @property
     def has_speech(self) -> bool:
@@ -274,6 +286,7 @@ class Engine:
             return Answer(language, AnswerKind.GREETING, Outcome.FIXED_REPLY, intent=Intent.GREETING)
 
         screening = self.screen.screen(text, language, flagged=bool(assess([text], lexicon).flags))
+        screening = await self._crisis_similarity(text, screening, turn_id)
         log_screening(screening, turn_id, language)
         screened = tuple(c.value for c in screening.detected)
         action = screening.enforced.value if screening.enforced else None
@@ -284,20 +297,22 @@ class Engine:
         # Crisis: the full check continues after the crisis reply (a victim who "gave them my OTP" needs the model's
         # reading of the message: the rules alone missed it live); only a message with nothing to warn about gets
         # the crisis reply alone.
-        crisis = screening.enforced is Category.CRISIS
+        crisis = screening.enforced in CRISES
+        crisis_text = self.messages.text(language, crisis_message(screening.enforced)) if crisis else ""
         if screening.enforced in INJECTIONS:
             # The rules answer alone (with a translation for the rules): an injected message never reaches a model
             # that writes the reply.
             analysis, ms = await self._rules_only_analysis(text, language, deadline)
             model_down = True
+            if _ASKS_IF_REAL.search(normalize(text)):  # "... is this real?": still a check, by the rules
+                analysis = dataclasses.replace(analysis, intent=Intent.SCAM_CHECK)
         else:
             analysis, ms, model_down = await self.analyse(text, language, deadline=deadline)
         assessment = decide(text, analysis, lexicon)
         if (
             crisis and assessment.verdict not in REPORT_VERDICTS
         ):  # nothing to warn about: the crisis reply alone
-            body = self.messages.text(language, Msg.CRISIS_REPLY)
-            return Answer(language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=body, screened=screened,
+            return Answer(language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=crisis_text, screened=screened,
                           screen_action=action, llm_ms=ms)  # fmt: skip
         if screening.enforced is Category.INJECTION and assessment.verdict is Verdict.NO_FLAGS:
             # A message that clearly tries to steer the checker is itself a warning sign: never "no red flags".
@@ -360,7 +375,7 @@ class Engine:
             translation_rejections=generation.rejections,
             screened=screened,
             screen_action=action,
-            preface=self.messages.text(language, Msg.CRISIS_REPLY) if crisis else "",
+            preface=crisis_text,
         )
 
     async def analyse(
@@ -390,6 +405,40 @@ class Engine:
             if fallback is None:  # no usable English: rules on the original text only, no model flags
                 analysis = dataclasses.replace(analysis, english="", flags=(), untranslated=True)
         return resolve_analysis(analysis, text, language, fallback_translation=fallback), ms, False
+
+    async def _crisis_similarity(self, text: str, screening: Screening, turn_id: str | None) -> Screening:
+        """The embedding layer for crisis messages the phrases missed. Shadow: scored after the reply (no added
+        time) and logged; enforce: scored inline, and a hit is answered like a phrase hit. Fails open."""
+        similarity = self.crisis_similarity
+        if similarity is None or similarity.mode is ScreenMode.OFF or CRISES & set(screening.detected):
+            return screening
+        if similarity.mode is ScreenMode.SHADOW:
+
+            async def shadow() -> None:
+                await self._score_crisis(similarity, text, turn_id)
+
+            self._background(shadow())
+            return screening
+        found = await self._score_crisis(similarity, text, turn_id)
+        if not found:
+            return screening
+        return Screening((Category.CRISIS, *screening.detected), Category.CRISIS)
+
+    @staticmethod
+    async def _score_crisis(similarity: CrisisSimilarity, text: str, turn_id: str | None) -> bool:
+        try:
+            result = await asyncio.to_thread(similarity.score, text)
+        except Exception as exc:  # optional layer: the phrase screen's answer stands
+            log.warning("crisis similarity not run: %s", exc)
+            return False
+        log.info("crisis_semantic turn=%s mode=%s score=%.2f hit=%s ms=%d", turn_id, similarity.mode, result.score,
+                 result.hit, result.ms)  # fmt: skip
+        return result.hit
+
+    def _background(self, work: Coroutine[Any, Any, None]) -> None:
+        task = asyncio.create_task(work)
+        self._shadow.add(task)
+        task.add_done_callback(self._shadow.discard)
 
     async def _rules_only_analysis(
         self, text: str, language: LanguageCode, deadline: float | None
@@ -765,6 +814,8 @@ class Engine:
         return True
 
 
+# "real?", "is it a scam?", "na scam?": an injected message that also asks for a check still gets the rules' verdict
+_ASKS_IF_REAL = re.compile(r"\b(?:real|scam|legit\w*|genuine|true|fake|safe)\W*\?")
 _NO_ANALYSIS = Analysis(english="", intent=Intent.OTHER, flags=(), untranslated=True)
 
 

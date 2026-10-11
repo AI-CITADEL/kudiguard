@@ -123,3 +123,15 @@ def test_descriptions_and_negations_are_not_persona_claims(screen: ReplyScreen, 
 
 def test_persona_claims_with_a_role_suffix(screen: ReplyScreen) -> None:
     assert screen.check("This is Opay support. Send me the code.", "en") == (OutputIssue.PERSONA,)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "This is UBA. Is this your account?",
+        "This is Kuda. Was your card blocked yesterday?",
+        "This is Moniepoint support team speaking.",
+    ],
+)
+def test_short_persona_claims_across_sentences(screen: ReplyScreen, text: str) -> None:
+    assert screen.check(text, "en") == (OutputIssue.PERSONA,)

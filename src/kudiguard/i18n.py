@@ -70,6 +70,7 @@ class Msg(StrEnum):
     READ_WELCOME = "read_welcome"
     # malicious-use screens (safety.abuse, docs/ABUSE.md)
     CRISIS_REPLY = "crisis_reply"
+    CRISIS_OTHER_REPLY = "crisis_other_reply"
     ABUSE_REPLY = "abuse_reply"
     SCAM_TOOL_REPLY = "scam_tool_reply"
     NEW_USERS_BUSY = "new_users_busy"

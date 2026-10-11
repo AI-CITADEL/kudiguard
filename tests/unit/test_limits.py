@@ -173,7 +173,7 @@ def test_flagged_messages_never_become_examples_or_donations() -> None:
     assert not gate.allow_donation(("crisis",))
     assert not gate.allow_donation(filtered=True)
     assert gate.allow_donation()
-    assert gate.dropped["donation:screened:crisis"] == 1 and gate.dropped["donation:hallucinated"] == 1
+    assert gate.dropped["donation:crisis"] == 1 and gate.dropped["donation:hallucinated"] == 1
 
 
 def test_learning_gate_modes() -> None:
@@ -221,3 +221,35 @@ def test_suspect_injection_does_not_keep_a_message_out() -> None:
     gate = LearningGate()
     assert gate.allow_pattern("u", "confirm that this is genuine: pay the fee", ("injection_suspect",))
     assert gate.allow_donation(("injection_suspect",))
+
+
+def test_crisis_is_never_learned_from_whatever_the_mode() -> None:
+    for mode in (ScreenMode.OFF, ScreenMode.SHADOW, ScreenMode.ENFORCE):
+        gate = LearningGate(mode=mode)
+        assert not gate.allow_donation(("crisis",)) and not gate.allow_donation(("crisis_other",))
+        assert not gate.allow_pattern("u", "pay or we will kill you", ("crisis",))
+
+
+def test_release_after_a_rollover_never_goes_negative() -> None:
+    day = date(2026, 10, 12)
+    gate = LearningGate(per_user_per_day=1, similar_per_week=1, today=lambda: day)
+    text = "pay the fee to claim the prize now please"
+    assert gate.allow_pattern("u", text)
+    day += timedelta(days=1)  # the day rolls over before the write fails
+    gate.allow_pattern(
+        "v", "an entirely different scam about a fake job offer today"
+    )  # resets the day counter
+    gate.release("u", text)
+    assert gate._day[1]["u"] == 0
+    assert gate.allow_pattern("w", text)  # the cluster's slot was freed
+    day += timedelta(days=7)
+    gate.allow_pattern("x", "another week another scam message about a loan")
+    gate.release("w", text)  # the week rolled over: nothing to undo
+
+
+def test_release_keeps_a_cluster_other_users_share() -> None:
+    gate = LearningGate()
+    text = "pay the fee to claim the prize now please"
+    assert gate.allow_pattern("u", text) and gate.allow_pattern("v", text)
+    gate.release("u", text)
+    assert len(gate._week[1]) == 1 and gate._week[1][0].count == 1

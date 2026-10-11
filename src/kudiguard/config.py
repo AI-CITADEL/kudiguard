@@ -103,6 +103,9 @@ class Settings(BaseSettings):
 
     # --- malicious use (docs/ABUSE.md). Modes: off | shadow (log only) | enforce ------------------------------
     abuse_crisis_mode: ScreenModeName = "enforce"  # self-harm messages: humane fixed reply with help numbers
+    # second crisis layer: embedding similarity to abuse.crisis_exemplars (needs `embeddings`); log only by default
+    crisis_semantic_mode: ScreenModeName = "shadow"
+    crisis_semantic_threshold: float = Field(default=0.82, gt=0, lt=1)  # chosen on dev sets (docs/ABUSE.md)
     abuse_harassment_mode: ScreenModeName = (
         "enforce"  # insults / hate / sexual messages at the bot: calm reply
     )

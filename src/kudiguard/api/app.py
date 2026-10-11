@@ -38,7 +38,7 @@ from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
 from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation
-from kudiguard.engine import Answer, AnswerKind
+from kudiguard.engine import Answer, AnswerKind, crisis_message
 from kudiguard.envfile import load_env_file
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
@@ -626,6 +626,19 @@ def _web_router() -> APIRouter:
     async def web_check(
         request: Request, services: ServicesDep, background: BackgroundTasks
     ) -> CheckResponse:
+        """A typed crisis message gets the crisis reply whatever happens next (docs/ABUSE.md): no consent header,
+        rate limit, licence cap or busy server stands between the user and help, and nothing is stored then."""
+        crisis = await _typed_crisis(request, services)
+        try:
+            return await _gated_web_check(request, services, background)
+        except HTTPException:
+            if crisis is None:
+                raise
+            return crisis
+
+    async def _gated_web_check(
+        request: Request, services: Services, background: BackgroundTasks
+    ) -> CheckResponse:
         # Consent, session and rate limit come in headers so they are checked before any upload is read.
         if request.headers.get("x-kudiguard-consent") != CONSENT_VERSION:  # consent to the current text only
             raise HTTPException(403, "consent is required")
@@ -683,6 +696,35 @@ def _web_router() -> APIRouter:
         return {"deleted": len(await services.store.delete_voice_samples(user_hash))}
 
     return router
+
+
+async def _typed_crisis(request: Request, services: Services) -> CheckResponse | None:
+    """The crisis reply for a small typed web message, read before any gate (a voice note is only known to be a
+    crisis after transcription, behind the gates). None: not a crisis, or not a small text form."""
+    declared = request.headers.get("content-length", "")
+    kind = request.headers.get("content-type", "")
+    if not declared.isdigit() or int(declared) > SMALL_REQUEST_BYTES or "form" not in kind:
+        return None
+    try:  # parsed once; the gated path reuses it (a file part is left unread)
+        form = await request.form(max_files=1, max_fields=8, max_part_size=MAX_TEXT_CHARS * 4 + 1024)
+    except Exception:
+        return None  # malformed: the gated path answers it
+    fields = {k: v for k, v in form.multi_items() if isinstance(v, str)}
+    if len(fields) < len(form.multi_items()):
+        return None  # a voice note: known to be a crisis only after transcription
+    text = fields.get("text", "")[:MAX_TEXT_CHARS]
+    category = services.engine.screen.crisis(text)
+    if category is None:
+        return None
+    codes = {lang.code for lang in services.registry.enabled}
+    asked = fields.get("language", "")
+    language = asked if asked in codes else services.engine.screen.crisis_language(text) or "en"
+    messages = services.engine.messages
+    return CheckResponse(
+        verdict="not_a_check", headline=None, flags=[], actions=[], report_channels=[], language=language,
+        explanation=plain_text(messages.text(language, crisis_message(category))), degraded=False,
+        disclaimer=plain_text(messages.text(language, Msg.DISCLAIMER)), latency_ms=0,
+    )  # fmt: skip
 
 
 # --- health -------------------------------------------------------------------------------------------------------

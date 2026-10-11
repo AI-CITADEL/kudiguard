@@ -70,7 +70,7 @@ account that runs the watchdog:
 
 **Launch checklist: crisis help numbers (hard requirement, docs/ABUSE.md §6).** Do not launch, and re-check every
 quarter: call every number in the `crisis_reply` string of each language (`data/languages/*.yaml`): 112, SURPIN
-0800 078 7746 (toll-free), 0903 440 0009 and 0908 021 7555. Each must reach a person. Remove any number that does
+0800 078 7746 (toll-free), 0903 440 0009, 0908 021 7555 and the Hausa line 0814 224 1007 (in the Hausa replies). Each must reach a person. Remove any number that does
 not (in all four languages), and record the date and result next to the string. If none of the SURPIN lines works,
 keep "112 / someone you trust" only.
 

@@ -257,13 +257,16 @@ CRISIS_SCAM = "I wan kill myself. Somebody text me say make I send BVN and OTP t
 
 
 async def test_crisis_as_the_first_ever_message(h: Harness) -> None:
-    """Before consent, the welcome and the language menu: the help comes first, and nothing is stored."""
-    assert await h.say(CRISIS) == [h.t(Msg.CRISIS_REPLY)]
-    assert await user(h) is None and await interactions(h) == [] and h.llm.requests == []
+    """Before consent: the help comes first, then the welcome and the language menu (so they can come back); the
+    crisis message itself is stored nowhere."""
+    texts = await h.say(CRISIS)
+    assert texts[:2] == [h.t(Msg.CRISIS_REPLY), h.t(Msg.WELCOME)] and len(texts) == 3
+    assert await interactions(h) == [] and h.llm.requests == []
 
 
 async def test_crisis_from_a_new_user_in_hausa_gets_hausa_help(h: Harness) -> None:
-    assert await h.say("Sun cinye duk kudina, ina so in kashe kaina.") == [h.t(Msg.CRISIS_REPLY, "ha")]
+    texts = await h.say("Sun cinye duk kudina, ina so in kashe kaina.")
+    assert texts[0] == h.t(Msg.CRISIS_REPLY, "ha") and "0814 224 1007" in texts[0]
 
 
 async def test_crisis_when_kudiguard_is_full_or_busy(h: Harness) -> None:
@@ -337,3 +340,42 @@ async def test_record_pattern_failure_without_a_gate(h: Harness, monkeypatch: py
     monkeypatch.setattr(h.store, "add_pattern", broken)
     answer = await h.engine.check(OTP_SCAM, "en")
     await record_pattern(h.store, "whatsapp", answer, OTP_SCAM, datetime.now(UTC))  # never raises
+
+
+async def test_third_party_crisis_before_the_gates(h: Harness) -> None:
+    wire(h, limits=Limits(active_user_cap=1))
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    message = "My sister says she will kill herself, what do I do?"
+    assert await h.say(message, user=OTHER) == [h.t(Msg.CRISIS_OTHER_REPLY)]
+
+
+async def test_crisis_while_the_queue_is_full_is_answered(h: Harness) -> None:
+    wire(h, flood=FloodGuard(max_queued=1), limits=Limits(per_user_per_hour=100))
+    await h.onboard("en")
+    h.messenger.clear()
+    await _queue_behind_a_slow_turn(h, h.msg(OTP_SCAM), [h.msg("part 1"), h.msg(CRISIS)])
+    assert h.messenger.texts.count(h.t(Msg.CRISIS_REPLY)) == 1
+
+
+async def test_a_donor_crisis_voice_note_is_never_donated_even_with_the_gate_off(d: Harness) -> None:
+    wire_donations = d.conversation
+    d.conversation = Conversation(
+        engine=d.engine, store=d.store, messenger=d.messenger, hasher=d.hasher,
+        donations=wire_donations._donations, accept_donations=True, learning=LearningGate(mode=ScreenMode.OFF),
+    )  # fmt: skip
+    await opt_in(d)
+    d.asr.text = "I want to kill myself"
+    await voice(d)
+    assert await samples(d) == []
+
+
+async def test_stored_reply_never_quotes_the_crisis(h: Harness) -> None:
+    h.llm.script[Purpose.COMPOSE] = [
+        "You said you want to kill yourself. This is a scam.\n1. Do not send the OTP."
+    ]
+    h.llm.script[Purpose.ANALYSE] = [analysis("x", "scam_check", ["asks_credentials"])]
+    await h.onboard("en")
+    await h.say("I want to die. Someone asked for my OTP on the phone, is it a scam?")
+    [row] = await interactions(h)
+    assert "kill" not in row["reply"] and "This is a scam." in row["reply"]

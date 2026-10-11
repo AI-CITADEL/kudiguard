@@ -55,6 +55,7 @@ class Flag(StrEnum):
     IMPERSONATION = "impersonation"  # claims to be bank staff, CBN, EFCC, police, customer care
     URGENCY = "urgency"  # act now, within 24 hours
     SECRECY = "secrecy"  # "don't tell anyone"
+    THREAT = "threat"  # death, violence or public-shame threats to make you pay (extortion, loan-app threats)
 
 
 class Verdict(StrEnum):

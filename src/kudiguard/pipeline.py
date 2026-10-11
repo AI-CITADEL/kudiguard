@@ -34,14 +34,14 @@ from typing import Any, Protocol
 from kudiguard.commands import Command, CommandMatcher, Match
 from kudiguard.domain import InboundMessage, Interaction, LanguageCode, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation, VoiceVault
-from kudiguard.engine import Answer, AnswerKind, Engine
+from kudiguard.engine import Answer, AnswerKind, Engine, crisis_message
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageStatus
 from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
 from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
-from kudiguard.safety.abuse import INJECTIONS, Category
+from kudiguard.safety.abuse import CRISES, INJECTIONS
 from kudiguard.safety.limits import FloodGuard, LearningGate, NewUserGate
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
@@ -300,7 +300,15 @@ class Conversation:
             await self._best_effort_reply(message.user_id, self._limits.default_language)
             return
         if self._flood.queue_full(len(self._pending.get(user_hash, []))):
-            return  # a flood: this user already has a full queue (logged by the guard; no reply, they get one soon)
+            # a flood: this user already has a full queue (logged by the guard; no reply, they get one soon), but a
+            # crisis message is never dropped silently: the crisis reply goes out at once, nothing is stored
+            category = (
+                self._engine.screen.crisis(message.text or "") if message.kind is MessageKind.TEXT else None
+            )
+            if category is not None:
+                await self._best_effort_reply(message.user_id, await self._language_of(user_hash),
+                                              crisis_message(category))  # fmt: skip
+            return
         self._pending.setdefault(user_hash, []).append(message)
         try:
             await self._user_locks.run(user_hash, lambda: self._next(message, user_hash))
@@ -462,14 +470,18 @@ class Conversation:
         now, and nothing about the message is stored. Otherwise the check follows (its crisis reply is not sent
         twice); a voice note is only known to be a crisis after transcription, inside the check."""
         text = turn.message.text or ""
-        if not self._engine.screen.crisis(text):
+        category = self._engine.screen.crisis(text)
+        if category is None:
             return False
         if user is None or not user.language:  # first contact: answer in the language the message is in
             turn.language = self._engine.screen.crisis_language(text) or turn.language
-        await self._send(turn, self._messages.text(turn.language, Msg.CRISIS_REPLY))
+        await self._send(turn, self._messages.text(turn.language, crisis_message(category)))
         turn.crisis_sent = True
-        ready = user is not None and not user.stopped and _consented(user)
-        return not (ready and await self._admission(turn) is None and not await self._rate_limited(turn))
+        if await self._admission(turn) is not None:  # full or busy: the help was the answer
+            return True
+        if user is None or user.stopped or not _consented(user):
+            return False  # first contact: the welcome and language menu follow, so they can come back to us
+        return await self._rate_limited(turn)
 
     async def _onboard(
         self, turn: _Turn, user: UserState | None, match: Match, chosen: LanguageCode | None
@@ -677,7 +689,7 @@ class Conversation:
 
         # A crisis message that is also a scam: the crisis reply first, then the check. Its words are kept nowhere
         # (not in the log, the English field, the "I heard" echo or the pattern library).
-        private = answer.screen_action == Category.CRISIS
+        private = answer.screen_action in CRISES
         echo = turn.transcript if turn.voice and not private else None
         if private:
             turn.transcript = None
@@ -694,8 +706,10 @@ class Conversation:
             contacts=answer.contacts,
         )
         intent = f"screen:{answer.screen_action}" if answer.screen_action else None
+        # the stored reply never quotes the crisis words (a composed reply may echo them)
+        stored = self._engine.screen.scrub_crisis(reply) if private else reply
         interaction_id = await self._log(
-            turn, outcome=answer.outcome, answer=answer, reply=reply, intent=intent
+            turn, outcome=answer.outcome, answer=answer, reply=stored, intent=intent
         )
         assert turn.logged_at is not None
         await record_pattern(
@@ -733,7 +747,7 @@ class Conversation:
         """Crisis, abuse or a scam-tool request (docs/ABUSE.md): the fixed reply, no buttons, never a scam example or a
         donation. A crisis message is sensitive personal data: its text is not kept in the evidence log."""
         await self._store.save_user(user)
-        if answer.screen_action == Category.CRISIS:
+        if answer.screen_action in CRISES:
             turn.transcript = None
         await self._log(
             turn,
@@ -742,7 +756,7 @@ class Conversation:
             reply=answer.body,
             intent=f"screen:{answer.screen_action}",
         )
-        if not (answer.screen_action == Category.CRISIS and turn.crisis_sent):
+        if not (answer.screen_action in CRISES and turn.crisis_sent):
             await self._send(turn, answer.body)
 
     async def _follow_up(self, turn: _Turn, parsed: tuple[Action, str] | None) -> None:
@@ -1082,7 +1096,7 @@ async def record_pattern(
     """
     if answer.verdict not in REPORT_VERDICTS or channel not in PATTERN_CHANNELS or not text.strip():
         return
-    if answer.screen_action == Category.CRISIS:  # sensitive: never kept, whatever the learning gate's mode
+    if answer.screen_action in CRISES:  # sensitive: never kept, whatever the learning gate's mode
         return
     if gate is not None and not gate.allow_pattern(user_key, text, answer.screened):
         return

@@ -80,7 +80,8 @@ class PackScreen:
         language = language if language in self._registry else "en"
         instructions = self._registry.abuse_patterns(language).pack_instructions
         for text in (*texts, *advice):
-            if self._injection.injected(text, language):
+            # chat-template tokens and high-precision phrases; not "<system>"-style markup: a fact may name it
+            if self._injection.injected(text, language, markup=False):
                 return "injection"
             if any(p.search(normalize(text)) for p in instructions):
                 return "model_instruction"
