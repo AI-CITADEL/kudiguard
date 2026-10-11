@@ -39,6 +39,48 @@ replies (rubric and process: [NATIVE_REVIEW.md](NATIVE_REVIEW.md)); the table is
 | Speech, FLEURS read sentences as WhatsApp audio (WER) | Hausa 28% (20 clips) · Yoruba 33% (10; 64% with tone marks) · Igbo 46% (10) | read speech, not voice notes; possible training overlap |
 | Frozen end-to-end set (366 cases, 49 scam types, 5 languages) | to be scored live | ha/yo/ig cases near-parallel and DRAFT |
 
+## End-to-end test set T (frozen, v2.1)
+**Set.** `data/eval/e2e/cases.yaml`: 366 cases (en 147, pcm 63, ha/yo/ig 52 each; 196 scam, 96 genuine, 74 question),
+written blind by an independent author and frozen on 2026-10-10 before any system output was seen. No rule, prompt,
+lexicon, retrieval setting or threshold is tuned on it. The runner was built and tested on a synthetic 8-case fixture
+(`tests/fixtures/e2e_mini.yaml`); the live model is run on T once.
+
+**Run.** `scripts/eval_e2e.py` sends every case, one at a time, through the real `Engine` (greedy decoding:
+temperature 0, seed 42), with a per-case time limit that writes an error row instead of stopping. `--resume`
+continues an interrupted run. Pidgin cases run as `en`, as in the product. The 46 `voice: true` cases run as text
+(no TTS step). Each row stores the verdict, flags, the reply as shown, the English pivot the engine used, the English
+draft of an English-first reply, translation rejections, fallback, latency, model calls and the case's
+must_advise / must_not. For yo/ig scam misses the row also says whether the rules find a red flag in the English
+pivot (`cue_survived_translation`), find none (`no_rule_cue_in_translation`: read the pivot to see whether the
+translation lost the cue) or there was no pivot (`no_translation`).
+
+**Scoring** (`kudiguard.evaluation.e2e`, the header rules exactly). Red and orange = flagged, green = not flagged.
+Scam passes when flagged, genuine when not flagged, question when answered (a model-composed reply; a colour shown
+with it is ignored, and red verdicts on questions are counted for the judge to decide "no basis"). `accept` values
+also pass (caution = flagged). Red flags are compared through an explicit map: the 13 shared names map one-to-one to
+the system's flags; `harassment` maps to no match. Error rows are excluded from rates and counted. Reported per
+language and overall: scam recall, genuine false-positive rate, question-answered rate, flag recall/precision,
+latency p50/p95, fallback rate and translation-rejection rate. ha/yo/ig scam cases are near-parallel templates, so
+per-language scores are a consistency check, not independent evidence.
+
+**Answer quality.** must_advise / must_not are never keyword-scored. `scripts/judge_e2e_prep.py` writes blind batches
+(id, language, message, reply shown, must_advise, must_not; no label, verdict field or flags) for independent LLM
+judges.
+
+| T result (engine, live) | Value |
+|---|---|
+| Scam recall (all / per language) | to be run |
+| Genuine false-positive rate | to be run |
+| Questions answered | to be run |
+| Flag recall / precision | to be run |
+| Latency p50 / p95 | to be run |
+| Fallback / translation-rejection rate | to be run |
+| Judged: must_advise met / must_not violated | to be run |
+
+Deterministic safety floor (rules alone, no model; `--rules-only`, results in `data/eval/results/e2e-rules.jsonl`):
+88/196 scams flagged (45%), 11/96 genuine messages flagged (11%), 0/74 questions answered (no model, so only fixed
+text), flag recall 22%, precision 95%.
+
 ## Speech on real voice notes (donated, opt-in)
 Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The transcription loop:
 
