@@ -15,10 +15,12 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
   Reply strategy per language (`reply_translation.py`, `KUDIGUARD_COMPOSE_STRATEGY`, default
   `english_first,ha=direct`): **Yoruba and Igbo are English-first**: composed and checked in English (every English
   check sees the text), then translated, guarded again in the language and checked for fidelity (steps, numbers,
-  links, length, echo, negation kept); a failure falls back to fixed text in the language. **Hausa and English are
-  direct** (composed in the language). Why (docs/SPIKES.md H, dev set, same session): English-first raised Yoruba
-  coverage 0.36 → 0.56 and Igbo 0.37 → 0.42 (Igbo copying the worked example 42% → 8%) but cut Hausa 0.54 → 0.34,
-  for +1.6–2.3 s p50. Direct replies get only the output guard: no fidelity or negation check, so native review of
+  links, length, echo, negation kept); a failure falls back to fixed text in the language. B's shadow classifier and
+  grounding score the English draft; grounding in enforce mode trims it before translation. The "What should I do?"
+  and "Warn my family" buttons follow the same strategy. **Hausa and English are direct** (composed in the
+  language). Why (docs/SPIKES.md H, dev set, same session): English-first raised Yoruba coverage 0.36 → 0.56 and Igbo
+  0.37 → 0.42 (Igbo copying the worked example 42% → 8%) but cut Hausa 0.54 → 0.34, for +2.4–2.7 s p50 and ~70% more
+  model time per Yoruba/Igbo turn. Direct replies get only the output guard: no fidelity or negation check, so native review of
   Hausa replies matters (11% of measured translations flipped a negation; a direct reply can err the same way unseen).
 * **Conversation** (`pipeline.py`): versioned consent, STOP/DELETE/language commands, buttons, per-user ordering,
   message merging, rate limit, licence cap, never-silent failures, redacted evidence log.
