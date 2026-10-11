@@ -154,6 +154,13 @@ Settings in `.env.example` ("Advice quality"); code in `knowledge/service.py` (c
   number?" and "how do I reach GTBank customer care?" stay clean. Probe table: `tests/unit/test_rules_review.py`.
   Rules-only on the dev sets, master -> new: answers.yaml scams 14/20 -> 15/20, non-scams 2/21 -> 2/21; prompts.yaml
   17/18 -> 17/18, 2/16 -> 2/16 (impersonation and asks_credentials recall unchanged).
+* **ANALYSE `user_initiated` reverted** (dev2, 2747121 vs master: scam recall 96% -> 84%): asking N-ATLAS whether
+  the user started the transaction made it label described scam situations "question" and drop their flags (own
+  probes, same ANALYSE call: "friend's WhatsApp asks to borrow 50k urgently" scam_check+money_request -> question, no
+  flags; Yoruba "put 20k, get 40k in 7 days" wrong_transfer -> no flags). The field is no longer requested, so the
+  genuine-notice gate caps model-only suspicion at caution; the rule fixes carry the false-alarm gains.
+* **Latency cap**: at most one extra compose per turn: the Pidgin language retry (no example at all) or the copy retry,
+  never both (plus the output guard's own retry, as before).
 * **Pidgin, stabilised**: Pidgin input with a scam verdict gets a Pidgin worked example; a reply to Pidgin input that
   reads as Hausa, Yoruba or Igbo (`prompts.reads_as_hausa_yoruba_igbo`) is composed once more in English.
 * **Pidgin replies** (`KUDIGUARD_PIDGIN_REPLIES`): Pidgin arrives as language `en`; when

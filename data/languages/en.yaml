@@ -398,7 +398,7 @@ lexicon:
       - 'except\W+(?:our|the|your bank)\W+(?:\w+\W+)?(?:agent|staff|officer|team)'
       - '(?:read|give|tell|send|call out)\W+(?:the code|the otp|the pin|your (?:otp|pin|code)|the token)\W+(?:\w+\W+){0,1}?to (?:the |our |your )?(?:agent|officer|caller|staff|him|her)'
       - '(?:give|send|tell|read)\W+(?:it|them)\W+to (?:him|her|the (?:agent|officer|caller|staff))\W+only'
-      - '(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|read|forward)\W+(?:me |us )?(?:the|your|ur) (?:code|otp|pin)\b(?! to your)'
+      - '(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|read|forward)\W+(?:(?:me|us) (?:the|your|ur) (?:code|otp|pin)\b|(?:the|your|ur) (?:code|otp|pin)\b(?! to your)(?!\W+to\W+(?!me\b|us\b|confirm|complete|verify|unlock|activate|reactivate|continue|proceed|avoid|stop|receive|claim|update|validate|finish|process|cancel|block|secure)\w))'
     remote_access:
       - 'anydesk'
       - 'teamviewer'
@@ -420,7 +420,7 @@ lexicon:
       - '(?:please|kindly|pls|plz)\W+(?:\w+\W+){0,2}?(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|the transfer|my money)'
       # first person: the caller says the money went to "my account" and wants it back
       - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )(?:my|mine) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
-      - '(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|my money|the excess|her money|his money)\W+(?:back\W+)?to (?:him|her|them)'
+      - '(?:by mistake|mistakenly|wrongly|in error|by error|wrong account|sent you too much)\W+(?:\w+\W+){0,12}?(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|my money|the excess|her money|his money)\W+(?:back\W+)?to (?:him|her|them)'
       - '(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)\W+(?:\w+\W+){0,8}?(?:by mistake|mistakenly|wrongly|in error|by error|wrong account|sent you too much|excess (?:amount|money) i sent)'
       - '(?:by mistake|mistakenly|wrongly|in error|by error|wrong account|sent you too much|excess (?:amount|money) i sent)\W+(?:\w+\W+){0,10}?(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)'
       - 'excess (?:amount|money) i sent'
@@ -470,7 +470,7 @@ lexicon:
       - 'message from customer (?:care|service|support)'
       - 'contact our customer (?:care|service|support)'
       - '(?:this is|i am from|i m from|im from|we are from|calling from)\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
-      - '^(?:hello\W+|hi\W+)?(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)\W+here\b'
+      - '^(?:hello\W+|hi\W+)?(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)\W+here\b(?!\W+(?:in|at|on|near)\b)'
       - '(?:hello|hi)\W+this is\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
       - 'regards\W+(?:gt ?bank|gtco|access(?: bank)?|zenith(?: bank)?|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic|polaris|ecobank|keystone|mtn|airtel|glo|9mobile|nimc|cbn|efcc|firs)'
       - '(?:gt ?bank|gtco|access|zenith|first ?bank|uba|opay|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union bank|stanbic)\w* ?(?:support|care|help|team)'

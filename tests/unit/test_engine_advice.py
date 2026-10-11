@@ -469,13 +469,10 @@ async def test_a_copied_pidgin_worked_example_is_composed_again(registry: Langua
     assert len(llm.calls(Purpose.COMPOSE)) == 2 and answer.body == REPLY
 
 
-async def test_the_english_retry_for_pidgin_is_copy_checked_too(registry: LanguageRegistry) -> None:
-    from kudiguard.prompts import worked_example_reply
-
-    knowledge = StubKnowledge((OTHER, 0.9))
-    english_copy = worked_example_reply(
-        Verdict.LIKELY_SCAM, (Flag.ASKS_CREDENTIALS,), knowledge.result, "English"
-    )
-    llm = FakeLLM(analyse=analysis(), compose=["Wannan zamba ne. Kada ka ba su lambar.", english_copy, REPLY])
-    answer = await engine(registry, llm, knowledge).check(PIDGIN, "en")
-    assert len(llm.calls(Purpose.COMPOSE)) == 3 and answer.body == REPLY
+async def test_at_most_one_extra_compose_for_pidgin(registry: LanguageRegistry) -> None:
+    """The English retry for Pidgin input has no example at all (nothing to copy), and no copy retry follows."""
+    llm = FakeLLM(analyse=analysis(), compose=["Wannan zamba ne. Kada ka ba su lambar.", REPLY, "unused"])
+    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(PIDGIN, "en")
+    _first, second = llm.calls(Purpose.COMPOSE)
+    assert len(second.messages) == 2 and "<model_answer>" not in last_user(second)
+    assert answer.body == REPLY

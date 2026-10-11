@@ -432,7 +432,8 @@ class Engine:
         """Model-only suspicion on a genuine notice (the user's own OTP, a login alert) is lowered only when ALL hold:
         the best search hit is a notice at a high score; the rules found no flag at all; the message has no link,
         phone or account number to act on; the model saw no request to send money, codes or details (only urgency,
-        impersonation or secrecy). Then: no red flags if the user says they started it (ANALYSE ``user_initiated``),
+        impersonation or secrecy). Then: no red flags if the analysis says the user started it (``user_initiated``;
+        ANALYSE no longer asks for it, so in practice at most caution),
         else at most caution. Notice keywords overlap scam wording, so retrieval alone never lowers a verdict;
         when in doubt the model's verdict stands."""
         prefix = self.advice.notice_prefix
@@ -595,23 +596,22 @@ class Engine:
         request = build(example)
         if direct:
             generation = await self._generate(request, language, deadline, sources)
-            generation = await self._unless_copied(
-                generation, shown_for(compose_language), knowledge, build(None, worked_example=False), language,
-                deadline, sources,
-            )  # fmt: skip
+            # At most one extra compose per turn (latency): the Pidgin language retry, else the copy retry.
             if pidgin and generation.text is not None and reads_as_hausa_yoruba_igbo(generation.text):
-                # asked for Pidgin, got Hausa/Yoruba/Igbo: once more with the plain English instruction
+                # asked for Pidgin, got Hausa/Yoruba/Igbo: once more with the plain English instruction and no
+                # example at all (nothing left to copy)
                 log.info("compose: Pidgin input got a reply in another language, retrying in English")
                 retry = await self._generate(
-                    build(example, language_name=english_name), language, deadline, sources
+                    build(None, worked_example=False, language_name=english_name), language, deadline, sources
                 )
-                retry = await self._unless_copied(
-                    retry, shown_for(english_name), knowledge,
-                    build(None, worked_example=False, language_name=english_name), language, deadline, sources,
-                )  # fmt: skip
                 retry.ms += generation.ms
                 retry.issues = generation.issues + retry.issues
                 generation = retry
+            else:
+                generation = await self._unless_copied(
+                    generation, shown_for(compose_language), knowledge, build(None, worked_example=False),
+                    language, deadline, sources,
+                )  # fmt: skip
             return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
         if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
             # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
