@@ -1,0 +1,19 @@
+# KudiGuard's own "this is normal" content: genuine money notices people often mistake for scams (an OTP for a
+# transfer they started, a login alert after they logged in, a reversal of their own failed transfer, the CBN
+# new-device limit). Each entry says what the real notice looks like, why it is normal, and the ONE check that tells
+# it apart from a fake. Core kind so it is always in scope next to the red-flag entries; same priority as core.
+# Sources for every entry are in YAML comments in topics.yaml. Model answers live in examples.yaml (Entry forbids
+# unknown fields).
+id: genuine-notices
+name: Genuine Money Notices
+owner: KudiGuard
+kind: core
+priority: 10
+content_language: en
+cite: false  # our own content: not cited as a third-party source
+description: >
+  Normal bank, telco and everyday money notices that are often mistaken for scams, each with the one check that tells
+  the real notice apart from a fake. Facts are short and plain so N-ATLAS can restate them in Hausa, Yoruba, Igbo or
+  English.
+source:
+  type: files
