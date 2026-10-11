@@ -46,8 +46,10 @@ lexicon, retrieval setting or threshold is tuned on it. The runner was built and
 (`tests/fixtures/e2e_mini.yaml`); the live model is run on T once.
 
 **Run.** `scripts/eval_e2e.py` sends every case, one at a time, through the real `Engine` (greedy decoding:
-temperature 0, seed 42), with a per-case time limit that writes an error row instead of stopping. `--resume`
-continues an interrupted run. Pidgin cases run as `en`, as in the product. The 46 `voice: true` cases run as text
+temperature 0, seed 42) under the product's turn deadline (60 s turn limit minus the 3 s reply reserve,
+`--turn-deadline`), with a much longer hang guard that writes an error row instead of stopping. `--resume`
+continues an interrupted run, retries its error rows, and refuses a file made in another mode or against another
+model server (every row records both). Pidgin cases run as `en`, as in the product. The 46 `voice: true` cases run as text
 (no TTS step). Each row stores the verdict, flags, the reply as shown, the English pivot the engine used, the English
 draft of an English-first reply, translation rejections, fallback, latency, model calls and the case's
 must_advise / must_not. For yo/ig scam misses the row also says whether the rules find a red flag in the English
@@ -57,10 +59,15 @@ translation lost the cue) or there was no pivot (`no_translation`).
 **Scoring** (`kudiguard.evaluation.e2e`, the header rules exactly). Red and orange = flagged, green = not flagged.
 Scam passes when flagged, genuine when not flagged, question when answered (a model-composed reply; a colour shown
 with it is ignored, and red verdicts on questions are counted for the judge to decide "no basis"). `accept` values
-also pass (caution = flagged). Red flags are compared through an explicit map: the 13 shared names map one-to-one to
-the system's flags; `harassment` maps to no match. Error rows are excluded from rates and counted. Reported per
+also pass (caution = flagged). The headline is the pass rate (label or accept); scam recall, genuine
+false-positive rate and questions answered are label-only and ignore `accept`. Red flags are compared through an explicit map: the 13 shared names map one-to-one to
+the system's flags; `harassment` maps to no match. Error rows are excluded from rates and printed
+prominently, with a worst-case pass rate that counts them as failures; above 2% errors the run exits non-zero.
+Flag precision uses only scam cases with at least one mapped expected flag and is a lower bound: the author's flag
+lists are not exhaustive, so a system flag outside them may still be right. Reported per
 language and overall: scam recall, genuine false-positive rate, question-answered rate, flag recall/precision,
-latency p50/p95, fallback rate and translation-rejection rate. ha/yo/ig scam cases are near-parallel templates, so
+latency p50/p95, fallback rate, translation-rejection rate and model calls (in `--rules-only` mode
+these count the failed call attempts). ha/yo/ig scam cases are near-parallel templates, so
 per-language scores are a consistency check, not independent evidence.
 
 **Answer quality.** must_advise / must_not are never keyword-scored. `scripts/judge_e2e_prep.py` writes blind batches
@@ -69,10 +76,11 @@ judges.
 
 | T result (engine, live) | Value |
 |---|---|
+| Pass rate, label or accept (all / per language; worst case with errors as failures) | to be run |
 | Scam recall (all / per language) | to be run |
 | Genuine false-positive rate | to be run |
 | Questions answered | to be run |
-| Flag recall / precision | to be run |
+| Flag recall / precision (lower bound) | to be run |
 | Latency p50 / p95 | to be run |
 | Fallback / translation-rejection rate | to be run |
 | Judged: must_advise met / must_not violated | to be run |

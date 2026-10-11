@@ -32,6 +32,7 @@ from kudiguard.evaluation.stats import percentile
 from kudiguard.llm.base import LLM, ChatRequest, Completion
 
 ALL = "all"
+ERROR_LIMIT = 0.02  # above this share of error rows a run is reported as unreliable (non-zero exit)
 FLAGGED_VERDICTS = frozenset({Verdict.LIKELY_SCAM.value, Verdict.CAUTION.value})
 
 # Test vocabulary (cases.yaml ``red_flags_vocab`` + ``extra_red_flags``) -> the system's ``Flag`` enum. The 13 shared
@@ -114,6 +115,23 @@ def passes(row: Mapping[str, Any]) -> bool:
     return any(outcome_matches(value, flagged=flagged, answered=answered) for value in wanted)
 
 
+def resume_ids(rows: Iterable[Mapping[str, Any]], *, mode: str, url: str) -> set[str]:
+    """Ids a resumed run can skip: rows without an error (error rows are retried). Raises ValueError when the file
+    holds rows from another mode or model server."""
+    done: set[str] = set()
+    for row in rows:
+        if (row.get("mode"), row.get("url")) != (mode, url):
+            raise ValueError(
+                f"cannot resume: {row['id']} was run as {row.get('mode')!r} @ {row.get('url')!r}, "
+                f"not {mode!r} @ {url!r}"
+            )
+        if row.get("error"):
+            done.discard(row["id"])
+        else:
+            done.add(row["id"])
+    return done
+
+
 def diagnose_miss(english: str, english_rule_flags: Sequence[str]) -> str:
     """Why a scam was missed after translation: ``no_translation`` (no usable English pivot),
     ``cue_survived_translation`` (the rules find a red flag in the English pivot, so the cue was not lost in
@@ -133,10 +151,15 @@ def record(
     model_calls: int = 0,
     error: str = "",
     english_rule_flags: Sequence[str] = (),
+    mode: str = "",
+    url: str = "",
 ) -> dict[str, Any]:
-    """One results row. ``answer`` None = the run failed (``error`` says why)."""
+    """One results row. ``answer`` None = the run failed (``error`` says why). ``mode`` / ``url`` say how the row
+    was produced (``rules-only`` or ``engine``; the model server), so a resumed run cannot mix them."""
     row: dict[str, Any] = {
         "id": case["id"],
+        "mode": mode,
+        "url": url,
         "lang": case["lang"],
         "engine_lang": engine_language(case["lang"]),
         "label": case["label"],
@@ -182,6 +205,7 @@ class Group:
 
     n: int = 0
     errors: int = 0
+    timeouts: int = 0
     passed: int = 0
     scam: int = 0
     scam_flagged: int = 0
@@ -205,6 +229,7 @@ class Group:
         self.voice += bool(row.get("voice"))
         if row.get("error"):
             self.errors += 1
+            self.timeouts += row["error"] == "timeout"
             return
         flagged = is_flagged(row["verdict"])
         self.passed += passes(row)
@@ -217,9 +242,12 @@ class Group:
             self.scam += 1
             self.scam_flagged += flagged
             expected, predicted = set(row["expected_flags"]), set(row["flags"])
-            self.flag_hits += len(expected & predicted)
-            self.flags_expected += len(expected)
-            self.flags_predicted += len(predicted)
+            # Only cases with at least one mapped expected flag: the author's lists are not exhaustive, so a
+            # system flag missing from them may still be right (precision is a lower bound).
+            if expected:
+                self.flag_hits += len(expected & predicted)
+                self.flags_expected += len(expected)
+                self.flags_predicted += len(predicted)
             if row.get("miss_diagnosis"):
                 self.diagnoses[row["miss_diagnosis"]] += 1
         elif label == "genuine":
@@ -243,6 +271,9 @@ def metrics(group: Group) -> dict[str, Any]:
     return {
         "n": group.n,
         "errors": group.errors,
+        "timeouts": group.timeouts,
+        "error_rate": _rate(group.errors, group.n),
+        "worst_case_pass_rate": _rate(group.passed, group.n),
         "voice_cases": group.voice,
         "pass_rate": _rate(group.passed, group.scored),
         "scam_recall": _rate(group.scam_flagged, group.scam),
@@ -250,7 +281,7 @@ def metrics(group: Group) -> dict[str, Any]:
         "question_answered_rate": _rate(group.question_answered, group.question),
         "question_shown_red": group.question_shown_red,
         "flag_recall": _rate(group.flag_hits, group.flags_expected),
-        "flag_precision": _rate(group.flag_hits, group.flags_predicted),
+        "flag_precision_lower_bound": _rate(group.flag_hits, group.flags_predicted),
         "latency_p50_s": percentile(group.latencies, 0.5),
         "latency_p95_s": percentile(group.latencies, 0.95),
         "fallback_rate": _rate(group.fallbacks, group.scored),
@@ -283,14 +314,14 @@ def format_summary(summary: Mapping[str, Mapping[str, Any]], *, mode: str = "") 
     head = f"End-to-end test set T{f' ({mode})' if mode else ''}"
     lines = [
         head,
-        "  lang    n  err  pass  scam-recall  genuine-FPR  q-answered  flag-R  flag-P  fallback  tr-reject"
+        "  lang    n  err  pass  scam-recall  genuine-FPR  q-answered  flag-R  flag-P≥ fallback  tr-reject"
         "  p50 s  p95 s",
     ]
     for lang, m in summary.items():
         lines.append(
             f"  {lang:4} {m['n']:4d} {m['errors']:4d} {_pct(m['pass_rate'])}   {_pct(m['scam_recall'])}"
             f"        {_pct(m['genuine_false_positive_rate'])}       {_pct(m['question_answered_rate'])}"
-            f"     {_pct(m['flag_recall'])}   {_pct(m['flag_precision'])}    {_pct(m['fallback_rate'])}"
+            f"     {_pct(m['flag_recall'])}   {_pct(m['flag_precision_lower_bound'])}    {_pct(m['fallback_rate'])}"
             f"     {_pct(m['translation_rejection_rate'])}  {m['latency_p50_s']:5.1f}  {m['latency_p95_s']:5.1f}"
         )
     total = summary[ALL]
@@ -301,6 +332,19 @@ def format_summary(summary: Mapping[str, Mapping[str, Any]], *, mode: str = "") 
         f"{counts['question_answered'][0]}/{counts['question_answered'][1]} "
         f"(shown red: {total['question_shown_red']}, basis left to the judge), model calls {total['model_calls']}"
     )
+    lines.append(
+        f"  pass = label or accept; scam recall, genuine FPR and questions answered are label-only (accept ignored)."
+        f" Worst-case pass rate (errors = failures): {_pct(total['worst_case_pass_rate']).strip()}."
+        " flag-P≥ is a lower bound (scam cases with a mapped expected flag; the lists are not exhaustive)."
+    )
+    if total["errors"]:
+        lines.append(
+            f"  ERRORS: {total['errors']} of {total['n']} cases (timeouts {total['timeouts']}) excluded from all rates"
+        )
+    if too_many_errors(summary):
+        lines.append(
+            f"  WARNING: error rate above {ERROR_LIMIT:.0%}: the rates above are not reliable; rerun with --resume"
+        )
     for lang, m in summary.items():
         if lang != ALL and m["miss_diagnosis"]:
             lines.append(f"  {lang} scam misses: {m['miss_diagnosis']}")
@@ -309,6 +353,11 @@ def format_summary(summary: Mapping[str, Mapping[str, Any]], *, mode: str = "") 
         " scored here: they go to the independent judge."
     )
     return "\n".join(lines)
+
+
+def too_many_errors(summary: Mapping[str, Mapping[str, Any]]) -> bool:
+    rate = summary[ALL]["error_rate"]
+    return rate is not None and rate > ERROR_LIMIT
 
 
 def judge_item(row: Mapping[str, Any]) -> dict[str, Any]:

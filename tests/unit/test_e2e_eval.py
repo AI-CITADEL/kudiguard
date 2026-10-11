@@ -23,7 +23,9 @@ from kudiguard.evaluation.e2e import (
     outcome_matches,
     passes,
     record,
+    resume_ids,
     summarize,
+    too_many_errors,
 )
 from kudiguard.llm.base import ChatRequest, Completion
 
@@ -164,7 +166,7 @@ def test_summary_per_language_and_overall(cases: dict[str, dict[str, Any]]) -> N
     en, total = summary["en"], summary[ALL]
     assert en["n"] == 4 and en["scam_recall"] == 1.0 and en["genuine_false_positive_rate"] == 0.5
     assert en["question_answered_rate"] == 1.0 and en["question_shown_red"] == 1
-    assert en["flag_recall"] == 0.25 and en["flag_precision"] == 0.5
+    assert en["flag_recall"] == 0.25 and en["flag_precision_lower_bound"] == 0.5
     assert en["fallback_rate"] == 0.25 and en["voice_cases"] == 1 and en["model_calls"] == 2
     assert (
         summary["ig"]["errors"] == 1
@@ -180,6 +182,42 @@ def test_summary_per_language_and_overall(cases: dict[str, dict[str, Any]]) -> N
     assert "(rules-only)" in text and "yo scam misses" in text and "2 voice cases were run as text" in text
     assert "  -  " in text  # a rate with nothing to measure
     assert format_summary(summary).startswith("End-to-end test set T\n")
+    assert total["timeouts"] == 1 and total["worst_case_pass_rate"] == 4 / 7
+    assert "ERRORS: 1 of 7 cases (timeouts 1) excluded from all rates" in text
+    assert "WARNING: error rate above 2%" in text and too_many_errors(summary)
+    assert "Worst-case pass rate (errors = failures): 57%" in text and "lower bound" in text
+
+
+def test_no_errors_no_warning(cases: dict[str, dict[str, Any]]) -> None:
+    summary = summarize([record(cases["t-en-01"], check(Verdict.CAUTION))])
+    text = format_summary(summary)
+    assert "ERRORS" not in text and "WARNING" not in text and not too_many_errors(summary)
+    assert not too_many_errors({ALL: {"error_rate": None}})
+
+
+def test_flag_precision_only_on_cases_with_a_mapped_expected_flag() -> None:
+    case = {"id": "s", "lang": "en", "label": "scam", "text": "t", "red_flags": ["harassment"]}
+    summary = summarize([record(case, check(Verdict.LIKELY_SCAM, Flag.URGENCY))])
+    assert summary[ALL]["flag_precision_lower_bound"] is None and summary[ALL]["flag_recall"] is None
+
+
+def test_resume_retries_errors_and_refuses_another_mode(cases: dict[str, dict[str, Any]]) -> None:
+    kw = {"mode": "engine", "url": "http://x"}
+    rows = [
+        record(cases["t-en-01"], check(Verdict.CAUTION), **kw),
+        record(cases["t-en-02"], None, error="timeout", **kw),
+        record(cases["t-en-03"], check(Verdict.NO_FLAGS), **kw),
+        record(cases["t-en-03"], None, error="timeout", **kw),  # a later error: retried again
+        record(cases["t-en-04"], None, error="timeout", **kw),
+        record(cases["t-en-04"], check(Verdict.NO_FLAGS), **kw),  # retried and done
+    ]
+    assert rows[0]["mode"] == "engine" and rows[0]["url"] == "http://x"
+    assert resume_ids(rows, **kw) == {"t-en-01", "t-en-04"}
+    with pytest.raises(ValueError, match="cannot resume"):
+        resume_ids(rows, mode="rules-only", url="")
+    with pytest.raises(ValueError, match="cannot resume"):
+        resume_ids(rows, mode="engine", url="http://other")
+    assert resume_ids([], **kw) == set()
 
 
 class _Inner:

@@ -39,12 +39,16 @@ def main() -> None:
     random.Random(args.seed).shuffle(items)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    prefix = f"e2e-{source.stem}-"
+    for stale in out_dir.glob(f"{prefix}*"):  # batches from an earlier prep of the same results file
+        if stale.suffix in (".jsonl", ".csv") and stale.stem[len(prefix) :].isdigit():
+            stale.unlink()
     for number, start in enumerate(range(0, len(items), args.batch_size), 1):
         batch = items[start : start + args.batch_size]
-        stem = out_dir / f"e2e-{source.stem}-{number:02d}"
-        with stem.with_suffix(".jsonl").open("w", encoding="utf-8") as f:
+        stem = out_dir / f"{prefix}{number:02d}"
+        with Path(f"{stem}.jsonl").open("w", encoding="utf-8") as f:
             f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in batch)
-        with stem.with_suffix(".csv").open("w", encoding="utf-8", newline="") as f:
+        with Path(f"{stem}.csv").open("w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=JUDGE_FIELDS)
             writer.writeheader()
             for item in batch:
