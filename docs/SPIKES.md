@@ -278,21 +278,25 @@ max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min**
 |---|---|---|---|---|
 | `safety/scam_rules.py` | 119 (+33 in annotations) | 86.6% | **95.0%** | 6 |
 | `safety/decision.py` | 116 (+11) | 76.7% | **93.1%** | 8 |
-| `text.py` (redact) | 99 → 167 ¹ | 55.6% | **97.6%** | 4 |
+| `text.py` (redact) | 99 → 915 ¹ | 55.6% | **94.6%** | 49 |
 | `privacy.py` | 80 | 65.0% | **93.8%** | 5 |
 | `donation.py` | 474 (+33) | 77.2% | **90.1%** | 47 |
 | `commands.py` | 80 (+11) | 70.0% | **85.0%** | 12 |
 | `hosting.py` | 42 | 73.8% | **81.0%** | 8 |
 | `render.py` | 233 (+11) | 50.2% | **97.9%** | 5 |
 | `review.py` | 712 (+66) | 85.5% | **93.4%** | 47 |
-| `patterns.py` | 79 → 80 (+11) ¹ | 67.1% | **86.3%** | 11 |
-| **All** | **2,034 → 2,103** | **75.3%** | **92.7%** | **153** |
+| `patterns.py` | 79 → 81 (+11) ¹ | 67.1% | **87.7%** | 10 |
+| **All ten** | **2,034 → 2,852** | **75.3%** | **93.1%** | **197** |
+| `storage/export.py` ² | 48 (+33) | – | **100%** | 0 |
+| `storage/sqlite.py` ² | 435 (+110) | – | **91.5%** | 37 |
 
-¹ After the redaction fix below (new code, so more mutants). String mutants alone went from 62% to 92% killed (text
-50% → 96%, privacy 29% → 84%). `donation`'s before figure used
-its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION` against `voice.html`) was added after.
+¹ After the redaction rebuild below (new code, so more mutants). ² Added with the rebuild (re-redaction of stored
+rows); 4 of `sqlite.py`'s survivors are in the new code (equivalent: a one-column row read as `row[-1]`, and `is not`
+for `!=`, which only rewrites unchanged rows too), the other 33 are in code from before G, not triaged here (the
+module is outside G's ten). String mutants alone went from 62% to 93% killed (text 50% → 94%, privacy 29% → 84%).
+`donation`'s before figure used its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION` against `voice.html`) was added after.
 
-**Real gaps found and closed**, by area (tests only, except the two redaction leaks below):
+**Real gaps found and closed**, by area (tests only, except redaction, rebuilt below):
 
 * Verdict policy: each flag's weight, score and verdict alone and as a declared check (a 2→3 change to any strong
   flag turned a "caution" into "likely scam" unnoticed); strong + amplifier reaching the threshold; flags ordered by
@@ -323,34 +327,65 @@ its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION`
   1–5 and y/n, short and blank CSV rows, semicolon sheets with commas in the notes, UTF-16 BE, a rewritten sheet
   truncating the old file, the sheet's columns, `since` on the day itself and undated rows, samples over 256.
 
-**Two privacy leaks fixed in `redact`** (found while triaging the survivors). (1) A number split after a single digit
-("8 031 234 567", "+234 8 031 234 567", "0 803 123 4567") or with dots ("0803.123.4567") was left in clear: the old
-patterns needed 2–4-digit first groups and spaces or dashes. (2) A 20-digit card in groups of four was masked only up
-to 16 digits, leaving the rest. Now one pattern masks any run of >= 10 digits in groups of any size joined by single
-spaces, dots or dashes (cards of 13–19 digits and longer runs included), starting only where a number starts and
-taken whole (never from the middle of a run); the phone pattern (brackets) also matches whole numbers only. Amounts,
-dates and times are kept by looking at the whole run: after `₦`/`N`/`$` or before `naira`/`kobo`/`k`, plain digits
-or thousands in threes (`₦ 5 000 000 000`, `N12500000000.50`, `5 000 000 000 naira`); runs made only of valid dates
-and times (`12-05-2024 10.30`, `2026-10-08 2026-10-09`). Thousands without a currency sign or unit are masked
-(`8 031 234 567` is exactly such a split). Because stored text from before the fix was redacted with the old
-patterns, exports redact again on the way out (`export_row`: evidence export and review sheets; `ScamPattern.as_row`;
-the voice-export manifest); `redact` is idempotent. Tests: 17 spellings, amount/date/time boundaries, seeded
-property tests (3,000 random Nigerian mobiles, international numbers, NUBAN/BVN, 13–19-digit cards and 20–31-digit
-runs split into random 1–4-digit groups with random separators: no digit left; 3,000 random amounts, dates and times:
-unchanged), idempotence and speed, and `tests/unit/test_redaction_paths.py` (both stores, the pattern library, rows
-written before the fix, review sheets, voice export). A 200,000-case fuzz run left only splits that are genuinely
-amounts (an identifier written exactly as "₦ 1 237 648 798" or "… 529 naira").
+**Redaction rebuilt after two review rounds** (`text.redact`; found while triaging the survivors, then by the
+verification of the first fix). The old patterns left in clear: numbers split after a single digit ("8 031 234 567",
+"+234 8 031 234 567", "0 803 123 4567"), written with dots, slashes, underscores, en/em dashes, NBSP/thin/zero-width
+spaces, tabs or newlines, Arabic-Indic or full-width digits, O/l/I look-alikes ("o8o3…", "0803 l23 4567"), spelled
+out ("zero eight zero three…"), after `+234.`, glued to letters ("abc0803…"), and a 20-digit card after 16 digits.
+The first fix (3fea447) then leaked numbers next to commas, colons, amounts and times ("08031234567,08051234567",
+"₦5,000 0803 123 4567", "at 10:30 0803 123 4567").
 
-**Equivalent or accepted survivors** (153): *identity-equivalent* — `is`/`==` on enums, interned literals and small
+How it works now: numbers are found on a *detection view* of the text, one view character per original character
+or more (digits of every script as ASCII, every space, control and zero-width character as " ", every dash and the
+minus sign as "-", the rest
+NFKC-folded and lower case as `deidentify` reads it, O/o/l/I inside digit tokens as 0/1); each view character knows its
+original position, so masks are applied span by span on the original. A *run* is a maximal sequence of digit groups
+joined by any number of spaces and up to three of `. - / _ * ~ · , ( )`; it is judged as a whole: >= 10 digits are masked (a single
+unbroken 6–9-digit group too, unless an amount: `N500000`, `500000k`), except an amount after a currency sign
+(`₦`/`N`/`NGN`/`$`… with plain digits or thousands in threes, decimals 1–2), a comma-grouped amount
+(`1,234,567,890`) and runs made only of valid dates, times and years (`12-05-2024 10.30`, `in 2026 2027 2028`). In
+front of a whole number, the minutes of a time (`10:30 0803…`), a fully written date (`10-10-2026 0803…`) and an
+amount after a currency sign (`N5000 0803…`) are kept; of a comma amount only the part that cannot be the number's
+first group (`₦5,[number]`: "N8,015,369,511.9 889…" could be an amount followed by "511.9 889…"). USSD codes are
+kept field by field (`*737*1*500000#`), unless a field is a whole number (`*737*[number]#`). Spelled-out digits are
+masked at >= 7 in a row (English/Pidgin, and DRAFT Hausa, Yoruba and Igbo lists pending native review, matched
+without tone marks), with digits mixed in. Short secrets named as such (`cvv`, `pin`, `otp`, `password`, `passcode`,
+`exp 09/28`) and written-out emails (`john(at)gmail.com`, `j @ x.com`, `john [at] gmail [dot] com`,
+`… at gmail dot com`) are masked too. A masked number takes its `+` and brackets along. All patterns are linear on
+pathological input (a USSD code starts once per code; the verifier's `perf.py` and 32,000-character probes run in
+under 0.1 s).
+
+Rows already stored: exports redact again (`export_row`: evidence export and review sheets; `ScamPattern.as_row`;
+the voice-export manifest), and SQLite rewrites every stored transcript/english/reply/error, voice hypothesis and scam
+example once per `REDACTION_VERSION` (meta table) in one transaction, with secure_delete on and the WAL truncated, so
+the digits do not stay at rest and DELETE still finds the examples taken from a user's messages (`deidentify` was made
+idempotent for that: it no longer re-reads its own `[link: host]`). The memory store holds nothing older than the
+process. Log records (message, arguments, exception text) pass `RedactingFilter` on every handler of `kudiguard serve`.
+
+**Old-vs-new check (mandatory before a redaction change):** `tests/fixtures/redaction_corpus.yaml` holds every probe
+of both reviews and of the unit tests (414 cases, `expect: masked|kept`, digits allowed to remain listed); a unit test
+asserts each. `python scripts/redaction_compare.py` compares b4f96f8's `redact` with the current one on the corpus
+(every digit the old one masked must stay masked, except 7 cases marked `changed:` with the reason: years, two dates,
+a date and a time, the minutes of a time) and on random identifiers joined to amounts, dates, times and words with
+", ", ",", ": ", " ", " and ", "; " in both orders (`tests/redaction_fuzz.py`): **0 regressions or leaks in 200,000
+cases.** The unit tests run the same generators (5,000 joined cases, 3,000 bare identifiers, 3,000 amounts/dates/
+times, idempotence). Known, accepted: an identifier written exactly like an amount after a currency sign
+("₦ 8 031 234 567") is read as an amount, as before.
+
+**Equivalent or accepted survivors** (197 in the ten modules): *identity-equivalent* — `is`/`==` on enums, interned literals and small
 ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`
 string order, counts that cannot exceed their cap, `len > 1` vs `!= 1` on non-empty lists, `-w` vs `~w` in a sort
 key, a regex `^`/`$` under `fullmatch`/`match`, `{9,20}` after a 10-digit lookahead, `rfind+1` vs `cut != 0`);
 *declarations* — `@dataclass(frozen=…, slots=…)` (mypy strict rejects writes) and `*`→`/` in signatures whose callers
 all use keywords; *platform* — POSIX file modes (tested by the POSIX-only tests) and `os.open` flag arithmetic on
-disjoint bits / `O_BINARY` (CPython writes bytes untranslated on Windows; a random 128-bit `.part` name never
+disjoint bits / `O_BINARY` (`os.fdopen(fd, "wb")` returns a binary file object whose bytes reach the file
+unchanged even without `O_BINARY`, checked on Windows; a random 128-bit `.part` name never
 pre-exists, so dropping `O_EXCL` cannot show); *stricter* — a mutant that masks or deletes more (dropped look-behinds
-in `deidentify`, a one-letter TLD, `wipe` with −1 s grace); in `redact` only the phone pattern's length bound (every
-bracket-free spelling is also caught by the digit-run pattern) and an empty decimal tail (a run never ends in `.`);
+in `deidentify`, a one-letter TLD, `wipe` with −1 s grace); in `redact`: windows wider than needed (`start - 5` for a
+4-character currency, `start - 3` for a 2-character clock), bit operations on a group index that is always 0 where
+they apply (`i | 1`, `i ^ 1`), `is` on single characters (cached), separator and decimal bounds a run cannot reach
+(an empty decimal tail, an empty second separator form), the USSD look-behinds (they only keep it linear),
+`REDACTION_VERSION` ± 1 (any value works if it grows with each change);
 *unreachable* — `_fit` budgets ≤ 1, files whose age equals the grace to the nanosecond, `now % mtime` (= `now − mtime`
 while `now < 2·mtime`), TLDs of 23–25 letters, `^ 4` on warning budgets whose bit 2 is set in all four languages;
 *neutral strings* — internal enum values never stored or shown (`Command`, `CHECK`/`QUESTION`), `""` defaults

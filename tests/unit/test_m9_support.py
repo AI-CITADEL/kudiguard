@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
 from kudiguard.reporting import build_report, format_report, percentile
 from kudiguard.storage.sqlite import SQLiteStore
+from kudiguard.text import RedactingFilter
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "s" * MIN_SECRET_BYTES
@@ -341,8 +343,15 @@ def test_cli_serve_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KUDIGUARD_HASH_SECRET", SECRET)
     monkeypatch.setenv("KUDIGUARD_WHATSAPP_ENABLED", "false")
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: called.update(kwargs))
-    assert cli.main(["serve", "--port", "9000"]) == 0
-    assert called["port"] == 9000 and called["host"] == "127.0.0.1"
+    handlers = logging.getLogger().handlers
+    before = {id(h): list(h.filters) for h in handlers}
+    try:
+        assert cli.main(["serve", "--port", "9000"]) == 0
+        assert called["port"] == 9000 and called["host"] == "127.0.0.1"
+        assert all(any(isinstance(f, RedactingFilter) for f in h.filters) for h in handlers)
+    finally:
+        for handler in handlers:
+            handler.filters = before.get(id(handler), [])
 
 
 def test_rows_without_latency_are_still_counted() -> None:

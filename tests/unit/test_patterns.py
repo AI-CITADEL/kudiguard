@@ -259,8 +259,8 @@ def test_examples_round_trip_exactly_through_the_stored_transcript() -> None:
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("acct0123456789.ng", "[link: acct#.ng]"),
-        ("8031234567pay.ng", "[link: #pay.ng]"),
+        ("acct0123456789.ng", "acct[number].ng"),  # digits glued to a host are masked before links are read
+        ("8031234567pay.ng", "[number][link: pay.ng]"),
         ("bit.ly/x1", "[link: bit.ly]"),
     ],
 )
@@ -290,7 +290,7 @@ async def test_weeks_are_utc_even_for_local_clocks() -> None:
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("pay123456.ng", "[link: pay#.ng]"),  # six digits in a host: masked
+        ("pay123456.ng", "pay[number].ng"),  # six digits in a host: masked
         ("shop12345.ng", "[link: shop12345.ng]"),  # five: kept
         ("https://www.Scam.ng/a?u=1", "[link: scam.ng]"),  # www. dropped after a scheme too
         (
@@ -315,3 +315,21 @@ def test_retention_and_channels_match_what_users_are_told(registry: LanguageRegi
 
     assert PATTERN_RETENTION_DAYS == 730 and "up to 2 years" in registry.get("en").strings[Msg.WELCOME]
     assert {"whatsapp", "web"} == PATTERN_CHANNELS  # end users who consented, never API partners' users
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "click https://bit.ly/abc?u=8031234567 now",
+        "go to www.Fake-Bank.ng/login",
+        "join t.me/x",
+        "pay123456k.ng",
+    ],
+)
+def test_deidentify_is_idempotent(raw: str) -> None:
+    once = deidentify(raw)
+    assert deidentify(once) == once  # stored examples are de-identified again when redaction improves
+
+
+def test_digit_runs_redact_keeps_are_masked_in_hosts() -> None:
+    assert deidentify("pay123456k.ng") == "[link: pay#k.ng]"  # "123456k" reads as an amount to redact

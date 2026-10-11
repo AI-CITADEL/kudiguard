@@ -28,7 +28,8 @@ MAX_PATTERN_CHARS = 2000
 PATTERN_CHANNELS = frozenset({"whatsapp", "web"})  # end users who consented (API callers' users did not)
 _TLDS = "com|ng|net|org|ly|me|io|co|app|xyz|info|biz|link|site|online|top|live|shop|store|click|club|gov|edu|uk|us|tk|ml|ga"
 _URL = re.compile(
-    rf"(?i)(?:\b(?:https?|ftp)://|\bwww\.|(?<![@\w.-])(?=(?:[a-z0-9-]+\.)+(?:{_TLDS})\b))"  # scheme, www. or bare host
+    rf"(?i)(?:\b(?:https?|ftp)://|\bwww\.|(?<![@\w.#-])(?<!\[link: )(?=(?:[a-z0-9-]+\.)+(?:{_TLDS})\b))"  # scheme, www. or bare host (never one we
+    # already reduced: deidentify is idempotent, so stored examples can be de-identified again)
     rf"(?:[^\s/@?#<>\"']*@)?"  # credentials (user:pass@) are dropped
     rf"((?:[a-z0-9-]+\.)+[a-z]{{2,24}})"  # the host we keep
     rf"(?::\d+)?[^\s<>\"']*"  # port, path, query: dropped

@@ -16,9 +16,12 @@ from kudiguard.donation import DONATION_VERSION, Donation, Sealer, VoiceVault
 from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.patterns import ScamPattern, deidentify
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
+from kudiguard.storage import sqlite as sqlite_module
 from kudiguard.storage.base import Store, VoiceSample
+from kudiguard.storage.export import export_row, spreadsheet_cell
 from kudiguard.storage.memory import MemoryStore
 from kudiguard.storage.sqlite import SQLiteStore
+from kudiguard.text import REDACTION_VERSION
 
 ROOT = Path(__file__).resolve().parents[2]
 HASHER = UserHasher(b"r" * MIN_SECRET_BYTES)
@@ -112,6 +115,57 @@ async def test_rows_stored_before_the_fix_are_masked_on_export(tmp_path: Path) -
         await store.close()
 
 
+async def test_a_database_from_an_older_release_is_redacted_again_on_open(tmp_path: Path) -> None:
+    """Legacy rows are rewritten once (``redaction_version``): masked at rest, and DELETE still finds the examples."""
+    db = tmp_path / "kg.db"
+    leaky = "they said call 8 031 234 567 now"  # what the old patterns stored unmasked
+    store = await SQLiteStore.open(db, hasher=HASHER)
+    await store.add_interaction(interaction(transcript="x", english="x", reply="x"))
+    await store.add_pattern(
+        ScamPattern.from_check(
+            language="en", channel="whatsapp", verdict=Verdict.LIKELY_SCAM, flags=(), text="x", english="x",
+            day=datetime.now(UTC).date(),
+        )
+    )  # fmt: skip
+    await store.add_voice_sample(
+        VoiceSample(
+            id="b" * 32, user_hash="u1", week=date(2026, 10, 12), language="en", channel="whatsapp",
+            consent_version=DONATION_VERSION, hypothesis="x",
+        )
+    )  # fmt: skip
+    await store.close()
+    with sqlite3.connect(db) as legacy:
+        legacy.execute(
+            "UPDATE interactions SET transcript = ?, english = ?, reply = ?, error = ?",
+            (leaky, leaky, leaky, leaky),
+        )
+        legacy.execute("UPDATE scam_patterns SET text = ?, english = ?", (leaky, leaky))
+        legacy.execute("UPDATE voice_samples SET hypothesis = ?", (leaky,))
+        legacy.execute("DELETE FROM meta WHERE key = 'redaction_version'")  # written before the fix
+    legacy.close()
+    store = await SQLiteStore.open(db, hasher=HASHER)
+    try:
+        with sqlite3.connect(db) as raw:  # at rest, not only on export
+            rows = raw.execute("SELECT transcript, english, reply, error FROM interactions").fetchall()
+            assert all(no_digits(value) for row in rows for value in row)
+            assert all(
+                no_digits(t) for row in raw.execute("SELECT text, english FROM scam_patterns") for t in row
+            )
+            assert no_digits(raw.execute("SELECT hypothesis FROM voice_samples").fetchone()[0])
+            version = raw.execute("SELECT value FROM meta WHERE key = 'redaction_version'").fetchone()[0]
+        raw.close()
+        assert int(version) == REDACTION_VERSION
+        assert await store.delete_user("u1") >= 3  # the example taken from the user's message goes too
+        assert await store.export_patterns() == []
+    finally:
+        await store.close()
+    assert not files_containing(tmp_path, b"031 234 567")  # nor in free pages or the WAL file
+
+
+def files_containing(folder: Path, needle: bytes) -> list[Path]:
+    return [f for f in folder.glob("kg.db*") if needle in f.read_bytes()]
+
+
 async def test_voice_export_masks_hypotheses_stored_before_the_fix(tmp_path: Path) -> None:
     store = MemoryStore(HASHER)
     vault = VoiceVault(tmp_path / "voice", store, Sealer(b"v" * MIN_SECRET_BYTES))
@@ -130,3 +184,123 @@ async def test_voice_export_masks_hypotheses_stored_before_the_fix(tmp_path: Pat
     with (tmp_path / "out" / voice_cli.MANIFEST).open(encoding="utf-8-sig", newline="") as handle:
         [row] = list(csv.DictReader(handle))
     assert no_digits(row["asr_hypothesis"])
+
+
+async def test_clean_rows_are_left_alone_and_a_failed_rewrite_closes_the_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "kg.db"
+    store = await SQLiteStore.open(db, hasher=HASHER)
+    await store.add_interaction(interaction(transcript="no numbers", english=None, reply="fine"))
+    await store.add_pattern(
+        ScamPattern.from_check(
+            language="en", channel="whatsapp", verdict=Verdict.LIKELY_SCAM, flags=(), text="send the code",
+            english=None, day=date(2026, 10, 12),
+        )
+    )  # fmt: skip
+    await store.add_voice_sample(
+        VoiceSample(
+            id="c" * 32, user_hash="u1", week=date(2026, 10, 12), language="en", channel="whatsapp",
+            consent_version=DONATION_VERSION, hypothesis="no numbers",
+        )
+    )  # fmt: skip
+    await store.close()
+    with sqlite3.connect(db) as legacy:
+        legacy.execute("DELETE FROM meta WHERE key = 'redaction_version'")
+    legacy.close()
+    store = await SQLiteStore.open(db, hasher=HASHER)
+    try:
+        [row] = await store.export_interactions()
+        assert (row["transcript"], row["english"], row["reply"]) == ("no numbers", None, "fine")
+        [pattern] = await store.export_patterns()
+        assert (pattern["text"], pattern["english"]) == ("send the code", None)
+    finally:
+        await store.close()
+
+    def broken(connection: sqlite3.Connection) -> None:
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(sqlite_module, "_reredact", broken)
+    with pytest.raises(sqlite3.OperationalError):
+        await SQLiteStore.open(db, hasher=HASHER)
+
+
+async def legacy_database(tmp_path: Path, leaky: str, version: int | None) -> Path:
+    db = tmp_path / "kg.db"
+    store = await SQLiteStore.open(db, hasher=HASHER)
+    await store.add_interaction(interaction(transcript="x", english="x", reply="x"))
+    await store.add_pattern(
+        ScamPattern.from_check(
+            language="en", channel="whatsapp", verdict=Verdict.LIKELY_SCAM, flags=(), text="x", english="x",
+            day=date(2026, 10, 12),
+        )
+    )  # fmt: skip
+    await store.add_voice_sample(
+        VoiceSample(
+            id="d" * 32, user_hash="u1", week=date(2026, 10, 12), language="en", channel="whatsapp",
+            consent_version=DONATION_VERSION, hypothesis="x",
+        )
+    )  # fmt: skip
+    await store.close()
+    with sqlite3.connect(db) as legacy:
+        legacy.execute("UPDATE interactions SET transcript = ?", (leaky,))
+        legacy.execute("UPDATE scam_patterns SET text = ?", (leaky,))
+        legacy.execute("UPDATE voice_samples SET hypothesis = ?", (leaky,))
+        if version is None:
+            legacy.execute("DELETE FROM meta WHERE key = 'redaction_version'")
+        else:
+            legacy.execute("UPDATE meta SET value = ? WHERE key = 'redaction_version'", (str(version),))
+    legacy.close()
+    return db
+
+
+def stored_texts(db: Path) -> list[str]:
+    with sqlite3.connect(db) as raw:
+        texts = [
+            raw.execute("SELECT transcript FROM interactions").fetchone()[0],
+            raw.execute("SELECT text FROM scam_patterns").fetchone()[0],
+            raw.execute("SELECT hypothesis FROM voice_samples").fetchone()[0],
+        ]
+    raw.close()
+    return texts
+
+
+async def test_text_that_redacts_to_something_sorting_lower_is_rewritten(tmp_path: Path) -> None:
+    db = await legacy_database(
+        tmp_path, "mail john(at)gmail.com", version=None
+    )  # "[email]" sorts before "john"
+    await (await SQLiteStore.open(db, hasher=HASHER)).close()
+    assert stored_texts(db) == ["mail [email]"] * 3
+
+
+@pytest.mark.parametrize("offset", [0, 1])
+async def test_a_database_at_or_after_this_version_is_not_rewritten(tmp_path: Path, offset: int) -> None:
+    """Opening stays cheap: the rewrite runs once per version (and never downgrades a newer database)."""
+    leaky = "call 8 031 234 567"  # only possible here because the test writes it behind the store's back
+    db = await legacy_database(tmp_path, leaky, version=REDACTION_VERSION + offset)
+    await (await SQLiteStore.open(db, hasher=HASHER)).close()
+    assert stored_texts(db) == [leaky] * 3
+
+
+def test_evidence_export_columns() -> None:
+    row = export_row(interaction(transcript="t", english="e", reply="r"), None)
+    assert list(row) == [
+        "id", "created_at", "user", "channel", "language", "kind", "outcome", "intent", "verdict", "flags",
+        "transcript", "english", "reply", "reply_to", "decode_ms", "asr_ms", "llm_ms", "total_ms", "error", "helpful",
+    ]  # fmt: skip
+
+
+NBSP, IDEO = chr(0x00A0), chr(0x3000)  # no-break and ideographic spaces
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("X=1", "X=1"),
+        (IDEO + "=1", "'" + IDEO + "=1"),
+        (NBSP + "@SUM(1)", "'" + NBSP + "@SUM(1)"),
+        (" \t\r\n-1", "' \t\r\n-1"),
+    ],
+)
+def test_only_blanks_are_skipped_before_a_formula(value: str, expected: str) -> None:
+    assert spreadsheet_cell(value) == expected

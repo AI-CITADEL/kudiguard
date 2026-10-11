@@ -1,9 +1,13 @@
+import logging
 import random
+import re
+import sys
 import time
 
 import pytest
 
-from kudiguard.text import normalize, redact, tokens
+from kudiguard.text import RedactingFilter, normalize, redact, tokens
+from redaction_fuzz import case, kept_digits, random_amount, random_date_or_time, random_identifier
 
 
 @pytest.mark.parametrize(
@@ -153,7 +157,7 @@ def test_numbers_are_masked_whole_however_they_are_split(raw: str) -> None:
         "pay ₦ 5 000 000 000 now",
         "pay N12500000000.50 now",
         "pay $ 1 234 567 890 now",
-        "5 000 000 000 naira",
+        "5,000,000,000 naira",
         "on 12-05-2024 10.30 and 2026-10-08 14:30",
         "from 01-05-2024 10:30 to 2026-10-08 2026-10-09",
         "times 10.30 12.45 14.00 16.15",
@@ -182,11 +186,11 @@ def test_amounts_dates_and_times_are_kept(raw: str) -> None:
         ("on 31-12-2724 23.59", "on [number]"),  # not a year
         ("pay ₦ 1234 567 890", "pay ₦ [number]"),  # not grouped in thousands
         ("pay ₦1 234 567 890.5", "pay ₦1 234 567 890.5"),
-        ("pay ₦1 234 567 890.505", "pay ₦[number]"),  # three decimals: not an amount
+        ("pay ₦1 234 567 890.505", "pay ₦1 [number]"),  # three decimals: not an amount
         ("pay N12345678901.5", "pay N12345678901.5"),
         ("pay N12345678901.505", "pay N[number]"),
         ("pay x₦ 12 345 678 90", "pay x₦ [number]"),  # a currency sign glued to a word still counts
-        ("call (080) 312 3456", "call ([number]"),  # ten digits with brackets
+        ("call (080) 312 3456", "call [number]"),  # ten digits with brackets, brackets included
         ("call 0700 12345", "call 0700 12345"),  # nine digits: kept
         ("login 123456", "login [number]"),  # "n " ending a word is not the naira sign
         ("code 123456 kindly", "code [number] kindly"),  # "k" starting a word is not thousands
@@ -195,36 +199,6 @@ def test_amounts_dates_and_times_are_kept(raw: str) -> None:
 )
 def test_amount_date_and_time_boundaries(raw: str, expected: str) -> None:
     assert redact(raw) == expected
-
-
-def split_randomly(rng: random.Random, digits: str) -> str:
-    groups, rest = [], digits
-    while rest:
-        size = rng.randint(1, 4)
-        groups.append(rest[:size])
-        rest = rest[size:]
-    text = groups[0]
-    for group in groups[1:]:
-        text += rng.choice(" -.") + group
-    return text
-
-
-def random_identifier(rng: random.Random) -> str:
-    def digits(n: int) -> str:
-        return "".join(rng.choice("0123456789") for _ in range(n))
-
-    kind = rng.randrange(6)
-    if kind == 0:  # Nigerian mobile, local
-        return split_randomly(rng, "0" + rng.choice(["70", "80", "81", "90", "91"]) + digits(8))
-    if kind == 1:  # international
-        return "+" + split_randomly(rng, "234" + rng.choice("789") + rng.choice("01") + digits(8))
-    if kind == 2:  # NUBAN account number
-        return split_randomly(rng, digits(10))
-    if kind == 3:  # BVN / NIN
-        return split_randomly(rng, rng.choice("12") + digits(10))
-    if kind == 4:  # card, 13-19 digits
-        return split_randomly(rng, rng.choice("3456") + digits(rng.randint(12, 18)))
-    return split_randomly(rng, rng.choice("123456789") + digits(rng.randint(19, 30)))  # long runs
 
 
 def test_random_identifiers_are_always_masked_whole() -> None:
@@ -237,27 +211,17 @@ def test_random_identifiers_are_always_masked_whole() -> None:
         assert not any(ch.isdigit() for ch in masked), (identifier, masked)
 
 
-def random_amount(rng: random.Random) -> str:
-    whole = rng.randint(1, 10**12)
-    sign = rng.choice(["₦", "N", "$", "₦ ", "N ", "$ "])
-    decimals = rng.choice(["", f".{rng.randint(0, 99):02d}"])
-    style = rng.randrange(4)
-    if style == 0:
-        return f"{sign}{whole:,}{decimals}"
-    if style == 1:
-        return f"{sign}{whole:,}{decimals}".replace(",", " ")
-    if style == 2:
-        return f"{sign}{whole}{decimals}"
-    return f"{whole:,} naira".replace(",", rng.choice([",", " "]))
-
-
-def random_date_or_time(rng: random.Random) -> str:
-    day, month, year = rng.randint(1, 28), rng.randint(1, 12), rng.randint(1990, 2030)
-    sep = rng.choice("-./")
-    date = rng.choice([f"{day:02d}{sep}{month:02d}{sep}{year}", f"{year}{sep}{month:02d}{sep}{day:02d}"])
-    time_sep = rng.choice(":.")
-    clock = f"{rng.randint(0, 23):02d}{time_sep}{rng.randint(0, 59):02d}"
-    return rng.choice([date, f"{date} {clock}", f"{date} at {clock}", clock])
+def test_random_identifiers_next_to_amounts_dates_and_times() -> None:
+    """Joined with ", ", ",", ": ", " " (and more) in both orders: the identifier is always masked whole; a plain
+    amount after a currency sign, a date or a time in front of it, with a space between, is kept."""
+    rng = random.Random(2027)
+    for _ in range(5000):
+        text, (start, end), context = case(rng)
+        masked = redact(text)
+        assert not [i for i in kept_digits(text, masked) if start <= i < end], (text, masked)
+        spaced = re.search(r"\d[ ,]\d", context)  # "₦5,000 0803…": where the amount ends is ambiguous
+        if text.startswith(context) and not spaced and " " in text[len(context) : start]:
+            assert masked.startswith(context), (text, masked)
 
 
 def test_random_amounts_dates_and_times_are_kept() -> None:
@@ -273,6 +237,149 @@ def test_redaction_is_idempotent_and_fast() -> None:
         once = redact(f"{random_identifier(rng)} {random_amount(rng)} {random_date_or_time(rng)}")
         assert redact(once) == once
     start = time.perf_counter()
-    for text in ("1 " * 5000, "1-" * 5000 + "x", "N 1" + " 000" * 3000, "0." * 5000):
+    for text in (
+        "1 " * 5000,
+        "1-" * 5000 + "x",
+        "N 1" + " 000" * 3000,
+        "0." * 5000,
+        "1," * 5000,
+        "*1" * 5000,  # USSD-like: one start per code
+        "o8 " * 3000,
+        "one " * 3000,
+        "1:" * 5000,
+    ):
         redact(text)
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < 2.0
+
+
+def test_log_records_are_redacted(caplog: pytest.LogCaptureFixture) -> None:
+    logger = logging.getLogger("kudiguard.test_redaction")
+    caplog.handler.addFilter(RedactingFilter())
+    try:
+        raise ValueError("bad input: call 0803 123 4567")
+    except ValueError:
+        logger.exception("turn failed for %s", "acct 0123456789", stack_info=True)
+    caplog.handler.filters.clear()
+    text = caplog.text
+    assert "turn failed for acct [number]" in text and "ValueError: bad input: call [number]" in text
+    assert "Traceback" in text and "0803" not in text and "0123456789" not in text
+
+
+def test_the_log_filter_redacts_an_unformatted_exception() -> None:
+    try:
+        raise ValueError("call 0803 123 4567")
+    except ValueError:
+        record = logging.LogRecord(
+            "kudiguard", logging.ERROR, __file__, 1, "failed %s", ("0123456789",), sys.exc_info()
+        )
+    assert RedactingFilter().filter(record)
+    assert record.getMessage() == "failed [number]" and record.exc_text and "0803" not in record.exc_text
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("call (08031234567) now", "call [number] now"),  # brackets around the number go with it
+        ("call zero 0803 123 4567 now", "call [number] now"),  # spelled and written digits overlap
+    ],
+)
+def test_masks_take_brackets_and_merge(raw: str, expected: str) -> None:
+    assert redact(raw) == expected
+
+
+# --- boundaries of the rebuilt redaction, found by mutation testing ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "separator",
+    [
+        *map(chr, (8203, 8204, 8205, 8206, 8207, 8288, 65279, 173)),
+        "\xa0",
+        "\u2009",
+        "\u202f",
+        "\t",
+        *map(chr, (*range(8208, 8214), 8722, 65112, 65123, 65293)),
+        "-",
+    ],
+)
+def test_every_space_and_dash_separates_groups(separator: str) -> None:
+    assert redact(f"call 0803{separator}123{separator}4567 now") == "call [number] now"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # spelled-out digits: the first and the last word of every list, seven in a row
+        ("call zero nine zero nine zero nine zero now", "call [number] now"),
+        ("call zero nine zero nine zero nine now", "call zero nine zero nine zero nine now"),  # six: kept
+        ("kira sifili tara sifili tara sifili tara sifili yanzu", "kira [number] yanzu"),
+        ("pe odo esan odo esan odo esan odo bayi", "pe [number] bayi"),
+        ("kpọọ efu itoolu efu itoolu efu itoolu efu ugbu a", "kpọọ [number] ugbu a"),
+        ("call zero , nine - zero . nine  zero nine zero now", "call [number] now"),
+        ("call zero 0803 123 4567 nine now", "call [number] now"),  # one span holds the other
+        ("call 0803 123 4567 and zero 0805 123 4567 now", "call [number] and [number] now"),
+        # look-alikes only inside digit tokens
+        ("hello8031234567", "hello[number]"),
+        ("call 08031234567olx", "call [number]olx"),
+        ("call 0803 123 456 o7 now", "call [number] now"),
+        ("i 803 123 456 now", "i 803 123 456 now"),
+        # times and dates next to numbers
+        ("12-05-2024 9:30 ok", "12-05-2024 9:30 ok"),
+        ("on 12-05-2024 100:30 ok", "on [number]:30 ok"),
+        ("at 1:5 08031234567", "at 1:[number]"),
+        ("at 10:300 0803 123 4567", "at 10:[number]"),
+        ("10:30,0803 123 4567", "10:30,[number]"),
+        # comma and currency amounts next to numbers
+        ("₦1,234,567,890.00 0803 123 4567", "₦1,234,567,[number]"),
+        ("₦5,000,000 0803 123 4567", "₦5,000,[number]"),
+        ("N5000.5 08031234567", "N5000.5 [number]"),
+        ("N5000.50 08031234567", "N5000.50 [number]"),
+        ("N5000.505 08031234567", "N[number]"),
+        ("acct 1,234,567,890.5", "acct 1,234,567,890.5"),
+        ("acct 1,234,567,890.505", "acct [number]"),
+        ("acct 1234,567,890", "acct [number]"),
+        ("call 0803    123    4567 now", "call [number] now"),  # any number of spaces
+        ("call 0803 ... 123 ... 4567 now", "call [number] now"),  # up to three separators
+        ("call 0803...123...4567 now", "call [number] now"),
+        ("call 0803 -- 123 -- 4567 now", "call [number] now"),
+        ("call 0803....123....4567 now", "call 0803....123....4567 now"),  # four: not one number
+        ("call 0803\x01123\x014567 now", "call [number] now"),  # control characters separate too
+        ("call 0803\u221e123\u221e4567 now", "call 0803\u221e123\u221e4567 now"),  # other symbols do not
+        ("acct 1234567 ok", "acct [number] ok"),  # seven unbroken digits
+        ("1:30 0803 123 4567", "1:30 [number]"),
+        ("valid 2026-10-08 2026-10-09 9:30", "valid 2026-10-08 2026-10-09 9:30"),
+        ("1,2345 0803 123 4567", "[number]"),  # not a comma amount
+        ("N5000/50 08031234567", "N[number]"),  # only "." starts decimals
+        ("call 0803 123 4567 and zero 0805 123 4567 nine now", "call [number] and [number] now"),
+        ("codexp 09/28 ok", "codexp 09/28 ok"),
+        ("exp 09/281 ok", "exp 09/281 ok"),  # not an expiry date
+        ("write to john at gmail dot community", "write to john at gmail dot community"),
+        ("callzero nine zero nine zero nine zero", "callzero nine zero nine zero nine zero"),  # whole words
+        ("zero nine zero nine zero nine zerox", "zero nine zero nine zero nine zerox"),
+        ("call 0803 .... 123 .... 4567 now", "call 0803 .... 123 .... 4567 now"),
+        # USSD codes: kept field by field, a whole number in a field masked, the text after untouched
+        ("dial *737*2*08031234567# now", "dial *737*2*[number]# now"),
+        ("dial *737*0123456789#", "dial *737*[number]#"),
+        ("dial *737*1*500000# then call 0803 123 4567 now", "dial *737*1*500000# then call [number] now"),
+        # brackets and plus signs
+        ("+2348031234567 is mine", "[number] is mine"),
+        ("08031234567 call me (", "[number] call me ("),
+        ("call 08031234567) now", "call [number]) now"),
+        ("call (08031234567x", "call [number]x"),
+        ("call (08031234567 now", "call [number] now"),
+        ("call 0803)123)4567) now", "call [number]) now"),
+        ("call (0803)1234567) now", "call [number]) now"),
+        # secrets and spelled emails, exactly
+        ("my pin 1234 ok", "my pin [number] ok"),
+        ("my pin1234 ok", "my pin[number] ok"),
+        ("spin 1234 ok", "spin 1234 ok"),
+        ("pin 12 ok", "pin 12 ok"),
+        ("otp::  482913", "otp::  [number]"),
+        ("card exp 9/28 ok", "card exp [number] ok"),
+        ("card expiry: 09 / 2028 ok", "card expiry: [number] ok"),
+        ("mail john(at)gmail.com now", "mail [email] now"),
+        ('mail "a"@x.com now', "mail [email] now"),
+    ],
+)
+def test_rebuilt_redaction(raw: str, expected: str) -> None:
+    assert redact(raw) == expected

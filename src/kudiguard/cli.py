@@ -223,11 +223,14 @@ def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     import uvicorn
 
     from kudiguard.api.app import create_app
+    from kudiguard.text import RedactingFilter
 
     logging.basicConfig(
         level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     logging.getLogger("uvicorn.access").addFilter(redact_query_strings)
+    for handler in logging.getLogger().handlers:  # every record reaching the log, from any logger
+        handler.addFilter(RedactingFilter())
 
     uvicorn.run(
         create_app(settings), host=args.host, port=args.port, log_level=args.log_level, proxy_headers=False

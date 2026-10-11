@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import copy
 import json
 import os
@@ -43,7 +44,7 @@ from queue import Queue
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "var" / "mutation"
 COPIED = ("src", "tests", "data", "docs", "scripts", "deploy", "pyproject.toml", "README.md", "Dockerfile")
-BASE_PORT = 9870
+BASE_PORT = 9870  # default first worker port (--base-port)
 
 # target -> (module, focused tests that exercise it; the full suite is too slow to run per mutant)
 TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
@@ -60,6 +61,8 @@ TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
             "test_patterns.py",
             "test_commands.py",
             "test_redaction_paths.py",
+            "test_redaction_corpus.py",
+            "test_m9_support.py",
         ),
     ),
     "privacy": ("src/kudiguard/privacy.py", ("test_privacy.py", "test_review.py", "test_sqlite_store.py")),
@@ -83,6 +86,14 @@ TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
     "patterns": (
         "src/kudiguard/patterns.py",
         ("test_patterns.py", "test_m9_support.py", "test_donation.py", "test_redaction_paths.py"),
+    ),
+    "export": (
+        "src/kudiguard/storage/export.py",
+        ("test_redaction_paths.py", "test_store_contract.py", "test_review.py", "test_sqlite_store.py"),
+    ),
+    "sqlite": (
+        "src/kudiguard/storage/sqlite.py",
+        ("test_sqlite_store.py", "test_store_contract.py", "test_redaction_paths.py", "test_patterns.py"),
     ),
 }
 
@@ -296,8 +307,11 @@ class TargetResult:
 
 
 def test_command(tests: Sequence[str]) -> str:
-    paths = " ".join(f"tests/unit/{t}" for t in tests)
-    return f"{Path(sys.executable).as_posix()} -m pytest -x -q -p no:cacheprovider {paths}"
+    paths = " ".join(shlex.quote(f"tests/unit/{t}") for t in tests)
+    python = shlex.quote(
+        Path(sys.executable).as_posix()
+    )  # shlex-split again by cosmic-ray: spaces in paths survive
+    return f"{python} -m pytest -x -q -p no:cacheprovider {paths}"
 
 
 def clone_env(clone: Path) -> dict[str, str]:
@@ -330,12 +344,15 @@ def make_clones(count: int) -> list[Path]:
 
 
 def kill_tree(proc: subprocess.Popen[bytes]) -> None:
-    """Kill a test run and its children: on Windows a venv's python.exe is a launcher that starts the real
-    interpreter as a child, so killing only the launcher would leave a looping mutant running."""
+    """Kill a timed-out test run and its children. cosmic-ray kills the process group with ``os.killpg``, which does
+    not exist on Windows, and falls back to killing the one process; but a venv's ``python.exe`` is a launcher that
+    starts the real interpreter as a child, so that would leave a looping mutant running and eating a core. Hence
+    ``taskkill /T`` on Windows and the process group (the run is started in its own session) elsewhere."""
     if os.name == "nt":
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, check=False)
     else:
-        os.killpg(proc.pid, 9)
+        with contextlib.suppress(OSError):  # the group is already gone
+            os.killpg(proc.pid, 9)
     proc.kill()
     proc.communicate()
 
@@ -374,13 +391,13 @@ def cosmic_ray_exe() -> str:
     return found
 
 
-def start_workers(clones: Sequence[Path]) -> list[subprocess.Popen[bytes]]:
+def start_workers(clones: Sequence[Path], base_port: int) -> list[subprocess.Popen[bytes]]:
     workers = []
     for i, clone in enumerate(clones):
         log = (OUT / f"worker-{i}.log").open("wb")
         workers.append(
             subprocess.Popen(
-                [sys.executable, str(Path(__file__).resolve()), "--worker", str(BASE_PORT + i)],
+                [sys.executable, str(Path(__file__).resolve()), "--worker", str(base_port + i)],
                 cwd=clone,
                 env=clone_env(clone),
                 stdout=log,
@@ -391,7 +408,7 @@ def start_workers(clones: Sequence[Path]) -> list[subprocess.Popen[bytes]]:
     for i in range(len(clones)):
         while True:
             try:
-                socket.create_connection(("127.0.0.1", BASE_PORT + i), timeout=1).close()
+                socket.create_connection(("127.0.0.1", base_port + i), timeout=1).close()
                 break
             except OSError:
                 if time.monotonic() > deadline:
@@ -403,14 +420,14 @@ def start_workers(clones: Sequence[Path]) -> list[subprocess.Popen[bytes]]:
 
 
 def run_cosmic(
-    name: str, module: str, command: str, timeout: float, workers: int, result: TargetResult
+    name: str, module: str, command: str, timeout: float, workers: int, result: TargetResult, base_port: int
 ) -> None:
     from cosmic_ray.work_db import WorkDB, use_db  # type: ignore[import-untyped]
     from cosmic_ray.work_item import TestOutcome, WorkerOutcome, WorkResult  # type: ignore[import-untyped]
 
     config = OUT / f"{name}.toml"
     session = OUT / f"{name}.sqlite"
-    urls = ", ".join(f'"http://127.0.0.1:{BASE_PORT + i}"' for i in range(workers))
+    urls = ", ".join(f'"http://127.0.0.1:{base_port + i}"' for i in range(workers))
     config.write_text(
         "[cosmic-ray]\n"
         f'module-path = "{module}"\n'
@@ -522,6 +539,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=min(16, max(1, (os.cpu_count() or 2) // 2)))
     parser.add_argument("--no-cosmic", action="store_true", help="skip cosmic-ray (string mutants only)")
     parser.add_argument("--no-strings", action="store_true", help="skip string mutants")
+    parser.add_argument(
+        "--base-port", type=int, default=BASE_PORT, help=f"first worker port (default {BASE_PORT})"
+    )
     parser.add_argument("--worker", type=int, help=argparse.SUPPRESS)  # internal: run one http worker
     args = parser.parse_args(argv)
     if args.worker:
@@ -532,7 +552,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error(f"unknown targets: {unknown}")
     OUT.mkdir(parents=True, exist_ok=True)
     clones = make_clones(args.workers)
-    workers = [] if args.no_cosmic else start_workers(clones)
+    workers = [] if args.no_cosmic else start_workers(clones, args.base_port)
     results: list[TargetResult] = []
     started = time.monotonic()
     try:
@@ -544,7 +564,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             timeout = round(max(30.0, 5 * baseline(command, clones[0])), 1)
             print(f"{name}: {module} (timeout {timeout}s per mutant)", flush=True)
             if not args.no_cosmic:
-                run_cosmic(name, module, command, timeout, len(clones), result)
+                run_cosmic(name, module, command, timeout, len(clones), result, args.base_port)
             if not args.no_strings:
                 run_strings(module, command, timeout, clones, result)
             result.seconds = round(time.monotonic() - begin, 1)

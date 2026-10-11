@@ -23,7 +23,7 @@ from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
-from kudiguard.text import redact
+from kudiguard.text import REDACTION_VERSION, redact
 
 T = TypeVar("T")
 _TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -541,7 +541,42 @@ def _connect(path: Path) -> sqlite3.Connection:
                 db.execute("ROLLBACK")
             db.close()
             raise
+    try:
+        _reredact(db)
+    except sqlite3.Error:
+        db.close()
+        raise
     return db
+
+
+def _reredact(db: sqlite3.Connection) -> None:
+    """Once per ``REDACTION_VERSION``: redact every stored free text again, and de-identify every stored scam example
+    again, with the current patterns (rows written by an older release may hold numbers it missed). Pattern texts are
+    re-derived the same way as a new user's (``deidentify``), so DELETE still finds the examples taken from a user's
+    messages. One transaction; secure_delete overwrites the old values and the WAL is truncated afterwards."""
+    row = db.execute("SELECT value FROM meta WHERE key = 'redaction_version'").fetchone()
+    if row is not None and int(row[0]) >= REDACTION_VERSION:
+        return
+    with _transaction(db):
+        for r in db.execute("SELECT id, transcript, english, reply, error FROM interactions").fetchall():
+            texts = [r["transcript"], r["english"], r["reply"], r["error"]]
+            if (new := [redact(t) if t else t for t in texts]) != texts:
+                db.execute(
+                    "UPDATE interactions SET transcript = ?, english = ?, reply = ?, error = ? WHERE id = ?",
+                    (*new, r["id"]),
+                )
+        for r in db.execute("SELECT id, hypothesis FROM voice_samples").fetchall():
+            if (hypothesis := redact(r["hypothesis"])) != r["hypothesis"]:
+                db.execute("UPDATE voice_samples SET hypothesis = ? WHERE id = ?", (hypothesis, r["id"]))
+        for r in db.execute("SELECT id, text, english FROM scam_patterns").fetchall():
+            new = [deidentify(r["text"]), deidentify(r["english"]) if r["english"] else r["english"]]
+            if new != [r["text"], r["english"]]:
+                db.execute("UPDATE scam_patterns SET text = ?, english = ? WHERE id = ?", (*new, r["id"]))
+        db.execute(
+            "INSERT INTO meta VALUES ('redaction_version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (str(REDACTION_VERSION),),
+        )
+    db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # the old values must not linger in the WAL file
 
 
 def _interaction(row: sqlite3.Row) -> Interaction:
