@@ -2,7 +2,9 @@
 
 KudiGuard answers from **knowledge packs**. Our core pack carries scam-safety guidance; a bank, fintech, cooperative
 or NGO plugs in its own FAQ, safety messages and contact channels, with no code changes. Answers are composed in the
-user's language (Hausa, Yoruba, Igbo, English…) from your content, so you write it once, in English.
+user's language (Hausa, Yoruba, Igbo, English…) from your content, so you write it once, in English. Quality differs
+by language: on our dev set the answers cover about 0.64 of the key points in English, 0.46 in Hausa, 0.58 in Yoruba
+and 0.33 in Igbo (docs/CLAIMS.md C6), and no Hausa/Yoruba/Igbo reply has been native-reviewed yet.
 
 **Shipped packs:** `kudiguard-core` (scam red flags, basic money literacy, verified report contacts) and
 `money-skills` (planning irregular income, emergency money, savings goals, ajo/esusu/adashe/isusu groups,
@@ -53,7 +55,7 @@ matching scam replies.
 source:
   type: http
   base_url: https://kb.acme.example/kudiguard
-  mode: sync              # sync: we pull /export every refresh_s | live: we call /search per question
+  mode: sync              # sync: we pull /export every refresh_s | live: we call /search per question (off by default)
   timeout_s: 1.5
   refresh_s: 3600
   auth: {env: ACME_KB_TOKEN}   # sent as "Authorization: Bearer <token>"
@@ -67,8 +69,11 @@ source:
 Entries and contacts use the same fields as the files. A runnable reference server is in
 `src/kudiguard/knowledge/reference_server.py` (`python scripts/mock_partner_api.py`).
 
-**Guarantees we give you:** HTTPS + per-partner token; only the English query text, red flags and a language code
-are sent (never phone numbers, names or audio); responses are size-capped (1 MB default) and schema-validated.
+**What is sent and checked:** HTTPS + per-partner token. Sync mode sends nothing about users. Live mode sends the
+**English translation of the user's message** (most numbers and emails masked; names are not removed, and some
+phone formats may pass), the red flags and a language code (never the phone number or audio); it is therefore off
+unless the operator sets `KUDIGUARD_ALLOW_LIVE_PACKS=true`, which also discloses it on /privacy. Responses are
+size-capped (1 MB default) and schema-validated.
 **Resilience:** in sync mode the last good copy keeps serving if your API is down; every call has a timeout; three
 consecutive failures open a circuit breaker for 60 s; live results are cached for `cache_ttl_s`.
 
@@ -84,14 +89,19 @@ consecutive failures open a circuit breaker for 60 s; live results are cached fo
 
 ## Quality (measured, `tests/integration/test_retrieval_quality.py`)
 
-54 benchmark questions on the core pack, **30 of them held out** (8 written after content was frozen, 22 written by
-an independent reviewer), Pidgin-influenced phrasing included:
+**Held-out set** (`data/eval/retrieval_blind.yaml`): 24 English questions written by an independent author who never
+saw the pack content. Production path (scam rules + hybrid search, production packs): **top-1 62%, top-3 96%**
+(core pack alone: 67% / 96%; BM25 only: 67% / 75%). n=24, so one question moves the rate by 4 points, and real
+queries arrive as N-ATLAS translations, which this set does not test.
 
-| Setup | Top-1 | Top-3 | p50 latency |
+**Dev sets** (`data/eval/retrieval.yaml`, 54 questions on the core pack, Pidgin-influenced phrasing included): the
+pack content was tuned on them, so these are **not** held-out numbers:
+
+| Setup (dev, tuned on) | Top-1 | Top-3 | p50 latency |
 |---|---|---|---|
-| BM25 only | 81% | 93% | 0.08 ms |
-| Hybrid (BM25 + bge-small-en-v1.5, CPU) | 89% | 94% | ~10 ms |
-| **Production path: scam rules + hybrid knowledge base** | **89%** | **96%** | ~10 ms |
+| BM25 only | 81% | 93% | ~0.1 ms |
+| Hybrid (BM25 + bge-small-en-v1.5, CPU) | 89% | 94% | ~7-10 ms |
+| Production path: scam rules + hybrid knowledge base | 89% | 96% | ~7-10 ms |
 
 The query is embedded once per request, off the event loop, and cached; sources are searched in parallel.
 

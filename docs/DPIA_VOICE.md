@@ -162,7 +162,8 @@ against the gazetted text before filing.
   of mid-2026, and these rules are already in force under the NDPA and GAID 2025.
 * **The location is a setting:** `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (default) or `nigeria`. Every text
   renders the setting, so it stays true after the move. Nothing claims "stored in Nigeria" by default.
-* Moving the server abroad again requires a new `CONSENT_VERSION`. Moving it into Nigeria needs no new consent, but
+* Moving the server abroad again requires a new `CONSENT_VERSION` (an operator step: the code does not detect the
+  move). Moving it into Nigeria needs no new consent, but
   the transfer through Meta and Cloudflare remains.
 * The CBN payment-data localisation circular (in force January 2027) covers payment-system participants. It does
   not apply to KudiGuard, though it is relevant to partner banks' own data.
