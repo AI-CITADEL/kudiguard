@@ -100,8 +100,8 @@ sit-fake-lottery-dv: >-
   travel.state.gov.
 sit-fake-abroad-job-visa: >-
   Visa fees go to the embassy or its official visa centre, not an agent's personal account. Be wary of "guaranteed"
-  visas or jobs with no interview. Check the employer on its own website, keep copies of your documents, and never
-  give up your passport.
+  visas or jobs with no interview. Check the employer on its own website. Never hand your passport to an agent;
+  give it only to the embassy or its official visa centre.
 sit-fake-customer-care: >-
   That account is likely fake. Real banks never ask for your PIN, OTP or card number in chats. Do not share details or
   click their links. Contact your bank only through its app, official website, or the number on your card.
@@ -125,7 +125,7 @@ sit-ndic-fintech-wallet: >-
   subscriber up to N5 million per operator if that bank fails. It does not cover scams or unlicensed apps. Check the
   app is CBN-licensed and confirm limits on the NDIC website.
 sit-check-company: >-
-  Ask for the RC number and search it free on search.cac.gov.ng. CAC registration only shows the company exists. For
+  Ask for the RC number and search it on the public search on the CAC website (cac.gov.ng); a basic search is free. CAC registration only shows the company exists. For
   investments, also check the SEC register at sec.gov.ng; for loan apps, the FCCPC approved list.
 sit-ajo-collector-disappears: >-
   Gather the other members and list what each person paid, with receipts and chats. Report together to the police
@@ -159,5 +159,5 @@ sit-family-emergency-new-number: >-
   Scammers often say "this is my new number" and ask for urgent money. Call the old number you have for the person, or
   ask someone close to them, before you pay anything.
 sit-fake-network-call: >-
-  Hang up. Networks do not ask you to dial codes or share PINs or OTPs to keep your SIM. Some codes forward your calls
-  and texts to scammers. If you dialled one, call your network from another phone.
+  Hang up. Networks do not ask you to dial codes or share PINs or OTPs to keep your SIM. Some codes forward your calls,
+  including calls that read out bank codes, to them. If you dialled one, call your network from another phone.
