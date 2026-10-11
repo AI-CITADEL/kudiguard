@@ -1,0 +1,437 @@
+# Genuine money notices: things that are NORMAL, so the assistant can say "this looks normal" with grounding.
+# Rules for authors:
+#  * each entry: what the real notice looks like, why it is normal, and the ONE check that tells it apart from a fake
+#  * normality is always conditional ("if you started it yourself..."), never an unconditional "this is normal"
+#  * one idea per fact, short sentences, no jargon (N-ATLAS restates them in the user's language)
+#  * never promise an outcome and never call anything "safe"; say "looks normal" and give the check
+#  * no phone numbers, shortcodes or links here: the check always goes through the user's own app, card or branch
+#  * keywords describe the user's OWN genuine situation ("otp for my own transfer"), never a scam's wording ("send me
+#    money", "credit alert", "delivery"): a notice-* top hit lowers the verdict, so a collision could turn a scam green
+#  * sources (URL + date accessed) in a comment above each entry; all accessed 2026-10-11
+# Model answers (<= 60 words) are in examples.yaml: the Entry model forbids unknown fields.
+
+# --- codes and logins -----------------------------------------------------------------------------------------------
+
+# Sources: CBN never asks for PIN/OTP (Dubawa fake-alert explainer, cites bank guidance):
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+#   CBN Mar 2026 circular, multi-factor authentication for transfers and logins:
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-otp-own-transaction
+  title: An OTP for a transfer or payment you just started yourself
+  facts:
+    - If you start a transfer, card payment or login yourself, your bank sends a one-time code (OTP) by SMS or email. Getting it seconds after you pressed "send" or "pay" is normal.
+    - The code is only for you to type into your own app, website or the payment page you opened.
+    - Check that the amount and merchant in the OTP message match what you are paying.
+    - If a caller or chat told you to start this payment, stop. That is a scam, even though the code is real.
+    - Never read the code to anyone who calls or chats with you. Your bank will never ask for it.
+  actions:
+    - Type the code only into the app or page you opened yourself.
+    - If you did not start any payment, ignore the code and call your bank using the number on the back of your card.
+  keywords: [otp for my own transfer, code after i press pay, otp for my own payment, i started the transfer myself, otp for my purchase]
+
+# Sources: CBN Mar 2026 circular, extra multi-factor authentication on first-time internet banking logins on a new device:
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-login-alert
+  title: A login alert right after you logged in yourself
+  facts:
+    - Many banks send an SMS, email or app message each time someone logs in to your mobile or internet banking.
+    - If you just logged in, this alert is normal. It is there so you notice any login that was not you.
+    - The alert should only inform you. It should not ask you to click a link, reply with a code or call a number in the message.
+    - The one check is the time. If the login time matches when you opened your app, it was you.
+  actions:
+    - If the time matches, you do not need to do anything.
+    - If you did not log in, change your password in your own app and call your bank using the number on the back of your card, not any number or link in the alert.
+  keywords: [login alert after i logged in, i just login my app, login notification for my login, i logged in myself]
+
+# Sources: CBN Mar 2026 circular (device binding: app works on one device; moving devices triggers reactivation and authentication):
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-new-device-alert
+  title: A "new device" alert after you set up your bank app on a new phone
+  facts:
+    - Since 1 July 2026, your bank app can be active on only one phone at a time.
+    - If you install the app on a new or reset phone, the bank checks it is you again and may send a "new device" alert.
+    - The alert is normal only if you just changed phone, reinstalled the app or cleared its data.
+    - The one check is whether you changed or reset a phone today. If you did not, someone else may be trying to use your account.
+  actions:
+    - If it was you, finish the setup inside the official app only.
+    - If it was not you, call your bank at once using the number on the back of your card, not any number or link in the alert.
+  keywords: [i change phone, i just buy new phone, new device alert after i set up app, i reinstalled my bank app, app logout my old phone]
+
+# Sources: CBN circular dated 12 Mar 2026, effective 1 Jul 2026 (existing customer on a new device: outflows capped at N20,000 for 24 h):
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+#   https://leadership.ng/cbn-caps-mobile-banking-transactions-at-n20000-within-first-24-hours-on-new-devices/ (accessed 2026-10-11)
+- id: notice-cbn-new-device-limit
+  title: "The ₦20,000 limit for 24 hours after you set up your app on a new phone"
+  facts:
+    - A CBN rule dated 12 March 2026 started on 1 July 2026.
+    - If you set up your bank app on a new phone in the last day, the money you can send out is capped at ₦20,000 for the first 24 hours. A bank may set a lower cap.
+    - The limit ends by itself after 24 hours. You do not need to pay anyone or share any code to remove it.
+    - Messages saying your account is restricted under a new CBN rule and asking you to click a link or pay to unlock it are scams.
+    - The one check is whether you set up the app on a new phone in the last day.
+  actions:
+    - Wait for the 24 hours to pass, or ask your bank through its official app or the number on the back of your card.
+    - Do not pay any "unlock" or "upgrade" fee to anyone.
+  keywords: [new phone 20k limit, 24 hours limit new phone, i no fit send pass 20k after i change phone, limit after i set up app on new phone]
+
+# Sources: CBN circular 12 Mar 2026, effective 1 Jul 2026 (newly activated app / newly opened account: inflow and outflow capped at N20,000 for 24 h):
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-new-account-app-limit
+  title: A limit on a newly opened account
+  facts:
+    - Since 1 July 2026, if you just opened a new account and activated its app, money in and money out are both capped at ₦20,000 for the first 24 hours.
+    - This is different from an existing customer on a new phone, where only money going out is capped.
+    - A notice about this limit on a new account is normal. It is a CBN rule, not a sign that your account is in trouble.
+    - The limit lifts by itself. Nobody needs a fee or your PIN to remove it. Check the limit inside the official app, not in a message from a stranger.
+  actions:
+    - Wait 24 hours, or ask your bank inside its official app or at a branch.
+  keywords: [i just open account, limit on my new account, new account 20k limit, first 24 hours new account]
+
+# --- reversals and pending money ------------------------------------------------------------------------------------
+
+# Sources: CBN 2018 rule: failed NIP transfer not reversed within 24 h of complaint attracts a N10,000 fine:
+#   https://guardian.ng/news/cbn-to-fine-banks-n10000-for-failed-e-transactions/ (Sep 2018; accessed 2026-10-11)
+#   Fake credit/reversal alerts, check balance in app: https://techeconomy.ng/how-to-detect-fake-credit-debit-sms-alert (accessed 2026-10-11)
+- id: notice-reversal-failed-transfer
+  title: A reversal of your own failed transfer
+  facts:
+    - Sometimes a transfer you sent fails and your account is debited anyway.
+    - If you had a failed transfer, a reversal is normal. It shows as a credit alert marked "reversal" or "REV" with the same amount.
+    - The one check is your balance in your own bank app or by your bank's USSD code. A real reversal changes your balance. A fake SMS does not.
+    - If a stranger says they reversed money to you and asks you to send it back, that is a different thing and a common trick.
+  actions:
+    - Check your balance in your own app before you do anything.
+    - If the money is not back, complain to your bank and keep the transaction reference. It should be reversed within 24 hours of your complaint.
+  keywords: [my failed transfer reversed, debit but not credited, transfer fail money return, dem reverse my failed transfer]
+
+# Sources: CBN ATM rules: on-us failed withdrawals reversed instantly (manual within 24 h); not-on-us within 48 h:
+#   https://nairametrics.com/2025/10/11/cbn-mandates-instant-refund-for-failed-atm-transactions/ (11 Oct 2025; accessed 2026-10-11)
+#   https://brandcom.ng/2026/03/16/cbn-orders-instant-reversal-of-failed-atm-transactions-mandates-massive-network-expansion/ (16 Mar 2026; accessed 2026-10-11)
+- id: notice-atm-reversal
+  title: A refund after an ATM did not give you cash
+  facts:
+    - If an ATM debits you but gives no cash, your bank should put the money back.
+    - At your own bank's ATM the refund should be instant, or within 24 hours if done by hand. At another bank's ATM it should be within 48 hours.
+    - If you had such a failed withdrawal, a credit alert marked "reversal" is normal.
+    - The one check is your balance in your own bank app or USSD, not the SMS alone.
+  actions:
+    - If no refund comes in time, complain to your bank with the date, time and ATM location.
+  keywords: [atm no pay me, atm debit no cash, my failed atm withdrawal, atm refund for my withdrawal, machine no bring money]
+
+# Sources: CBN 2018 rule (failed NIP items reversed within 24 h of complaint):
+#   https://guardian.ng/news/cbn-to-fine-banks-n10000-for-failed-e-transactions/ (Sep 2018; accessed 2026-10-11)
+#   Fake "pending"/credit alerts used on sellers: https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+- id: notice-transfer-pending
+  title: '"Transaction pending" after a transfer you sent'
+  facts:
+    - Sometimes a transfer you sent shows "pending" or "processing" because the bank network is slow. Most complete or are reversed, usually within 24 hours.
+    - Do not send the same money again while it is pending. You may pay twice.
+    - The one check is the transaction status in your own app's history, not a message from someone else.
+    - If someone paying YOU says it is pending, wait until it shows in your own balance before you release anything.
+  actions:
+    - Wait and check your app's transaction history.
+    - If it is still pending after 24 hours, complain to your bank with the transaction reference.
+  keywords: [my transfer pending, i sent money e dey pending, my transfer still processing, transfer i sent never land]
+
+# --- normal debits ---------------------------------------------------------------------------------------------------
+
+# Sources: CBN Guide to Charges 2026 (SMS alerts on customer-initiated transactions on cost-recovery basis; email alerts free):
+#   https://radionigerialagos.gov.ng/?p=40748 (6 May 2026; accessed 2026-10-11)
+- id: notice-sms-alert-charge
+  title: A small debit for SMS alerts
+  facts:
+    - Banks may charge you for SMS alerts on your own transactions, at the cost of sending them.
+    - The debit is usually small and shows with a narration like "SMS charge" or "SMS alert fee", often once a month.
+    - Email alerts must be free under the CBN's 2026 charges guide.
+    - The one check is your statement or transaction history in your own app. The narration and amount should be small and match past months.
+  actions:
+    - If the charge looks too high, ask your bank inside its app or at a branch.
+  keywords: [sms alert charge on my statement, sms fee debit, dem remove money for sms, monthly sms charge]
+
+# Sources: Nigeria Tax Act 2025: N50 stamp duty replaced EMTL from 1 Jan 2026, paid by sender, on transfers of N10,000 and above;
+#   exempt: below N10,000, salary payments, transfers between your own accounts at the same bank:
+#   https://www.techeconomy.ng/stamp-duty-replaces-emtl-sender-to-bear-50-charge-on-bank-transfers (1 Jan 2026; accessed 2026-10-11)
+#   https://leadership.ng/tax-laws-banks-shift-stamp-duty-costs-on-electronic-transfers-to-senders/ (accessed 2026-10-11)
+- id: notice-stamp-duty
+  title: "A ₦50 stamp duty debit"
+  facts:
+    - Since 1 January 2026, a ₦50 stamp duty is charged on electronic transfers of ₦10,000 or more.
+    - Under the new tax law, the sender pays it, not the receiver. It replaced the old ₦50 EMTL levy.
+    - Transfers below ₦10,000, salary payments and transfers between your own accounts in the same bank are exempt.
+    - The one check is your app history. There should be one ₦50 debit next to a transfer of ₦10,000 or more that you sent.
+  actions:
+    - If you see ₦50 taken on a small transfer or on money you received, ask your bank in its app or at a branch.
+  keywords: [50 naira stamp duty, stamp duty on my transfer, emtl, why dem remove 50 naira after my transfer]
+
+# Sources: CBN Guide to Charges 2026, reported effective 1 May 2026: naira debit/credit card maintenance fee removed; FCY cards $10 a year:
+#   https://radionigerialagos.gov.ng/?p=40748 (6 May 2026; accessed 2026-10-11)
+#   https://candidejohnsonlaw.com/?p=3201 (on the Apr 2026 exposure draft; accessed 2026-10-11)
+- id: notice-card-maintenance-fee
+  title: A card maintenance fee debit
+  facts:
+    - Under the CBN's 2026 charges guide, from 1 May 2026 banks should no longer charge a monthly maintenance fee on naira debit or credit cards.
+    - Dollar or other foreign currency cards may still carry a yearly maintenance fee.
+    - A card fee shown in your own app with a clear narration is a bank charge. But a naira card maintenance fee after 1 May 2026 is worth asking about.
+    - The one check is the narration in your app history. Then ask your bank about it in its app or at a branch, not through someone who called you.
+  actions:
+    - Ask your bank directly if you see a naira card maintenance fee.
+  keywords: [card maintenance fee on my statement, card maintenance debit, dem remove money for my card]
+
+# Sources: CBN Guide to Charges 2026: debit/credit card issuance or replacement N1,500 (was N1,000); virtual cards no maintenance fee:
+#   https://radionigerialagos.gov.ng/?p=40748 (6 May 2026; accessed 2026-10-11)
+#   https://blueprint.ng/cbn-raises-atm-card-issuance-fee/ (accessed 2026-10-11)
+- id: notice-card-issuance-fee
+  title: "A ₦1,500 debit for a new or replacement card you asked for"
+  facts:
+    - When you ask for a new or replacement naira debit card, the bank may charge up to ₦1,500 under the CBN's 2026 charges guide.
+    - This debit is normal if you asked for the card, or your old card expired and the bank issued a new one.
+    - Virtual cards carry no maintenance fee.
+    - The one check is whether you asked for a card or your card was due to expire. If neither, ask your bank in its app or at a branch.
+  actions:
+    - If you did not ask for a card, ask your bank at a branch or in its official app.
+  keywords: [card replacement fee i requested, 1500 naira for my new card, replace my card charge, card issuance fee on my statement]
+
+# Sources: Fake debit/credit alerts, check in app: https://techeconomy.ng/how-to-detect-fake-credit-debit-sms-alert (accessed 2026-10-11)
+- id: notice-airtime-data-debit
+  title: A debit for airtime or data you bought
+  facts:
+    - When you buy airtime or data from your bank app or USSD, you get a debit alert for that amount. The narration often names the network and the phone number.
+    - If you set up auto-renewal for a data plan, the debit can repeat each week or month.
+    - The one check is your phone. The airtime or data should arrive on the line you chose, and the amount should match.
+  actions:
+    - If you did not buy it, check for an auto-renewal in your app and ask your bank.
+  keywords: [i buy airtime, i buy data, debit for my airtime, my data subscription debit, data auto renewal debit]
+
+# Sources: CBN Guide to Charges 2026: current account maintenance fee capped at N0.5 per mille in 2026, to be removed in 2027:
+#   https://radionigerialagos.gov.ng/?p=40748 (6 May 2026; accessed 2026-10-11)
+#   https://candidejohnsonlaw.com/?p=3201 (accessed 2026-10-11)
+- id: notice-account-maintenance-fee
+  title: An account maintenance fee (COT) debit on a current account
+  facts:
+    - Current accounts can carry an account maintenance fee, often shown as "AMF" or "COT".
+    - In 2026 it is capped at 50 kobo for every ₦1,000 of money you sent out. The CBN plans to remove it in 2027.
+    - This small debit is normal on a current account, usually at the end of the month.
+    - The one check is your app statement. The fee should be small compared with what you spent that month.
+  actions:
+    - If it looks too high, ask your bank to explain it, in its app or at a branch.
+  keywords: [account maintenance fee, amf, cot, commission on turnover, end of month charge on my current account]
+
+# Sources: NCC end-user billing for USSD from June 2025: N6.98 per 120 s session from airtime, with a consent prompt; no longer from bank accounts:
+#   https://businessday.ng/banking/article/nigerian-banks-ordered-to-stop-charging-ussd-fees-from-customer-accounts/ (accessed 2026-10-11)
+#   https://21stcenturychronicle.com/ussd-telcos-to-charge-subscribers-directly-from-june-18/ (accessed 2026-10-11)
+- id: notice-ussd-charge
+  title: A USSD charge prompt when you dial your bank code yourself
+  facts:
+    - When you dial your bank's USSD code, your network may show a prompt about a small charge before the menu opens.
+    - Since June 2025, this charge is meant to come from your airtime, about ₦6.98 for each session, not from your bank account.
+    - If you dialled the code yourself, seeing this prompt is normal. You choose to accept it.
+    - The one check is that the prompt appears right after you dialled the code yourself. It never asks for your PIN.
+  actions:
+    - Accept only if you dialled the code yourself. Type your PIN only inside the bank's USSD menu, never to a person.
+  keywords: [ussd charge prompt when i dial my bank code, n6.98 ussd charge, airtime deduction for my ussd session]
+
+# --- money coming in ---------------------------------------------------------------------------------------------------
+
+# Sources: fake credit alerts, real credit changes your balance in app/USSD; "sent by mistake" trick:
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+#   https://techeconomy.ng/how-to-detect-fake-credit-debit-sms-alert (accessed 2026-10-11)
+- id: notice-credit-alert
+  title: A salary or credit alert for money you were expecting
+  facts:
+    - If you were expecting money, like your salary on payday, your bank sends a credit alert by SMS, email or app.
+    - Fake credit alerts exist. They look real but do not change your balance.
+    - The one check is your balance in your own bank app or USSD, not the SMS. Release goods only after the money shows there.
+    - If a stranger says they sent money to you by mistake, do not send it back yourself. Tell your bank to reverse it.
+  actions:
+    - Open your own app or dial your bank's USSD to see the new balance.
+  keywords: [salary alert, salary don enter, payday alert, expected payment landed]
+
+# Sources: CBN Guide to Charges 2026: monthly statements free; e-statement for personal use free:
+#   https://candidejohnsonlaw.com/?p=3201 (accessed 2026-10-11)
+- id: notice-e-statement
+  title: A monthly e-statement email from your bank
+  facts:
+    - Many banks email a monthly account statement, often as a PDF with a password.
+    - Under the CBN's 2026 charges guide, your monthly statement for your own use should be free.
+    - A real statement email just attaches the statement. It does not ask you to log in through a link or confirm your details.
+    - Do not open an attachment that asks you to log in. The one check is to compare the statement with the history in your own app.
+  actions:
+    - Do not click any login link in the email. Open your bank app yourself if you want to check.
+  keywords: [monthly e-statement email, my bank statement email, monthly statement pdf, statement pdf password]
+
+# --- everyday life ---------------------------------------------------------------------------------------------------
+
+# Sources: FCCPC Digital, Electronic, Online or Non-Traditional Consumer Lending (DEON) Regulations 2025 (registration, curbs on abusive recovery):
+#   https://www.mondaq.com/nigeria/dodd-frank-consumer-protection-act/1692284/demystifying-deon-your-essential-guide-to-the-fccpcs-latest-lending-rules (accessed 2026-10-11)
+- id: notice-loan-repayment-reminder
+  title: A repayment reminder from a lender you borrowed from
+  facts:
+    - If you took a loan, the lender may remind you before and on the due date by SMS, email or app.
+    - A polite reminder that names your loan, the amount and the date is normal.
+    - Digital loan apps in Nigeria must register with the FCCPC and must not harass or shame you.
+    - The one check is the loan inside the lender's own app. The amount and due date there should match the reminder.
+  actions:
+    - Pay only inside the lender's official app or to the account shown there, never to an account sent by a stranger.
+  keywords: [reminder for the loan i took, my loan don due, repayment reminder from my lender, due date of my loan]
+
+# Sources: fake prize/bonus messages ask for codes or payment; real promos ask for nothing:
+#   https://dubawa.org/website-asking-nigerians-to-verify-nin-sim-status-is-fraudulent/ (accessed 2026-10-11)
+- id: notice-telco-bonus
+  title: A data bonus message from your network
+  facts:
+    - Networks often send messages about bonus data, airtime or new bundles.
+    - A promo that asks for nothing can be normal, for example one saying a bonus was added after you bought a bundle.
+    - A real bonus asks for nothing. Any promo that wants a fee, a code, your PIN or your BVN is a trick.
+    - The one check is your balance. Dial your network's balance code yourself and see if the bonus is there.
+  actions:
+    - Ignore any promo that asks for a fee, a code or your personal details.
+  keywords: [bonus data added, data bonus credited, bundle bonus]
+
+# Sources: fake alerts and fake links (general guidance): https://techeconomy.ng/how-to-detect-fake-credit-debit-sms-alert (accessed 2026-10-11)
+- id: notice-delivery-for-your-order
+  title: A delivery notice for something you ordered
+  facts:
+    - When you order something online, the shop or rider may message you about the delivery time. A message that names your order, from the shop you bought from, is normal.
+    - If you did not order anything, it is not yours.
+    - A "customs" or "redelivery" fee by link is a known trick.
+    - The one check is your order inside the shop's own app or website, opened by you. The order number and status should match.
+  actions:
+    - Pay any balance only through the shop's own app or on delivery, never through a link in a message.
+  keywords: [my order delivery time, rider for my order, order i placed]
+
+# Sources: savings groups (ajo, esusu) are trust-based; check with the group you know (money-skills pack covers rules):
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (fake proof of payment; accessed 2026-10-11)
+- id: notice-ajo-reminder
+  title: An ajo or esusu contribution reminder from your own group
+  facts:
+    - In an ajo, esusu, adashe or isusu group, the collector or leader often reminds members when contributions are due.
+    - A reminder from the leader you know, with the usual amount and the usual account, is normal.
+    - The danger sign is a change, like a new account number, a new person collecting, or a sudden extra fee.
+    - The one check is to confirm any change face to face or with a call to the leader's usual number.
+  actions:
+    - Pay to the usual account. Confirm any new account in person first.
+  keywords: [ajo reminder, esusu reminder, adashe reminder, isusu reminder, my ajo contribution, ajo collection day]
+
+# Sources: impersonation of known people/accounts is a common scam pattern; confirm through a known channel:
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+- id: notice-religious-school-account
+  title: A church, mosque or school account announced officially
+  facts:
+    - Churches, mosques and schools often share an account number for tithes, zakat, levies or fees.
+    - An account number announced in service, or printed on the official bill or school portal, is normal.
+    - Scammers sometimes copy a church or school name and post their own account, or send it by WhatsApp.
+    - The one check is the account name shown before you confirm the transfer. It should be the church, mosque or school, matching the official bill or announcement.
+  actions:
+    - If the account name is a person's name, or you are not sure, ask the office in person before paying.
+  keywords: [church account announced in service, school fees account on the bill, school portal account, mosque zakat account, pta levy on school bill]
+
+# Sources: impersonation of family by new numbers / hacked accounts / cloned voices; confirm by calling the usual number:
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+- id: notice-family-request-confirmed
+  title: A family member's money request that you confirmed by calling them
+  facts:
+    - Family and friends do ask for money sometimes. Scammers copy them using new numbers, hacked WhatsApp accounts and even cloned voices.
+    - If you dialled their usual number yourself and they confirmed it, the request is very likely theirs.
+    - Be careful if they want it paid into someone else's account.
+    - The one check is that call to the number you have always used. Check also that the account name matches their name.
+  actions:
+    - Call back on the number you already have, not a number in the message.
+  keywords: [i call am confirm, i called them back, confirmed on their usual number]
+
+# --- account admin -----------------------------------------------------------------------------------------------------
+
+# Sources: tiers: Tier 1 needs BVN or NIN; Tier 2 both; Tier 3 adds address:
+#   https://help.kuda.com/en/articles/9424612-new-account-tiers-rules-and-limits (accessed 2026-10-11)
+#   https://leadership.ng/?p=182003 (CBN BVN/NIN directive; accessed 2026-10-11)
+- id: notice-tier-upgrade
+  title: A tier upgrade offer or notice inside your official app
+  facts:
+    - Bank and wallet accounts have tiers. Higher tiers allow bigger balances and transfers.
+    - To move up, you add your BVN or NIN, whichever is missing, then a verified address, inside the official app or at a branch.
+    - A tier upgrade prompt or "upgrade successful" message inside your own app is normal.
+    - The one check is where it happens. A real upgrade is done inside the app you opened yourself, never through a link, a caller or an agent who wants a fee.
+  actions:
+    - Upgrade only inside the official app or at a branch.
+  keywords: [tier upgrade in app, upgrade successful]
+
+# Sources: CBN BVN/NIN requirement for accounts; fake NIN/SIM linkage apps and sites:
+#   https://leadership.ng/?p=182003 (accessed 2026-10-11)
+#   https://thewillnews.com/nimc-alerts-nigerians-to-fake-mobile-app/ (accessed 2026-10-11)
+#   https://dubawa.org/website-asking-nigerians-to-verify-nin-sim-status-is-fraudulent/ (accessed 2026-10-11)
+- id: notice-bvn-nin-linkage
+  title: A BVN or NIN linkage request inside your bank's official app
+  facts:
+    - Banks must have your BVN or NIN on your account, so they sometimes ask you to link them.
+    - A banner or notice inside your own bank app, or at the branch, asking you to add your NIN is normal.
+    - Fake versions come by SMS or WhatsApp with a link, or from an app that is not your bank's.
+    - The one check is to open your bank app yourself and look for the request there. If it is not in the app, ignore the message.
+  actions:
+    - Link your BVN or NIN only in the official app or at a branch.
+  keywords: [nin banner in my app, link nin in app, bank app ask for nin]
+
+# Sources: banks and CBN say they never ask for PIN, OTP or card details:
+#   https://dubawa.org/four-bank-credit-alert-schemes-scammers-have-used-to-defraud-victims (accessed 2026-10-11)
+#   https://techeconomy.ng/how-to-detect-fake-credit-debit-sms-alert (accessed 2026-10-11)
+- id: notice-bank-security-tips
+  title: A security tips message from your bank
+  facts:
+    - Banks often send messages like "We will never ask for your PIN, OTP or password."
+    - A message that only gives advice, and asks you to do nothing, is normal.
+    - A fake one mixes the advice with a link, a phone number to call, or a request for details.
+    - The one check is to see whether it asks you to do anything. Real tips only warn you.
+  actions:
+    - You do not need to reply. Ignore any link or number inside such a message.
+  keywords: [bank says never share pin, fraud awareness tips]
+
+# Sources: CBN circular 12 Mar 2026: affidavit no longer required for dormant-account reactivation unless funds already moved to the
+#   Unclaimed Balances Trust Fund pool; enhanced ID checks still apply:
+#   https://nairametrics.com/2026/03/14/cbn-revises-dormant-account-guidelines-drops-affidavit-requirement/ (14 Mar 2026; accessed 2026-10-11)
+#   https://businessday.ng/news/article/cbn-relaxes-dormant-account-rules-with-affidavit-requirement-removal/ (accessed 2026-10-11)
+- id: notice-dormant-reactivation
+  title: Reactivating a dormant account at your bank
+  facts:
+    - An account not used for a long time can become dormant.
+    - To reactivate it, the bank checks your ID and BVN, usually at a branch. Some banks also accept requests through their official app.
+    - Since March 2026, the CBN no longer requires an affidavit for this, unless the money was already moved to the CBN's unclaimed balances fund.
+    - The one check is that you started the reactivation yourself, at the branch or in the app. A caller offering to "reactivate" your account for a fee is not your bank.
+  actions:
+    - Go to your branch with your ID, or use your bank's official app.
+  keywords: [reactivate my dormant account, my account don sleep, dormant account reactivation at branch]
+
+# Sources: CBN Guide to Charges 2026: card issuance/replacement N1,500:
+#   https://radionigerialagos.gov.ng/?p=40748 (6 May 2026; accessed 2026-10-11)
+- id: notice-card-expiry
+  title: A card expiry or replacement notice
+  facts:
+    - Bank cards have an expiry date printed on them, so banks remind you before the card expires.
+    - If your card is near its expiry date, a notice that a new one is ready at your branch is normal.
+    - Your bank will not ask you to send your old card details, PIN or a fee to a person to get a new card.
+    - The one check is the expiry date on your own card. Collect the new card at the branch.
+  actions:
+    - Collect your new card at your branch and destroy the old one.
+  keywords: [my card don expire, new card ready at my branch, my card expiry date reminder]
+
+# Sources: CBN circular 12 Mar 2026: customers may set their own transfer limits (up to N25m individual), opt out of instant transfers, with MFA:
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-transfer-limit-set
+  title: A notice that you set or changed your transfer limit
+  facts:
+    - Under a CBN rule from July 2026, you can set your own daily transfer limit in your bank app, up to the bank's maximum.
+    - If you changed it yourself, the bank's notice confirming the new limit is normal.
+    - Raising a limit needs extra checks by the bank. Nobody can do it for you over the phone for a fee.
+    - The one check is whether you changed the limit yourself. Look at the limit inside your own app.
+  actions:
+    - If you did not change it, call your bank using the number on the back of your card, not any number or link in the notice.
+  keywords: [i changed my transfer limit, i set my daily limit, limit update after i changed it]
+
+# Sources: CBN circular 12 Mar 2026: customers may opt out of instant transfers and opt back in, subject to MFA:
+#   https://businessday.ng/news/article/cbn-caps-new-mobile-banking-transfers-at-n20000-for-24-hours/ (13 Mar 2026; accessed 2026-10-11)
+- id: notice-instant-transfer-opt-out
+  title: A notice that you turned instant transfers off or on
+  facts:
+    - Since July 2026, you can switch off instant online transfers on your account, and switch them back on later.
+    - While they are off, you can still send money by going to your bank.
+    - If you changed this setting yourself, a notice confirming it is normal.
+    - The one check is whether you changed the setting yourself in your own app.
+  actions:
+    - If you did not change it, call your bank using the number on the back of your card, not any number or link in the notice.
+  keywords: [i opted out of instant transfers, i turned off instant transfer, i opted back in to instant transfer]
