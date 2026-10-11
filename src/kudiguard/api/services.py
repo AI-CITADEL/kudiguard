@@ -19,10 +19,11 @@ import httpx
 from kudiguard.admission import Admission
 from kudiguard.config import Settings
 from kudiguard.donation import VOICE_RETENTION_DAYS, Sealer, VoiceVault
-from kudiguard.engine import Engine
+from kudiguard.engine import AdvicePolicy, Engine
 from kudiguard.knowledge.base import ContentScreen
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
+from kudiguard.knowledge.models import Relevance
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLM
@@ -119,6 +120,28 @@ async def purge_loop(
         await asyncio.sleep(interval_s)
 
 
+def min_relevance(settings: Settings) -> Relevance | None:
+    """The relevance cut-off for search hits (None = off: both levels 0)."""
+    dense, bm25 = settings.knowledge_min_relevance_dense, settings.knowledge_min_relevance_bm25
+    return Relevance(dense=dense, bm25=bm25) if dense or bm25 else None
+
+
+def advice_policy(settings: Settings) -> AdvicePolicy:
+    return AdvicePolicy(
+        examples=settings.compose_examples,
+        example_min=Relevance(
+            dense=settings.compose_example_min_relevance_dense,
+            bm25=settings.compose_example_min_relevance_bm25,
+        ),
+        example_copy_max=settings.compose_example_copy_max,
+        notice_prefix=settings.notice_prefix,
+        notice_min=Relevance(
+            dense=settings.notice_min_relevance_dense, bm25=settings.notice_min_relevance_bm25
+        ),
+        pidgin_replies=settings.pidgin_replies,
+    )
+
+
 async def build_knowledge(
     settings: Settings, client: httpx.AsyncClient, screen: ContentScreen | None = None
 ) -> tuple[KnowledgeBase, Embedder | None]:
@@ -135,6 +158,7 @@ async def build_knowledge(
             allow_samples=settings.allow_sample_packs,
             screen=screen,
             allow_live=settings.allow_live_packs,
+            min_relevance=min_relevance(settings),
         )
 
     knowledge, embedder = None, None
@@ -419,6 +443,7 @@ async def build_services(settings: Settings) -> Services:
             compose_policy=settings.compose_policy([lang.code for lang in registry.enabled]),
             **build_abuse_screens(settings, registry),
             crisis_similarity=build_crisis_similarity(settings, registry, embedder),
+            advice=advice_policy(settings),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

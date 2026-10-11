@@ -4,6 +4,7 @@
 <pack>/topics.yaml     curated entries: list of Entry objects (optional)
 <pack>/faq.csv         question,answer[,id][,keywords "a; b"] rows, e.g. an exported FAQ (optional)
 <pack>/contacts.yaml   list of Contact objects (optional)
+<pack>/examples.yaml   entry id -> model answer text (optional; same as an inline ``example:`` in topics.yaml)
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ log = logging.getLogger(__name__)
 
 _ENTRIES = TypeAdapter(list[Entry])
 _CONTACTS = TypeAdapter(list[Contact])
+_EXAMPLES = TypeAdapter(dict[str, str])
 MAX_FILE_BYTES = 5_000_000
 MAX_FACT_CHARS = 1000
 MAX_FACTS = 12
@@ -138,7 +140,30 @@ def read_pack_files(directory: Path) -> tuple[list[Entry], list[Contact]]:
         if entry.id in seen:
             raise KnowledgeConfigError(f"{directory}: duplicate entry id {entry.id!r}")
         seen.add(entry.id)
-    return entries, _read_list(directory / "contacts.yaml", _CONTACTS)
+    return _with_examples(directory, entries), _read_list(directory / "contacts.yaml", _CONTACTS)
+
+
+def _with_examples(directory: Path, entries: list[Entry]) -> list[Entry]:
+    """Attach ``examples.yaml`` (id -> text) to the entries; an unknown id or a second example is an error."""
+    path = directory / "examples.yaml"
+    if not path.is_file():
+        return entries
+    try:
+        examples = _EXAMPLES.validate_python(_read_yaml(path) or {})
+    except ValidationError as exc:
+        raise KnowledgeConfigError(f"{path}: {exc}") from exc
+    by_id = {e.id: e for e in entries}
+    if unknown := sorted(set(examples) - by_id.keys()):
+        raise KnowledgeConfigError(f"{path}: examples for unknown entry ids {unknown}")
+    if twice := sorted(i for i in examples if by_id[i].example is not None):
+        raise KnowledgeConfigError(f"{path}: entries {twice} already have an inline example")
+    try:
+        return [
+            Entry.model_validate({**e.model_dump(), "example": examples[e.id]}) if e.id in examples else e
+            for e in entries
+        ]
+    except ValidationError as exc:
+        raise KnowledgeConfigError(f"{path}: {exc}") from exc
 
 
 class FilePackSource:

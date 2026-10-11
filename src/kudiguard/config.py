@@ -80,6 +80,21 @@ class Settings(BaseSettings):
     # direct (compose in the user's language), with per-language overrides. Default "english_first,ha=direct":
     # Yoruba/Igbo English-first, Hausa direct (docs/SPIKES.md H); English is always direct.
     compose_strategy: str = DEFAULT_COMPOSE_STRATEGY
+    # Advice quality (docs/ARCHITECTURE.md, "Advice quality"; thresholds chosen on the dev retrieval sets).
+    # Search hits below these relevance levels are not passed to COMPOSE (red-flag entries always are);
+    # 0 = keep every hit. Dense = cosine (embeddings on), bm25 = squashed BM25 (embeddings off).
+    knowledge_min_relevance_dense: float = Field(default=0.60, ge=0, lt=1)
+    knowledge_min_relevance_bm25: float = Field(default=0.58, ge=0, lt=1)
+    compose_examples: bool = True  # show the top entry's model answer to COMPOSE
+    compose_example_min_relevance_dense: float = Field(
+        default=0.68, ge=0, lt=1
+    )  # entry must be the top hit at this
+    compose_example_min_relevance_bm25: float = Field(default=0.68, ge=0, lt=1)
+    compose_example_copy_max: float = Field(default=0.5, gt=0, le=1)  # trigram share that counts as a copy
+    notice_prefix: str = "notice-"  # genuine-notice entries (empty = no notice handling)
+    notice_min_relevance_dense: float = Field(default=0.75, gt=0, lt=1)
+    notice_min_relevance_bm25: float = Field(default=0.80, gt=0, lt=1)
+    pidgin_replies: bool = True  # Nigerian Pidgin messages get a reply in Pidgin
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)

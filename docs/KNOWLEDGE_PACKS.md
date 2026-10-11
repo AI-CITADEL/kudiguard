@@ -20,8 +20,12 @@ data/packs/<your-pack-id>/
 ├── pack.yaml       # required: who you are, priority
 ├── faq.csv         # question,answer[,id][,keywords]   ← an export of your existing FAQ works
 ├── topics.yaml     # optional: curated entries, can be tied to scam red flags
-└── contacts.yaml   # optional: your fraud desk, WhatsApp, USSD block code, website
+├── contacts.yaml   # optional: your fraud desk, WhatsApp, USSD block code, website
+└── examples.yaml   # optional: entry id -> a model answer (or `example:` inline in topics.yaml)
 ```
+
+A model answer is shown to the model for the top entry only, as something to adapt, never copy (a reply
+that copies it is written again without it; docs/ARCHITECTURE.md "Advice quality").
 
 See `data/packs/demo-bank/` (fictional sample) for a complete example.
 

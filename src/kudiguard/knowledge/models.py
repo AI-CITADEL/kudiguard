@@ -81,6 +81,9 @@ class Entry(_Strict):
     actions: tuple[Long, ...] = Field(default=(), max_length=8)
     flags: tuple[Flag, ...] = ()
     keywords: tuple[Short, ...] = ()
+    # A model answer for a typical message on this topic: shown to COMPOSE (top entry only) as something to adapt,
+    # never to copy (``prompts.compose_request``; copy guard in ``engine``). Not indexed for search.
+    example: Long | None = None
 
 
 class PackKind(StrEnum):
@@ -202,3 +205,16 @@ class KnowledgeResult:
     entries: tuple[SourcedEntry, ...] = ()
     contacts: tuple[Contact, ...] = ()
     failed_sources: tuple[str, ...] = ()
+    dense: bool = False  # hit relevance is cosine similarity (embeddings on), else squashed BM25
+
+
+@dataclass(frozen=True, slots=True)
+class Relevance:
+    """A relevance level on both scales a hit can carry (``Hit.relevance``)."""
+
+    dense: float  # cosine similarity (bge-small-en-v1.5)
+    bm25: float  # squashed BM25, score / (score + 3)
+
+    def met(self, relevance: float | None, *, dense: bool) -> bool:
+        """None (an unscored hit, e.g. from a partner API) never meets a level."""
+        return relevance is not None and relevance >= (self.dense if dense else self.bm25)

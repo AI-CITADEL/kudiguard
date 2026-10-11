@@ -89,4 +89,44 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
    load, the pattern library and donations pass a learning gate, and new users, queues, notices and voice notes are
    rate-limited. Every defence is `off | shadow | enforce`, phrases per language under `abuse:` in the YAMLs.
 
+## Advice quality (what reaches COMPOSE)
+
+Settings in `.env.example` ("Advice quality"); code in `knowledge/service.py` (cut-off), `engine.py`
+(`AdvicePolicy`, `_genuine_notice`, `_unless_copied`) and `prompts.py`.
+
+* **Relevance cut-off** (`KUDIGUARD_KNOWLEDGE_MIN_RELEVANCE_DENSE=0.60`, `..._BM25=0.58`; `0`/`0` = off). Search hits
+  below it never reach COMPOSE; red-flag entries always do (they match the message's flags, not its words). A
+  question left with no facts gets `prompts.NO_FACTS_TASK` (honest general guidance plus one short clarifying
+  question) and a matching worked example, never an unrelated entry. Calibrated on the dev retrieval sets only
+  (`data/eval/retrieval.yaml`, `retrieval_money.yaml`, and the English `answers.yaml` cases with their `from`
+  entries; 104 correct and 176 wrong top-3 hits with embeddings, production packs): dense 0.60 keeps 99% of correct
+  hits and drops 9% of wrong ones (0.62 would lose 4% of correct hits); BM25 0.58 is the highest level that keeps
+  every correct hit (drops 37% of wrong ones). Cosine separates related from unrelated poorly in the 0.6-0.7 band,
+  so the level only removes clearly unrelated entries; ranking still decides among related ones. Dev sets (97
+  English queries, rules + production packs) before -> after: hybrid top-1 82.5% -> 82.5%, top-3 94.8% -> 94.8%,
+  wrong entries passed to COMPOSE 174/283 -> 158/266; BM25 top-1 74.2% -> 74.2%, top-3 91.8% -> 91.8%, wrong
+  entries 170/275 -> 111/216 (one query left with no entry).
+* **Entry model answers** (`example:` inline in `topics.yaml`, or `examples.yaml` in the pack: `id: text`). The top
+  entry's example is shown to COMPOSE labelled "a model answer for a similar situation; do not copy it, adapt it to
+  the user's message", and replaces the fixed worked example (one example per request). Copy guard: a reply (the
+  English draft for English-first languages) sharing more than `KUDIGUARD_COMPOSE_EXAMPLE_COPY_MAX` (0.5) of its word
+  trigrams with the example is composed once more without it. `KUDIGUARD_COMPOSE_EXAMPLES=false` turns it off. The
+  example is used only when its entry is the top search hit at `KUDIGUARD_COMPOSE_EXAMPLE_MIN_RELEVANCE_DENSE` /
+  `_BM25` (0.68, above the cut-off: keeps 82% / 79% of correct and 39% / 30% of wrong top-3 hits on the dev sets).
+  0.5 is a starting level, not yet measured on live replies (no pack had examples when it was set).
+* **Genuine notices** (entries `notice-*`, `KUDIGUARD_NOTICE_PREFIX`; empty = off). Notice keywords overlap scam
+  wording (credit alert, reversal, BVN update, delivery), so retrieval alone never lowers a verdict. Model-only
+  suspicion is lowered only when ALL hold: the best search hit is a notice at or above
+  `KUDIGUARD_NOTICE_MIN_RELEVANCE_DENSE=0.75` (`..._BM25=0.80`; on the dev sets <= 3% / 1% of wrong hits reach these
+  levels); the rules (`scam_rules.assess`) found no flag at all; the message has no link, email, phone or account
+  number (`prompts.strip_contacts`; an OTP SMS with its code therefore keeps its verdict); the model's flags are only
+  urgency, impersonation or secrecy (no request to send money, codes or details). Then: no red flags (the notice's
+  own check; red-flag entries dropped) when ANALYSE's `user_initiated` says the user started it, else at most
+  caution. Otherwise the model's verdict stands. Typical look-alike scams are unit-tested not to be lowered.
+* **Pidgin replies** (`KUDIGUARD_PIDGIN_REPLIES`): Pidgin arrives as language `en`; when
+  `guard_classifier.is_pidgin` detects it, COMPOSE is asked to "Reply in Nigerian Pidgin".
+* **Stock answer fix**: the fixed question example (NIN, "dial *346#") was the only worked example for every
+  question; with no matching facts N-ATLAS copied it (a stolen-card question got "*346#"). Questions without facts now
+  get the no-facts example, and an entry example replaces the fixed one.
+
 Measurements behind each design choice: `docs/SPIKES.md`. Plan and milestones: `docs/PLAN.md`.

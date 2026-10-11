@@ -38,6 +38,7 @@ from kudiguard.knowledge.models import (
     KnowledgeResult,
     PackKind,
     Query,
+    Relevance,
     SourcedEntry,
     SourceResult,
 )
@@ -105,7 +106,10 @@ class KnowledgeBase:
         embedder: Embedder | None = None,
         deadline_s: float = 1.5,
         limits: Limits = DEFAULT_LIMITS,
+        min_relevance: Relevance | None = None,
     ) -> None:
+        """``min_relevance``: search hits below it are dropped (None = keep every hit the index returns). Red-flag
+        entries are never dropped: they match the message's flags, not its wording."""
         ids = [s.manifest.id for s in sources]
         if len(ids) != len(set(ids)):
             raise KnowledgeConfigError(f"duplicate knowledge source ids in {ids}")
@@ -115,6 +119,7 @@ class KnowledgeBase:
         self._embedder = embedder
         self._deadline_s = deadline_s
         self._limits = limits
+        self._min_relevance = min_relevance
         self._partner_floor = DENSE_MIN if embedder is not None else PARTNER_MIN_BM25_RELEVANCE
         self._query_cache: OrderedDict[str, NDArray[np.float32]] = OrderedDict()
         self._safety_order = sorted(
@@ -145,13 +150,16 @@ class KnowledgeBase:
         answers = await asyncio.gather(*(self._ask(s, query) for s in active))
         results = {s.manifest.id: a for s, a in zip(active, answers, strict=True) if a is not None}
         answered = [s for s in self._safety_order if s.manifest.id in results]
+        dense = query.vector is not None
+        hits = self._best_hits(answered, results)
+        if (floor := self._min_relevance) is not None:
+            hits = [h for h in hits if floor.met(h.relevance, dense=dense)]
 
         return KnowledgeResult(
-            entries=self._within_budget(
-                self._flag_entries(answered, results), self._best_hits(answered, results)
-            ),
+            entries=self._within_budget(self._flag_entries(answered, results), hits),
             contacts=self._contacts(answered, results, query),
             failed_sources=tuple(s.manifest.id for s in active if s.manifest.id not in results),
+            dense=dense,
         )
 
     # --- merging --------------------------------------------------------------------------------------
@@ -271,13 +279,16 @@ def knowledge_base_from_packs(
     deadline_s: float = 1.5,
     limits: Limits = DEFAULT_LIMITS,
     screen: ContentScreen | None = None,
+    min_relevance: Relevance | None = None,
 ) -> KnowledgeBase:
     """The supported way to wire a KnowledgeBase: one embedder shared by every index and the query path."""
     sources = build_sources(
         packs_dir, client=client, include=include, embedder=embedder, allow_samples=allow_samples,
         allow_live=allow_live, screen=screen,
     )  # fmt: skip
-    return KnowledgeBase(sources, embedder=embedder, deadline_s=deadline_s, limits=limits)
+    return KnowledgeBase(
+        sources, embedder=embedder, deadline_s=deadline_s, limits=limits, min_relevance=min_relevance
+    )
 
 
 def build_sources(
