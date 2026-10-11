@@ -11,7 +11,9 @@ the reply is back-translated to English and scored (kudiguard.evaluation): verdi
 `must` points, `must_not`/pattern violations, claims unsupported by the facts the model saw. The sampling options
 apply to the engine only; back-translation always uses the plain backend so translator noise stays out of an A/B.
 Results: data/eval/results/answers-<label>.jsonl (a meta line, then one record per case and run, appended as they
-are produced). Once workstream B merges, build the engine with grounding on, as production does.
+are produced). The eval engine runs without B's grounding checker and classifier: in production they run in shadow
+mode, which never changes a reply, so the scored replies are the ones users get (the scorer grounds them separately).
+On Windows set PYTHONIOENCODING=utf-8: replies and logs contain Yoruba/Igbo/Hausa characters.
 """
 
 from __future__ import annotations

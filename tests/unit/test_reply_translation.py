@@ -261,6 +261,22 @@ def test_review_negation_cases(lang: str, english: str, translated: str, problem
     assert any(p.startswith(f"negation {problem}") for p in translation_problems(english, translated, lang))
 
 
+@pytest.mark.parametrize(
+    ("english", "igbo"),
+    [
+        (
+            "Call your bank today, do not wait until tomorrow.",
+            "Kpọọ ụlọ akụ gị taa, ekwela ka ị chere ruo echi.",
+        ),
+        ("Call your bank today.", "Kpọọ ụlọ akụ gị taa. Ekwela ka ị chere ruo echi."),  # added by the model
+        ("Call your bank today.", "Kpọọ ụlọ akụ gị taa. Echela ruo echi."),
+    ],
+)
+def test_igbo_dont_wait_is_no_negation(english: str, igbo: str) -> None:
+    """Round-2 live false fallback: "Ekwela ka ị chere ruo echi" (do not wait until tomorrow) asks for action."""
+    assert not [p for p in translation_problems(english, igbo, "ig") if p.startswith("negation")]
+
+
 def test_whole_step_left_in_english_is_untranslated() -> None:
     translated = YORUBA.replace("Ẹ pe báǹkì yín.", "Call your bank on the number on your card.")
     english = ENGLISH.replace("Call your bank.", "Call your bank on the number on your card.")
@@ -424,6 +440,7 @@ async def test_too_little_time_for_both_steps_skips_the_model(
     deadline = clock.now + MIN_GENERATE_S + MIN_TRANSLATE_S - 0.5  # enough for one step, not two
     answer = await make(registry, knowledge, llm).check(YO_OTP, "yo", deadline=deadline)
     assert llm.calls(Purpose.COMPOSE) == [] and llm.calls(Purpose.REPLY_TRANSLATE) == []
+    assert answer.translation_rejections == ("no_time",)
     assert answer.outcome is Outcome.FALLBACK and answer.body == Messages(registry).text(
         "yo", Msg.FALLBACK_SCAM
     )
@@ -666,3 +683,25 @@ async def test_unsafe_warning_falls_back(
     follow = await make(registry, knowledge, llm).warning(YO_OTP_EN, (Flag.ASKS_CREDENTIALS,), "yo")
     assert follow.outcome is Outcome.FALLBACK
     assert follow.text == Messages(registry).text("yo", Msg.WARN_FAMILY_FALLBACK)
+    if "reply_translate" in script:
+        assert "negation_lost" in follow.translation_rejections
+
+
+async def test_next_steps_record_translation_rejections(
+    registry: LanguageRegistry, knowledge: KnowledgeBase
+) -> None:
+    llm = FakeLLM(reply_translate="Ẹ ṣe é.")  # one line for three steps
+    follow = await make(registry, knowledge, llm).next_steps(YO_OTP_EN, (Flag.ASKS_CREDENTIALS,), "yo")
+    assert follow.outcome is Outcome.FALLBACK and follow.translation_rejections[0] == "steps"
+
+
+async def test_outcome_claim_in_a_translation_is_log_only_like_in_english(
+    registry: LanguageRegistry, knowledge: KnowledgeBase
+) -> None:
+    """Shadow mode: an outcome claim is recorded, not blocking (mirrors ``Engine._blocks`` for English replies)."""
+    english = "This looks like a scam.\n1. Do not share the code.\n2. You will get your money back."
+    yoruba = "Èyí jọ ẹ̀tàn.\n1. Ẹ má ṣe fi kóòdù náà fún ẹnikẹ́ni.\n2. Ẹ ó rí owó yín gbà, you will get your money back."
+    llm = scam_llm(compose=english, reply_translate=yoruba)
+    answer = await make(registry, knowledge, llm).check(YO_OTP, "yo")
+    assert answer.outcome is Outcome.ANSWERED and answer.body == yoruba
+    assert OutputIssue.OUTCOME_CLAIM in answer.issues and answer.translation_rejections == ()

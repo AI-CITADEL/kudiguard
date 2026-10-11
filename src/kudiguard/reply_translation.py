@@ -76,8 +76,9 @@ INVERTING: Mapping[LanguageCode, re.Pattern[str]] = MappingProxyType(
         "yo": re.compile(
             r"\b(?:[ẹe]\s+)?(?:ma\s+ṣe|maṣe|ma\s+se|mase|ma)\s+(?:gbagbe|ṣiyemeji|siyemeji|duro|pẹ)\w*"
         ),
-        # echefula (don't forget), egbula oge (don't delay)
-        "ig": re.compile(r"\b(?:echefula|echefuna|egbula\s+oge)\w*"),
+        # echefula (don't forget), egbula oge (don't delay), ekwela ka i chere / echela (don't wait). DRAFT: the
+        # verifier's live run rejected "Ekwela ka ị chere ruo echi" (do not wait until tomorrow) as an added "do not"
+        "ig": re.compile(r"\b(?:echefula|echefuna|egbula\s+oge|ekwela\s+ka\s+i\s+chere|echela)\w*"),
         # kada/kar (ka) manta (don't forget), ... jinkiri / jira (delay / wait)
         "ha": re.compile(r"\b(?:kada|kar)\s+(?:\w+\s+)?(?:manta|jinkiri|jira|yi\s+jinkiri)\w*"),
     }
@@ -130,9 +131,10 @@ class ComposeStrategy(StrEnum):
     ENGLISH_FIRST = "english_first"
 
 
-# Shipped default (user decision, 10 Oct 2026; docs/SPIKES.md H): Yoruba/Igbo English-first (coverage 0.36 -> 0.56 and
-# 0.37 -> 0.42 vs direct); Hausa direct (English-first cut its coverage 0.54 -> 0.34). Direct replies get no
-# translation-fidelity (negation) check: native review of Hausa replies matters.
+# Shipped default (user decision, 10 Oct 2026; docs/SPIKES.md H, measured on the shipped code vs direct): Yoruba
+# English-first (coverage 0.36 -> 0.58); Igbo English-first for less example copying (42% -> 8%) and the English
+# safety checks, not coverage (0.37 -> 0.33); Hausa direct (English-first cut its coverage 0.54 -> 0.34). Direct
+# replies get no translation-fidelity (negation) check: native review of Hausa replies matters.
 DEFAULT_COMPOSE_STRATEGY = "english_first,ha=direct"
 
 

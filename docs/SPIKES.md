@@ -494,7 +494,8 @@ Goal: bring yo/ig replies up to Hausa's level with the loop Hausa got, then (use
 **English-first** where it helps: compose in English, run every English check, translate, check the translation.
 Measured for ha/yo/ig; shipped for Yoruba and Igbo only (Hausa and English stay direct; decision at the end).
 All numbers: `scripts/eval_answers.py` live on N-ATLAS (llama.cpp, temperature 0 + seed 42), stand-in grounding;
-per-item results in `data/eval/results/answers-h_{base,after_direct,after,final}.jsonl` (`h_base`: master code on the
+per-item results in `data/eval/results/answers-h_{base,after_direct,after,final}.jsonl` and `answers-h2_final.jsonl`
+(the shipped code, re-measured by the verifier) (`h_base`: master code on the
 extended dev set; `h_final`: English-first for ha/yo/ig with the first negation check; the shipped default uses it for
 yo/ig and `h_after_direct` for ha). Other workstreams used the same server and CPU, so latency is noisy.
 `h_after_direct`, `h_after` and `h_final` ran back to back; `h_base` and master's `answers-t0seed` ran in earlier
@@ -579,7 +580,8 @@ Same session, final code: `h_after_direct` (direct), `h_after` (english_first, b
 OTP" (scorer false positive; the reply is safe). The 8% yo violation without the negation check was a real one
 (yo-inflation-cash: "keep all your money at home", see below).
 
-Against the H baseline (`h_base`, master, same 53 cases, earlier session): yo 0.36 → 0.56, ig 0.35 → 0.42 (Igbo
+Against the H baseline (`h_base`, master, same 53 cases, earlier session), for `h_final` (the shipped code's re-run
+`h2_final` gave yo 0.58, ig 0.33, see the decision below): yo 0.36 → 0.56, ig 0.35 → 0.42 (Igbo
 copied 50% → 8% vs `h_base`; 42% → 8% vs `h_after_direct`), ha 0.52 → 0.34, en 0.66 → 0.62 (en path unchanged:
 noise). Against master's `answers-t0seed` (the original 45 cases, earlier session): ig 0.25 → 0.39 (copied 62% → 0%),
 yo 0.35 → 0.52, ha 0.52 → 0.34, en 0.66 → 0.62; verdicts en 86 → 90%, ig 88 → 100%, yo 88%, ha 100%.
@@ -601,21 +603,26 @@ What it shows:
   on those cases: ha-budget, yo-inflation-cash, ig-fake-alert-goods, ig-loan-fee). Subtler meaning errors remain
   undetected ("three months" → "ọ̀sẹ̀ mẹ́ta", three weeks).
 * **Latency**: the translation step alone takes p50 2.1 s (ha) / 3.1 s (yo, ig), max 9 s for long replies (replay of
-  32 English drafts). Shipped (`h_final` vs `h_after_direct`, same session): **+2.4 s (yo) and +2.7 s (ig) p50**
-  (target ≤ +1.5 s: **missed**); p95 up to 14–16 s with the retry. **Capacity:** model time per yo/ig turn rises
-  ~70% (mean `llm_ms` yo 4.0 → 7.0 s, ig 4.5 → 7.7 s), so the single GPU serves ~40% fewer yo/ig turns per minute.
-  English and Hausa replies are unchanged. The 60-s turn deadline is not at risk.
+  32 English drafts). Shipped code (`h2_final` vs `h_after_direct`): **+1.7 s (yo) and +1.3 s (ig) p50**, p95
+  8.2 s (yo) / 9.4 s (ig) (target ≤ +1.5 s: missed for Yoruba). The first version (`h_final`, warm retries) was
+  +2.4 / +2.7 s p50, p95 14–16 s. **Capacity:** model time per yo/ig turn rises +42% (yo) / +35% (ig), so the single
+  GPU serves ≈26–30% fewer yo/ig turns per minute. English and Hausa replies are unchanged. The 60-s turn deadline is
+  not at risk.
 * `scripts/eval_prompts.py` still exercises the direct path (it builds the compose request itself); English-first is
   measured by `eval_answers.py --compose-strategy`, whose records now keep the English draft (`reply_english`).
 
-**Decision (user, 10 Oct 2026): default `english_first,ha=direct`.** Yoruba and Igbo are English-first (coverage
-0.36 → 0.56 and 0.37 → 0.42, Igbo copying 42% → 8%, all vs `h_after_direct`; every English check sees the reply); Hausa stays direct (0.54 vs
-0.34 English-first); English is always direct. Shipped configuration = `h_final` rows for yo/ig and `h_after_direct`
-rows for ha/en. Note: the direct path has **no translation-fidelity or negation check** (there is no English text to
+**Decision (user, 10 Oct 2026): default `english_first,ha=direct`.** Yoruba and Igbo are English-first (every English
+check sees the reply); Hausa stays direct (0.54 vs 0.34 English-first in the same session); English is always direct.
+Measured on the shipped code (`h2_final`, commit 6da290d, 3 runs, verifier's re-run, vs `h_after_direct`): Yoruba
+coverage 0.36 → **0.58**, fallback 8%; Igbo 0.37 → **0.33** (0.36 excluding 3 failed back-translations): **the Igbo
+coverage gain is NOT reproduced**; Igbo's measured benefits are copying 42% → 8% and the English safety checks (17% of
+Igbo replies fall back to fixed text, all confirmed real negation flips). Hausa direct measured 0.46 in that session
+(cross-session noise, mostly ha-otp-blocked's analyse-step flag). Note: the direct path has **no translation-fidelity or negation check** (there is no English text to
 compare against), only the output guard; given the 11% negation-flip rate seen in translations, the same kind of error
 in a direct Hausa reply would go unnoticed, so native-speaker review of Hausa replies matters.
 
-**Review fixes (after merging workstream B; unit-tested, not re-measured live):**
+**Review fixes (after merging workstream B; unit-tested; re-measured live as `h2_final` above,
+`data/eval/results/answers-h2_final.jsonl`, with B's `CheckerGrounding` in the eval):**
 * **B's checks on the English draft**: for yo/ig the shadow classifier and shadow grounding score the English draft
   (`Answer.reply_english`), not the translation; grounding in enforce mode runs between the draft and the translation
   (unsupported English steps are trimmed before translating; nothing left → fixed text); the classifier in enforce mode

@@ -120,6 +120,7 @@ class FollowUp:
     text: str
     outcome: Outcome
     llm_ms: int = 0
+    translation_rejections: tuple[str, ...] = ()  # english_first: as ``Answer.translation_rejections``
 
 
 @dataclass(slots=True)
@@ -349,7 +350,8 @@ class Engine:
             # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
             # (the user chose a language) or a translation cut off by the deadline.
             log.warning("english_first: %.1fs left, using fixed text", deadline - time.monotonic())
-            return _Generation(unavailable=True)
+            # Not a model failure: no call is made for lack of time; "unavailable" gives the same fixed-text path.
+            return _Generation(unavailable=True, rejections=("no_time",))
         draft = await self._generate(request, PIVOT, deadline)
         draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
         if draft.text is None:
@@ -408,16 +410,19 @@ class Engine:
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(strip_reply_tags(completion.text), truncated=completion.truncated)
             issues = self._guard.check(text, language)
+            blocking = tuple(i for i in issues if self._blocks(i))  # log-only outcome claims do not reject
             problems = translation_problems(english, text, language)
-            if not issues and not problems:
+            result.issues += issues
+            if not blocking and not problems:
+                if issues:
+                    log.info("reply translation outcome claim (log only): %s", issues)
                 result.text = text
                 return result
-            result.issues += issues
             result.rejections += tuple(dict.fromkeys(problem_kind(p) for p in problems)) + (
-                ("guard",) if issues else ()
+                ("guard",) if blocking else ()
             )
             log.info("reply translation rejected (attempt %d): %s %s", attempt + 1, issues, problems)
-            if issues or not all(problem_kind(p) in RETRYABLE_PROBLEMS for p in problems):
+            if blocking or not all(problem_kind(p) in RETRYABLE_PROBLEMS for p in problems):
                 break
         return result
 
@@ -592,9 +597,11 @@ class Engine:
             generation = await self._generate(
                 steps_request(language_name=name, actions=actions), language, deadline
             )
+        rejections = generation.rejections
         if generation.text is None:
-            return FollowUp(self.messages.text(language, Msg.FALLBACK_STEPS), Outcome.FALLBACK, generation.ms)
-        return FollowUp(generation.text, Outcome.ANSWERED, generation.ms)
+            text = self.messages.text(language, Msg.FALLBACK_STEPS)
+            return FollowUp(text, Outcome.FALLBACK, generation.ms, rejections)
+        return FollowUp(generation.text, Outcome.ANSWERED, generation.ms, rejections)
 
     async def report_contacts(
         self, english: str, flags: Sequence[Flag], language: LanguageCode
@@ -608,6 +615,7 @@ class Engine:
     ) -> FollowUp:
         """ "Warn my family": a short forwardable warning in the user's language."""
         ms = 0
+        rejections: tuple[str, ...] = ()
         if english:
             name = self.registry.get(language).name
             if self.compose_policy.for_language(language) is ComposeStrategy.ENGLISH_FIRST:
@@ -626,10 +634,12 @@ class Engine:
             else:
                 request = warn_family_request(language_name=name, english=english, flags=tuple(flags))
                 generation = await self._generate(request, language, deadline)
+            rejections = generation.rejections
             if generation.text is not None:
-                return FollowUp(generation.text, Outcome.ANSWERED, generation.ms)
+                return FollowUp(generation.text, Outcome.ANSWERED, generation.ms, rejections)
             ms = generation.ms
-        return FollowUp(self.messages.text(language, Msg.WARN_FAMILY_FALLBACK), Outcome.FALLBACK, ms)
+        text = self.messages.text(language, Msg.WARN_FAMILY_FALLBACK)
+        return FollowUp(text, Outcome.FALLBACK, ms, rejections)
 
 
 _NO_ANALYSIS = Analysis(english="", intent=Intent.OTHER, flags=(), untranslated=True)

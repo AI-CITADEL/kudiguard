@@ -18,9 +18,10 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
   links, length, echo, negation kept); a failure falls back to fixed text in the language. B's shadow classifier and
   grounding score the English draft; grounding in enforce mode trims it before translation. The "What should I do?"
   and "Warn my family" buttons follow the same strategy. **Hausa and English are direct** (composed in the
-  language). Why (docs/SPIKES.md H, dev set, same session): English-first raised Yoruba coverage 0.36 → 0.56 and Igbo
-  0.37 → 0.42 (Igbo copying the worked example 42% → 8%) but cut Hausa 0.54 → 0.34, for +2.4–2.7 s p50 and ~70% more
-  model time per Yoruba/Igbo turn. Direct replies get only the output guard: no fidelity or negation check, so native review of
+  language). Why (docs/SPIKES.md H, dev set, shipped code `h2_final` vs direct): Yoruba coverage 0.36 → 0.58; Igbo
+  0.37 → 0.33 (no coverage gain), but Igbo stops copying the worked example (42% → 8%) and gets the English safety
+  checks (17% of Igbo replies fall back to fixed text, all real negation flips); Hausa lost coverage English-first
+  (0.54 → 0.34), so it stays direct. Cost: +1.7 s (yo) / +1.3 s (ig) p50 and +42% / +35% model time per turn. Direct replies get only the output guard: no fidelity or negation check, so native review of
   Hausa replies matters (11% of measured translations flipped a negation; a direct reply can err the same way unseen).
 * **Conversation** (`pipeline.py`): versioned consent, STOP/DELETE/language commands, buttons, per-user ordering,
   message merging, rate limit, licence cap, never-silent failures, redacted evidence log.
