@@ -3,7 +3,7 @@
     kudiguard serve [--host 127.0.0.1] [--port 8000]
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
-    kudiguard purge [--days 90]          (also donated voice notes, DELETE markers and scam examples past their periods)
+    kudiguard purge [--days 90]   (also donated voice notes, DELETE + licence-cap markers, old scam examples)
     kudiguard review export [--out-dir var/review] [--n 50] [--languages ha,yo,ig] [--seed 0]
     kudiguard review score graded.csv [more.csv ...] [--markdown]
     kudiguard review check sheet.csv [more.csv ...]
@@ -128,7 +128,7 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     print(
         f"removed {rows} rows older than {args.days} days; "
         f"{voice} donated voice samples older than {settings.voice_retention_days} days; "
-        f"{markers} DELETE markers older than {DELETION_MARKER_DAYS} days; "
+        f"{markers} DELETE and licence-cap markers older than {DELETION_MARKER_DAYS} days; "
         f"{patterns} scam examples older than {settings.pattern_retention_days} days"
     )
     return 0

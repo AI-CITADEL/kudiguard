@@ -200,7 +200,7 @@ def test_purge_removes_expired_voice_samples(
         capsys.readouterr()
         .out.strip()
         .endswith(
-            "0 donated voice samples older than 365 days; 0 DELETE markers older than 30 days; "
+            "0 donated voice samples older than 365 days; 0 DELETE and licence-cap markers older than 30 days; "
             "0 scam examples older than 730 days"
         )
     )
@@ -537,7 +537,7 @@ def test_form_answers_must_be_younger_than_any_delete_marker(
 def test_delete_markers_expire_with_the_purge(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     delete_user(env, "+2348099999999", datetime.now(UTC) - timedelta(days=31))
     assert cli.main(["purge"]) == 0
-    assert "; 1 DELETE markers older than 30 days" in capsys.readouterr().out
+    assert "; 1 DELETE and licence-cap markers older than 30 days" in capsys.readouterr().out
 
     async def marker() -> datetime | None:
         store = await SQLiteStore.open(env.db, hasher=UserHasher(SECRET.encode()))

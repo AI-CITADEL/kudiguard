@@ -810,7 +810,8 @@ async def test_every_partner_call_names_a_pseudonymous_end_user(
         "cust.000123:web",
         "ab12" * 32,  # SHA-512 hex
         "c-" + "ab12" * 32,  # tagged SHA-512 (130 characters)
-        "cust-" + "0f" * 64,  # the longest tag: 137 characters
+        "cust-" + "0f" * 64,  # tagged SHA-512 (133 characters)
+        "abcdefgh-" + "0f" * 64,  # the longest tag (8 letters): 137 characters, the maximum
     ],
 )
 async def test_pseudonymous_ids_are_accepted(api: Api, value: str) -> None:

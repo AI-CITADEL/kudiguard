@@ -18,8 +18,9 @@ from kudiguard.patterns import ScamPattern
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
 DELETION_MARKER_DAYS = 30  # DELETE markers (only for the sign-up import); stated on /privacy
-# A second, separate marker for the licence cap: dated with the erased user's last interaction, kept only if they had
-# one (a number that never used KudiGuard takes no slot). Same table and purge as the DELETE markers.
+# A second, separate marker for the licence cap: dated with the erased user's last interaction, written only if that
+# interaction is inside the active-user window (a number that never used KudiGuard takes no slot). Same table as the
+# DELETE markers, but its own purge (``purge_cap_markers``) at exactly the window start.
 CAP_MARKER_PREFIX = "cap:"
 
 
@@ -121,7 +122,8 @@ class Store(Protocol):
     async def delete_user(self, user_hash: str) -> int:
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
         their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Leaves only
-        a coded DELETE marker (``deleted_at``). Returns rows removed (the marker is not counted)."""
+        a coded DELETE marker (``deleted_at``) and, if their last interaction is inside the active-user window, a
+        licence-cap marker dated with it. Returns rows removed (the markers are not counted)."""
         ...
 
     async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
