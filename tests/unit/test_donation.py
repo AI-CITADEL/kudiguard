@@ -8,8 +8,12 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from kudiguard import donation as donation_module
+from kudiguard.config import Settings
 from kudiguard.donation import (
     DONATION_VERSION,
     MARKER,
@@ -134,7 +138,13 @@ async def test_unknown_duration_is_kept_as_unknown(vault: VoiceVault, store: Mem
 
 
 @pytest.mark.parametrize(
-    "overrides", [{"channel": "api"}, {"consent_version": "2020-01-01"}, {"consent_version": ""}]
+    "overrides",
+    [
+        {"channel": "api"},
+        {"consent_version": "2020-01-01"},
+        {"consent_version": ""},
+        {"consent_version": "9999-12-31"},
+    ],
 )
 async def test_donations_without_valid_consent_or_from_api_users_are_refused(
     vault: VoiceVault, store: MemoryStore, overrides: dict[str, object]
@@ -404,3 +414,195 @@ async def test_files_are_private_to_the_service_user(vault: VoiceVault) -> None:
     assert sample_id
     assert vault.path(sample_id).stat().st_mode & 0o077 == 0
     assert vault.directory.stat().st_mode & 0o077 == 0
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------------
+
+
+def test_the_file_format_is_stable() -> None:
+    """Sealed files must stay readable by later releases and operator tools: b"KGV1" | 12-byte nonce | AES-256-GCM
+    under HKDF-SHA256(secret, info=b"kudiguard/voice-donation/aes-256-gcm/v1"), with b"KGV1" + id as associated data."""
+    sample_id = new_sample_id()
+    blob = Sealer(SECRET).seal(sample_id, AUDIO)
+    assert len(blob) == 4 + 12 + len(AUDIO) + 16
+    info = b"kudiguard/voice-donation/aes-256-gcm/v1"
+    key = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(SECRET)
+    assert AESGCM(key).decrypt(blob[4:16], blob[16:], b"KGV1" + sample_id.encode()) == AUDIO
+
+
+def test_shortest_valid_file_and_truncation() -> None:
+    sealer, sample_id = Sealer(SECRET), new_sample_id()
+    empty = sealer.seal(sample_id, b"")
+    assert len(empty) == 32 and sealer.open(sample_id, empty) == b""
+    with pytest.raises(VoiceIntegrityError, match="not a KudiGuard"):
+        sealer.open(sample_id, empty[:-1])
+
+
+def test_keys_of_32_bytes_or_more_are_accepted() -> None:
+    with pytest.raises(ValueError):
+        Sealer(b"v" * 31)
+    for secret in (b"v" * 32, b"v" * 64):
+        sample_id = new_sample_id()
+        assert Sealer(secret).open(sample_id, Sealer(secret).seal(sample_id, AUDIO)) == AUDIO
+
+
+def test_retention_matches_what_users_are_told() -> None:
+    # "12 months" in the offer and on /privacy (the version is checked against voice.html in test_patterns)
+    field = Settings.model_fields["voice_retention_days"]
+    assert donation_module.VOICE_RETENTION_DAYS == field.default == 365
+
+
+async def test_default_bounds_twenty_a_day_and_eight_pending(tmp_path: Path, store: MemoryStore) -> None:
+    vault = VoiceVault(tmp_path / "v", store, Sealer(SECRET))
+    assert all([await vault.donate(donation()) for _ in range(20)])
+    assert await vault.donate(donation()) is None and vault.dropped["daily-cap"] == 1
+    gate = gate_writes(vault)
+    writes = [asyncio.create_task(vault.donate(donation(user=f"p{i}"))) for i in range(8)]
+    await asyncio.sleep(0.02)
+    assert await vault.donate(donation(user="p8")) is None and vault.dropped["busy"] == 1
+    gate.set()
+    assert all(await asyncio.gather(*writes))
+
+
+async def test_the_pending_bound_survives_completed_and_cancelled_writes(
+    tmp_path: Path, store: MemoryStore
+) -> None:
+    vault = VoiceVault(tmp_path / "v", store, Sealer(SECRET), max_pending=1)
+    assert await vault.donate(donation())  # completed: its slot is released exactly once
+    gate = gate_writes(vault)
+    caller = asyncio.create_task(vault.donate(donation()))
+    await asyncio.sleep(0.02)
+    caller.cancel()  # the write goes on (shielded) and still holds the slot
+    with pytest.raises(asyncio.CancelledError):
+        await caller
+    assert await vault.donate(donation(user="u2")) is None
+    gate.set()
+    for _ in range(200):
+        if vault._pending == 0:
+            break
+        await asyncio.sleep(0.01)
+    assert await vault.donate(donation(user="u3")) is not None
+
+
+async def test_consent_from_the_instant_of_a_withdrawal_does_not_count(
+    vault: VoiceVault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    moment = utcnow()
+    monkeypatch.setattr(donation_module, "utcnow", lambda: moment)
+    await vault.erase("u1")
+    assert await vault.donate(donation(consented_at=moment)) is None
+
+
+async def test_each_withdrawal_blocks_late_writes_for_one_hour(
+    vault: VoiceVault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    start = utcnow()
+    clock = [start]
+    monkeypatch.setattr(donation_module, "utcnow", lambda: clock[0])
+    old_consent = start - timedelta(seconds=1)
+    await vault.erase("a")
+    clock[0] = start + timedelta(seconds=3599)
+    await vault.erase("b")  # another donor's withdrawal keeps a's tombstone
+    assert await vault.donate(donation(user="a", consented_at=old_consent)) is None
+    clock[0] = start + timedelta(seconds=3600)
+    await vault.erase("c")  # one hour on: a's tombstone has expired, b's has not
+    assert await vault.donate(donation(user="a", consented_at=old_consent))
+    assert await vault.donate(donation(user="b", consented_at=old_consent)) is None
+
+
+async def test_orphans_age_out_after_one_hour(vault: VoiceVault, caplog: pytest.LogCaptureFixture) -> None:
+    await vault.donate(donation())
+    young, old = (vault.directory / f"{new_sample_id()}{SUFFIX}" for _ in range(2))
+    for path, age in ((young, 3599.0), (old, 3600.3)):
+        path.write_bytes(b"x")
+        os.utime(path, (time.time() - age, time.time() - age))
+    await vault.purge(date(2000, 1, 1))
+    assert young.exists() and not old.exists()
+    assert "removed 1 orphaned voice files" in caplog.text
+
+
+async def test_nothing_is_reported_swept_when_there_is_nothing_to_sweep(
+    tmp_path: Path, store: MemoryStore, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert await VoiceVault(tmp_path / "missing", store, Sealer(SECRET)).purge(date(2000, 1, 1)) == 0
+    real = VoiceVault(tmp_path / "v", MemoryStore(UserHasher(SECRET)), Sealer(SECRET))
+    assert await real.donate(donation())
+    assert await VoiceVault(tmp_path / "v", store, Sealer(SECRET)).purge(date(2000, 1, 1)) == 0
+    assert "orphaned" not in caplog.text
+
+
+async def test_debris_from_an_interrupted_write_counts_as_audio(
+    tmp_path: Path, store: MemoryStore, caplog: pytest.LogCaptureFixture
+) -> None:
+    unmarked = tmp_path / "unmarked"
+    unmarked.mkdir()
+    (unmarked / f"{new_sample_id()}.part").write_bytes(b"x")
+    assert await VoiceVault(unmarked, store, Sealer(SECRET)).donate(donation()) is None  # never claimed
+    assert not (unmarked / MARKER).exists()
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    (foreign / MARKER).write_text("another database", encoding="utf-8")
+    (foreign / f"{new_sample_id()}.part").write_bytes(b"x")
+    assert await VoiceVault(foreign, store, Sealer(SECRET)).wipe() == (0, 1)  # reported, never deleted
+    assert "does not belong to this database" in caplog.text
+
+
+async def test_the_size_cap_counts_stored_samples_only_and_is_inclusive(
+    tmp_path: Path, store: MemoryStore
+) -> None:
+    audio = bytes(1035)  # a sealed size whose bits overlap its double (so `|` cannot stand in for `+`)
+    folder = tmp_path / "v"
+    assert await VoiceVault(folder, store, Sealer(SECRET)).donate(donation(audio=audio))
+    [size] = [p.stat().st_size for p in folder.iterdir() if p.suffix == SUFFIX]
+    (folder / f"{new_sample_id()}.part").write_bytes(b"x" * 10_000)  # debris and other files do not count
+    (folder / "notes.txt").write_bytes(b"x" * 10_000)
+    restarted = VoiceVault(folder, store, Sealer(SECRET), max_bytes=2 * size)  # measures the folder once
+    assert await restarted.donate(donation(user="u2", audio=audio))  # exactly at the cap: kept
+    assert await restarted.donate(donation(user="u3", audio=audio)) is None
+    tight = VoiceVault(folder, store, Sealer(SECRET), max_bytes=3 * size - 1)
+    assert await tight.donate(donation(user="u4", audio=audio)) is None  # the two stored samples count
+
+
+async def test_a_vault_folder_may_be_nested_in_new_folders(tmp_path: Path, store: MemoryStore) -> None:
+    vault = VoiceVault(tmp_path / "a" / "b" / "voice", store, Sealer(SECRET))
+    assert await vault.donate(donation())
+
+
+async def test_erase_goes_on_after_a_missing_or_locked_file(
+    vault: VoiceVault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    donated = [await vault.donate(donation()) for _ in range(3)]
+    gone, stuck, last = sorted(i for i in donated if i)  # the order erasure deletes them in
+    vault.path(gone).unlink()
+    real_unlink = Path.unlink
+
+    def locked(self: Path, missing_ok: bool = False) -> None:
+        if self.name.startswith(stuck):
+            raise PermissionError("in use")
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", locked)
+    assert await vault.erase("u1") == 3
+    assert not vault.path(last).exists()
+
+
+async def test_the_orphan_sweep_goes_on_after_a_locked_file(
+    vault: VoiceVault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await vault.donate(donation())
+    orphans = [vault.directory / f"{new_sample_id()}{SUFFIX}" for _ in range(2)]
+    for orphan in orphans:
+        orphan.write_bytes(b"x")
+    real_stat = Path.stat
+    failed: list[Path] = []
+
+    def locked(self: Path, **kwargs: object) -> os.stat_result:
+        if self in orphans and not failed:
+            failed.append(self)
+            raise PermissionError("locked")
+        return real_stat(self, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "stat", locked)
+    await vault.purge(date(2000, 1, 1), orphan_grace_s=0)
+    monkeypatch.undo()
+    assert [o.exists() for o in orphans] == [o in failed for o in orphans]

@@ -151,7 +151,9 @@ async def export_samples(vault: VoiceVault, samples: Iterable[VoiceSample], out:
             continue
         (audio_dir / f"{sample.id}{audio_suffix(data)}").write_bytes(data)
         duration = "" if sample.duration_s is None else f"{sample.duration_s:.1f}"
-        rows.append([sample.id, sample.language, sample.week.isoformat(), duration, sample.hypothesis, ""])
+        rows.append(
+            [sample.id, sample.language, sample.week.isoformat(), duration, redact(sample.hypothesis), ""]
+        )
     with (out / MANIFEST).open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(COLUMNS)

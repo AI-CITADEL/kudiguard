@@ -61,6 +61,9 @@ DONATION_DEADLINE_S = 60.0  # the background donation step (write or offer) afte
 # nobody reads the notice faster, and it protects against this server's clock running up to this much *behind*
 # the provider's (a clock ahead only delays when a reply counts). Keep the clock synced (docs/DEPLOY.md).
 WELCOME_READ_S = 5.0
+# Inbound text is cut to this before it is matched, checked, redacted or stored: the engine reads only the first
+# MAX_INPUT_CHARS (2000) anyway, WhatsApp sends at most 4096, and redaction time and stored size stay bounded.
+MAX_INBOUND_CHARS = 8000
 MAX_COALESCED = 5  # quick successive notes/texts merged into one check (people split one story over messages)
 
 
@@ -412,7 +415,7 @@ class Conversation:
             utcnow()
         )  # real time, compared with withdrawal tombstones (not the injectable clock)
         message = turn.message
-        match = self._matcher.match(message.text) if message.kind is MessageKind.TEXT else Match()
+        match = self._matcher.match(_inbound(message)) if message.kind is MessageKind.TEXT else Match()
         user = await self._store.get_user(turn.user_hash)
         if user is not None and user.language:
             turn.language = user.language
@@ -593,7 +596,7 @@ class Conversation:
             await self._follow_up(turn, parsed)
         elif match.greeting_language:
             await self._store.save_user(user)
-            await self._fixed(turn, Msg.GREETING_REPLY, transcript=turn.message.text)
+            await self._fixed(turn, Msg.GREETING_REPLY, transcript=_inbound(turn.message))
         else:
             await self._check(turn, user)
             self._after_voice(turn, user)
@@ -620,7 +623,7 @@ class Conversation:
             turn.transcript = speech.transcript.text.strip()
             turn.decode_ms, turn.asr_ms = speech.decode_ms, speech.asr_ms
         else:
-            turn.transcript = (message.text or "").strip()
+            turn.transcript = _inbound(message)
         follow_ons = self._take_follow_ons(turn)
         if follow_ons:
             for merged in follow_ons:
@@ -851,7 +854,7 @@ class Conversation:
     async def _content_of(self, turn: _Turn, message: InboundMessage) -> str:
         """Text of a merged follow-on message; an unusable voice note among several is skipped, not fatal."""
         if message.kind is not MessageKind.AUDIO:
-            return (message.text or "").strip()
+            return _inbound(message)
         turn.voice = True
         try:
             data = await self._audio_of(message, turn.deadline)
@@ -1004,6 +1007,11 @@ class Conversation:
 
 
 AUDIO = MessageKind.AUDIO
+
+
+def _inbound(message: InboundMessage) -> str:
+    """The text of an inbound message, stripped and cut to MAX_INBOUND_CHARS."""
+    return (message.text or "").strip()[:MAX_INBOUND_CHARS]
 
 
 async def record_pattern(store: Store, channel: str, answer: Answer, text: str, now: datetime) -> None:

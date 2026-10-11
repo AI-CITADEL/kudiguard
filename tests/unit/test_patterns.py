@@ -12,6 +12,7 @@ from test_pipeline import h as _harness_fixture
 
 from kudiguard.domain import Flag, Verdict
 from kudiguard.i18n import Msg
+from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import Purpose
 from kudiguard.patterns import MAX_PATTERN_CHARS, ScamPattern, deidentify
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
@@ -290,8 +291,8 @@ def test_examples_round_trip_exactly_through_the_stored_transcript() -> None:
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("acct0123456789.ng", "[link: acct#.ng]"),
-        ("8031234567pay.ng", "[link: #pay.ng]"),
+        ("acct0123456789.ng", "acct[number].ng"),  # digits glued to a host are masked before links are read
+        ("8031234567pay.ng", "[number][link: pay.ng]"),
         ("bit.ly/x1", "[link: bit.ly]"),
     ],
 )
@@ -313,3 +314,106 @@ async def test_weeks_are_utc_even_for_local_clocks() -> None:
     await record_pattern(store, "whatsapp", answer, OTP_SCAM, datetime(2026, 10, 12, 0, 30, tzinfo=lagos))
     [row] = await store.export_patterns()
     assert row["week"] == "2026-10-05"
+
+
+# --- found by mutation testing (docs/SPIKES.md, G) ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("pay123456.ng", "pay[number].ng"),  # six digits in a host: masked
+        ("shop12345.ng", "[link: shop12345.ng]"),  # five: kept
+        ("https://www.Scam.ng/a?u=1", "[link: scam.ng]"),  # www. dropped after a scheme too
+        (
+            "visit scam-site.com/x?id=1",
+            "visit [link: scam-site.com]",
+        ),  # bare hosts: first and last listed TLDs
+        ("free.ga/win", "[link: free.ga]"),
+    ],
+)
+def test_more_links(raw: str, expected: str) -> None:
+    assert deidentify(raw) == expected
+
+
+def test_length_caps() -> None:
+    assert deidentify("w" * 2000) == "w" * 2000 and deidentify("w" * 2001) == "w" * 2000
+    assert deidentify("a" + " " * 3000 + "b") == "a b"  # long whitespace runs do not eat the text
+    assert deidentify("a" + " " * 4500 + "b") == "a"  # input is cut at twice the cap before any regex runs
+
+
+def test_retention_and_channels_match_what_users_are_told(registry: LanguageRegistry) -> None:
+    from kudiguard.patterns import PATTERN_CHANNELS, PATTERN_RETENTION_DAYS
+
+    welcome = registry.get("en").strings[Msg.WELCOME]
+    # the period is filled in from settings
+    assert PATTERN_RETENTION_DAYS == 730 and "for up to {pattern_retention_days} days" in welcome
+    assert {"whatsapp", "web"} == PATTERN_CHANNELS  # end users who consented, never API partners' users
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "click https://bit.ly/abc?u=8031234567 now",
+        "go to www.Fake-Bank.ng/login",
+        "join t.me/x",
+        "pay123456k.ng",
+        " one @otp .*" + chr(0x20A6) + "67oO73.com",  # found by the verifier's fuzz
+        "#" + chr(0x200B) + "gmail(www.at O-3-www.759.com. dot www.O8",
+        "k-5ahttp://875aN9" + chr(0x200B) + "eight 2.www.6.l-3N.com.",
+        ")O+ dot 7a .comao -www.0lx.com[email] *" + chr(0xA0) + "o@5",
+        "[email]41,pin 6" + chr(0xA0) + " 8i" + chr(0x661) + "#a2.at .5one *," + chr(0x661) + "http://a",
+        "/pin 9  " + chr(0x661) + "464,gmail#Onaira:2_" + chr(0x661),
+        "[number]]Ootp pin 727" + chr(0x200B) + "7otp " + chr(0x661) + "14z/9,4xl1#06",
+        "2[at z++otp " + chr(0x200B) + "*_ dot  dot at www.8.com3 dot naira-",
+        "at k[*.comO2) dot [number]http://www.www.www.+(gmail_y",
+        "http://47"
+        + chr(0x661)
+        + chr(0x200B)
+        + "pin @http://x9N.comz0gmail@at -x+7@"
+        + chr(0x200B)
+        + "otp */",
+    ],
+)
+def test_deidentify_is_idempotent(raw: str) -> None:
+    once = deidentify(raw)
+    assert deidentify(once) == once  # stored examples are de-identified again when redaction improves
+
+
+def test_digit_runs_redact_keeps_are_masked_in_hosts() -> None:
+    assert deidentify("pay123456k.ng") == "[link: pay#k.ng]"  # "123456k" reads as an amount to redact
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            "visit http://pay-0803-123-4567.ng/x now",
+            "visit [link] now",
+        ),  # a number in the host: the whole link
+        ("click https://bit.ly/abc?u=08031234567 now", "click [link: bit.ly] now"),  # in the query: dropped
+        # links an older release reduced: the host is checked again, an address before it is an address
+        ("visit [link: pay-0803.123.4567.ng] now", "visit [link] now"),
+        ("[link: pay#k.ng] and [link]", "[link: pay#k.ng] and [link]"),
+        ("j @ [link: x.com] wants [number]", "[email] wants [number]"),
+        ("john(at)[link: gmail.com]", "[email]"),
+        ("ade at [link: yahoo.com] now", "[email] now"),
+        ("see [link: x.com] now", "see [link: x.com] now"),
+        ("Login at gtbank-verify.com to unlock", "Login at [link: gtbank-verify.com] to unlock"),
+        ("Apply at bit.ly/fg-grant", "Apply at [link: bit.ly]"),
+        ("pay at [link: gtb.com] ok", "pay at [link: gtb.com] ok"),  # a word before "at" is not an address
+        (
+            "see [link: x.com] call 08031234567 now",
+            "see [link: x.com] call [number] now",
+        ),  # text after a link
+        (
+            "[link] a [link: b.com] call 08031234567 or 08051234567",
+            "[link] a [link: b.com] call [number] or [number]",
+        ),
+        ("see http://mail.www.example.com/x", "see [link: mail.www.example.com]"),  # only a leading www. goes
+        ("http://47ade@[link: x.com] now", "[link] now"),  # an address found only once its domain was a link
+    ],
+)
+def test_deidentify_reads_stored_links_again(raw: str, expected: str) -> None:
+    assert deidentify(raw) == expected
+    assert deidentify(expected) == expected
