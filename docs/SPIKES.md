@@ -258,7 +258,8 @@ Goal: bring yo/ig replies up to Hausa's level with the loop Hausa got, then (use
 ha/yo/ig reply **English-first**: compose in English, run every English check, translate, check the translation.
 All numbers: `scripts/eval_answers.py` live on N-ATLAS (llama.cpp, temperature 0 + seed 42), stand-in grounding;
 per-item results in `data/eval/results/answers-h_{base,after_direct,after,final}.jsonl` (`h_base`: master code on the
-extended dev set; `h_final`: the shipped configuration). Other workstreams used the same server and CPU, so latency is noisy; arms that
+extended dev set; `h_final`: English-first for ha/yo/ig with every check; the shipped default uses it for yo/ig and
+`h_after_direct` for ha). Other workstreams used the same server and CPU, so latency is noisy; arms that
 are compared were run back to back.
 
 **Dev data parity.** `data/eval/answers.yaml` +8 cases (yo/ig 8 → 12 each: prize fee, fake alert, ajo/budget, stolen
@@ -309,8 +310,9 @@ NCAIR1 Igbo model detects **`yo` on every clip (p ≈ 1.0)**; forcing `yo` gives
 (45.5%, WER+d 48.9%, CER 25.9%, 1 rejected quiet clip) at **p50 3.5 s vs 6.5 s** (auto) under load (re-run with the
 committed script, lighter load: 2.5 s vs 4.4 s); forcing `ha` gives 46.4%, `en` 66.0%. `ig.yaml` now forces `yo`.
 
-**English-first replies** (`kudiguard/reply_translation.py`; `KUDIGUARD_COMPOSE_STRATEGY`, default `english_first`,
-per-language overrides such as `english_first,ha=direct`; English is always direct). COMPOSE in English (same prompt,
+**English-first replies** (`kudiguard/reply_translation.py`; `KUDIGUARD_COMPOSE_STRATEGY`, a default strategy plus
+per-language overrides; English is always direct; shipped default `english_first,ha=direct`, see the decision below).
+COMPOSE in English (same prompt,
 English worked examples) → clean + output guard (en; retry once) → REPLY_TRANSLATE (zero-shot, temperature 0 + seed,
 `max_tokens` ≈ 0.75 × English characters, 128–700) → strip echoed tags, clean, guard (user language) and fidelity
 check → one warmer retry → fixed text in the language. Fidelity (deterministic): same number of steps; no new numbers,
@@ -345,7 +347,7 @@ What it shows:
   records whose eval back-translation echoed the Hausa): the English drafts for Hausa cases are worse than
   Hausa-direct replies ("adashe" translated as the stock market, a credit alert read as a debit). The analyse-step
   translation is now the single bottleneck for every language. `english_first,ha=direct` restores Hausa's coverage but
-  gives up the English checks for Hausa: a decision for the lead (default left at english_first, as decided).
+  gives up the English checks for Hausa.
 * **Translations flip negations.** Offline over 93 accepted translations, 10 (11%) lost or added a negation, all
   confirmed by reading: Yoruba "You should not keep all your money at home" → "Ó yẹ kí o máa tọ́jú gbogbo owó rẹ nílé"
   (keep all your money at home); Igbo "Do not pay anything" → "Nye ego ọ bụla" (give any money); Hausa "block your
@@ -358,6 +360,13 @@ What it shows:
   up to 14–16 s with the retry. English replies are unchanged. The 60-s turn deadline is not at risk.
 * `scripts/eval_prompts.py` still exercises the direct path (it builds the compose request itself); English-first is
   measured by `eval_answers.py --compose-strategy`, whose records now keep the English draft (`reply_english`).
+
+**Decision (user, 10 Oct 2026): default `english_first,ha=direct`.** Yoruba and Igbo are English-first (coverage
+0.36 → 0.56 and 0.37 → 0.42, Igbo copying 42% → 8%, every English check sees the reply); Hausa stays direct (0.54 vs
+0.34 English-first); English is always direct. Shipped configuration = `h_final` rows for yo/ig and `h_after_direct`
+rows for ha/en. Note: the direct path has **no translation-fidelity or negation check** (there is no English text to
+compare against), only the output guard; given the 11% negation-flip rate seen in translations, the same kind of error
+in a direct Hausa reply would go unnoticed, so native-speaker review of Hausa replies matters.
 
 Status: yo/ig stay **beta** (Hausa `stable`): coverage is up but still below Hausa-direct, and no native speaker has
 reviewed a reply, a translation, a lexicon term or a negator list.

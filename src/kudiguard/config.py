@@ -13,7 +13,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from kudiguard.hosting import StorageLocation
-from kudiguard.reply_translation import ComposePolicy
+from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
 
@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     preload_languages: Annotated[tuple[str, ...], NoDecode] = ("ha", "en")  # warm speech models at startup
     ffmpeg: str | None = None
     # How replies are written (kudiguard.reply_translation): english_first (compose in English, check, translate) or
-    # direct (compose in the user's language), with per-language overrides: "english_first,ig=direct".
-    compose_strategy: str = "english_first"
+    # direct (compose in the user's language), with per-language overrides. Default "english_first,ha=direct":
+    # Yoruba/Igbo English-first, Hausa direct (docs/SPIKES.md H); English is always direct.
+    compose_strategy: str = DEFAULT_COMPOSE_STRATEGY
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)

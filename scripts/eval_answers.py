@@ -43,7 +43,7 @@ from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.llm.sampling import add_sampling_arguments, describe, with_sampling
-from kudiguard.reply_translation import ComposePolicy
+from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / "data" / "eval" / "answers.yaml"
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument("--only", default="", help="comma-separated languages and/or case ids")
     parser.add_argument(
         "--compose-strategy",
-        default="english_first",
+        default=DEFAULT_COMPOSE_STRATEGY,
         help='kudiguard.reply_translation: "english_first", "direct" or e.g. "english_first,ig=direct"',
     )
     parser.add_argument("--label", default="latest", help="results file suffix, e.g. t01 / t0seed")

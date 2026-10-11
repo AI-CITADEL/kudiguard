@@ -17,6 +17,7 @@ from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import DEFAULT_SEED, LLMError, Purpose
 from kudiguard.reply_translation import (
+    DEFAULT_COMPOSE_STRATEGY,
     MAX_TRANSLATE_TOKENS,
     MIN_TRANSLATE_TOKENS,
     ComposePolicy,
@@ -61,10 +62,22 @@ def make(registry: LanguageRegistry, knowledge: KnowledgeBase, llm: FakeLLM, spe
 # --- policy ------------------------------------------------------------------------------------------------------
 
 
-def test_policy_defaults_to_english_first_except_english() -> None:
-    policy = ComposePolicy()
-    assert policy.for_language("yo") is ComposeStrategy.ENGLISH_FIRST
-    assert policy.for_language("en") is ComposeStrategy.DIRECT  # nothing to translate
+def test_shipped_default_is_english_first_for_yoruba_and_igbo_direct_for_hausa() -> None:
+    policy = ComposePolicy.parse(DEFAULT_COMPOSE_STRATEGY)
+    assert {lang: policy.for_language(lang).value for lang in ("en", "ha", "yo", "ig")} == {
+        "en": "direct",  # nothing to translate
+        "ha": "direct",  # English-first cut Hausa coverage 0.54 -> 0.34 (docs/SPIKES.md H)
+        "yo": "english_first",
+        "ig": "english_first",
+    }
+    assert (
+        ComposePolicy().for_language("ha") is ComposeStrategy.ENGLISH_FIRST
+    )  # the bare policy: no overrides
+
+
+def test_engine_uses_the_shipped_default(registry: LanguageRegistry) -> None:
+    engine = Engine(registry=registry, llm=FakeLLM(), knowledge=None)  # type: ignore[arg-type]
+    assert engine.compose_policy == ComposePolicy.parse(DEFAULT_COMPOSE_STRATEGY)
 
 
 @pytest.mark.parametrize(
@@ -99,7 +112,8 @@ def test_policy_parse_rejects_typos(spec: str, message: str) -> None:
 def test_settings_validate_the_strategy_at_startup() -> None:
     settings = Settings(compose_strategy="english_first,yo=direct", _env_file=None)  # type: ignore[call-arg]
     assert settings.compose_policy().for_language("yo") is ComposeStrategy.DIRECT
-    assert Settings(_env_file=None).compose_policy() == ComposePolicy.parse("english_first")  # type: ignore[call-arg]
+    default = Settings(_env_file=None).compose_policy()  # type: ignore[call-arg]
+    assert default == ComposePolicy.parse("english_first,ha=direct")
     with pytest.raises(ValidationError, match="compose strategy"):
         Settings(compose_strategy="english", _env_file=None)  # type: ignore[call-arg]
 

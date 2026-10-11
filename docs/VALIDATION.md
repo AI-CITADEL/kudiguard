@@ -71,13 +71,18 @@ Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The
   come after the notice could be read (docs/DEPLOY.md).
 * Genuine bank OTP SMS can be flagged 🟠 "be careful" (safe direction; fix pending separate examples).
 * Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review (model replies: see above).
-* Hausa/Yoruba/Igbo replies are composed in English and machine-translated (docs/SPIKES.md H). The translation can
-  change meaning: 11% of measured translations flipped a negation ("do not pay" → "pay"). A negation check turns
-  those into fixed text in the language (8–14% of ha/yo/ig dev replies), but other meaning errors ("three months" →
-  "three weeks") are not detected. Negator lists, translations and the new yo/ig scam terms are DRAFT, unreviewed.
-* English-first costs Hausa answer coverage (0.54 → 0.34 on the dev set; Yoruba 0.36 → 0.56, Igbo 0.37 → 0.42) and
-  adds ~1.6–2.3 s per ha/yo/ig reply (p95 up to ~16 s). `KUDIGUARD_COMPOSE_STRATEGY=english_first,ha=direct` trades
-  Hausa's English safety checks for its coverage.
+* **Known risk: translations flip negations.** Yoruba and Igbo replies are composed in English and machine-translated
+  (default `KUDIGUARD_COMPOSE_STRATEGY=english_first,ha=direct`; docs/SPIKES.md H). Of 93 measured translations, 10
+  (**11%**) lost or added a negation (Igbo "Do not pay anything" → "give any money"; Yoruba "You should not keep all
+  your money at home" → "keep all your money at home"; Hausa "block your SIM" → "do not block your SIM"). A negation
+  check turns those into fixed text in the language (8–14% of dev replies), but other meaning errors ("three months"
+  → "three weeks") are not detected. Negator lists, translations and the new yo/ig scam terms are DRAFT, unreviewed.
+* **Hausa replies are composed directly in Hausa** (English-first cut Hausa coverage 0.54 → 0.34 on the dev set, while
+  it raised Yoruba 0.36 → 0.56 and Igbo 0.37 → 0.42). A direct reply only passes the output guard (Hausa and English
+  patterns): no English-side checks and no fidelity or negation check, so a flipped instruction in a Hausa reply is
+  not caught automatically. Native-speaker review of Hausa replies is the control for this.
+* English-first adds ~1.6–2.3 s per Yoruba/Igbo reply (p95 up to ~16 s with a retry); Hausa and English replies are
+  not slowed.
 * Every language's answer depends on the model's English translation of the message, which still mistranslates some
   Yoruba/Igbo/Hausa words (ajo/adashe, "blocked" read as "hacked").
 * Yoruba and Igbo stay **beta**; Igbo speech forces Whisper's `yo` token (the model's own choice on every test clip,

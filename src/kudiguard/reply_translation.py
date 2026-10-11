@@ -7,10 +7,10 @@ checked again with the user's language guard (a second net) and by ``translation
 fidelity check. Pure functions; the engine (``Engine._compose``) runs the calls.
 
 Strategies (``KUDIGUARD_COMPOSE_STRATEGY``, parsed by ``ComposePolicy.parse``):
-* ``english_first`` (default for every non-English language): COMPOSE in English -> clean + guard (en) ->
-  REPLY_TRANSLATE -> clean + guard (user language) + fidelity -> one retry -> fixed text in the user's language.
-* ``direct``: COMPOSE in the user's language (the original path; kept as an override and for comparison).
-English is always ``direct`` (there is nothing to translate).
+* ``english_first`` (default for Yoruba and Igbo): COMPOSE in English -> clean + guard (en) -> REPLY_TRANSLATE ->
+  clean + guard (user language) + fidelity -> one retry -> fixed text in the user's language.
+* ``direct`` (default for Hausa): COMPOSE in the user's language; output guard only, no fidelity/negation check.
+English is always ``direct`` (there is nothing to translate). Default: ``DEFAULT_COMPOSE_STRATEGY``.
 """
 
 from __future__ import annotations
@@ -93,6 +93,12 @@ _MARKERS = ("[number]", "[link removed]")  # left by prompts.clean_reply
 class ComposeStrategy(StrEnum):
     DIRECT = "direct"
     ENGLISH_FIRST = "english_first"
+
+
+# Shipped default (user decision, 10 Oct 2026; docs/SPIKES.md H): Yoruba/Igbo English-first (coverage 0.36 -> 0.56 and
+# 0.37 -> 0.42, Igbo example copying 42% -> 8%); Hausa direct (English-first cut its coverage 0.54 -> 0.34). Direct
+# replies get no translation-fidelity (negation) check: native review of Hausa replies matters.
+DEFAULT_COMPOSE_STRATEGY = "english_first,ha=direct"
 
 
 @dataclass(frozen=True, slots=True)

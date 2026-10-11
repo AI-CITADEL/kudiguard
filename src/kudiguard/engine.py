@@ -43,6 +43,7 @@ from kudiguard.prompts import (
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.reply_translation import (
+    DEFAULT_COMPOSE_STRATEGY,
     ComposePolicy,
     ComposeStrategy,
     reply_translate_request,
@@ -119,8 +120,8 @@ class Engine:
         max_concurrent_transcriptions: int = 4,
         compose_policy: ComposePolicy | None = None,
     ) -> None:
-        """``compose_policy``: direct or English-first replies per language (default: English-first for every
-        non-English language; ``reply_translation``)."""
+        """``compose_policy``: direct or English-first replies per language (default:
+        ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct)."""
         self.registry = registry
         self.messages = Messages(registry)
         # One limit for every caller (WhatsApp, API, web): decoding + recognition are CPU-bound. A transcription
@@ -133,7 +134,7 @@ class Engine:
         self._temp_dir = temp_dir
         self._guard = OutputGuard(registry)
         self._matcher = CommandMatcher(registry)
-        self.compose_policy = compose_policy or ComposePolicy()
+        self.compose_policy = compose_policy or ComposePolicy.parse(DEFAULT_COMPOSE_STRATEGY)
 
     @property
     def has_speech(self) -> bool:
