@@ -322,7 +322,8 @@ def select_flags(rule_flags: Sequence[Flag], analysis: Analysis) -> tuple[Flag, 
 
 
 def facts_block(knowledge: KnowledgeResult) -> tuple[list[str], list[str]]:
-    """The facts and actions COMPOSE is grounded on (also shown to native-speaker reviewers, ``kudiguard.review``)."""
+    """The facts and actions COMPOSE shows the model: the grounding check's evidence, also shown to native-speaker
+    reviewers (``kudiguard.review``)."""
     facts: list[str] = []
     actions: list[str] = []
     for item in knowledge.entries[:MAX_ENTRIES]:

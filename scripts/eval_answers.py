@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -52,6 +53,9 @@ RESULTS = ROOT / "data" / "eval" / "results"
 
 
 def git_commit() -> str:
+    """The checkout's commit; ``KUDIGUARD_EVAL_COMMIT`` names it when the code runs from a copy (no .git)."""
+    if named := os.environ.get("KUDIGUARD_EVAL_COMMIT"):
+        return named
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT

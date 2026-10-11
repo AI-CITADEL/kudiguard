@@ -11,30 +11,24 @@ grounded rate is ~100% by construction and the measure that matters is the other
 from __future__ import annotations
 
 import importlib
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Protocol
 
 import numpy as np
 
-from kudiguard import prompts
 from kudiguard.domain import Flag, LanguageCode, Verdict
 from kudiguard.evaluation.answers import Specifics, names_in, numbers_in, split_sentences, words_in
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.models import KnowledgeResult
 from kudiguard.languages import PIVOT, LanguageRegistry
 from kudiguard.llm.base import LLM, LLMError
-from kudiguard.prompts import FLAG_TEXT, clean_translation, translate_request
-
-# The facts the model sees. Workstreams B and C rename ``_facts_block`` to ``facts_block`` (no alias): either works.
-facts_block: Callable[[KnowledgeResult], tuple[list[str], list[str]]] = (
-    getattr(prompts, "facts_block", None) or getattr(prompts, "_facts_block")  # noqa: B009 - absent after the rename
-)
+from kudiguard.prompts import FLAG_TEXT, clean_translation, facts_block, translate_request
 
 GROUNDING_MODULE = "kudiguard.safety.grounding"  # workstream B
 DEFAULT_SUPPORT_THRESHOLD = (
-    0.73  # stand-in only; mirrors B's DEFAULT_THRESHOLD (``support_threshold`` reads B's)
+    0.75  # stand-in only; mirrors B's DEFAULT_THRESHOLD (``support_threshold`` reads B's)
 )
 MIN_CLAIM_WORDS = 3  # "Stay calm." carries no checkable fact
 VERDICT_LINE: dict[Verdict, str] = {  # as in B

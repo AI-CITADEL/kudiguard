@@ -6,8 +6,9 @@ misconfigured deployment fails fast instead of half-working.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -45,6 +46,25 @@ class Settings(BaseSettings):
     model_cache: Path = ROOT / "models"  # converted CTranslate2 speech models (scripts/prepare_asr.py)
     embeddings: bool = True  # hybrid retrieval (fastembed, CPU); False = BM25 only
     embeddings_cache: Path = ROOT / "models" / "fastembed"
+    # Check English replies claim by claim against their facts (needs ``embeddings``; CPU, fails open; see
+    # safety/grounding.py). shadow = record only; enforce = drop unsupported steps or send fixed text. Enforce only
+    # after >= 100 held-out real N-ATLAS English replies show <= 5% false replacements (docs/SPIKES.md S8).
+    grounding_mode: Literal["off", "shadow", "enforce"] = "shadow"
+    grounding_threshold: float = Field(
+        default=0.75, gt=0, lt=1
+    )  # = grounding.DEFAULT_THRESHOLD (bge-small cosine)
+    grounding_budget_ms: int = Field(
+        default=150, gt=0
+    )  # = grounding.DEFAULT_BUDGET_S; past it: send the reply
+    # Second guard layer: a learned classifier for unsafe advice in English replies (safety/guard_classifier.py;
+    # needs ``embeddings``). shadow = score after sending, log only; enforce = a flagged reply is retried, then fixed
+    # text. Pidgin replies (language "en") use ``guard_classifier_pidgin_mode`` when set (e.g. en enforce, Pidgin
+    # shadow). Threshold: unset or empty = the artefact's (chosen on dev). Past the budget: the regex verdict alone.
+    guard_classifier_mode: Literal["off", "shadow", "enforce"] = "shadow"
+    guard_classifier_pidgin_mode: Literal["off", "shadow", "enforce"] | None = None
+    guard_classifier_path: Path = ROOT / "data" / "guard" / "en_classifier.npz"
+    guard_classifier_threshold: float | None = Field(default=None, gt=0, lt=1)
+    guard_classifier_budget_ms: int = Field(default=250, gt=0)  # = guard_classifier.DEFAULT_BUDGET_S
     speech: bool = True
     preload_languages: Annotated[tuple[str, ...], NoDecode] = ("ha", "en")  # warm speech models at startup
     ffmpeg: str | None = None
@@ -80,6 +100,12 @@ class Settings(BaseSettings):
     # --- WhatsApp (optional: the channel is mounted only when configured) -----------------------------------
     whatsapp_enabled: bool = True
 
+    @field_validator("guard_classifier_threshold", "guard_classifier_pidgin_mode", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """``KUDIGUARD_GUARD_CLASSIFIER_THRESHOLD=`` (an empty line in .env) means "not set", not a parse error."""
+        return None if isinstance(value, str) and not value.strip() else value
+
     @field_validator("packs", "preload_languages", "api_keys", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
@@ -93,8 +119,9 @@ class Settings(BaseSettings):
         ComposePolicy.parse(value)  # fail fast at startup on a typo
         return value
 
-    def compose_policy(self) -> ComposePolicy:
-        return ComposePolicy.parse(self.compose_strategy)
+    def compose_policy(self, languages: Iterable[str] | None = None) -> ComposePolicy:
+        """``languages``: the configured codes (startup); an override for another code raises ``ValueError``."""
+        return ComposePolicy.parse(self.compose_strategy, languages)
 
     def voice_secret(self) -> bytes:
         """Input key for donated-audio encryption: ``voice_key`` if set, else the hash secret."""

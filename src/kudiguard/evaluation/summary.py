@@ -63,6 +63,8 @@ class Record:
     grounding_ms: int | None = None
     sources: list[str] = field(default_factory=list)
     reply_english: str = ""  # english_first: the checked English reply the body translates
+    # english_first: why translations were rejected (e.g. "negation_lost"); counted per record for the flip rate
+    translation_rejections: list[str] = field(default_factory=list)
 
     @property
     def scored(self) -> bool:
@@ -99,6 +101,7 @@ class Record:
             grounding_ms=result.grounding_ms,
             sources=list(answer.sources),
             reply_english=answer.reply_english,
+            translation_rejections=list(answer.translation_rejections),
         )
 
     @classmethod

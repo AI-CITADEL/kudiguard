@@ -329,7 +329,7 @@ def native(registry: LanguageRegistry, code: str) -> Lexicon:
         # they will block my account
         ("yo", Flag.ACCOUNT_THREAT, "Wọ́n ní àwọn yóò dí àkáǹtì mi tí mi ò bá fèsì."),
         # he says it is a sure profit
-        ("yo", Flag.GUARANTEED_RETURNS, "Ó ní èrè tó dájú ni, kò sí ìṣòro."),
+        ("yo", Flag.GUARANTEED_RETURNS, "Ó ní èrè tó dájú ni, ẹ wá dókòwò."),
         # if I put down 50k, I will get 150k within a week
         ("yo", Flag.GUARANTEED_RETURNS, "Tí mo bá fi 50k sílẹ̀, màá rí 150k gbà láàrin ọ̀sẹ̀ kan."),
         # I must first pay N5,000 before they send the money
@@ -366,6 +366,18 @@ def test_native_parity_terms_fire(registry: LanguageRegistry, lang: str, flag: F
         ("ig", "Nne m nyere m onyinye ego maka ụbọchị ọmụmụ m."),
         # how do I put money in savings monthly
         ("ig", "Kedu ka m ga-esi tinye ego n'akaụntụ nchekwa kwa ọnwa?"),
+        # review false positives (H review, 10 Oct 2026)
+        # I put money in the bank, I will get interest in a month
+        ("yo", "Mo fi owó sílẹ̀ ní báǹkì, màá gba èlé ní oṣù kan."),
+        # a sure profit does not exist in investing (a denied mention)
+        ("yo", "Èrè tó dájú kò sí nínú ìdókòwò kankan."),
+        ("yo", "Kò sí èrè tó dájú nínú ìdókòwò."),
+        # I switched my SIM off / it has become my account
+        ("yo", "Mo ti pa SIM mi tì."),
+        ("yo", "Ó ti di àkáǹtì mi báyìí."),
+        # please tell me what OTP means / I did not tell him my PIN
+        ("ig", "Biko gwa m ihe OTP pụtara."),
+        ("ig", "Agwaghị m ya PIN m."),
     ],
 )
 def test_native_parity_terms_spare_ordinary_messages(
