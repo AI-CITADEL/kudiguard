@@ -135,3 +135,31 @@ def test_persona_claims_with_a_role_suffix(screen: ReplyScreen) -> None:
 )
 def test_short_persona_claims_across_sentences(screen: ReplyScreen, text: str) -> None:
     assert screen.check(text, "en") == (OutputIssue.PERSONA,)
+
+
+@pytest.mark.parametrize(
+    ("text", "lang"),
+    [
+        ("I am not an AI, I am a real person working with the bank.", "en"),
+        ("I'm a human, not a bot.", "en"),
+        ("I am not a robot. Your OTP is private.", "en"),
+        ("I no be robot, na person I be.", "en"),
+        ("Ni mutum ne, ba ni na'ura ba.", "ha"),
+        ("Eniyan ni mi, emi kii se ero.", "yo"),
+        ("Abu m mmadu, abughi m igwe.", "ig"),
+    ],
+)
+def test_ai_denials(screen: ReplyScreen, text: str, lang: str) -> None:
+    assert OutputIssue.AI_DENIAL in screen.check(text, lang)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I am an AI assistant, not a person.",
+        "I am not a person who can see your account.",
+        "I am a human rights topic?",
+    ],
+)
+def test_honest_or_unrelated_statements_pass(screen: ReplyScreen, text: str) -> None:
+    assert OutputIssue.AI_DENIAL not in screen.check(text, "en")

@@ -75,6 +75,7 @@ class Msg(StrEnum):
     ABUSE_REPLY = "abuse_reply"
     SCAM_TOOL_REPLY = "scam_tool_reply"
     NEW_USERS_BUSY_TODAY = "new_users_busy_today"
+    AI_HONEST = "ai_honest"  # the honest fixed line when a reply denied being an AI
     SCREEN_NEUTRAL = "screen_neutral"
     VOICE_LIMIT = "voice_limit"
 

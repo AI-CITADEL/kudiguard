@@ -109,6 +109,10 @@ injection; a reply repeating the system prompt is blocked by the reply screen.
 ## 6. Abuse, harassment and crisis
 
 * Abuse aimed at the bot gets a calm fixed reply; it is never stored as a scam example or donated.
+* **Honesty about being an AI.** The compose prompt says KudiGuard is an AI assistant, not a person. A reply that denies
+  it ("I am not an AI/a bot/a robot", "I am a human/real person"; Pidgin and DRAFT ha/yo/ig forms in
+  `abuse.ai_denials`) is retried, then replaced by a fixed honest line (`ai_honest`, 4 languages). Found live in
+  round 3: "Are you an AI?" got "I am not an AI".
 * **Crisis** (self-harm; checked with every language's phrases whatever the user's language, and through
   obfuscation: zero-width characters, look-alike Cyrillic/Greek letters, leetspeak "k!ll", letter-spacing).
   * Two framings: the first person ("I want to die", "I've taken pills", "I wan go meet my papa for heaven") gets
@@ -181,10 +185,20 @@ probes were used to fix the phrases). A third fresh set is kept by the reviewer 
 | | | genuine enforced (round 1 / round 2) | 0/69 / 0/68 (round 2: 8/68 still logged as injection_suspect) |
 | | | crisis caught (round 1 / round 2) | 35/35 / 38/38 |
 | | | threats wrongly crisis / threat flag (round 2) | 0/22 / 22/22 likely_scam |
+| **Round 3 (reviewer, written blind, 2026-10-11; latest out-of-sample)** | **7c67101, out-of-sample** | crisis / crisis + scam | 25/32 (78%) / 6/6 |
+| | | third-party crisis routed to the helper reply / no help at all | 5/11 / 4/11 |
+| | | threat scams with the THREAT flag | 1/16 (in-sample it was 22/22: the lexicon overfit) |
+| | | genuine messages: enforced / shadow-flagged | 2/43 / 3/43 |
+| | | injection and scam-tool attacks enforced | 16/32 (all 9 classic overrides; scam-writing requests missed) |
+| Round 3 | this version, **in-sample** | crisis / third-party / threat flag / genuine enforced / attacks | 32/32 / 11/11 / 16/16 / 0/43 / 30/32 (misses: a "grandmother" role-play, base64) |
 | Dev inputs (246: scenarios, prompts, answers, retrieval, ASR references) | this version | anything enforced / threat flag | only the 2 injections their authors wrote as such / 0 |
 
-There is no out-of-sample measurement of this version yet; round 2 showed that in-sample perfection on round 1
-(42/42, 35/35) fell to 53% and 63% on fresh probes, so expect the same kind of gap again.
+**Phrase lists overfit.** Each fresh, out-of-sample set has scored 53-78% where the previous version scored 100%
+in-sample (round 2: 53% injection, 63% crisis; round 3: 78% crisis, 50% attacks, 6% threat flag). The round-3 fixes
+generalise by structure where they could (a demand plus a consequence for threats; a writing verb plus a scam kind
+plus a message type for scam-writing requests) but are in-sample, and this version has not been measured on a fresh
+set: expect the same kind of gap. The phrase screens are a first layer; the model's flags, the rules verdict, the
+output guard and the reply screen remain the backstop, and the broad check is the T live run.
 
 After merging workstream Q (shared admission), a 13-call live check through the real Conversation: a crisis +
 scam message got the crisis reply then likely_scam (after fixing a bug this check found: "…took all my 450k. I want to

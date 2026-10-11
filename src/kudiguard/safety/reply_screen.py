@@ -76,6 +76,8 @@ class ReplyScreen:
         issues: list[OutputIssue] = []
         if any(p.search(folded) for p in self._registry.abuse_patterns(language).persona_claims):
             issues.append(OutputIssue.PERSONA)
+        if any(p.search(folded) for p in self._registry.abuse_patterns(language).ai_denials):
+            issues.append(OutputIssue.AI_DENIAL)
         if _SCAFFOLD.search(folded) or _grams(words, LEAK_WORDS) & self._prompt_grams:
             issues.append(OutputIssue.PROMPT_LEAK)
         reply_grams = _grams(words, self._echo_words)

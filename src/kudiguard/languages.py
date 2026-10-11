@@ -100,6 +100,9 @@ class _AbuseSpec(BaseModel):
     crisis_exemplars: list[str] = Field(default_factory=list)
     abuse: list[str] = Field(default_factory=list)  # insults, hate and sexual messages aimed at the bot
     scam_tool: list[str] = Field(default_factory=list)  # requests to write, translate or polish scam content
+    scam_tool_defensive: list[str] = Field(
+        default_factory=list
+    )  # questions about scams ("so I can recognise")
     # attempts to override instructions or extract them: high-precision phrases (enforce by default)
     injection: list[str] = Field(default_factory=list)
     injection_suspect: list[str] = Field(
@@ -116,6 +119,7 @@ class _AbuseSpec(BaseModel):
     # segments dropped only when nothing else was said (a lone "You." on noise; "you" is a word in real speech)
     asr_alone: list[str] = Field(default_factory=list)
     persona_claims: list[str] = Field(default_factory=list)  # a reply claiming to be a bank / customer care
+    ai_denials: list[str] = Field(default_factory=list)  # a reply denying it is an AI ("I am not a bot")
 
 
 class _CommandsSpec(BaseModel):
@@ -157,6 +161,7 @@ class AbusePatterns:
     crisis_other: Patterns = ()
     abuse: Patterns = ()
     scam_tool: Patterns = ()
+    scam_tool_defensive: Patterns = ()
     injection: Patterns = ()
     injection_suspect: Patterns = ()
     injection_reported: Patterns = ()
@@ -165,6 +170,7 @@ class AbusePatterns:
     asr_annotations: Patterns = ()
     asr_alone: Patterns = ()
     persona_claims: Patterns = ()
+    ai_denials: Patterns = ()
 
 
 def _ui_length(text: str) -> int:

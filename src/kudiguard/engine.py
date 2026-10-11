@@ -349,6 +349,10 @@ class Engine:
                     self._ground_in_background(checked, checked_language, evidence, analysis.english, turn_id)
         if generation.text is not None:
             body, outcome = generation.text, Outcome.ANSWERED
+        elif (
+            OutputIssue.AI_DENIAL in generation.issues
+        ):  # the model denied being an AI: the honest line instead
+            body, outcome = self.messages.text(language, Msg.AI_HONEST), Outcome.FALLBACK
         elif screening.enforced in INJECTIONS and verdict is Verdict.NOT_A_CHECK:
             # not "try again later" (a retry is screened again) and not the greeting (it would look ignored)
             body, outcome = self.messages.text(language, Msg.SCREEN_NEUTRAL), Outcome.FIXED_REPLY

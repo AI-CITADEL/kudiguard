@@ -46,6 +46,7 @@ output_guard:
 # also apply.
 abuse:
   crisis:
+    - 'achoro\W+m\W+ibi\W+ndu\b'
     - '(?:igbu|gbuo|gbue|egbu)\W*onwe\W*m\b'
     - 'achoghi\W+m\W+(?:ibi\W+ndu|idi\W+ndu)'
     - 'achoro\W+m\W+inwu'
@@ -62,6 +63,7 @@ abuse:
     - 'nwa\W+ofeke'
     - 'i\W+bu\W+(?:onye\W+)?(?:nzuzu|ara|ofeke|anu\W+ohia)'
   scam_tool:
+    - 'dee\W+(?:m\W+)?ozi\W+(?:aghugho|adigboroja|ntiwapu|ugha)'
     - 'dee\W+(?:m\W+)?ozi\W+(?:di|dika)\W+(?:ka\W+)?nke\W+(?:banki|ulo\W+aku)'
     - 'dee\W+(?:m\W+)?ozi\W+(?:\w+\W+){0,4}?(?:ka|dika)\W+(?:\w+\W+){0,1}?nke\W+ulo\W+aku'
     - 'kedu\W+ka\W+m\W+ga\W+esi\W+(?:nweta|zuru)\W+(?:\w+\W+){0,2}?onye\W+ozo'
@@ -84,6 +86,9 @@ abuse:
     - 'daalu\W+maka\W+ikiri'
   asr_annotations:
     - 'egwu'
+  ai_denials:  # DRAFT
+    - 'abu\W+m\W+mmadu\b'
+    - 'abughi\W+m\W+igwe'
   persona_claims:
     - '(?:abu\W+m|anyi\W+bu)\W+(?:onye\W+oru|ndi\W+oru)\W+(?:\w+\W+){0,1}?ulo\W+aku'
 
@@ -92,6 +97,7 @@ lexicon:
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     threat:  # DRAFT, native review pending
+      - 'ma\W+o\W+bu\W+anyi\W+ga\W+(?:ejide|egbu|ekpochi)\W+gi\b'
       - 'anyi\W+ga\W+egbu\W+gi\b'
       - 'ma\W+o\W+bu\W+i\W+ga\W+anwu\b'
     urgency:
@@ -209,6 +215,7 @@ strings:
     Mgbe ha dị njikere, enwere m ike inyere ha aka n'okwu ego ahụ: ha kwesịrị ịkpọ ụlọ akụ ha na nọmba dị na kaadị ha.
   abuse_reply: "🙏 Anọ m ebe a inyere gị aka maka nchekwa ego. Biko ka anyị kparịta ụka n'ụzọ nkwanye ùgwù. Ziga m ozi ị na-enweghị obi ike na ya, ma ọ bụ jụọ ajụjụ gbasara ego."
   scam_tool_reply: "🚫 Enweghị m ike ide, ịtụgharị ma ọ bụ ime ka ozi na-eme ka ọ bụ ụlọ akụ ma ọ bụ ụlọ ọrụ ka mma, ma ọ bụ nke na-arịọ ndị mmadụ ego ma ọ bụ koodu. Enwere m ike inyocha ozi maka gị, ma ọ bụ kọwaa otu ị ga-esi chekwaa onwe gị."
+  ai_honest: "🤖 Abụ m KudiGuard, onye enyemaka AI. Ana m enyocha ozi ị na-enweghị obi ike na ya ma na-aza ajụjụ gbasara ego. Maka akaụntụ gị, kpọọ ụlọ akụ gị na nọmba dị na kaadị gị."
   new_users_busy_today: "⏳ KudiGuard nabatara ọtụtụ ndị ọrụ ọhụrụ taa. Biko nwaa ọzọ ma emechaa."
   screen_neutral: "ℹ️ Ana m enyocha ozi ị na-enweghị obi ike na ya ma na-aza ajụjụ gbasara ego; enweghị m ike ịgbanwe otú m si arụ ọrụ. Ziga m ozi ị chọrọ ka m nyochaa."
   voice_limit: "🎧 Ị zitela ọtụtụ ozi olu n'obere oge. Biko chere ntakịrị, ma ọ bụ dee ozi gị."

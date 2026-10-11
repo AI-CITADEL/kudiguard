@@ -126,6 +126,11 @@ abuse:
   # required: threats ("You wan die? Send 200k", "they will end my life", "he would end it all if I don't pay") are
   # scams to check, not crises.
   crisis:
+    - '(?:taking|take|end|ending)\W+my\W+own\W+life'
+    - '(?:thinking|think\w*)\W+(?:of|about)\W+(?:taking|ending)\W+my\W+life'
+    - '(?:nobody|no\W+one|noone)\W+(?:would|will|go)\W+miss\W+me'
+    - '(?:what''s|whats|what\W+is|no)\W+(?:the\W+)?point\W+(?:of|in)\W+living'
+    - 'i\W+(?:\w+\W+){0,1}?(?:bought|buy|drank|drink|took|take|got)\W+(?:some\W+)?(?:rat\W+)?poison'
     - 'kill(?:ing)?\W+my\W*self'
     - '(?:i|im|i''m|me|i\W+will|i\W+go|i\W+wan|i\W+want\W+to)\W+(?:\w+\W+){0,3}?(?:end|ending|take|taking)\W+my\W+(?:own\W+)?life'
     - '(?:i|im|i''m)\W+(?:\w+\W+){0,3}?end(?:ing)?\W+it\W+all'
@@ -146,7 +151,7 @@ abuse:
     - 'sleep\W+and\W+never\W+wake\W+up'
     - 'jump\W+(?:into|inside|off|from)\W+(?:the\W+)?(?:lagoon|river|bridge|sea|ocean|third\W+mainland)'
     - 'life\W+no\W+(?:get|dey\W+get)\W+meaning'
-    - '(?<!financial\W)(?<!economic\W)(?<!political\W)(?<!career\W)(?<!social\W)suicide(?!\W+(?:bomb\w*|attack\w*|squad|mission))'
+    - '(?<!financial\W)(?<!economic\W)(?<!political\W)(?<!career\W)(?<!social\W)suicide(?!\W+(?:bomb\w*|attack\w*|squad|mission|prevention|helpline|hotline|awareness|rates?|statistics))'
     - 'overdos\w*'
     - '(?:i|i''ve|ive|i\W+have|i\W+just|i\W+don|just)\W+(?:\w+\W+){0,1}?(?:taken|took|swallowed|drank|drunk|drink|chop)\W+(?:\w+\W+){0,2}?(?:pills|tablets|poison|sniper|otapiapia|rat\W+poison|bleach|insecticide)'
     - 'feel\w*\W+like\W+dying'
@@ -160,6 +165,10 @@ abuse:
   # Someone else at risk ("my brother says he will kill himself"): the crisis reply framed for helping them
   # (strings: crisis_other_reply). Checked before the first-person phrases.
   crisis_other:
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)\W+(?:\w+\W+){0,2}?(?:said|says|say|wrote|writes|told\W+me|keeps\W+saying|talk\w*\W+say)\W+(?:that\W+)?(?:he|she|they|im)\W+(?:doesn''t|does\W+not|don''t|do\W+not|no\W+longer|no|doesnt|dont)\W+(?:want|wants|wan)\W+(?:to\W+)?(?:live|be\W+alive)'
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)\W+(?:\w+\W+){0,3}?(?:bought|drank|took|got)\W+(?:some\W+)?(?:rat\W+)?poison'
+    - '(?:kill|go\W+kill)\W+imself|im\W+wan\W+(?:kill|die)\b'
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|cousin|colleague|child|padi|parent)s?)\W+(?:\w+\W+){0,3}?(?:wrote|written|left|writes)\W+(?:a\W+|an\W+)?(?:goodbye|suicide|farewell)\W+(?:letter|note|message)'
     - '(?:kill|killing|hang|hanging|poison|poisoning|harm|harming|hurt|hurting)\W+(?:him|her|them)sel(?:f|ves)'
     - '(?:end|ending|take|taking)\W+(?:his|her|their)\W+(?:own\W+)?li(?:fe|ves)'
     - '(?:he|she|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)[^\w.!?]+(?:\w+[^\w.!?]+){0,3}?(?:wants?|wan|plans?|planning|threaten\w*|tried|tries)\W+(?:to\W+)?(?:die\b(?!\W+(?:rich|laughing|of|from|happy|old|young))|commit\W+suicide)'
@@ -193,6 +202,12 @@ abuse:
   # Requests to create, translate, polish or obtain scam content: a fixed refusal with an offer to check a
   # message instead (strings: scam_tool_reply).
   scam_tool:
+    - '(?:write|draft|compose|create)\W+(?:me\W+)?(?:a\W+|an\W+)?(?:message|sms|text|letter|email)\W+(?:\w+\W+){0,3}?(?:telling|asking|to\W+tell|to\W+ask)\W+(?:people|customers|users|someone|everyone|victims)\W+(?:\w+\W+){0,8}?(?:pay|send|share|give|click|transfer|otp|pin|bvn)\b'
+    - 'write\W+(?:\w+\W+){0,4}?message\W+(?:\w+\W+){0,4}?(?:scam|trick|fool|dupe)\W+(?:person|people|dem|them)'
+    - '(?:write|draft|generate|create|compose|make|design|produce|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:fake|scam|phishing|threat\w*|sextortion|romance\W+scam|fraud\w*|bogus)\W+(?:\w+\W+){0,3}?(?:message|sms|text|letter|alert|script|email|notice|page|template)s?'
+    - '(?:convince|persuade|trick|deceive|lure)\W+(?:\w+\W+){0,4}?(?:to\W+)?(?:give|send|tell|share|read)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:pin|otp|bvn|password|card\W+details|money)'
+    - '(?:use|try)\W+(?:it|them|this|these)\W+on\W+(?:my\W+)?(?:target|victim|mugu|maga|client)s?'
+    - 'translate\b.{0,300}?\bso\W+(?:that\W+)?i\W+(?:can|could|fit)\W+(?:send|forward|share|post)\W+(?:it\W+)?(?:to\W+)?(?:people|them|everyone|many|my\W+(?:customers|targets|contacts))'
     - 'so\W+(?:that\W+)?(?:banks?|kudiguard|filters?|the\W+bank|people|nobody|no\W+one)\W+(?:won''t|wont|will\W+not|cannot|can''t|go\W+not)\W+(?:detect|notice|flag|catch|know)'
     - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,4}?(?:message|sms|text|email|letter|alert|notice|script|post|broadcast)\W+(?:\w+\W+){0,6}?(?:(?:sound|look|seem)s?\W+(?:\w+\W+){0,2}?(?:like|as\W+if|real|official|legit\w*|genuine)|from\W+(?:my|a|the|their)\W+bank|pretend\w*|impersonat\w*|convinc\w*|so\W+(?:that\W+)?(?:they|people|he|she|them|dem)\W+(?:will\W+|go\W+)?(?:send|pay|click|give|share))'
     - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:message|sms|text|email|broadcast)\W+(?:\w+\W+){0,6}?(?:make|so)\W+(?:dem|people|they|them|person)\W+(?:go\W+|will\W+|must\W+)?(?:send|pay|click|give|share)'
@@ -205,6 +220,12 @@ abuse:
     - '(?:rewrite|reword|rephrase|edit|polish|improve|fix|tweak)\W+(?:\w+\W+){0,5}?(?:sound|look|seem)s?\W+(?:more\W+)?(?:official|legit\w*|real|genuine|convincing|believable)'
     - '(?:less|not)\W+(?:\w+\W+){0,1}?like\W+a\W+scam'
     - '(?:invent|make\W+up|fabricate|generate|create)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:believable|fake|random|realistic)\W+(?:\w+\W+){0,3}?(?:account\W+number|phone\W+number|account\W+officer|bvn|customer\W+care\W+number)'
+  # Questions about scams, not requests to write one: never screened as scam_tool.
+  scam_tool_defensive:
+    - '(?:how|why)\W+do\W+(?:scammers|fraudsters|they|people)\W+(?:write|make|create|send)'
+    - 'so\W+(?:that\W+)?i\W+can\W+(?:recognise|recognize|spot|identify|avoid|detect)'
+    - 'what\W+(?:does|do)\W+(?:a|an)?\W*(?:fake|scam|phishing)\W+(?:\w+\W+){0,3}?look\W+like'
+    - '(?:warning|alert)\W+(?:\w+\W+){0,3}?(?:my|our)\W+(?:parents|family|mum|mother|dad|father|friends)'
   # Attempts to override KudiGuard's instructions, change its role or verdict, or extract its prompt: HIGH-PRECISION
   # phrases only (enforce by default: the rules answer, the model never writes the reply). A phrase is not counted
   # here when the text before it reports someone else's words (injection_reported) or it sits inside quotes; it is
@@ -313,6 +334,11 @@ abuse:
     - 'music|applause|silence|laughter|laughs|noise|inaudible|background\W+noise|blank\W+audio'
   asr_alone:
     - 'you'
+  # A reply that denies being an AI (KudiGuard is one): retried, then the honest fixed line (strings: ai_honest).
+  ai_denials:
+    - '(?:i\W+am|i''m|im)\W+(?:not|no)\W+(?:an?\W+)?(?:ai|bot|robot|machine|computer|chatbot|program|artificial\W+intelligence)\b'
+    - '(?:i\W+am|i''m|im)\W+(?:a\W+)?(?:real\W+)?(?:human|human\W+being|real\W+person|person)\b(?!\W+(?:at|from|in|rights|resources?|error)\b)'
+    - 'i\W+no\W+be\W+(?:robot|machine|ai|computer)|na\W+(?:real\W+)?(?:person|human)\W+i\W+be'
   # A reply that claims to BE a bank, customer care or an official (role-play injection): retried, then fixed text.
   # Not a claim: negations ("This is not bank staff", "We are not Opay") and descriptions ("This is a GTBank phishing
   # message", "a fake customer care agent", "a CBN rule", "Opay support impersonation").
@@ -322,6 +348,12 @@ abuse:
 lexicon:
   flags:
     threat:
+      - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise|before)\W+(?:\w+\W+){0,6}?(?:kill\w*|hurt|harm\w*|burn\w*|kidnap\w*|arrest\w*|prosecut\w*|jail\w*|prison|detain\w*|release|post|share|send|expose|leak|publish|tell|inform|deal\W+with|dispatched|pick\W+you|come\W+(?:to\W+)?your\W+(?:house|home|office|shop))\b'
+      - '(?:pay|send|transfer|repay)\W+(?:\w+\W+){0,8}?(?:to\W+avoid|or\W+face)\W+(?:\w+\W+){0,2}?(?:arrest|prosecution|jail|prison|being\W+arrested|detention)'
+      - 'if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|no|fail\W+to|refuse\W+to)\W+(?:pay|send|repay|transfer)\W+(?:\w+\W+){0,8}?(?:kill\w*|arrest\w*|burn|kidnap|harm|hurt|post|share|send|release|expose|tell|jail|prosecut\w*)'
+      - '(?:will\W+be\W+(?:sent|posted|shared|released|leaked|published|harmed|hurt|killed|arrested|prosecuted|burnt|burned)|you\W+will\W+be\W+(?:arrested|prosecuted|killed|harmed|jailed))\W+(?:\w+\W+){0,6}?(?:unless|if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|fail\W+to|no))\W+(?:\w+\W+){0,3}?(?:pay|send|transfer|repay)'
+      - 'warrant\W+(?:\w+\W+){0,4}?(?:arrest)\W+(?:\w+\W+){0,8}?(?:pay|bail|fee)'
+      - '(?:i|we)\W+have\W+your\W+(?:video|photos?|pictures?|nudes?|chats?)\b'
       - '(?:or|else|otherwise|if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|no|fail\W+to)\W+(?:\w+\W+){0,3}?)\W*(?:we|they|dem|our\W+\w+|i)\W+(?:will|go|shall|gonna|are\W+going\W+to|would)\W+(?:\w+\W+){0,2}?(?:kill|deal\W+with|kidnap|hurt|harm|shoot|end|finish)\W+(?:you|your|u)\b'
       - '(?:or|else|otherwise)\W+(?:you|u)\W+(?:will|go|shall)\W+die\b|(?:pay|send)\W+or\W+die\b'
       - '(?:you|u)\W+will\W+(?:die\W+(?:a\W+debtor|in\W+prison)|be\W+killed)'
@@ -539,6 +571,7 @@ strings:
     When they are ready, I can help with the money: they should call their bank on the number printed on their card.
   abuse_reply: "🙏 I am here to help with money safety. Please keep our chat respectful. Send me a message you are unsure about, or ask a money question."
   scam_tool_reply: "🚫 I cannot write, translate or improve messages that imitate a bank or a company, or that ask people for money or codes. I can check a message for you, or explain how to stay safe."
+  ai_honest: "🤖 I am KudiGuard, an AI assistant. I check messages you are unsure about and answer money questions. For anything about your account, call your bank on the number printed on your card."
   new_users_busy_today: "⏳ KudiGuard has welcomed many new users today. Please try again later."
   # An injected message that is not a scam check (instead of the greeting, which would look like it ignored them).
   screen_neutral: "ℹ️ I check messages you are unsure about and answer money questions; I cannot change how I work. Send me the message you want checked."

@@ -48,6 +48,7 @@ class OutputIssue(StrEnum):
     PERSONA = "persona"  # claims to be a bank / customer care
     PROMPT_LEAK = "prompt_leak"  # repeats KudiGuard's own instructions
     ECHO = "echo"  # copies a long run of the user's message
+    AI_DENIAL = "ai_denial"  # denies being an AI (KudiGuard is one)
 
 
 class OutputGuard:

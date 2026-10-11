@@ -192,7 +192,10 @@ class InputScreen:
         found = {
             Category.CRISIS_OTHER: lambda: _search_any(self._everywhere.crisis_other, readings),
             Category.CRISIS: lambda: _search_any(self._everywhere.crisis, readings),
-            Category.SCAM_TOOL: lambda: _search(patterns.scam_tool, folded),
+            Category.SCAM_TOOL: lambda: (
+                _search_any(patterns.scam_tool, readings)
+                and not _search(patterns.scam_tool_defensive, folded)
+            ),
             Category.ABUSE: lambda: not flagged and _search(patterns.abuse, folded),
             Category.INJECTION: lambda: any(self._strong(r, head, patterns) for r in readings),
             Category.INJECTION_SUSPECT: lambda: self._suspect(readings, head, patterns),

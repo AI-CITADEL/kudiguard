@@ -391,3 +391,20 @@ async def test_crisis_similarity_layer(
         assert "crisis_semantic turn=t9 mode=shadow score=0.90 hit=True" in caplog.text
     phrase = await eng.check("I want to kill myself", "en")  # the phrases already fired: not scored again
     assert phrase.screen_action == "crisis"
+
+
+async def test_a_reply_that_denies_being_an_ai_becomes_the_honest_line(
+    registry: LanguageRegistry, knowledge: KnowledgeBase
+) -> None:
+    llm = FakeLLM(
+        analyse=analysis("x", "question"), compose="I am not an AI, I am a real person here to help."
+    )
+    for lang in ("en",):  # English: the scripted reply is composed directly
+        answer = await engine(registry, knowledge, llm).check("Are you an AI? Who built you?", lang)
+        assert answer.body == text(registry, lang, Msg.AI_HONEST) and OutputIssue.AI_DENIAL in answer.issues
+
+
+def test_the_compose_prompt_says_kudiguard_is_an_ai() -> None:
+    from kudiguard.prompts import SYSTEM_PROMPTS
+
+    assert "You are an AI assistant, not a person" in SYSTEM_PROMPTS[2]

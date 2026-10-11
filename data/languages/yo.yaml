@@ -46,11 +46,13 @@ output_guard:
 # also apply. Accents are stripped before matching: avoid bare words that fold onto English ("were", "ode").
 abuse:
   crisis:
+    - 'mi\W+o\W+fe\W+wa\W+laye'
     - 'pa\W+ara\W+mi(?!\W+(?:lara|mo))'
     - '(?:nko|mi\W+o|emi\W+ko)\W+fe\W+(?:wa\W+laaye|gbe\W+aye)\W*(?:mo)?'
     - '(?:mo\W+fe|o\W+ya\W+ki\W+n|je\W+ki\W+n)\W+ku\b'
     - 'gbe\W+majele\W+je'
   crisis_other:
+    - 'oun\W+fe\W+pa\W+ara\W+oun'
     - '(?:o|won)\W+fe\W+pa\W+ara\W+(?:re|won)'
   crisis_exemplars:
     - Mo fe pa ara mi
@@ -64,6 +66,7 @@ abuse:
     - 'omo\W+ale'
     - 'olodo\W+(?:ni\W+(?:e|o)|robot|ero)'
   scam_tool:
+    - 'ko\W+(?:\w+\W+){0,2}?(?:ifiranse|oro)\W+(?:iro|jibiti|ihale|eke)'
     - 'ko\W+(?:oro|ifiranse)\W+(?:\w+\W+){0,5}?(?:dabi|bi)\W+ti\W+banki'
     - 'ko\W+(?:\w+\W+){0,3}?ifiranse\W+(?:\w+\W+){0,5}?(?:dabi|bi)\W+(?:\w+\W+){0,3}?banki'
     - 'bawo\W+ni\W+mo\W+se\W+le\W+(?:gba|ji)\W+(?:\w+\W+){0,2}?elomiran'
@@ -84,6 +87,9 @@ abuse:
     - 'e\W+se\W+fun\W+wiwo'
   asr_annotations:
     - 'orin'
+  ai_denials:  # DRAFT
+    - 'eniyan\W+ni\W+mi\b'
+    - 'emi\W+(?:kii|ki\W+i)\W+se\W+ero'
   persona_claims:
     - '(?:emi\W+ni|awa\W+ni)\W+(?:osise|asoju)\W+(?:\w+\W+){0,1}?banki'
 
@@ -92,6 +98,7 @@ lexicon:
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     threat:  # DRAFT, native review pending
+      - 'tabi\W+a\W+(?:o|maa|yoo)\W+(?:mu|pa|ti)\W+(?:o|e)\b'
       - 'a\W+(?:maa|ma|yoo|o)\W+pa\W+(?:o|e|yin)\b'
       - 'tabi\W+ki\W+o\W+ku\b'
     urgency:
@@ -214,6 +221,7 @@ strings:
     Nígbà tí wọ́n bá ṣetán, mo lè ràn wọ́n lọ́wọ́ pẹ̀lú ọ̀rọ̀ owó náà: kí wọ́n pe báǹkì wọn lórí nọ́mbà tó wà lórí káàdì wọn.
   abuse_reply: "🙏 Mo wà níbí láti ràn ọ́ lọ́wọ́ nípa ààbò owó. Jọ̀wọ́ jẹ́ kí ọ̀rọ̀ wa jẹ́ ti ọ̀wọ̀. Fi ọ̀rọ̀ tí o kò dá lójú ránṣẹ́ sí mi, tàbí béèrè ìbéèrè nípa owó."
   scam_tool_reply: "🚫 Mi ò lè kọ, túmọ̀ tàbí tún ọ̀rọ̀ tí ó ń díbọ́n pé òun jẹ́ báǹkì tàbí ilé-iṣẹ́ ṣe, tàbí èyí tí ó ń béèrè owó tàbí kóòdù lọ́wọ́ ènìyàn. Mo lè ṣàyẹ̀wò ọ̀rọ̀ kan fún ọ, tàbí ṣàlàyé bí o ṣe lè dáàbò bo ara rẹ."
+  ai_honest: "🤖 Èmi ni KudiGuard, olùrànlọ́wọ́ AI. Mo máa ń ṣàyẹ̀wò ọ̀rọ̀ tí ẹ kò dá lójú, mo sì ń dáhùn ìbéèrè nípa owó. Fún ọ̀rọ̀ account yín, ẹ pe báǹkì yín lórí nọ́mbà tó wà lórí káàdì yín."
   new_users_busy_today: "⏳ KudiGuard ti gba ọ̀pọ̀ olùmúlò tuntun lónìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i nígbà míì."
   screen_neutral: "ℹ️ Mo máa ń ṣàyẹ̀wò ọ̀rọ̀ tí ẹ kò dá lójú, mo sì ń dáhùn ìbéèrè nípa owó; mi ò lè yí bí mo ṣe ń ṣiṣẹ́ padà. Ẹ fi ọ̀rọ̀ tí ẹ fẹ́ kí n ṣàyẹ̀wò ránṣẹ́."
   voice_limit: "🎧 O ti fi ọ̀pọ̀ ohùn ránṣẹ́ láàárín àkókò kúkúrú. Jọ̀wọ́ dúró díẹ̀, tàbí kọ ọ̀rọ̀ rẹ."
