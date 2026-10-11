@@ -17,9 +17,20 @@ texts are AI-drafted pending native-speaker review, so per-language numbers are 
 | Compared with other models | ❓ **Not measured.** We cannot claim another model would do better; most general models are weaker in Yoruba and Igbo, not stronger | — |
 
 Related measurement: with the rules alone (no model), the native scam-word lists caught about 6 of 27 Yoruba and 6 of 27
-Igbo scams on the frozen end-to-end set (`data/eval/e2e`, measured during the workstream-H review). In normal operation
-the message is first translated by N-ATLAS and the much larger English rule set also applies, so the end-to-end figure
-is higher; it is not yet measured (see §4).
+Igbo scams on the frozen end-to-end set (`data/eval/e2e`, measured during the workstream-H review).
+
+**End-to-end evidence on translation (T v1, live once at 8e15852, `data/eval/results/e2e-live.jsonl`, `miss_diagnosis`
+plus reading the English pivot).** The full engine flagged 48 of 54 Yoruba and Igbo scams (yo 24/27, ig 24/27). Of the
+**6 misses**, 3 involved translation: 2 were never translated (the message was classified as a greeting and got a fixed
+reply: ig-002, ig-026) and 1 lost a cue in translation (yo-002: "don't call me" became "my network is good"; the
+money request survived). The other 3 had a clean translation that kept the cue and were still not flagged (yo-008,
+yo-023, ig-001). n=6, so this is indicative only; ha/yo/ig cases are DRAFT near-parallel templates. Translation is
+**not the main cause** of missed scams; the larger failure on T is false alarms on genuine messages (36% flagged,
+all languages).
+
+The T v2 re-run (5503deb, `e2e-live2.jsonl`; not independent) gives the same picture: 6 yo/ig scam misses again
+(ig 4: 2 never translated, 2 with no rule cue in the translation; yo 2, no rule cue), and the same 35/96 genuine
+messages flagged. One Igbo miss, ig-001, got worse: it is now shown green (`no_flags`) instead of not checked.
 
 ## 2. The constraint
 
@@ -42,13 +53,15 @@ and carry its licence in `docs/` and the settings.
 
 ## 4. Plan: measure, don't switch on a hunch
 
-1. **Run the frozen end-to-end set (T) live, once** (`data/eval/e2e/cases.yaml`, 366 cases). For every Yoruba and Igbo scam
+1. **Done: run the frozen end-to-end set (T) live, once** (8e15852; results in §1) (`data/eval/e2e/cases.yaml`, 366 cases). For every Yoruba and Igbo scam
    it misses, record whether the warning sign was lost in **translation** or missed by the **rules**.
-2. **Translation A/B (only if translation is the culprit):** translate T's Yoruba and Igbo cases (54 scams, 50 genuine
-   messages and questions) with N-ATLAS and with NLLB-200, locally.
+2. **Translation A/B: lower priority.** Step 1 is done (T v1, §1): only 3 of 6 Yoruba/Igbo scam misses involved
+   translation, and 2 of those were intent routing (no translation at all), not translation quality. The A/B stays a
+   possible later measurement, behind fixing false alarms on genuine notices. If run: translate T's Yoruba and Igbo
+   cases (54 scams, 50 genuine messages and questions) with N-ATLAS and with NLLB-200, locally.
    - Score: do the scam signals survive (OTP/PIN/BVN, fee, link, "blocked", urgency, secrecy)? Which translation do the
      English rules catch? False alarms on the genuine messages; latency; memory.
-   - Measurement only: nothing is tuned on T, so it stays a clean test.
+   - Measurement only: nothing is tuned on T for it.
 3. **Decide by the numbers:** if NLLB clearly wins, add it as a configurable second opinion **for scam detection only**,
    flagged with its licence. Otherwise keep N-ATLAS alone. Either way N-ATLAS remains the core model.
 
