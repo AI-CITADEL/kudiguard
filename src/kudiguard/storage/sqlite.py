@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import sqlite3
 import threading
+import time
 from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
@@ -23,9 +25,12 @@ from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
 from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
+from kudiguard.storage.legacy import reredact, v1_deidentify
 from kudiguard.text import REDACTION_VERSION, redact
 
 T = TypeVar("T")
+log = logging.getLogger(__name__)
+CHECKPOINT_ATTEMPTS = 5
 _TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 MIGRATIONS: Sequence[str] = (
@@ -361,7 +366,7 @@ class SQLiteStore:
                     "excluded.deleted_at",
                     (marker, _ts(utcnow())),
                 )
-            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # erased pages must not linger in the WAL file
+            _checkpoint(db)  # erased pages must not linger in the WAL file
             return patterns + feedback + turns + users + voice
 
         return await self._run(work)
@@ -374,7 +379,7 @@ class SQLiteStore:
                 ]
                 db.execute("DELETE FROM voice_samples WHERE user_hash = ?", (user_hash,))
             if ids:
-                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                _checkpoint(db)
             return sorted(ids)
 
         return await self._run(work)
@@ -383,7 +388,7 @@ class SQLiteStore:
         def work(db: sqlite3.Connection) -> bool:
             removed = db.execute("DELETE FROM voice_samples WHERE id = ?", (sample_id,)).rowcount == 1
             if removed:
-                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                _checkpoint(db)
             return removed
 
         return await self._run(work)
@@ -543,40 +548,71 @@ def _connect(path: Path) -> sqlite3.Connection:
             raise
     try:
         _reredact(db)
-    except sqlite3.Error:
+    except BaseException:  # any failure: never leave the file open (and locked) behind a failed open
         db.close()
         raise
     return db
 
 
+def _checkpoint(db: sqlite3.Connection) -> bool:
+    """Copy the WAL into the database and truncate it, so overwritten values do not linger in the WAL file. A reader
+    of another process can keep it busy: retried, then reported (the next checkpoint truncates it)."""
+    for attempt in range(CHECKPOINT_ATTEMPTS):
+        if db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0] == 0:
+            return True
+        time.sleep(0.05 * (attempt + 1))
+    log.warning("WAL checkpoint busy: overwritten values stay in the -wal file until the next checkpoint")
+    return False
+
+
+_SCAM_VERDICTS = ("likely_scam", "caution")
+
+
 def _reredact(db: sqlite3.Connection) -> None:
-    """Once per ``REDACTION_VERSION``: redact every stored free text again, and de-identify every stored scam example
-    again, with the current patterns (rows written by an older release may hold numbers it missed). Pattern texts are
-    re-derived the same way as a new user's (``deidentify``), so DELETE still finds the examples taken from a user's
-    messages. One transaction; secure_delete overwrites the old values and the WAL is truncated afterwards."""
+    """Once per ``REDACTION_VERSION``: every stored free text is redacted again with today's rules, and every stored
+    scam example is derived again, so nothing an older release missed stays at rest and DELETE keeps working.
+
+    DELETE finds a user's examples by de-identifying the user's stored transcripts again (same week). So an example is
+    matched to the transcript it was taken from with the old release's frozen ``v1_deidentify`` and then derived from
+    the re-redacted transcript exactly as DELETE derives it. An example without such a transcript (the user's history
+    already erased or expired) is de-identified again from its own text. One transaction; secure_delete overwrites the
+    old values and the WAL is truncated afterwards."""
     row = db.execute("SELECT value FROM meta WHERE key = 'redaction_version'").fetchone()
     if row is not None and int(row[0]) >= REDACTION_VERSION:
         return
     with _transaction(db):
-        for r in db.execute("SELECT id, transcript, english, reply, error FROM interactions").fetchall():
+        derived: dict[
+            tuple[str, str], list[str]
+        ] = {}  # (week, old example text) -> example texts derived again
+        for r in db.execute(
+            "SELECT id, transcript, english, reply, error, verdict, created_at FROM interactions"
+        ).fetchall():
             texts = [r["transcript"], r["english"], r["reply"], r["error"]]
-            if (new := [redact(t) if t else t for t in texts]) != texts:
+            new = [reredact(t) if t else t for t in texts]
+            if r["transcript"] and r["verdict"] in _SCAM_VERDICTS:
+                week = week_of(_dt_required(r["created_at"]).date()).isoformat()
+                derived.setdefault((week, v1_deidentify(r["transcript"])), []).append(deidentify(new[0]))
+            if new != texts:
                 db.execute(
                     "UPDATE interactions SET transcript = ?, english = ?, reply = ?, error = ? WHERE id = ?",
                     (*new, r["id"]),
                 )
         for r in db.execute("SELECT id, hypothesis FROM voice_samples").fetchall():
-            if (hypothesis := redact(r["hypothesis"])) != r["hypothesis"]:
+            if (hypothesis := reredact(r["hypothesis"])) != r["hypothesis"]:
                 db.execute("UPDATE voice_samples SET hypothesis = ? WHERE id = ?", (hypothesis, r["id"]))
-        for r in db.execute("SELECT id, text, english FROM scam_patterns").fetchall():
-            new = [deidentify(r["text"]), deidentify(r["english"]) if r["english"] else r["english"]]
-            if new != [r["text"], r["english"]]:
-                db.execute("UPDATE scam_patterns SET text = ?, english = ? WHERE id = ?", (*new, r["id"]))
+        for r in db.execute("SELECT id, week, text, english FROM scam_patterns").fetchall():
+            sources = derived.get((r["week"], r["text"]))  # one example per check: one each
+            text = sources.pop() if sources else deidentify(reredact(r["text"]))
+            english = deidentify(reredact(r["english"])) if r["english"] else r["english"]
+            if [text, english] != [r["text"], r["english"]]:
+                db.execute(
+                    "UPDATE scam_patterns SET text = ?, english = ? WHERE id = ?", (text, english, r["id"])
+                )
         db.execute(
             "INSERT INTO meta VALUES ('redaction_version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
             (str(REDACTION_VERSION),),
         )
-    db.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # the old values must not linger in the WAL file
+    _checkpoint(db)
 
 
 def _interaction(row: sqlite3.Row) -> Interaction:

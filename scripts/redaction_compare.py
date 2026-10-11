@@ -4,7 +4,8 @@
     python scripts/redaction_compare.py --old abc1234 --fuzz 200000
 
 Inputs: every case in ``tests/fixtures/redaction_corpus.yaml`` plus random identifiers joined to amounts, dates,
-times and words (``tests/redaction_fuzz.py``). A corpus digit kept now but masked before is a regression unless the
+times and words (``tests/redaction_fuzz.py``), codes of 6-9 digits followed by small numbers, date runs, mixed
+texts and long inputs. A corpus digit kept now but masked before is a regression unless the
 case is marked ``changed:`` with the reason (years, dates and amounts the old patterns over-masked). For fuzz cases
 only the identifier's digits count: none may be kept. Exit status 1 on any regression.
 """
@@ -15,6 +16,7 @@ import argparse
 import random
 import subprocess
 import sys
+import time
 import types
 from collections.abc import Callable
 from pathlib import Path
@@ -25,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
 from kudiguard.text import redact  # noqa: E402
-from redaction_fuzz import case, kept_digits  # noqa: E402
+from redaction_fuzz import case, kept_digits, random_text  # noqa: E402
 
 CORPUS = ROOT / "tests" / "fixtures" / "redaction_corpus.yaml"
 
@@ -75,9 +77,29 @@ def main(argv: list[str] | None = None) -> int:
         ):
             failures += 1
             print(f"FUZZ LEAK {text!r}: old {old(text)!r}, new {redact(text)!r}")
+    texts = args.fuzz // 10
+
+    def leaks(text: str, spans: list[tuple[int, int]]) -> list[int]:
+        kept = kept_digits(text, redact(text))
+        return [i for i in sorted(kept) if any(a <= i < b for a, b in spans)]
+
+    for _ in range(texts):  # mixed text: no digit of an identifier or code may remain
+        text, spans = random_text(rng, rng.randint(20, 400))
+        if lost := leaks(text, spans):
+            failures += 1
+            print(f"TEXT LEAK {text!r} at {lost[:5]}: new {redact(text)!r}")
+    slowest = 0.0
+    for length in (5_000, 20_000, 64_000):  # long inputs: still linear, still no leak
+        text, spans = random_text(rng, length)
+        started = time.perf_counter()
+        redact(text)
+        slowest = max(slowest, time.perf_counter() - started)
+        if lost := leaks(text, spans):
+            failures += 1
+            print(f"LONG LEAK ({length} chars) at {lost[:5]}")
     print(
-        f"{len(corpus)} corpus cases ({changed} intended changes), {args.fuzz} fuzz cases: "
-        f"{failures} regressions or leaks"
+        f"{len(corpus)} corpus cases ({changed} intended changes), {args.fuzz} joined fuzz cases, {texts} mixed texts, "
+        f"long inputs up to 64,000 chars (slowest {slowest:.2f} s): {failures} regressions or leaks"
     )
     return 1 if failures else 0
 

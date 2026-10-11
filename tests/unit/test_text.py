@@ -1,8 +1,10 @@
+import json
 import logging
 import random
 import re
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -57,7 +59,7 @@ def test_redact_keeps_ussd_amounts() -> None:
         ("on 2026 10 08 at noon", "on 2026 10 08 at noon"),  # a date: kept
         ("pay 5 000 000 naira", "pay 5 000 000 naira"),  # an amount: kept
         ("dial *737*1*500 000#", "dial *737*1*500 000#"),
-        ("meet 10:30 12 45 2026", "meet 10:30 12 45 2026"),  # a time, not a number
+        ("meet 10:30 12 45 2026", "meet 10:[number]"),  # minutes that would take digits from a number
         ("pay N 50 000 000 000 now", "pay N 50 000 000 000 now"),  # an amount
         ("BVN is 2 2 3 1 5 6 7 8 9 0 1", "BVN is [number]"),  # read out digit by digit
         ("the 1 2 3 steps", "the 1 2 3 steps"),
@@ -87,7 +89,7 @@ def test_grouped_numbers_without_prefix_are_masked(raw: str, expected: str) -> N
         ("balance ₦1 234 567 890.50", "balance ₦1 234 567 890.50"),  # a decimal amount
         ("balance 12 345 678 90.50", "balance [number]"),  # without a currency sign: a number
         ("BVN 2 2 3 1 5 6 7 8 9 0", "BVN [number]"),  # ten digits read out
-        ("PIN 2 2 3 1 5 6 7 8 9", "PIN 2 2 3 1 5 6 7 8 9"),  # nine: kept
+        ("PIN 2 2 3 1 5 6 7 8 9", "PIN [number]"),  # named as a PIN: masked
         ("acct 123456 ok", "acct [number] ok"),  # six digits: masked
         ("code 12345 ok", "code 12345 ok"),  # five: kept
         ("acct 1234567890 kindly", "acct [number] kindly"),  # "k" starting a word is no amount
@@ -220,7 +222,9 @@ def test_random_identifiers_next_to_amounts_dates_and_times() -> None:
         masked = redact(text)
         assert not [i for i in kept_digits(text, masked) if start <= i < end], (text, masked)
         spaced = re.search(r"\d[ ,]\d", context)  # "₦5,000 0803…": where the amount ends is ambiguous
-        if text.startswith(context) and not spaced and " " in text[len(context) : start]:
+        # "2001.03.05 02 3 539…": a date before a number's group of one or two digits may be the number's start
+        short = re.match(r"\d{1,2}\D", text[start:end]) and not re.match(r"0\D*[789]\D*[01]", text[start:end])
+        if text.startswith(context) and not spaced and not short and " " in text[len(context) : start]:
             assert masked.startswith(context), (text, masked)
 
 
@@ -330,8 +334,8 @@ def test_every_space_and_dash_separates_groups(separator: str) -> None:
         ("at 10:300 0803 123 4567", "at 10:[number]"),
         ("10:30,0803 123 4567", "10:30,[number]"),
         # comma and currency amounts next to numbers
-        ("₦1,234,567,890.00 0803 123 4567", "₦1,234,567,[number]"),
-        ("₦5,000,000 0803 123 4567", "₦5,000,[number]"),
+        ("₦1,234,567,890.00 0803 123 4567", "₦1,[number]"),  # the comma groups could start the number
+        ("₦5,000,000 0803 123 4567", "₦5,[number]"),
         ("N5000.5 08031234567", "N5000.5 [number]"),
         ("N5000.50 08031234567", "N5000.50 [number]"),
         ("N5000.505 08031234567", "N[number]"),
@@ -383,3 +387,192 @@ def test_every_space_and_dash_separates_groups(separator: str) -> None:
 )
 def test_rebuilt_redaction(raw: str, expected: str) -> None:
     assert redact(raw) == expected
+
+
+_KEYCAP = chr(0xFE0F) + chr(0x20E3)
+_EN_DASH = chr(0x2013)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # a code of 6-9 digits stays masked next to a small number
+        ("Your code 482913. 10 minutes", "Your code [number]. 10 minutes"),
+        ("Use 482913, 5 mins", "Use [number], 5 mins"),
+        ("verification code 482913 - 10 mins", "verification code [number] - 10 mins"),
+        ("482913-1", "[number]-1"),
+        ("code 482913/2", "code [number]/2"),
+        ("ref 12345678 (2)", "ref [number] (2)"),
+        ("acct 1234567 89", "acct [number] 89"),
+        ("send to 5012345 3 times", "send to [number] 3 times"),
+        ("pay 1234567 2x", "pay [number] 2x"),
+        ("482913 (1)", "[number] (1)"),
+        ("482913 482914", "[number]"),
+        ("1234567.5", "1234567.5"),  # a decimal amount
+        ("1234567,8", "1234567,8"),
+        # lists, not numbers
+        ("10/10/2026 - 12/10/2026", "10/10/2026 - 12/10/2026"),
+        (f"1/10/2026 {_EN_DASH} 31/10/2026", f"1/10/2026 {_EN_DASH} 31/10/2026"),
+        ("2026-10-10 - 2026-12-31", "2026-10-10 - 2026-12-31"),
+        ("10.10.2026-12.10.2026", "10.10.2026-12.10.2026"),
+        ("10, 20, 30, 40, 50", "10, 20, 30, 40, 50"),
+        ("1 2 3 4 5 6 7 8 9 10", "1 2 3 4 5 6 7 8 9 10"),
+        ("10 9 8 7 6 5", "10 9 8 7 6 5"),
+        ("0 1 2 3 4 5 6 7 8 9", "[number]"),  # read-out digits, not counting
+        ("IP 192.168.100.200", "IP 192.168.100.200"),
+        ("192.168.100.200", "[number]"),  # without "IP" a dotted quad may be a number
+        ("IP 192.168.100.256", "IP [number]"),
+        ("IP 192.168.010.200", "IP [number]"),
+        ("5,000 10,000 20,000", "5,000 10,000 20,000"),
+        ("1.5 0.5 2.5", "1.5 0.5 2.5"),
+        ("2.5, 3.5, 4.5, 5.5, 6.5", "2.5, 3.5, 4.5, 5.5, 6.5"),
+        ("1.5 0.25 2.5", "1.5 0.25 2.5"),  # mixed precision: not a list, but short groups
+        ("1.5 0.5", "1.5 0.5"),
+        ("10.30 0803 123 4567", "10.30 [number]"),  # a time with a dot before a whole mobile number
+        ("v2.1 08031234567", "v2.1 [number]"),  # a version glued to a word
+        ("v12.345.678 08031234567", "v[number]"),  # too many digits for a version
+        ("6.57 05.674-3719-06", "[number]"),  # not a mobile number: the "time" may be its start
+        ("10.30 0803 123 4567 10:30", "[number] 10:30"),
+        ("08031234567 *737#", "[number] *737#"),
+        # leaks found by the fuzz and the verifier: nothing takes digits from a number next to it
+        ("ngn6.78287,16,4178 0055", "ngn[number]"),
+        ("706.7 2.1 112.3", "[number]"),
+        ("250.122.208.23", "[number]"),
+        ("+23.47 07-065-4443 04:19", "[number] 04:19"),
+        ("07-065-4443 04:19", "[number]:19"),
+        ("54 2075.06.06", "[number]"),
+        ("080-2061.07.24", "[number]"),
+        ("07-06-2026 301", "[number]"),
+        ("24/01/1990, 389792 07-0-05-09-1929", "24/01/1990, [number]"),
+        ("28.97 34 296 083.4160-0.22-13-11-1913", "[number]"),
+        ("3.32 7-09-1998 and 01:48", "[number] and 01:48"),  # in a list, dates fully written
+        ("2001.03.05 02 3 53958365", "[number]"),  # a date shape starting a number in pieces
+        ("20-04-1998 09.0.31-622.973", "20-04-1998 [number]"),  # a date before a mobile number
+        ("20-04-1998, 53.8-40 2069.05", "20-04-1998, [number]"),  # a list
+        ("08-10-2026 0803", "[number]"),
+        ("08031234567-10/10/2026", "[number]-10/10/2026"),
+        ("on 16/08/2026 18:33 please", "on 16/08/2026 18:33 please"),
+        ("10:30 8031234567", "10:30 [number]"),
+        ("10:30 803123456", "10:[number]"),
+        ("10:30,0803 123 4567", "10:30,[number]"),
+        # separators, keycaps and look-alikes
+        ("call 0803:123:4567", "call [number]"),
+        ("call 0803\\123\\4567", "call [number]"),
+        ("call 0803|123|4567", "call [number]"),
+        ("call 0803;123;4567", "call [number]"),
+        ("call 0803'123'4567", "call [number]"),
+        ("call 0803+123+4567", "call [number]"),
+        ("call " + _KEYCAP.join("08031234567") + _KEYCAP + " now", "call [number] now"),
+        ("call O8O3 l23 4S67", "call [number]"),
+        ("call 08B3 123 4567", "call [number]"),
+        ("call 0803 123 4Z67", "call [number]"),
+        ("[0803] 123-4567", "[number]"),
+        ("meet at 10:30", "meet at 10:30"),
+        # USSD
+        ("*737*0803*1234567#", "*737*[number]*[number]#"),
+        ("*894*500*0123456789#", "*894*500*[number]#"),
+        # secrets
+        ("pin na 1234", "pin na [number]"),
+        ("pin 1 2 3 4", "pin [number]"),
+        ("pin one two three four", "pin [number]"),
+        ("otp is 4 8 2 9 1 3", "otp is [number]"),
+        ("OTP - 482-913", "OTP - [number]"),
+        ("token 4829", "token [number]"),
+        ("spinach 1234", "spinach 1234"),
+        # emails
+        ("ade" + chr(0xFF20) + "gmail" + chr(0xFF0E) + "com", "[email]"),
+        ("ade@gmail,com", "[email]"),
+        ("ade at gmail.com", "[email]"),
+        ("ade@gmail", "[email]"),
+    ],
+)
+def test_round_four_redaction(raw: str, expected: str) -> None:
+    assert redact(raw) == expected
+    assert redact(expected) == expected
+
+
+@pytest.mark.parametrize(
+    "unit",
+    [
+        "10/10/2026 ",
+        "10-10-2026-",
+        "2026-10-10 ",
+        "10:30 ",
+        "2026 ",
+        "N5,000 ",
+        "1, ",
+        "1.5 ",
+        "0803 123 4567 ",
+    ],
+)
+def test_long_inputs_are_linear(unit: str) -> None:
+    """Runs of dates, times, amounts and numbers up to 64k characters: no recursion, a hard time bound."""
+    for size in (1_000, 64_000):
+        text = (unit * (size // len(unit) + 1))[:size]
+        start = time.perf_counter()
+        once = redact(text)
+        assert time.perf_counter() - start < 1.0, (unit, size)
+        assert redact(once) == once
+
+
+def test_the_log_filter_keeps_hashed_ids_and_never_raises() -> None:
+    hashed = "8203914ec82a1b2c3d4e5f60718293a4"  # a user hash that starts with seven digits
+    record = logging.LogRecord(
+        "kudiguard",
+        logging.INFO,
+        __file__,
+        1,
+        "turn=%s user=%s for %s",
+        (hashed, hashed, "0803 123 4567"),
+        None,
+    )
+    assert RedactingFilter().filter(record)
+    assert record.getMessage() == f"turn={hashed} user={hashed} for [number]"
+    named = logging.LogRecord(
+        "kudiguard", logging.INFO, __file__, 1, "for %(who)s", ({"who": "0803 123 4567"},), None
+    )
+    assert RedactingFilter().filter(named) and named.getMessage() == "for [number]"
+    plain = logging.LogRecord("kudiguard", logging.INFO, __file__, 1, f"id {hashed}", None, None)
+    assert (
+        RedactingFilter().filter(plain) and plain.getMessage() == "id [number]ec82a1b2c3d4e5f[number]a4"
+    )  # no key
+    for name in ("kudiguard", "uvicorn.access"):  # arguments that do not fit the message
+        broken = logging.LogRecord(name, logging.INFO, __file__, 1, "%s %s", ("only one",), None)
+        assert RedactingFilter().filter(broken)
+        assert broken.getMessage() == "(log record withheld: not redactable)"
+
+
+_MUTATION_CASES = json.loads(
+    (Path(__file__).resolve().parents[1] / "fixtures" / "redaction_mutation_cases.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+@pytest.mark.parametrize(("raw", "expected"), _MUTATION_CASES, ids=range(len(_MUTATION_CASES)))
+def test_inputs_found_by_mutation_testing(raw: str, expected: str) -> None:
+    """The shortest input on which each surviving mutant of the round-4 rewrite leaked or masked differently
+    (differential triage: corpus, review probes, 50,000 joined cases, 3,000 mixed texts, 120,000 token mixes)."""
+    assert redact(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("turn=1234567890 ok", "turn=1234567890 ok"),  # 10 to 64 hex characters after a known key: an id
+        ("turn=123456789 ok", "turn=[number] ok"),
+        ("id=" + "1" * 64 + " ok", "id=" + "1" * 64 + " ok"),
+        ("id=" + "1" * 65 + " ok", "id=[number] ok"),
+        ("xid=1234567890 ok", "xid=[number] ok"),  # not a known key
+        ("id=1234567890x ok", "id=[number]x ok"),  # not a whole id
+    ],
+)
+def test_log_id_fields(message: str, expected: str) -> None:
+    record = logging.LogRecord("kudiguard", logging.INFO, __file__, 1, message, None, None)
+    assert RedactingFilter().filter(record) and record.getMessage() == expected
+
+
+def test_only_uvicorn_access_lines_are_redacted_argument_by_argument() -> None:
+    hashed = "8203914ec82a1b2c3d4e5f60718293a4"
+    record = logging.LogRecord("werkzeug", logging.INFO, __file__, 1, "turn=%s", (hashed,), None)
+    assert RedactingFilter().filter(record) and record.getMessage() == f"turn={hashed}"

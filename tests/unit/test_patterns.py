@@ -324,6 +324,21 @@ def test_retention_and_channels_match_what_users_are_told(registry: LanguageRegi
         "go to www.Fake-Bank.ng/login",
         "join t.me/x",
         "pay123456k.ng",
+        " one @otp .*" + chr(0x20A6) + "67oO73.com",  # found by the verifier's fuzz
+        "#" + chr(0x200B) + "gmail(www.at O-3-www.759.com. dot www.O8",
+        "k-5ahttp://875aN9" + chr(0x200B) + "eight 2.www.6.l-3N.com.",
+        ")O+ dot 7a .comao -www.0lx.com[email] *" + chr(0xA0) + "o@5",
+        "[email]41,pin 6" + chr(0xA0) + " 8i" + chr(0x661) + "#a2.at .5one *," + chr(0x661) + "http://a",
+        "/pin 9  " + chr(0x661) + "464,gmail#Onaira:2_" + chr(0x661),
+        "[number]]Ootp pin 727" + chr(0x200B) + "7otp " + chr(0x661) + "14z/9,4xl1#06",
+        "2[at z++otp " + chr(0x200B) + "*_ dot  dot at www.8.com3 dot naira-",
+        "at k[*.comO2) dot [number]http://www.www.www.+(gmail_y",
+        "http://47"
+        + chr(0x661)
+        + chr(0x200B)
+        + "pin @http://x9N.comz0gmail@at -x+7@"
+        + chr(0x200B)
+        + "otp */",
     ],
 )
 def test_deidentify_is_idempotent(raw: str) -> None:
@@ -333,3 +348,35 @@ def test_deidentify_is_idempotent(raw: str) -> None:
 
 def test_digit_runs_redact_keeps_are_masked_in_hosts() -> None:
     assert deidentify("pay123456k.ng") == "[link: pay#k.ng]"  # "123456k" reads as an amount to redact
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            "visit http://pay-0803-123-4567.ng/x now",
+            "visit [link] now",
+        ),  # a number in the host: the whole link
+        ("click https://bit.ly/abc?u=08031234567 now", "click [link: bit.ly] now"),  # in the query: dropped
+        # links an older release reduced: the host is checked again, an address before it is an address
+        ("visit [link: pay-0803.123.4567.ng] now", "visit [link] now"),
+        ("[link: pay#k.ng] and [link]", "[link: pay#k.ng] and [link]"),
+        ("j @ [link: x.com] wants [number]", "[email] wants [number]"),
+        ("john(at)[link: gmail.com]", "[email]"),
+        ("ade at [link: yahoo.com] now", "[email] now"),
+        ("see [link: x.com] now", "see [link: x.com] now"),
+        (
+            "see [link: x.com] call 08031234567 now",
+            "see [link: x.com] call [number] now",
+        ),  # text after a link
+        (
+            "[link] a [link: b.com] call 08031234567 or 08051234567",
+            "[link] a [link: b.com] call [number] or [number]",
+        ),
+        ("see http://mail.www.example.com/x", "see [link: mail.www.example.com]"),  # only a leading www. goes
+        ("http://47ade@[link: x.com] now", "[link] now"),  # an address found only once its domain was a link
+    ],
+)
+def test_deidentify_reads_stored_links_again(raw: str, expected: str) -> None:
+    assert deidentify(raw) == expected
+    assert deidentify(expected) == expected

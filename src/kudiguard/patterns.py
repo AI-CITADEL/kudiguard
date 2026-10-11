@@ -28,8 +28,7 @@ MAX_PATTERN_CHARS = 2000
 PATTERN_CHANNELS = frozenset({"whatsapp", "web"})  # end users who consented (API callers' users did not)
 _TLDS = "com|ng|net|org|ly|me|io|co|app|xyz|info|biz|link|site|online|top|live|shop|store|click|club|gov|edu|uk|us|tk|ml|ga"
 _URL = re.compile(
-    rf"(?i)(?:\b(?:https?|ftp)://|\bwww\.|(?<![@\w.#-])(?<!\[link: )(?=(?:[a-z0-9-]+\.)+(?:{_TLDS})\b))"  # scheme, www. or bare host (never one we
-    # already reduced: deidentify is idempotent, so stored examples can be de-identified again)
+    rf"(?i)(?:\b(?:https?|ftp)://|\bwww\.|(?<![@\w.#-])(?=(?:[a-z0-9-]+\.)+(?:{_TLDS})\b))"  # scheme, www. or bare host
     rf"(?:[^\s/@?#<>\"']*@)?"  # credentials (user:pass@) are dropped
     rf"((?:[a-z0-9-]+\.)+[a-z]{{2,24}})"  # the host we keep
     rf"(?::\d+)?[^\s<>\"']*"  # port, path, query: dropped
@@ -42,22 +41,43 @@ def week_of(day: date) -> date:
 
 
 _HOST_DIGITS = re.compile(r"\d{6,}")
+_WWW = re.compile(r"^(?:www\.)+")  # every leading "www.", so a host read again stays the same
 _MASKED_URL = re.compile(
-    r"(?i)\b(?:https?|ftp)://\S*\[email\]\S*"
-)  # credentials@host already masked as [email]
+    r"(?i)\b(?:https?|ftp)://(?:\S*\[email\]|[^\s/?#]*\[number\])\S*"
+)  # credentials, a number in the host
+_LINK_MARKER = re.compile(r"(\[link(?:: [^\]\s]*)?\])")  # a link already reduced: not read as text again
+# An address whose domain an older release reduced to a link ("j @ [link: x.com]", "john(at)[link: gmail.com]").
+_EMAIL_BEFORE_LINK = re.compile(
+    r"(?i)(?<![\w.+-])(?:[\w.+-]+|\"[^\"\n]+\")(?:\s*(?:@|\(at\)|\[at\]|\{at\}|<at>)\s*|\s+at\s+)\[link: [^\]\s]*\]"
+)
 
 
-def _host(host: str) -> str:
-    """Lower-case host without www.; long digit runs (an account or phone number in a domain) are masked."""
-    return _HOST_DIGITS.sub("#", host.lower().removeprefix("www."))
+def _host(host: str) -> str | None:
+    """Lower-case host without www.; None when it holds a number ("pay-0803-123-4567.ng"); long digit runs that
+    ``redact`` reads as amounts ("pay123456k.ng") are masked."""
+    host = redact(_WWW.sub("", host.lower()))
+    return None if "[" in host else _HOST_DIGITS.sub("#", host)
+
+
+def _link(host: str) -> str:
+    kept = _host(host)
+    return "[link]" if kept is None else f"[link: {kept}]"
 
 
 def deidentify(text: str) -> str:
-    """Mask identifiers (most numbers, emails, cards) and reduce links to their host; cap the length."""
-    text = unicodedata.normalize("NFKC", text)[: MAX_PATTERN_CHARS * 2]  # bound the regex work first
-    text = redact(text)  # first: digits glued to a domain ("…4567pay.ng") are masked before links are read
-    text = _MASKED_URL.sub("[link]", text)
-    text = _URL.sub(lambda m: f"[link: {_host(m.group(1))}]", text)
+    """Mask identifiers (most numbers, emails, cards) and reduce links to their host; cap the length.
+
+    Idempotent, so stored examples can be de-identified again: a link already reduced is not read as text again, only
+    its host is checked again (an older release kept "[link: pay-0803.123.4567.ng]")."""
+    text = " ".join(unicodedata.normalize("NFKC", text)[: MAX_PATTERN_CHARS * 2].split())  # bounded, one form
+    parts = _LINK_MARKER.split(text)
+    for i, part in enumerate(parts):
+        if i % 2:  # a reduced link
+            parts[i] = _link(part[len("[link: ") : -1]) if part.startswith("[link: ") else part
+        else:  # free text; first redact: digits glued to a domain ("…4567pay.ng") are masked before links are read
+            part = _MASKED_URL.sub("[link]", redact(part))
+            parts[i] = _URL.sub(lambda m: _link(m.group(1)), part)
+    text = _MASKED_URL.sub("[link]", _EMAIL_BEFORE_LINK.sub("[email]", "".join(parts)))  # "j @ [link: x.com]"
     return " ".join(text.split())[:MAX_PATTERN_CHARS]
 
 

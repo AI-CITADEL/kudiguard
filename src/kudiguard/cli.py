@@ -16,13 +16,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 import io
 import json
 import logging
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -217,24 +219,55 @@ def redact_query_strings(record: logging.LogRecord) -> bool:
     return True
 
 
-def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
-    import logging
+def query_string_filter() -> Callable[[logging.LogRecord], bool]:
+    """``logging.config`` factory of ``redact_query_strings``."""
+    return redact_query_strings
 
+
+def serve_log_config() -> dict[str, Any]:
+    """uvicorn's logging configuration with every handler filtered. Its loggers do not propagate to the root, so a
+    filter on the root handlers never sees them: access lines lose their query string, and every line (an ASGI
+    exception traceback can quote a request or a message) is redacted, on uvicorn's own handlers."""
+    from uvicorn.config import LOGGING_CONFIG
+
+    config = copy.deepcopy(LOGGING_CONFIG)
+    config["filters"] = {
+        "queries": {"()": "kudiguard.cli.query_string_filter"},
+        "redact": {"()": "kudiguard.text.RedactingFilter"},
+    }
+    config["handlers"]["default"]["filters"] = ["redact"]
+    config["handlers"]["access"]["filters"] = ["queries", "redact"]
+    return config
+
+
+def redact_every_handler() -> None:
+    """RedactingFilter on the root's handlers and on any handler of the kudiguard logger tree."""
+    from kudiguard.text import RedactingFilter
+
+    loggers = [logging.getLogger()] + [
+        logger
+        for name, logger in logging.Logger.manager.loggerDict.items()
+        if isinstance(logger, logging.Logger) and (name == "kudiguard" or name.startswith("kudiguard."))
+    ]
+    for logger in loggers:
+        for handler in logger.handlers:
+            if not any(isinstance(f, RedactingFilter) for f in handler.filters):
+                handler.addFilter(RedactingFilter())
+
+
+def cmd_serve(settings: Settings, args: argparse.Namespace) -> int:
     import uvicorn
 
     from kudiguard.api.app import create_app
-    from kudiguard.text import RedactingFilter
 
     logging.basicConfig(
         level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
-    logging.getLogger("uvicorn.access").addFilter(redact_query_strings)
-    for handler in logging.getLogger().handlers:  # every record reaching the log, from any logger
-        handler.addFilter(RedactingFilter())
-
+    redact_every_handler()
     uvicorn.run(
-        create_app(settings), host=args.host, port=args.port, log_level=args.log_level, proxy_headers=False
-    )
+        create_app(settings), host=args.host, port=args.port, log_level=args.log_level, proxy_headers=False,
+        log_config=serve_log_config(),
+    )  # fmt: skip
     return 0
 
 

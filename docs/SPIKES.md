@@ -278,22 +278,46 @@ max(30 s, 5 × the baseline run). A full run of the ten targets takes **32 min**
 |---|---|---|---|---|
 | `safety/scam_rules.py` | 119 (+33 in annotations) | 86.6% | **95.0%** | 6 |
 | `safety/decision.py` | 116 (+11) | 76.7% | **93.1%** | 8 |
-| `text.py` (redact) | 99 → 915 ¹ | 55.6% | **94.6%** | 49 |
+| `text.py` (redact) | 99 → 2,121 ¹ | 55.6% | **86.0% → ~92.7%** ³ | 297 → 156 |
 | `privacy.py` | 80 | 65.0% | **93.8%** | 5 |
 | `donation.py` | 474 (+33) | 77.2% | **90.1%** | 47 |
 | `commands.py` | 80 (+11) | 70.0% | **85.0%** | 12 |
 | `hosting.py` | 42 | 73.8% | **81.0%** | 8 |
 | `render.py` | 233 (+11) | 50.2% | **97.9%** | 5 |
 | `review.py` | 712 (+66) | 85.5% | **93.4%** | 47 |
-| `patterns.py` | 79 → 81 (+11) ¹ | 67.1% | **87.7%** | 10 |
-| **All ten** | **2,034 → 2,852** | **75.3%** | **93.1%** | **197** |
+| `patterns.py` | 79 → 118 (+22) ¹ | 67.1% | **89.8%** | 12 |
+| **All ten** | **2,034 → 2,852** (round 3) | **75.3%** | **93.1%** (round 3) ⁵ | 197 (round 3) |
 | `storage/export.py` ² | 48 (+33) | – | **100%** | 0 |
-| `storage/sqlite.py` ² | 435 (+110) | – | **91.5%** | 37 |
+| `storage/sqlite.py` ² | 486 (+110) | – | **92.8%** | 35 |
+| `storage/legacy.py` ² | 153 | – | **73.2%** ⁴ | 41 |
 
-¹ After the redaction rebuild below (new code, so more mutants). ² Added with the rebuild (re-redaction of stored
-rows); 4 of `sqlite.py`'s survivors are in the new code (equivalent: a one-column row read as `row[-1]`, and `is not`
-for `!=`, which only rewrites unchanged rows too), the other 33 are in code from before G, not triaged here (the
-module is outside G's ten). String mutants alone went from 62% to 93% killed (text 50% → 94%, privacy 29% → 84%).
+¹ After the redaction rebuilds below (round 4: a new, larger module, so more mutants). ² Added with the rebuild
+(re-redaction of stored rows). ³ Measured 86.0% on the round-4 code (1,794 killed + 30 timeouts of 2,121); the 297
+survivors were then triaged *differentially*: each survivor's `redact` was run against the original on the corpus,
+the review probes, 50,000 joined cases, 3,000 mixed texts and 120,000 random token mixes. 135 behaved differently on
+some input (65 of them leaked a digit the original masks); the shortest such input of each is now a test
+(`tests/fixtures/redaction_mutation_cases.json`, 76 inputs) and every one of the 135 was re-run against them and fails;
+7 more (the log filter's `id=` field bounds and the uvicorn-name check) are killed by new filter tests. The module was
+not re-run through cosmic-ray after that (wrap-up), so 92.7% is computed, not measured. The 156 left behave
+identically on all 170,000 inputs: `is` for `==` on interned strings and small ints; `<` → `!=` on indexes that step
+by one to their bound; `*` → `/` in keyword-only signatures; `REDACTION_VERSION` ± 1; look-behind windows wider or
+narrower than any prefix that matches (`start - 4` for a currency, `- 16` for "IP", `- 2` for a clock); regex bounds
+the run pattern cannot reach (an empty decimal tail, `{0,3}` separators); the USSD look-behind (one start per code:
+it keeps the scan linear — the "ngn6.78287,16,4178 0055" leak the verifier found for it in c9c0fdd is now a test and
+masked by the rewrite); arithmetic in `_widen`'s bracket balance (a masked span holds at most one unbalanced bracket);
+the email blanking loop (an address's digits are inside its `[email]` span either way). They are not individually
+proven equivalent; the list is in `var/mutation/text-survivors.txt`. ⁴ `legacy.py` is the frozen b4f96f8 code plus
+the leftover-digit merge; measured with the golden fixture (`legacy_v1_golden.json`: b4f96f8's own output for 1,784
+inputs); its remaining survivors are regex bounds and look-behinds of the frozen v1 patterns that no recorded input
+distinguishes (they would only change which old example matches which check, in databases written by b4f96f8), the
+`MAX_PATTERN_CHARS * 2` pre-cut (bounds work; the result is cut to 2,000 anyway), and the leftover-merge bounds
+(`i > 0`, `i < len - 1`, the slice end), which four tests added after the run now pin (not re-measured).
+`sqlite.py`'s survivors in the new code are equivalent: `fetchone()[0] <= 0` for `== 0` (busy is 0 or 1), a
+one-column row read as `row[-1]`, `is not` for `!=` (rewrites an unchanged row with the same values), and `or` for
+`and` when collecting sources (adds non-scam checks as candidates; a different result needs two different texts of
+one week that b4f96f8 de-identified identically); the other 29 are in code from before G (outside G's ten).
+⁵ Not re-measured for all ten after round 4 (wrap-up): only text, patterns, export, sqlite and legacy changed.
+String mutants alone went from 62% to 93% killed (text 50% → 94%, privacy 29% → 84%).
 `donation`'s before figure used its first test list; `test_patterns.py` (which already pinned `DONATION_VERSION` against `voice.html`) was added after.
 
 **Real gaps found and closed**, by area (tests only, except redaction, rebuilt below):
@@ -333,44 +357,93 @@ verification of the first fix). The old patterns left in clear: numbers split af
 spaces, tabs or newlines, Arabic-Indic or full-width digits, O/l/I look-alikes ("o8o3…", "0803 l23 4567"), spelled
 out ("zero eight zero three…"), after `+234.`, glued to letters ("abc0803…"), and a 20-digit card after 16 digits.
 The first fix (3fea447) then leaked numbers next to commas, colons, amounts and times ("08031234567,08051234567",
-"₦5,000 0803 123 4567", "at 10:30 0803 123 4567").
+"₦5,000 0803 123 4567", "at 10:30 0803 123 4567"); the second (c9c0fdd) leaked 6–9-digit codes next to a small number
+("Your code 482913. 10 minutes", "acct 1234567 89"), ran out of recursion and took quadratic time on long runs of dates,
+and over-masked lists (date ranges, IPs, decimals, counting).
 
 How it works now: numbers are found on a *detection view* of the text, one view character per original character
 or more (digits of every script as ASCII, every space, control and zero-width character as " ", every dash and the
-minus sign as "-", the rest
-NFKC-folded and lower case as `deidentify` reads it, O/o/l/I inside digit tokens as 0/1); each view character knows its
-original position, so masks are applied span by span on the original. A *run* is a maximal sequence of digit groups
-joined by any number of spaces and up to three of `. - / _ * ~ · , ( )`; it is judged as a whole: >= 10 digits are masked (a single
-unbroken 6–9-digit group too, unless an amount: `N500000`, `500000k`), except an amount after a currency sign
-(`₦`/`N`/`NGN`/`$`… with plain digits or thousands in threes, decimals 1–2), a comma-grouped amount
-(`1,234,567,890`) and runs made only of valid dates, times and years (`12-05-2024 10.30`, `in 2026 2027 2028`). In
-front of a whole number, the minutes of a time (`10:30 0803…`), a fully written date (`10-10-2026 0803…`) and an
-amount after a currency sign (`N5000 0803…`) are kept; of a comma amount only the part that cannot be the number's
-first group (`₦5,[number]`: "N8,015,369,511.9 889…" could be an amount followed by "511.9 889…"). USSD codes are
-kept field by field (`*737*1*500000#`), unless a field is a whole number (`*737*[number]#`). Spelled-out digits are
-masked at >= 7 in a row (English/Pidgin, and DRAFT Hausa, Yoruba and Igbo lists pending native review, matched
-without tone marks), with digits mixed in. Short secrets named as such (`cvv`, `pin`, `otp`, `password`, `passcode`,
-`exp 09/28`) and written-out emails (`john(at)gmail.com`, `j @ x.com`, `john [at] gmail [dot] com`,
-`… at gmail dot com`) are masked too. A masked number takes its `+` and brackets along. All patterns are linear on
-pathological input (a USSD code starts once per code; the verifier's `perf.py` and 32,000-character probes run in
-under 0.1 s).
+minus sign as "-", keycaps and variation selectors dropped, the rest NFKC-folded and lower case as `deidentify` reads
+it, O/o/l/I/B/S/Z inside digit tokens as 0/1/8/5/2, ":" between groups of 3+ digits as "-"); each view character knows
+its original position, so masks are applied span by span on the original. A *run* is a maximal sequence of digit
+groups joined by any number of spaces and up to three of `. - / _ * ~ · , ( ) [ ] \ | ; ' +`. It is read in one
+pass:
+
+* *Lists, kept whole:* dates, times and years (`in 2026 2027 2028`; in a list, dates fully written), ranges
+  (`10/10/2026 - 12/10/2026`, en dash, ISO), three or more decimals of one precision (`1.5 0.5 2.5`, or after ", "),
+  comma lists of numbers up to 4 digits (`10, 20, 30, 40, 50`), counting by one from or to 10+
+  (`1 2 3 4 5 6 7 8 9 10`), a dotted quad after "IP" (`IP 192.168.100.200`), amounts after a currency sign.
+* *Units inside a run, kept:* a fully written date (`10-10-2026 0803…`, `1/10/2026`), a comma amount
+  (`1,234,567,890`), an amount after a currency sign before a whole number (`N5000 0803…`), the minutes or hour of a
+  time (`10:30 0803…`, `…4567 10:30`), a dotted time or a version glued to a word before a whole mobile number
+  (`10.30 0803 123 4567`, `v2.1 08031234567`).
+* *But a unit never takes digits from a number next to it:* it is not kept when the number's stretch would drop below
+  10 digits without it ("07-065-4443 04:19", "54 2075.06.06"), a date is not kept next to a group of one or two
+  digits after a plain space unless a mobile number starts there ("2001.03.05 02 3 539…"), a date glued with "-"
+  after a number only when written with "/" (`08031234567-10/10/2026`), and of a comma amount next to a number only
+  the part that cannot be the number's first group (`₦5,[number]`).
+* *Masked:* every stretch of >= 10 digits outside the units; otherwise every group of >= 6 digits that is not an
+  amount (a currency sign before, a unit after, a decimal part): codes stay masked next to small numbers
+  ("Your code [number]. 10 minutes", "acct [number] 89", "[number] (1)").
+
+USSD codes are kept field by field (`*737*1*500000#`), unless fields of 4+ digits after the service code hold a whole
+number (`*737*[number]*[number]#`). Spelled-out digits are masked at >= 7 in a row (English/Pidgin, and DRAFT Hausa,
+Yoruba and Igbo lists pending native review, matched without tone marks), with digits mixed in. Short secrets named
+as such (`cvv`, `pin`, `otp`, `password`, `passcode`, `token`, `security code`, also "pin na 1234", "otp is 4 8 2 9 1
+3", "OTP - 482-913", a spelled PIN, `exp 09/28`) and written-out emails (`john(at)gmail.com`, `j @ x.com`, full-width
+`＠`/`．`, `ade@gmail,com`, `ade@gmail`, `john [at] gmail [dot] com`, `… at gmail dot com`) are masked too. A masked
+number takes its `+`, brackets and keycaps along.
+
+*Time.* One pass over the groups, no recursion; every look-ahead is bounded (at most 10 digits) or precomputed. On a
+32,000-character realistic message (phone, account, amount, time, date and email repeated) `redact` takes ~48 ms; the
+verifier's 30 pathological shapes of 32,000 characters (`perf2.py`) take 32–97 ms each (the slowest: a run of times),
+and runs of 3,000 dates, times or years (33,000 characters, `rec.py`) under 55 ms. The unit test bounds runs of dates, ranges, times, years,
+amounts, comma lists, decimals and numbers of 64,000 characters at 1 s each (they take < 0.2 s). Inbound text is cut
+to `MAX_INBOUND_CHARS` = 8,000 in the pipeline before it is matched, checked, redacted or stored (the engine reads
+only the first `MAX_INPUT_CHARS` = 2,000 and WhatsApp sends at most 4,096, so the scam semantics do not change): a
+message costs at most ~26 ms (8,000 characters of times; ~12 ms realistic), five merged messages ~130 ms.
 
 Rows already stored: exports redact again (`export_row`: evidence export and review sheets; `ScamPattern.as_row`;
 the voice-export manifest), and SQLite rewrites every stored transcript/english/reply/error, voice hypothesis and scam
-example once per `REDACTION_VERSION` (meta table) in one transaction, with secure_delete on and the WAL truncated, so
-the digits do not stay at rest and DELETE still finds the examples taken from a user's messages (`deidentify` was made
-idempotent for that: it no longer re-reads its own `[link: host]`). The memory store holds nothing older than the
-process. Log records (message, arguments, exception text) pass `RedactingFilter` on every handler of `kudiguard serve`.
+example once per `REDACTION_VERSION` (meta table) in one transaction, with secure_delete on and the WAL truncated (the
+checkpoint is retried when another reader keeps it busy, then reported; the file is closed on any failure of the
+open). Free texts are redacted with today's rules and digits the old patterns left next to a mask go with it ("card
+[number] 1234" → "card [number]"). **Correction:** c9c0fdd claimed that DELETE still finds the examples after the
+rewrite; it did not for an example whose de-identified text changed differently from its source transcript (the
+verifier found orphans and emails left in examples). Now each example is matched to the transcript it was taken from
+(same week, `v1_deidentify(stored transcript) == example`, where `v1_deidentify` is b4f96f8's `redact`+`deidentify`
+frozen in `storage/legacy.py` for this match only) and derived again from the re-redacted transcript exactly as DELETE
+derives it; an example without a source (history already erased or expired) is de-identified again from its own text,
+including the hosts of links an older release reduced (`[link: pay-0803.123.4567.ng]` → `[link]`) and addresses
+before them (`j @ [link: x.com]` → `[email]`). Checked on a database written by b4f96f8's own code
+(`tests/fixtures/legacy_b4f96f8.db`: two users, 22 checks with every spelling the old patterns missed): after the open
+no identifier, `@` or digit in a link host is left at rest (only amounts, years, dates and times; the files' free pages
+and WAL included), and DELETE removes 22 of 22 examples. The memory store holds nothing older than the process.
+
+Logs: **correction** — c9c0fdd put `RedactingFilter` on the root logger's handlers only, but uvicorn's own loggers
+(`uvicorn`, `uvicorn.error`, `uvicorn.access`) do not propagate to the root, so an ASGI exception traceback or an
+access line reached the console unredacted. `kudiguard serve` now passes uvicorn a `log_config`
+(`cli.serve_log_config`) that installs the filter on uvicorn's own handlers (access lines also lose their query
+string), and puts it on the root's and the `kudiguard` logger tree's handlers; a test configures uvicorn from it and
+checks a traceback quoting 08031234567 and an access path. The filter formats the message first and redacts it whole
+(hashed ids after `turn=`, `user=`, `id=`… are kept), keeps uvicorn's five access arguments (each redacted), redacts
+exception and stack text, and never raises (a record whose arguments do not fit is replaced by a fixed line).
 
 **Old-vs-new check (mandatory before a redaction change):** `tests/fixtures/redaction_corpus.yaml` holds every probe
-of both reviews and of the unit tests (414 cases, `expect: masked|kept`, digits allowed to remain listed); a unit test
-asserts each. `python scripts/redaction_compare.py` compares b4f96f8's `redact` with the current one on the corpus
-(every digit the old one masked must stay masked, except 7 cases marked `changed:` with the reason: years, two dates,
-a date and a time, the minutes of a time) and on random identifiers joined to amounts, dates, times and words with
-", ", ",", ": ", " ", " and ", "; " in both orders (`tests/redaction_fuzz.py`): **0 regressions or leaks in 200,000
-cases.** The unit tests run the same generators (5,000 joined cases, 3,000 bare identifiers, 3,000 amounts/dates/
-times, idempotence). Known, accepted: an identifier written exactly like an amount after a currency sign
-("₦ 8 031 234 567") is read as an amount, as before.
+of the three reviews and of the unit tests (507 cases, `expect: masked|kept`, digits allowed to remain listed); a unit
+test asserts each. `python scripts/redaction_compare.py` compares b4f96f8's `redact` with the current one on the
+corpus (every digit the old one masked must stay masked, except 10 cases marked `changed:` with the reason: years, two
+dates, a date and a time, the minutes or hour of a time next to a masked number, a date after a masked number) and
+on random identifiers and 6–9-digit codes joined to amounts, dates, date runs, times, small numbers and words with
+", ", ",", ": ", " ", " and ", "; " in both orders (`tests/redaction_fuzz.py`; every digit of the identifier must be
+masked, whatever the old one did), on mixed texts of 20–400 characters and on long inputs of 5,000, 20,000 and 64,000
+characters (every identifier and code in them masked): **0 regressions or leaks with four seeds × 200,000 joined
+cases + 20,000 mixed texts each.** The unit tests run the same generators (5,000 joined cases, 3,000 bare identifiers,
+3,000 amounts/dates/times, idempotence). Known, accepted: an identifier written exactly like an amount after a
+currency sign ("₦ 8 031 234 567") or like a dotted quad after "IP" is read as such (as b4f96f8 did); one that starts
+with a fully written date followed by a space and a group of 3+ digits ("2001.03.05 0234 5678 90") keeps the date
+part (b4f96f8 kept "2001.03." and masked the rest): undecidable from "10-10-2026 0803 123 4567", which must keep the
+date.
 
 **Equivalent or accepted survivors** (197 in the ten modules): *identity-equivalent* — `is`/`==` on enums, interned literals and small
 ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`

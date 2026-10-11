@@ -95,6 +95,7 @@ TARGETS: dict[str, tuple[str, tuple[str, ...]]] = {
         "src/kudiguard/storage/sqlite.py",
         ("test_sqlite_store.py", "test_store_contract.py", "test_redaction_paths.py", "test_patterns.py"),
     ),
+    "legacy": ("src/kudiguard/storage/legacy.py", ("test_redaction_paths.py", "test_sqlite_store.py")),
 }
 
 

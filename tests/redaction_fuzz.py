@@ -80,9 +80,37 @@ def random_context(rng: random.Random) -> str:
     return rng.choice(["call", "my acct is", "Card:", "BVN:", "pls", "now"])
 
 
+def random_code(rng: random.Random) -> str:
+    """A one-time code or short account number: 6-9 digits in one piece ("482913")."""
+    return "".join(rng.choice("0123456789") for _ in range(rng.randint(6, 9)))
+
+
+def random_small_context(rng: random.Random) -> str:
+    """What follows a code in a message: "10 minutes", "5 mins", "(2)", "2x", "3 times"."""
+    return rng.choice(["10 minutes", "5 mins", "(2)", "2x", "3 times", "1", "10", "2 tries", "15 min"])
+
+
+def random_dates(rng: random.Random) -> str:
+    """A run of dates, as in a statement ("10/10/2026 11/10/2026 …") or a range ("10/10/2026 - 12/10/2026")."""
+    dates = [
+        f"{rng.randint(1, 28):02d}/{rng.randint(1, 12):02d}/{rng.randint(1990, 2030)}"
+        for _ in range(rng.randint(1, 6))
+    ]
+    return rng.choice([" ", " - ", "-"]).join(dates)
+
+
 def case(rng: random.Random) -> tuple[str, tuple[int, int], str]:
-    """(text, identifier span, context): the identifier joined to a context, in either order."""
-    identifier, context, join = random_identifier(rng), random_context(rng), rng.choice(JOINS)
+    """(text, identifier span, context): an identifier joined to a context, in either order."""
+    kind = rng.random()
+    if kind < 0.2:  # a code followed by a small number: "482913. 10 minutes", "482913-1", "482913 (2)"
+        identifier, context, join = (
+            random_code(rng),
+            random_small_context(rng),
+            rng.choice([". ", ", ", " - ", "-", "/", " "]),
+        )
+        return f"{identifier}{join}{context}", (0, len(identifier)), context
+    identifier, join = random_identifier(rng), rng.choice(JOINS)
+    context = random_dates(rng) if kind < 0.3 else random_context(rng)
     if rng.random() < 0.5:
         text = f"{context}{join}{identifier}"
         start = len(context) + len(join)
@@ -101,3 +129,22 @@ def kept_digits(text: str, output: str) -> set[int]:
         for i in range(block.a, block.a + block.size)
         if text[i].isdigit()
     }
+
+
+def random_text(rng: random.Random, length: int) -> tuple[str, list[tuple[int, int]]]:
+    """About ``length`` characters of short runs, amounts, dates, times, codes, identifiers and words (long inputs),
+    with the spans of the identifiers and codes in it (they must be masked whole)."""
+    makers = [
+        lambda: " ".join(str(rng.randint(0, 999)) for _ in range(rng.randint(1, 4))),
+        lambda: random_amount(rng), lambda: random_date_or_time(rng), lambda: random_dates(rng),
+        lambda: rng.choice(["call", "pay", "now", "and", "to"]),
+    ]  # fmt: skip
+    text, spans = "", []
+    while len(text) < length:
+        if rng.random() < 0.25:
+            piece = random_code(rng) if rng.random() < 0.3 else random_identifier(rng)
+            spans.append((len(text), len(text) + len(piece)))
+        else:
+            piece = rng.choice(makers)()
+        text += piece + rng.choice([" ", " ", " and ", ", ", ". "])
+    return text, spans
