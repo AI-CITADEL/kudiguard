@@ -44,11 +44,13 @@ from kudiguard.prompts import (
     compose_request,
     entry_example,
     example_overlap,
+    facts_block,
     parse_analysis,
     steps_request,
     strip_contacts,
     translate_request,
     warn_family_request,
+    worked_example_reply,
 )
 from kudiguard.render import REPORT_VERDICTS
 from kudiguard.reply_translation import (
@@ -574,7 +576,10 @@ class Engine:
         target = PIDGIN_NAME if pidgin else self.registry.get(language).name
         example = self._example(knowledge)
 
-        def build(model_answer: str | None) -> ChatRequest:
+        # the example the model is shown (the entry's, else the fixed worked example), for the copy check
+        shown = example or worked_example_reply(verdict, flags, knowledge)
+
+        def build(model_answer: str | None, worked_example: bool = True) -> ChatRequest:
             return compose_request(
                 language_name=target if direct else self.registry.get(PIVOT).name,
                 english=english,
@@ -582,13 +587,14 @@ class Engine:
                 flags=flags,
                 knowledge=knowledge,
                 example=model_answer,
+                worked_example=worked_example,
             )
 
         request = build(example)
         if direct:
             generation = await self._generate(request, language, deadline, sources)
             generation = await self._unless_copied(
-                generation, example, build(None), language, deadline, sources
+                generation, shown, knowledge, build(None, worked_example=False), language, deadline, sources
             )
             return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
         if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
@@ -598,7 +604,9 @@ class Engine:
             # Not a model failure: no call is made for lack of time; "unavailable" gives the same fixed-text path.
             return _Generation(unavailable=True, rejections=("no_time",))
         draft = await self._generate(request, PIVOT, deadline, sources)
-        draft = await self._unless_copied(draft, example, build(None), PIVOT, deadline, sources)
+        draft = await self._unless_copied(
+            draft, shown, knowledge, build(None, worked_example=False), PIVOT, deadline, sources
+        )
         draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
         if draft.text is None:
             return draft
@@ -626,17 +634,20 @@ class Engine:
     async def _unless_copied(
         self,
         generation: _Generation,
-        example: str | None,
+        example: str,
+        knowledge: KnowledgeResult,
         without_example: ChatRequest,
         language: LanguageCode,
         deadline: float | None,
         sources: Sequence[str],
     ) -> _Generation:
-        """A reply that copies the entry's model answer is composed once more without it (Igbo once copied a fixed
-        example in 42% of replies); that reply stands, or fixed text if it fails."""
-        if example is None or generation.text is None:
+        """A reply that copies the example it was shown (the entry's model answer or the fixed worked example) is
+        composed once more with no example at all (Igbo once copied a fixed example in 42% of replies; live, a
+        caution reply copied the fixed scam example word for word); that reply stands, or fixed text if it fails."""
+        if generation.text is None:
             return generation
-        overlap = example_overlap(generation.text, example)
+        facts, actions = facts_block(knowledge)
+        overlap = example_overlap(generation.text, example, " ".join((*facts, *actions)))
         if overlap <= self.advice.example_copy_max:
             return generation
         log.info("compose copied the model answer (overlap %.2f): composing again without it", overlap)

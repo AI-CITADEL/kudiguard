@@ -405,6 +405,11 @@ def _example_for(verdict: Verdict, flags: Sequence[Flag], has_facts: bool = True
     return _EXAMPLE_QUESTION if has_facts or verdict is Verdict.NO_FLAGS else _EXAMPLE_NO_FACTS
 
 
+def worked_example_reply(verdict: Verdict, flags: Sequence[Flag], knowledge: KnowledgeResult) -> str:
+    """The fixed worked example's reply ``compose_request`` shows when no entry example is given (copy check)."""
+    return _example_for(verdict, flags, bool(facts_block(knowledge)[0])).reply
+
+
 def entry_example(knowledge: KnowledgeResult) -> str | None:
     """The top entry's model answer (the first entry COMPOSE sees), if it has one."""
     return knowledge.entries[0].entry.example if knowledge.entries else None
@@ -418,12 +423,14 @@ def compose_request(
     flags: Sequence[Flag],
     knowledge: KnowledgeResult,
     example: str | None = None,
+    worked_example: bool = True,
 ) -> ChatRequest:
     """``example``: the top entry's model answer (``entry_example``), shown labelled in the request; it then
-    replaces the fixed worked example (one example per request: two made Hausa copy both)."""
+    replaces the fixed worked example (one example per request: two made Hausa copy both). ``worked_example``:
+    False = no fixed worked example either (the retry after a copied example)."""
     facts, actions = facts_block(knowledge)
     worked: tuple[dict[str, str], ...] = ()
-    if not example:
+    if not example and worked_example:
         shot = _example_for(verdict, flags, bool(facts))
         worked = (
             {
@@ -449,14 +456,18 @@ def compose_request(
     )
 
 
-def example_overlap(reply: str, example: str, n: int = 3) -> float:
-    """Share of the reply's word ``n``-grams that also appear in ``example`` (1.0 = a copy; 0 = none shared)."""
-    reply_words, example_words = _WORD.findall(fold(reply)), _WORD.findall(fold(example))
-    grams = {tuple(reply_words[i : i + n]) for i in range(len(reply_words) - n + 1)}
+def _grams(text: str, n: int) -> set[tuple[str, ...]]:
+    words = _WORD.findall(fold(text))
+    return {tuple(words[i : i + n]) for i in range(len(words) - n + 1)}
+
+
+def example_overlap(reply: str, example: str, grounded: str = "", n: int = 3) -> float:
+    """Share of the reply's word ``n``-grams copied from ``example`` (1.0 = a copy; 0 = none shared). Wording the
+    reply could have taken from ``grounded`` (the facts and actions it was given) does not count as copied."""
+    grams = _grams(reply, n)
     if not grams:
         return 0.0
-    shared = grams & {tuple(example_words[i : i + n]) for i in range(len(example_words) - n + 1)}
-    return len(shared) / len(grams)
+    return len((grams & _grams(example, n)) - _grams(grounded, n)) / len(grams)
 
 
 def steps_request(*, language_name: str, actions: Sequence[str]) -> ChatRequest:

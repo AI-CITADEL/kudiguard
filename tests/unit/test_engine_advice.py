@@ -208,6 +208,7 @@ def test_example_overlap() -> None:
     assert example_overlap(EXAMPLE, EXAMPLE) == 1.0
     assert example_overlap("Call your bank.", EXAMPLE) == 0.0
     assert example_overlap("ok", EXAMPLE) == 0.0  # too short for a trigram
+    assert example_overlap(EXAMPLE, EXAMPLE, grounded=EXAMPLE) == 0.0  # wording from the facts is not a copy
 
 
 # --- Pidgin replies ------------------------------------------------------------------------------------------
@@ -313,3 +314,57 @@ def test_inline_example(tmp_path: Path) -> None:
 def test_examples_file_errors(tmp_path: Path, examples: str, inline: str, error: str) -> None:
     with pytest.raises(KnowledgeConfigError, match=error):
         read_pack_files(_pack(tmp_path, examples, inline))
+
+
+async def test_a_copied_fixed_worked_example_is_composed_again_without_any_example(
+    registry: LanguageRegistry,
+) -> None:
+    from kudiguard.prompts import worked_example_reply
+
+    copied = worked_example_reply(
+        Verdict.CAUTION, (), KnowledgeResult(entries=StubKnowledge((OTHER, 0.9)).result.entries)
+    )
+    llm = FakeLLM(analyse=analysis(["upfront_fee"]), compose=[copied, REPLY])
+    answer = await engine(registry, llm, StubKnowledge((OTHER, 0.9))).check(
+        "They said I must pay first.", "en"
+    )
+    first, second = llm.calls(Purpose.COMPOSE)
+    assert len(first.messages) == 4 and len(second.messages) == 2  # the retry has no worked example
+    assert answer.body == REPLY
+
+
+# --- rules: a credential REQUEST, not a bank's own warning; first-person wrong transfers -------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "flag", "expected"),
+    [
+        ("Your OTP is 123456. Do not share it with anyone.", Flag.ASKS_CREDENTIALS, False),
+        (
+            "Your OTP is 482913. Don't share it with anyone, including bank staff.",
+            Flag.ASKS_CREDENTIALS,
+            False,
+        ),
+        ("Never give your PIN or OTP to anyone.", Flag.ASKS_CREDENTIALS, False),
+        ("Na your code be this, no go send am give anybody.", Flag.ASKS_CREDENTIALS, False),
+        ("send me the OTP", Flag.ASKS_CREDENTIALS, True),
+        ("read me the code that came to your phone", Flag.ASKS_CREDENTIALS, True),
+        ("share your PIN to unlock your account", Flag.ASKS_CREDENTIALS, True),
+        ("my account will be blocked if I no send the OTP now", Flag.ASKS_CREDENTIALS, True),
+        (
+            "She sent money to my account by mistake and wants me to reverse my money to her.",
+            Flag.WRONG_TRANSFER,
+            True,
+        ),
+        (
+            "He said I got an alert of 50k by mistake and I should send back the excess.",
+            Flag.WRONG_TRANSFER,
+            True,
+        ),
+        ("My transfer failed and the bank reversed my money.", Flag.WRONG_TRANSFER, False),
+    ],
+)
+def test_rule_requests(registry: LanguageRegistry, text: str, flag: Flag, expected: bool) -> None:
+    from kudiguard.safety.scam_rules import assess
+
+    assert (flag in assess([text], registry.lexicon_for("en")).flags) is expected

@@ -124,6 +124,18 @@ Settings in `.env.example` ("Advice quality"); code in `knowledge/service.py` (c
   urgency, impersonation or secrecy (no request to send money, codes or details). Then: no red flags (the notice's
   own check; red-flag entries dropped) when ANALYSE's `user_initiated` says the user started it, else at most
   caution. Otherwise the model's verdict stands. Typical look-alike scams are unit-tested not to be lowered.
+* **Copy guard on the fixed worked examples too**: a reply that shares more than the copy level of its trigrams with
+  the fixed worked example it was shown (live: a caution reply copied "Real offers do not ask you to pay first" word
+  for word) is composed once more with no example at all.
+* **Rules: a credential REQUEST, not a warning** (`data/languages/en.yaml`, `asks_credentials`): the request verb must
+  not be negated ("do not / don't / never / ever / nor / Pidgin no go" just before it), so a bank's own "Your OTP is
+  123456. Do not share it with anyone" no longer flags; "send me the OTP", "read me the code that came to your phone",
+  "share your PIN to unlock" and Pidgin "if I no send the OTP" still do. First-person wrong transfers ("sent money to
+  my account by mistake", "reverse my money to her", "send back the excess") were added to `wrong_transfer`.
+  Rules-only, before -> after (any flag on a message the user asks about): answers.yaml scams 14/20 -> 15/20,
+  non-scams flagged 2/21 -> 2/21; prompts.yaml scams 17/18 -> 17/18 (asks_credentials 5 -> 5), non-scams 2/16 ->
+  2/16; own-OTP / wrong-transfer probes: scams 3/5 -> 5/5, genuine notices flagged 3/4 -> 1/4 (the remaining one is
+  `impersonation` on a bank name).
 * **Pidgin replies** (`KUDIGUARD_PIDGIN_REPLIES`): Pidgin arrives as language `en`; when
   `guard_classifier.is_pidgin` detects it, COMPOSE is asked to "Reply in Nigerian Pidgin".
 * **Stock answer fix**: the fixed question example (NIN, "dial *346#") was the only worked example for every

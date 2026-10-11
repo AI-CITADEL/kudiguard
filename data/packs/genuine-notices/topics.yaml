@@ -25,7 +25,7 @@
     - If a caller or chat told you to start this payment, stop. That is a scam, even though the code is real.
     - Never read the code to anyone who calls or chats with you. Your bank will never ask for it.
   actions:
-    - Type the code only into the app or page you opened yourself.
+    - Never type the code into a link or page someone sent you.
     - If you did not start any payment, ignore the code and call your bank using the number on the back of your card.
   keywords: [otp for my own transfer, code after i press pay, otp for my own payment, i started the transfer myself, otp for my purchase]
 
@@ -36,7 +36,7 @@
   facts:
     - Many banks send an SMS, email or app message each time someone logs in to your mobile or internet banking.
     - If you just logged in, this alert is normal. It is there so you notice any login that was not you.
-    - The alert should only inform you. It should not ask you to click a link, reply with a code or call a number in the message.
+    - A real alert only informs you. A link to click, a request for a code or a number to call in it means it is fake.
     - The one check is the time. If the login time matches when you opened your app, it was you.
   actions:
     - If the time matches, you do not need to do anything.

@@ -387,10 +387,12 @@ lexicon:
       - 'death\W+announcement'
       - 'we\W+have\W+(?:your\W+)?(?:him|her|son|daughter|child|wife|husband)\b'
     asks_credentials:
-      - '(?:send|give|share|tell|provide|confirm|read|forward|drop|call out|reply(?: with)?|dm|text|whatsapp|submit)\W+(?:(?!my\b|our\b)\w+\W+){0,6}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin|(?:account|bank|atm|card) details|expiry date|(?:\d+[- ]?digits? )?code\W+(?:wey|that|which|we|dem|they|sent|you received))'
+      # a REQUEST: a negated verb ("do not share it", "never give your PIN", Pidgin "no go send am") is a bank's own
+      # warning, not a request (own-OTP SMS false alarm)
+      - '(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|provide|confirm|read|forward|drop|call out|reply(?: with)?|dm|text|whatsapp|submit)\W+(?:(?!my\b|our\b)\w+\W+){0,6}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin|(?:account|bank|atm|card) details|expiry date|(?:\d+[- ]?digits? )?code\W+(?:wey|that|which|we|dem|they|sent|you received))'
       - '(?:what is|whats) (?:your|ur) (?:otp|pin|cvv|password|bvn|nin|card number)'
       - 'ask(?:ed|ing|s)?\W+(?:\w+\W+){0,4}?for\W+(?:\w+\W+){0,3}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin)'
-      - '(?:otp|pin|cvv|password|verification code)\W+(?:\w+\W+){0,6}?(?:send|give|share|tell|forward)\W+(?:it|them|to me)'
+      - '(?:otp|pin|cvv|password|verification code)\W+(?:\w+\W+){0,6}?(?<!not )(?<!never )(?<!ever )(?<!dont )(?<!don''t )(?<!no go )(?<!nor )(?:send|give|share|tell|forward)\W+(?:it|them|to me)'
     remote_access:
       - 'anydesk'
       - 'teamviewer'
@@ -410,6 +412,10 @@ lexicon:
       - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:your|ur) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
       - '(?:mistakenly|wrongly) (?:sent|transferred|credited|paid)\W+(?:\w+\W+){0,4}?(?:to |into )?(?:you|your)'
       - '(?:please|kindly|pls|plz)\W+(?:\w+\W+){0,2}?(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|the transfer|my money)'
+      # first person: the caller says the money went to "my account" and wants it back
+      - '(?:sent|transferred|paid|credited)\W+(?:\w+\W+){0,4}?(?:to |into )(?:my|mine) (?:account|number|line|wallet)\W+(?:\w+\W+){0,3}?(?:by mistake|in error|wrongly|mistakenly)'
+      - '(?:reverse|refund|send back|return)\W+(?:it|the money|the funds|my money|the excess|her money|his money)\W+(?:back\W+)?to (?:him|her|them)'
+      - '(?:send|pay|transfer|return) (?:back )?(?:the excess|the balance)'
     account_threat:
       - '(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|line|whatsapp)\W+(?:\w+\W+){0,4}?(?:blocked|suspended|deactivated|restricted|frozen|barred|disabled|banned|closed|don block|go block)'
       - '(?:block|suspend|deactivat|restrict|freez|bar|ban)\w*\W+(?:your|ur)\W+(?:\w+\W+){0,2}?(?:account|bvn|nin|sim|card|wallet|whatsapp)'
