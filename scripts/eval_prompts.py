@@ -40,7 +40,6 @@ from kudiguard.prompts import (
 )
 from kudiguard.safety.decision import decide, is_content_free
 from kudiguard.safety.output_guard import OutputGuard
-from kudiguard.text import fold
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGLISH_STOPWORDS = {
@@ -136,8 +135,8 @@ async def run_case(ctx: Context, case: dict[str, str], *, verbose: bool) -> list
 
     # The example chosen for this request (its question and reply) and the real facts may legitimately be echoed.
     example = request.messages[1]["content"] + " " + request.messages[2]["content"]
-    allowed = fold(example + " ".join(f for e in knowledge.entries for f in e.entry.facts))
-    leaked = [p for p in EXAMPLE_PHRASES if p in fold(reply) and p not in allowed]
+    allowed = (example + " ".join(f for e in knowledge.entries for f in e.entry.facts)).lower()
+    leaked = [p for p in EXAMPLE_PHRASES if p in reply.lower() and p not in allowed]
     checks = {
         "truncated": truncated,
         "sign-off": bool(SIGN_OFF.search(reply)),

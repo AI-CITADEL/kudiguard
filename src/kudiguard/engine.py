@@ -39,7 +39,6 @@ from kudiguard.prompts import (
     parse_analysis,
     steps_request,
     translate_request,
-    translation_example,
     warn_family_request,
 )
 from kudiguard.render import REPORT_VERDICTS
@@ -86,7 +85,9 @@ class Answer:
     sources: tuple[str, ...] = ()  # knowledge entry ids used for grounding
     issues: tuple[OutputIssue, ...] = ()  # output-guard findings that forced a retry or fallback
     llm_ms: int = 0
-    reply_english: str = ""  # english_first: the checked English reply that ``body`` translates ("" = direct)
+    # english_first: the checked English reply that was translated (kept when the translation was rejected and
+    # ``body`` is fixed text); "" for direct replies
+    reply_english: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,9 +285,8 @@ class Engine:
         draft = await self._generate(request, PIVOT, deadline)
         if draft.text is None:
             return draft
-        example = translation_example(verdict, flags, target)
         translated = await self._translate_reply(
-            reply_translate_request(draft.text, target, example), draft.text, language, deadline
+            reply_translate_request(draft.text, target), draft.text, language, deadline
         )
         translated.ms += draft.ms
         translated.issues = draft.issues + translated.issues
@@ -312,7 +312,7 @@ class Engine:
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(strip_reply_tags(completion.text), truncated=completion.truncated)
             issues = self._guard.check(text, language)
-            problems = translation_problems(english, text)
+            problems = translation_problems(english, text, language)
             if not issues and not problems:
                 result.text = text
                 return result

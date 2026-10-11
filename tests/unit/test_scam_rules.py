@@ -384,7 +384,7 @@ def test_native_terms_never_fire_on_safe_advice(registry: LanguageRegistry, lang
     config = registry.get(lang)
     corpus = [("pack", t) for t in entry_texts(pack_entries(PACKS).values())]
     corpus += list(config.strings.items())
-    corpus += [(f"example:{e.language}:{e.kind}", e.reply) for e in prompts.WORKED_EXAMPLES]
+    corpus += [("worked example", e.reply) for e in prompts.WORKED_EXAMPLES]
     hits = {
         (lang, flag, key)
         for flag, terms in config.lexicon.flags.items()

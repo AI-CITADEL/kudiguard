@@ -23,6 +23,7 @@ from kudiguard.reply_translation import (
     ComposeStrategy,
     reply_translate_request,
     step_count,
+    strip_reply_tags,
     translate_max_tokens,
     translation_problems,
 )
@@ -107,16 +108,12 @@ def test_settings_validate_the_strategy_at_startup() -> None:
 
 
 def test_translate_request_shape() -> None:
-    request = reply_translate_request(ENGLISH, "Yoruba", ("Do not pay.", "Ẹ má sanwó."))
-    system, example_in, example_out, user = request.messages
+    request = reply_translate_request(ENGLISH, "Yoruba")
+    system, user = request.messages  # zero-shot: no worked example to copy
     assert "into Yoruba" in system["content"] and "numbered step" in system["content"]
-    assert (
-        example_in["content"] == "<reply>\nDo not pay.\n</reply>" and example_out["content"] == "Ẹ má sanwó."
-    )
     assert user["content"] == f"<reply>\n{ENGLISH}\n</reply>"
     assert request.purpose is Purpose.REPLY_TRANSLATE
     assert request.temperature == 0.0 and request.seed == DEFAULT_SEED
-    assert len(reply_translate_request(ENGLISH, "Hausa").messages) == 2  # no example for Hausa
 
 
 def test_translate_budget_follows_the_english_length() -> None:
@@ -152,6 +149,44 @@ def test_unfaithful_translations_are_caught(translated: str, problem: str) -> No
     assert any(p.startswith(problem) for p in translation_problems(ENGLISH, translated)), problem
 
 
+# Live failures (docs/SPIKES.md H): each flipped the advice and passed every other check.
+@pytest.mark.parametrize(
+    ("lang", "english", "translated", "problem"),
+    [
+        # "You should keep all your money at home"
+        ("yo", "You should not keep all your money.", "Ó yẹ kí o máa tọ́jú gbogbo owó rẹ.", "lost"),
+        # "Give any money"
+        ("ig", "Be careful.\n1. Do not pay anything.", "Kpachara anya.\n1. Nye ego ọ bụla.", "lost"),
+        # "Do not block your SIM"
+        ("ha", "You should block your SIM now.", "Kada ku rufe katin SIM yanzu.", "added"),
+        # "Do not end the call"
+        ("ha", "End the call.\n1. Hang up now.", "Ka katse kiran.\n1. Kada ka gama kiran.", "added"),
+    ],
+)
+def test_flipped_negation_is_caught(lang: str, english: str, translated: str, problem: str) -> None:
+    assert any(p.startswith(f"negation {problem}") for p in translation_problems(english, translated, lang))
+
+
+@pytest.mark.parametrize(
+    ("lang", "english", "translated"),
+    [
+        ("ha", "Check your balance, not an SMS alert.", "Duba ma'aunin ku, ba sakon SMS ba."),  # ba ... ba
+        ("ig", "Be careful of strangers who call you.", "Kpachara anya maka ndị na-amaghị ama na-akpọ gị."),
+        ("yo", "Stop replying to them.", "Ẹ dúró fífèsì sí wọn."),
+        ("ig", "1. Stop replying to them.", "1. Kwụsị ịza ha ozi."),
+        ("fr", "Do not pay.", "Payez maintenant."),  # no negator list: not checked
+    ],
+)
+def test_kept_negation_passes(lang: str, english: str, translated: str) -> None:
+    assert not [p for p in translation_problems(english, translated, lang) if p.startswith("negation")]
+
+
+def test_echoed_or_invented_tags_are_removed() -> None:
+    text = "<ìtumọ̀>\nẸ má sanwó.\n</ translation>\n</reply>"
+    assert strip_reply_tags(text).strip() == "Ẹ má sanwó."
+    assert strip_reply_tags("Lo <b>app</b> náà") == "Lo <b>app</b> náà"  # inline text is kept
+
+
 def test_short_replies_are_not_echo_tested() -> None:
     assert translation_problems("1. Dial *565*0# now.", "1. Dial *565*0# now o.") == []
 
@@ -170,7 +205,6 @@ async def test_english_first_composes_in_english_then_translates(
     (translate,) = llm.calls(Purpose.REPLY_TRANSLATE)
     assert "into Yoruba" in translate.messages[0]["content"]
     assert translate.messages[-1]["content"] == f"<reply>\n{ENGLISH}\n</reply>"
-    assert "kóòdù" in translate.messages[2]["content"]  # one-shot Yoruba example of the same kind
     assert answer.outcome is Outcome.ANSWERED and answer.verdict is Verdict.LIKELY_SCAM
     assert answer.body == YORUBA and answer.reply_english == ENGLISH
     assert answer.llm_ms == 300  # analyse + compose + translate
