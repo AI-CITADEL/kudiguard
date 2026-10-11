@@ -54,6 +54,10 @@ FLAG_MAP: Mapping[str, Flag | None] = {
     "secrecy": Flag.SECRECY,
     "harassment": None,
 }
+# System flags the frozen set's vocabulary has no name for (added after T was written: THREAT, workstream F). A
+# predicted flag outside the vocabulary can never be a hit, so it is left out of flag precision (not counted wrong).
+SCORED_FLAGS = frozenset(flag.value for flag in FLAG_MAP.values() if flag is not None)
+UNSCORED_FLAGS = frozenset(flag.value for flag in Flag) - SCORED_FLAGS
 
 # Languages whose scam misses get a translation diagnosis (the English pivot the engine used is stored).
 DIAGNOSED_LANGUAGES = frozenset({"yo", "ig"})
@@ -241,7 +245,7 @@ class Group:
         if label == "scam":
             self.scam += 1
             self.scam_flagged += flagged
-            expected, predicted = set(row["expected_flags"]), set(row["flags"])
+            expected, predicted = set(row["expected_flags"]), set(row["flags"]) & SCORED_FLAGS
             # Only cases with at least one mapped expected flag: the author's lists are not exhaustive, so a
             # system flag missing from them may still be right (precision is a lower bound).
             if expected:

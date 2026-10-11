@@ -13,6 +13,8 @@ from kudiguard.evaluation.e2e import (
     ALL,
     FLAG_MAP,
     JUDGE_FIELDS,
+    SCORED_FLAGS,
+    UNSCORED_FLAGS,
     CountingLLM,
     diagnose_miss,
     expected_flags,
@@ -43,8 +45,10 @@ def check(verdict: Verdict, *flags: Flag, outcome: Outcome = Outcome.ANSWERED, *
 
 
 def test_flag_map_covers_vocabulary_and_harassment_is_no_match() -> None:
-    assert {flag.value for flag in Flag} == {v.value for v in FLAG_MAP.values() if v is not None}
-    assert all(FLAG_MAP[flag.value] is flag for flag in Flag)
+    # every system flag is either in the frozen vocabulary (one-to-one) or explicitly unscored
+    assert {flag.value for flag in Flag} == SCORED_FLAGS | UNSCORED_FLAGS
+    assert {Flag.THREAT.value} == UNSCORED_FLAGS
+    assert all(FLAG_MAP[flag.value] is flag for flag in Flag if flag.value in SCORED_FLAGS)
     assert FLAG_MAP["harassment"] is None
 
 
@@ -199,6 +203,12 @@ def test_flag_precision_only_on_cases_with_a_mapped_expected_flag() -> None:
     case = {"id": "s", "lang": "en", "label": "scam", "text": "t", "red_flags": ["harassment"]}
     summary = summarize([record(case, check(Verdict.LIKELY_SCAM, Flag.URGENCY))])
     assert summary[ALL]["flag_precision_lower_bound"] is None and summary[ALL]["flag_recall"] is None
+
+
+def test_a_flag_outside_the_frozen_vocabulary_is_not_counted_wrong() -> None:
+    case = {"id": "s", "lang": "en", "label": "scam", "text": "t", "red_flags": ["urgency"]}
+    summary = summarize([record(case, check(Verdict.LIKELY_SCAM, Flag.URGENCY, Flag.THREAT))])
+    assert summary[ALL]["flag_precision_lower_bound"] == 1.0 and summary[ALL]["flag_recall"] == 1.0
 
 
 def test_resume_retries_errors_and_refuses_another_mode(cases: dict[str, dict[str, Any]]) -> None:

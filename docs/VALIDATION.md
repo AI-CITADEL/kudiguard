@@ -61,7 +61,7 @@ Scam passes when flagged, genuine when not flagged, question when answered (a mo
 with it is ignored, and red verdicts on questions are counted for the judge to decide "no basis"). `accept` values
 also pass (caution = flagged). The headline is the pass rate (label or accept); scam recall, genuine
 false-positive rate and questions answered are label-only and ignore `accept`. Red flags are compared through an explicit map: the 13 shared names map one-to-one to
-the system's flags; `harassment` maps to no match. Error rows are excluded from rates and printed
+the system's flags; `harassment` maps to no match, and the system's THREAT flag (added after T was frozen, so not in its vocabulary) is left out of flag precision. Error rows are excluded from rates and printed
 prominently, with a worst-case pass rate that counts them as failures; above 2% errors the run exits non-zero.
 Flag precision uses only scam cases with at least one mapped expected flag and is a lower bound: the author's flag
 lists are not exhaustive, so a system flag outside them may still be right. Reported per
