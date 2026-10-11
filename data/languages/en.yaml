@@ -236,6 +236,8 @@ abuse:
   # then injection_suspect. Chat-template tokens and role markup are matched in code (safety/abuse.py).
   injection:
     - '(?:never\W+admit|don''t\W+admit|dont\W+admit|do\W+not\W+admit|deny|don''t\W+say|dont\W+say|do\W+not\W+say|never\W+say)\W+(?:that\W+)?(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - '(?:^|[.!:;]\s*|\b(?:always|now|on)\W+)(?:deny|never\W+admit(?:\W+to)?|don''t\W+admit(?:\W+to)?|do\W+not\W+admit(?:\W+to)?)\W+being\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - '(?:do\W+not|don''t|dont|never)\W+(?:reveal|disclose|mention|tell\W+(?:anyone|anybody|them|people))\W+(?:that\W+)?(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
     - '(?:you|u)\W+(?:will|must|should|go|shall)\W+(?:always\W+)?deny\W+(?:being|say\W+(?:you|u)\W+be)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
     - 'if\W+(?:anyone|anybody|somebody|someone|they|dem|people|person|customers?|users?)\W+ask\w*\W+(?:\w+\W+){0,1}?(?:if|whether|say)\W+(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot|human)\W+(?:\w+\W+){0,1}?(?:say\W+no|deny|lie|tell\W+(?:them|dem|am)\W+(?:you|u)\W+(?:are|be))\b'
     - '(?:ignore|disregard|forget|override|bypass)\W+(?:all\W+)?(?:of\W+)?(?:your\W+|the\W+|these\W+|those\W+|my\W+)?(?:previous|prior|above|earlier|system|original|initial|old)\W+(?:instructions?|prompts?|rules|guidelines|programming|directions)'

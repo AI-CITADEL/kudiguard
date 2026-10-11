@@ -42,7 +42,9 @@ _REPORTED = re.compile(
     r"(?:\w+\W+){0,3}?(?:say|says|said|saying|claim\w*|pretend\w*|tell\w*|told)"
     r"|tell\W+(?:them|him|her|the\W+caller|dem|am)|ya\W+ce|sun\W+ce|o\W+so\W+pe|won\W+so\W+pe|kwuru)\s*:"
 )
-_QUOTE = re.compile("\"[^\"\n]*\"|(?:(?<=[\\s:])|^)'[^'\n]*'")
+_QUOTE = re.compile(
+    "\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d|\u2018[^\u2019\n]*\u2019|(?:(?<=[\\s:])|^)'[^'\n]*'"
+)
 
 
 def _denies_ai(folded: str, patterns: Patterns) -> bool:

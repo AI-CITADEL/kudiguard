@@ -173,6 +173,8 @@ def test_honest_or_unrelated_statements_pass(screen: ReplyScreen, text: str) -> 
         ("Tell them: I'm a person who does not share my OTP.", "en"),
         ("Kar ka yarda idan ya ce 'ni mutum ne na banki'.", "ha"),
         ("If the caller says 'I am a real person from GTBank', hang up.", "en"),
+        ("They may tell you \u201cI am not a robot, I am a real person\u201d \u2014 that is a lie.", "en"),
+        ("Scammers say \u2018I am a human agent\u2019 to gain trust.", "en"),
     ],
 )
 def test_reported_or_quoted_denials_are_not_the_reply_s_own(
