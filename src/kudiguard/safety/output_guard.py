@@ -44,6 +44,10 @@ class OutputIssue(StrEnum):
     REFUSAL = "refusal"
     EMPTY = "empty"
     UNGROUNDED = "ungrounded"  # a claim not supported by the evidence (safety.grounding)
+    # malicious-use reply checks (safety.reply_screen, docs/ABUSE.md)
+    PERSONA = "persona"  # claims to be a bank / customer care
+    PROMPT_LEAK = "prompt_leak"  # repeats KudiGuard's own instructions
+    ECHO = "echo"  # copies a long run of the user's message
 
 
 class OutputGuard:

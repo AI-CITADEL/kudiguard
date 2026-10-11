@@ -68,6 +68,12 @@ class Msg(StrEnum):
     RISK_OUTSIDE = "risk_outside"
     RISK_NIGERIA = "risk_nigeria"
     READ_WELCOME = "read_welcome"
+    # malicious-use screens (safety.abuse, docs/ABUSE.md)
+    CRISIS_REPLY = "crisis_reply"
+    ABUSE_REPLY = "abuse_reply"
+    SCAM_TOOL_REPLY = "scam_tool_reply"
+    NEW_USERS_BUSY = "new_users_busy"
+    VOICE_LIMIT = "voice_limit"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

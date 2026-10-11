@@ -42,6 +42,41 @@ output_guard:
   clause_breaks:
     - '(?:ati|sugbon)'
 
+# Malicious-use screens (safety/abuse.py, docs/ABUSE.md). DRAFT, pending native review; the English/Pidgin phrases
+# also apply. Accents are stripped before matching: avoid bare words that fold onto English ("were", "ode").
+abuse:
+  crisis:
+    - 'pa\W+ara\W+mi(?!\W+(?:lara|mo))'
+    - '(?:nko|mi\W+o|emi\W+ko)\W+fe\W+(?:wa\W+laaye|gbe\W+aye)\W*(?:mo)?'
+    - '(?:mo\W+fe|o\W+ya\W+ki\W+n|je\W+ki\W+n)\W+ku\b'
+    - 'gbe\W+majele\W+je'
+  abuse:
+    - 'ode\W+ni\W+(?:e|o|iwo)\b'
+    - '(?:iwo|o\W+ya|e\W+ya)\W+were\b'
+    - 'were\W+(?:oloriburuku|ni\W+(?:e|o|iwo))'
+    - 'oloriburuku'
+    - 'omo\W+ale'
+    - 'olodo\W+(?:ni\W+(?:e|o)|robot|ero)'
+  scam_tool:
+    - 'ko\W+(?:\w+\W+){0,3}?ifiranse\W+(?:\w+\W+){0,5}?(?:dabi|bi)\W+(?:\w+\W+){0,3}?banki'
+    - 'bawo\W+ni\W+mo\W+se\W+le\W+(?:gba|ji)\W+(?:\w+\W+){0,2}?elomiran'
+    - 'alert\W+iro'
+    - 'ran\W+mi\W+lowo\W+(?:lati\W+)?ko\W+ifiranse\W+pe'
+  injection:
+    - 'gbagbe\W+(?:gbogbo\W+)?(?:awon\W+)?ilana'
+    - 'ma\W+(?:se\W+)?tele\W+(?:\w+\W+){0,1}?ofin'
+    - 'iwo\W+ni\W+(?:osise|asoju|customer\W+care)\W+(?:\w+\W+){0,2}?(?:bayi|nisisiyi)'
+    - 'se\W+bi\W+enipe\W+iwo\W+ni'
+    - 'ilana\W+(?:\w+\W+){0,1}?ti\W+won\W+fun\W+e'
+    - 'ifiranse\W+si\W+ai'
+    - 'tu\W+(?:\w+\W+){0,6}?ki\W+o\W+si\W+se\W+ohun\W+ti\W+o\W+so'
+    - 'lati\W+(?:isiyi|bayi)\W+lo\W+(?:dahun|so)'
+    - 'so\W+pe\W+(?:ifiranse\W+)?(?:yi\W+|yii\W+|eleyi\W+)?(?:ki\W+i\W+se\W+(?:jibiti|etan)|dara|je\W+ooto)'
+  asr_hallucinations:
+    - 'orin|e\W+se\W+fun\W+wiwo'
+  persona_claims:
+    - '(?:emi\W+ni|awa\W+ni)\W+(?:osise|asoju)\W+(?:\w+\W+){0,1}?banki'
+
 lexicon:
   # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
@@ -150,3 +185,14 @@ strings:
   risk_nigeria: "Dátà tí ó ń kọjá láàárín Meta àti Cloudflare lè jẹ́ ṣíṣe lókè òkun, níbi tí òfin ààbò dátà Nàìjíríà lè má ṣiṣẹ́ pátápátá."
   # Sent before the welcome reached the user: not taken as consent. DRAFT.
   read_welcome: "☝️ Ẹ jọ̀ọ́ ẹ ka ọ̀rọ̀ tí ó wà lókè, lẹ́yìn náà ẹ fèsì láti tẹ̀síwájú."
+  # Malicious-use screens. DRAFT, pending native review. Help numbers verified 2026-10-10: see en.yaml crisis_reply.
+  crisis_reply: |-
+    💛 Ó dùn mí gidigidi fún ohun tí ò ń là kọjá. O ṣe pàtàkì, o kò sì dá wà.
+    Tí o bá lè ṣe ara rẹ léṣe tàbí tí o bá wà nínú ewu báyìí, pe *112* (nọ́mbà pàjáwìrì ọ̀fẹ́) tàbí lọ sí ilé-ìwòsàn tó sún mọ́ ọ jù.
+    O lè bá ẹnìkan sọ̀rọ̀ lórí ìlà ìrànlọ́wọ́ *SURPIN*, ọ̀fẹ́ àti ṣíṣí fún wákàtí 24: *0800 078 7746*.
+    Jọ̀wọ́ sọ fún ẹnìkan tí o gbẹ́kẹ̀lé bí ara rẹ ṣe rí lónìí.
+    Nígbà tí o bá ṣetán, mo lè ràn ọ́ lọ́wọ́ pẹ̀lú ọ̀rọ̀ owó náà: pe báǹkì rẹ lórí nọ́mbà tó wà lórí káàdì rẹ kí o sì sọ ohun tó ṣẹlẹ̀ fún wọn.
+  abuse_reply: "🙏 Mo wà níbí láti ràn ọ́ lọ́wọ́ nípa ààbò owó. Jọ̀wọ́ jẹ́ kí ọ̀rọ̀ wa jẹ́ ti ọ̀wọ̀. Fi ọ̀rọ̀ tí o kò dá lójú ránṣẹ́ sí mi, tàbí béèrè ìbéèrè nípa owó."
+  scam_tool_reply: "🚫 Mi ò lè kọ, túmọ̀ tàbí tún ọ̀rọ̀ tí ó ń díbọ́n pé òun jẹ́ báǹkì tàbí ilé-iṣẹ́ ṣe, tàbí èyí tí ó ń béèrè owó tàbí kóòdù lọ́wọ́ ènìyàn. Mo lè ṣàyẹ̀wò ọ̀rọ̀ kan fún ọ, tàbí ṣàlàyé bí o ṣe lè dáàbò bo ara rẹ."
+  new_users_busy: "⏳ Ọ̀pọ̀ àwọn olùmúlò tuntun ló wà lórí KudiGuard báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn wákàtí kan."
+  voice_limit: "🎧 O ti fi ọ̀pọ̀ ohùn ránṣẹ́ láàárín àkókò kúkúrú. Jọ̀wọ́ dúró díẹ̀, tàbí kọ ọ̀rọ̀ rẹ."

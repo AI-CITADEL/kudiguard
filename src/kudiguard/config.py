@@ -10,13 +10,14 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from kudiguard.hosting import StorageLocation
 from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
+ScreenModeName = Literal["off", "shadow", "enforce"]  # = safety.abuse.ScreenMode
 
 
 class Settings(BaseSettings):
@@ -99,6 +100,54 @@ class Settings(BaseSettings):
 
     # --- WhatsApp (optional: the channel is mounted only when configured) -----------------------------------
     whatsapp_enabled: bool = True
+
+    # --- malicious use (docs/ABUSE.md). Modes: off | shadow (log only) | enforce ------------------------------
+    abuse_crisis_mode: ScreenModeName = "enforce"  # self-harm messages: humane fixed reply with help numbers
+    abuse_harassment_mode: ScreenModeName = (
+        "enforce"  # insults / hate / sexual messages at the bot: calm reply
+    )
+    abuse_scam_tool_mode: ScreenModeName = "enforce"  # "write a message that sounds like my bank": refusal
+    abuse_injection_mode: ScreenModeName = (
+        "enforce"  # override / role-play / prompt extraction: rules-only answer
+    )
+    reply_screen_mode: ScreenModeName = (
+        "enforce"  # replies: persona claims, prompt leaks, long echoes of the input
+    )
+    reply_echo_words: int = Field(default=12, ge=4)  # a copied run this long counts as an echo
+    asr_hallucination_mode: ScreenModeName = (
+        "enforce"  # "thanks for watching" on music/noise is not a message
+    )
+    pack_screen_mode: ScreenModeName = (
+        "enforce"  # partner knowledge: quarantine planted instructions/unsafe facts
+    )
+    pack_screen_core_mode: ScreenModeName = "shadow"  # our own reviewed core packs: log only
+    learning_gate_mode: ScreenModeName = "enforce"  # pattern library and voice donations
+    pattern_max_per_user_per_day: int = Field(default=5, ge=1)
+    pattern_max_similar_per_week: int = Field(default=20, ge=1)
+    new_user_mode: ScreenModeName = "enforce"  # rate of users new to the licence window ("busy, try later")
+    new_users_per_hour: int | None = Field(default=40, ge=1)
+    new_users_per_day: int | None = Field(default=200, ge=1)
+    flood_mode: ScreenModeName = (
+        "enforce"  # per-user queue cap, one rate-limit notice per interval, voice budget
+    )
+    max_queued_per_user: int = Field(default=10, ge=1)
+    rate_notice_interval_s: float = Field(default=600.0, ge=0)
+    voice_notes_per_user_per_hour: int | None = Field(default=30, ge=1)
+
+    @field_validator(
+        "new_users_per_hour", "new_users_per_day", "voice_notes_per_user_per_hour", mode="before"
+    )
+    @classmethod
+    def _empty_is_no_cap(cls, value: object) -> object:
+        """An empty value (``KUDIGUARD_NEW_USERS_PER_DAY=``) means no cap."""
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode="after")
+    def _new_user_caps_consistent(self) -> Settings:
+        hour, day = self.new_users_per_hour, self.new_users_per_day
+        if hour is not None and day is not None and hour > day:
+            raise ValueError("KUDIGUARD_NEW_USERS_PER_HOUR cannot exceed KUDIGUARD_NEW_USERS_PER_DAY")
+        return self
 
     @field_validator("guard_classifier_threshold", "guard_classifier_pidgin_mode", mode="before")
     @classmethod

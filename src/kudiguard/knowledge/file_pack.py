@@ -18,6 +18,7 @@ from typing import Any
 import yaml
 from pydantic import TypeAdapter, ValidationError
 
+from kudiguard.knowledge.base import ContentScreen
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.index import EntryIndex
 from kudiguard.knowledge.models import (
@@ -157,11 +158,16 @@ class FilePackSource:
         self._index = EntryIndex(entries, contacts, embedder=embedder)
 
     @classmethod
-    def load(cls, directory: Path, *, embedder: Embedder | None = None) -> FilePackSource:
+    def load(
+        cls, directory: Path, *, embedder: Embedder | None = None, screen: ContentScreen | None = None
+    ) -> FilePackSource:
+        """`screen`: drops planted instructions and unsafe advice before indexing (docs/ABUSE.md)."""
         manifest = load_manifest(directory)
         if not isinstance(manifest.source, FilesSourceSpec):
             raise KnowledgeConfigError(f"{directory}: source type is {manifest.source.type!r}, not 'files'")
         entries, contacts = read_pack_files(directory)
+        if screen is not None:
+            entries, contacts = screen.entries(manifest, entries), screen.contacts(manifest, contacts)
         return cls(manifest, entries, contacts, embedder=embedder)
 
     def __len__(self) -> int:

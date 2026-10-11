@@ -26,7 +26,7 @@ import httpx
 import numpy as np
 from numpy.typing import NDArray
 
-from kudiguard.knowledge.base import KnowledgeSource, SourceUnavailable
+from kudiguard.knowledge.base import ContentScreen, KnowledgeSource, SourceUnavailable
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import FilePackSource, KnowledgeConfigError, load_manifest
 from kudiguard.knowledge.http_source import HttpSource
@@ -269,10 +269,16 @@ def knowledge_base_from_packs(
     allow_samples: bool = False,
     deadline_s: float = 1.5,
     limits: Limits = DEFAULT_LIMITS,
+    screen: ContentScreen | None = None,
 ) -> KnowledgeBase:
     """The supported way to wire a KnowledgeBase: one embedder shared by every index and the query path."""
     sources = build_sources(
-        packs_dir, client=client, include=include, embedder=embedder, allow_samples=allow_samples
+        packs_dir,
+        client=client,
+        include=include,
+        embedder=embedder,
+        allow_samples=allow_samples,
+        screen=screen,
     )
     return KnowledgeBase(sources, embedder=embedder, deadline_s=deadline_s, limits=limits)
 
@@ -286,6 +292,7 @@ def build_sources(
     allow_samples: bool = False,
     env: Mapping[str, str] = os.environ,
     clock: Callable[[], float] = time.monotonic,
+    screen: ContentScreen | None = None,
 ) -> list[KnowledgeSource]:
     """Instantiate sources from ``packs_dir``: every enabled pack, or exactly the ``include`` list.
 
@@ -310,7 +317,9 @@ def build_sources(
     for name in selected:
         manifest = manifests[name]
         if isinstance(manifest.source, HttpSourceSpec):
-            sources.append(HttpSource(manifest, client, env=env, clock=clock, embedder=embedder))
+            sources.append(
+                HttpSource(manifest, client, env=env, clock=clock, embedder=embedder, screen=screen)
+            )
         else:
-            sources.append(FilePackSource.load(available[name], embedder=embedder))
+            sources.append(FilePackSource.load(available[name], embedder=embedder, screen=screen))
     return sources

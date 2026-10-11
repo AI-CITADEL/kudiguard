@@ -385,7 +385,7 @@ async def _check_in_slot(
                 kind=MessageKind.AUDIO if audio is not None else MessageKind.TEXT,
                 outcome=answer.outcome,
                 intent=answer.intent.value if answer.intent else None,
-                transcript=text,
+                transcript=None if answer.screen_action == "crisis" else text,  # sensitive: not kept
                 english=answer.english or None,
                 verdict=answer.verdict if answer.kind is AnswerKind.CHECK else None,
                 flags=answer.flags,
@@ -399,7 +399,8 @@ async def _check_in_slot(
         )
     except Exception:
         log.exception("could not log %s check", channel)
-    await record_pattern(services.store, channel, answer, text or "", created)
+    await record_pattern(services.store, channel, answer, text or "", created, gate=services.learning,
+                         user_key=services.hasher.user_id(user_key))  # fmt: skip
     return answer, transcript, total_ms
 
 
@@ -559,6 +560,11 @@ async def _admit_web_session(services: Services, settings: Settings, session: st
     if full:
         message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
         raise HTTPException(503, {"problem": "at_capacity", "message": message})
+    if not services.new_users.admit(services.hasher.user_id(f"web:{session}")):  # minted sessions (ABUSE.md)
+        message = plain_text(services.engine.messages.text(settings.default_language, Msg.NEW_USERS_BUSY))
+        raise HTTPException(
+            503, {"problem": "busy_new_users", "message": message}, headers={"Retry-After": "3600"}
+        )
     pending.add(session)
     return True
 
@@ -645,9 +651,10 @@ def _web_router() -> APIRouter:
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
             )  # fmt: skip
-            if (
+            if (  # after the response is sent; never a flagged message (docs/ABUSE.md)
                 donating and audio is not None and services.donations is not None
-            ):  # after the response is sent
+                and services.learning.allow_donation(answer.screened)
+            ):  # fmt: skip
                 background.add_task(
                     services.donations.donate,
                     Donation(

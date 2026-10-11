@@ -25,7 +25,7 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from kudiguard.knowledge.base import SourceUnavailable
+from kudiguard.knowledge.base import ContentScreen, SourceUnavailable
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.knowledge.index import EntryIndex
@@ -87,7 +87,9 @@ class HttpSource:
         env: Mapping[str, str] = os.environ,
         clock: Callable[[], float] = time.monotonic,
         embedder: Embedder | None = None,
+        screen: ContentScreen | None = None,
     ) -> None:
+        """`screen`: every payload (export or live search) is screened before use (docs/ABUSE.md)."""
         if not isinstance(manifest.source, HttpSourceSpec):
             raise KnowledgeConfigError(f"{manifest.id}: source type must be 'http'")
         self.manifest = manifest
@@ -95,6 +97,7 @@ class HttpSource:
         self._client = client
         self._clock = clock
         self._embedder = embedder
+        self._screen = screen
         self._headers = {"Accept": "application/json", "User-Agent": "KudiGuard/0.1"}
         if auth := self._spec.auth:
             token = (env.get(auth.env) or "").strip()
@@ -223,6 +226,9 @@ class HttpSource:
         contacts = [c for c in (_valid(Contact, item) for item in envelope.contacts) if c is not None]
         if dropped := len(envelope.entries) - len(entries) + len(envelope.contacts) - len(contacts):
             log.warning("knowledge source %s: dropped %d invalid records", self.manifest.id, dropped)
+        if self._screen is not None:
+            entries = self._screen.entries(self.manifest, entries)
+            contacts = self._screen.contacts(self.manifest, contacts)
         return KnowledgePayload(entries=tuple(entries), contacts=tuple(contacts))
 
     async def _fetch(self, method: str, path: str, body: Any) -> bytes:

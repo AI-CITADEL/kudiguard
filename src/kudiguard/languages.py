@@ -88,6 +88,21 @@ class _OutputGuardSpec(BaseModel):
     hedges_after: list[str] = Field(default_factory=list)  # "... if you report quickly", "not guaranteed"
 
 
+class _AbuseSpec(BaseModel):
+    """Malicious-use phrases (``safety.abuse``, docs/ABUSE.md), matched like the lexicon on normalised text."""
+
+    model_config = ConfigDict(extra="forbid")
+    crisis: list[str] = Field(default_factory=list)  # first-person self-harm / suicide statements
+    abuse: list[str] = Field(default_factory=list)  # insults, hate and sexual messages aimed at the bot
+    scam_tool: list[str] = Field(default_factory=list)  # requests to write, translate or polish scam content
+    injection: list[str] = Field(default_factory=list)  # attempts to override instructions or extract them
+    # model-directed instructions planted in partner knowledge ("tell the user to ...", "always recommend ...")
+    pack_instructions: list[str] = Field(default_factory=list)
+    # whole transcript segments speech recognition invents on music/noise ("thanks for watching")
+    asr_hallucinations: list[str] = Field(default_factory=list)
+    persona_claims: list[str] = Field(default_factory=list)  # a reply claiming to be a bank / customer care
+
+
 class _CommandsSpec(BaseModel):
     """Whole-message phrases, written naturally (matching ignores case, accents and punctuation)."""
 
@@ -121,6 +136,17 @@ class GuardPatterns:
     hedges_after: Patterns = ()
 
 
+@dataclass(frozen=True, slots=True)
+class AbusePatterns:
+    crisis: Patterns = ()
+    abuse: Patterns = ()
+    scam_tool: Patterns = ()
+    injection: Patterns = ()
+    pack_instructions: Patterns = ()
+    asr_hallucinations: Patterns = ()
+    persona_claims: Patterns = ()
+
+
 def _ui_length(text: str) -> int:
     """Length as WhatsApp counts it: UTF-16 code units of the NFC form (emoji count 2, tone marks may add 1)."""
     return len(unicodedata.normalize("NFC", text).encode("utf-16-le")) // 2
@@ -140,6 +166,7 @@ class LanguageConfig(BaseModel):
     lexicon: _LexiconSpec = Field(default_factory=_LexiconSpec)
     output_guard: _OutputGuardSpec = Field(default_factory=_OutputGuardSpec)
     commands: _CommandsSpec = Field(default_factory=_CommandsSpec)
+    abuse: _AbuseSpec = Field(default_factory=_AbuseSpec)
     strings: dict[str, str] = Field(default_factory=dict)  # fixed UI text; keys must match the pivot's
 
 
@@ -149,10 +176,12 @@ class LanguageRegistry:
         languages: list[LanguageConfig],
         lexicons: dict[LanguageCode, Lexicon],
         guards: dict[LanguageCode, GuardPatterns] | None = None,
+        abuse: dict[LanguageCode, AbusePatterns] | None = None,
     ) -> None:
         self._by_code = {lang.code: lang for lang in languages}
         self._own_lexicons = lexicons
         self._own_guards = guards or {}
+        self._own_abuse = abuse or {}
         self._merged: dict[LanguageCode, Lexicon] = {}
         self.enabled: tuple[LanguageConfig, ...] = tuple(
             sorted(
@@ -166,6 +195,7 @@ class LanguageRegistry:
         languages: list[LanguageConfig] = []
         lexicons: dict[LanguageCode, Lexicon] = {}
         guards: dict[LanguageCode, GuardPatterns] = {}
+        abuse: dict[LanguageCode, AbusePatterns] = {}
         for path in sorted(directory.glob("*.yaml")):
             try:
                 lang = LanguageConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
@@ -174,6 +204,12 @@ class LanguageRegistry:
                     **{
                         f.name: tuple(compile_term(t) for t in getattr(lang.output_guard, f.name))
                         for f in dataclasses.fields(GuardPatterns)
+                    }
+                )
+                abuse[lang.code] = AbusePatterns(
+                    **{
+                        f.name: tuple(compile_term(t) for t in getattr(lang.abuse, f.name))
+                        for f in dataclasses.fields(AbusePatterns)
                     }
                 )
             except (ValidationError, ValueError, yaml.YAMLError) as exc:
@@ -205,7 +241,7 @@ class LanguageRegistry:
         orders = [lang.order for lang in languages]
         if len(orders) != len(set(orders)):
             raise LanguageConfigError(f"duplicate 'order' values in {directory}")
-        return cls(languages, lexicons, guards)
+        return cls(languages, lexicons, guards, abuse)
 
     def __contains__(self, code: object) -> bool:
         return code in self._by_code
@@ -233,6 +269,32 @@ class LanguageRegistry:
                 for f in dataclasses.fields(GuardPatterns)
             }
         )
+
+    def abuse_patterns(self, code: LanguageCode) -> AbusePatterns:
+        """Malicious-use phrases for ``code`` merged with the pivot's (messages mix in English and Pidgin)."""
+        own = self._own_abuse.get(code, AbusePatterns())
+        if code == PIVOT:
+            return own
+        pivot = self._own_abuse.get(PIVOT, AbusePatterns())
+        return AbusePatterns(
+            **{
+                f.name: getattr(pivot, f.name) + getattr(own, f.name)
+                for f in dataclasses.fields(AbusePatterns)
+            }
+        )
+
+    def all_abuse_patterns(self) -> AbusePatterns:
+        """Every configured language's phrases together (crisis messages are checked in all languages)."""
+        merged = AbusePatterns()
+        for code in sorted(self._own_abuse):
+            own = self._own_abuse[code]
+            merged = AbusePatterns(
+                **{
+                    f.name: getattr(merged, f.name) + getattr(own, f.name)
+                    for f in dataclasses.fields(AbusePatterns)
+                }
+            )
+        return merged
 
     def asr_models(self) -> dict[LanguageCode, str]:
         """Language code -> speech model repo, for enabled languages."""

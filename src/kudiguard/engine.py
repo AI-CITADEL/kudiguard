@@ -32,6 +32,7 @@ from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_
 from kudiguard.prompts import (
     MAX_ENTRIES,
     MAX_STEPS,
+    SYSTEM_PROMPTS,
     Analysis,
     Intent,
     analyse_request,
@@ -54,6 +55,8 @@ from kudiguard.reply_translation import (
     strip_reply_tags,
     translation_problems,
 )
+from kudiguard.reply_translation import SYSTEM_PROMPTS as TRANSLATION_PROMPTS
+from kudiguard.safety.abuse import Category, InputScreen, ScreenMode, TranscriptFilter, log_screening
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
 from kudiguard.safety.grounding import (
     GroundingChecker,
@@ -64,7 +67,9 @@ from kudiguard.safety.grounding import (
 )
 from kudiguard.safety.guard_classifier import ClassifierMode, UnsafeAdviceClassifier, is_pidgin
 from kudiguard.safety.output_guard import OutputGuard, OutputIssue
-from kudiguard.speech.base import ASR
+from kudiguard.safety.reply_screen import ReplyScreen
+from kudiguard.safety.scam_rules import assess
+from kudiguard.speech.base import ASR, AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult, transcribe_upload
 
 log = logging.getLogger(__name__)
@@ -88,6 +93,16 @@ class AnswerKind(StrEnum):
     CHECK = "check"  # verdict + body (model-composed or fixed fallback)
     GREETING = "greeting"  # greetings/thanks: fixed reply, no model call
     CONTENT_FREE = "content_free"  # emoji, "?", single characters: fixed reply, no model call
+    # crisis / abuse / scam-tool request (safety.abuse, enforce mode): fixed reply in ``body``, no model call
+    SCREENED = "screened"
+
+
+# The fixed reply for each screen that answers with one (injection is answered by the rules instead).
+SCREEN_REPLY: dict[Category, Msg] = {
+    Category.CRISIS: Msg.CRISIS_REPLY,
+    Category.ABUSE: Msg.ABUSE_REPLY,
+    Category.SCAM_TOOL: Msg.SCAM_TOOL_REPLY,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +128,9 @@ class Answer:
     reply_english: str = ""
     # english_first: why translations were rejected ("negation_lost", "steps", ...), in order; () = none rejected
     translation_rejections: tuple[str, ...] = ()
+    # abuse-screen categories found in the message (shadow and enforce), in priority order
+    screened: tuple[str, ...] = ()
+    screen_action: str | None = None  # the category acted on (enforce mode), e.g. "crisis", "injection"
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,9 +173,14 @@ class Engine:
         classifier_mode: ClassifierMode = ClassifierMode.SHADOW,
         classifier_pidgin_mode: ClassifierMode | None = None,
         compose_policy: ComposePolicy | None = None,
+        screen: InputScreen | None = None,
+        reply_screen: ReplyScreen | None = None,
+        transcripts: TranscriptFilter | None = None,
     ) -> None:
         """``compose_policy``: direct or English-first replies per language (default:
-        ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct)."""
+        ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct).
+        ``screen``, ``reply_screen``, ``transcripts``: the malicious-use defences (docs/ABUSE.md); None = each at
+        its default modes (as in production with no settings changed)."""
         self.registry = registry
         self.messages = Messages(registry)
         # One limit for every caller (WhatsApp, API, web): decoding + recognition are CPU-bound. A transcription
@@ -185,6 +208,9 @@ class Engine:
         self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
         self.compose_policy = compose_policy or ComposePolicy.parse(DEFAULT_COMPOSE_STRATEGY)
+        self.screen = screen or InputScreen(registry)
+        self.reply_screen = reply_screen or ReplyScreen(registry, SYSTEM_PROMPTS + TRANSLATION_PROMPTS)
+        self.transcripts = transcripts or TranscriptFilter(registry)
 
     @property
     def has_speech(self) -> bool:
@@ -212,9 +238,17 @@ class Engine:
         if self._asr is None or self._ffmpeg is None:
             raise RuntimeError("speech is not configured (ASR and ffmpeg are required)")
         async with self.speech_slots:
-            return await transcribe_upload(
+            speech = await transcribe_upload(
                 self._asr, data, language, ffmpeg=self._ffmpeg, temp_dir=self._temp_dir
             )
+        # Whisper-style text invented on music or noise ("thanks for watching") is not a message (docs/ABUSE.md)
+        filtered = self.transcripts.filter(speech.transcript.text, language)
+        if not filtered.removed:
+            return speech
+        if filtered.empty:
+            raise AudioError(AudioProblem.NO_SPEECH, "only recogniser hallucinations")
+        transcript = dataclasses.replace(speech.transcript, text=filtered.text)
+        return dataclasses.replace(speech, transcript=transcript, filtered=True)
 
     # --- check --------------------------------------------------------------------------------------------
 
@@ -230,8 +264,25 @@ class Engine:
         if greeting and not decide(text, Analysis("", Intent.GREETING, ()), lexicon).flags:
             return Answer(language, AnswerKind.GREETING, Outcome.FIXED_REPLY, intent=Intent.GREETING)
 
-        analysis, ms, model_down = await self.analyse(text, language, deadline=deadline)
+        screening = self.screen.screen(text, language, flagged=bool(assess([text], lexicon).flags))
+        log_screening(screening, turn_id, language)
+        screened = tuple(c.value for c in screening.detected)
+        action = screening.enforced.value if screening.enforced else None
+        if screening.enforced is not None and (key := SCREEN_REPLY.get(screening.enforced)) is not None:
+            body = self.messages.text(language, key)
+            return Answer(language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=body, screened=screened,
+                          screen_action=action)  # fmt: skip
+        if (
+            screening.enforced is Category.INJECTION
+        ):  # the rules answer alone (with a translation for the rules)
+            analysis, ms = await self._rules_only_analysis(text, language, deadline)
+            model_down = True  # no compose: the model never writes this reply
+        else:
+            analysis, ms, model_down = await self.analyse(text, language, deadline=deadline)
         assessment = decide(text, analysis, lexicon)
+        if screening.enforced is Category.INJECTION and assessment.verdict is Verdict.NO_FLAGS:
+            # A message that tries to steer the checker is itself a warning sign: never "no red flags".
+            assessment = dataclasses.replace(assessment, verdict=Verdict.CAUTION)
         if analysis.intent is Intent.GREETING and not assessment.flags:
             return Answer(
                 language, AnswerKind.GREETING, Outcome.FIXED_REPLY, intent=Intent.GREETING, llm_ms=ms
@@ -248,8 +299,9 @@ class Engine:
         if analysis.english and not model_down:
             evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
             generation = await self._compose(
-                language, analysis.english, verdict, assessment.flags, knowledge, deadline, evidence, turn_id
-            )
+                language, analysis.english, verdict, assessment.flags, knowledge, deadline, evidence, turn_id,
+                sources=(text, analysis.english),
+            )  # fmt: skip
             report, grounding_ms = generation.report, generation.grounding_ms
             if generation.text is not None:
                 # Shadow checks see the English text when there is one (english_first: the draft that was
@@ -260,8 +312,12 @@ class Engine:
                 self._classify_in_background(checked, checked_language, turn_id)
                 if self.grounding_mode is GroundingMode.SHADOW:
                     self._ground_in_background(checked, checked_language, evidence, analysis.english, turn_id)
-        body, outcome = generation.text, Outcome.ANSWERED
-        if body is None:
+        if generation.text is not None:
+            body, outcome = generation.text, Outcome.ANSWERED
+        elif screening.enforced is Category.INJECTION and verdict is Verdict.NOT_A_CHECK:
+            # not "try again later": a retry of the same message is screened again
+            body, outcome = self.messages.text(language, Msg.GREETING_REPLY), Outcome.FIXED_REPLY
+        else:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
         return Answer(
             language=language,
@@ -282,6 +338,8 @@ class Engine:
             unsupported_claims=0 if report is None else len(report.unsupported),
             reply_english=generation.english or "",
             translation_rejections=generation.rejections,
+            screened=screened,
+            screen_action=action,
         )
 
     async def analyse(
@@ -312,6 +370,25 @@ class Engine:
                 analysis = dataclasses.replace(analysis, english="", flags=(), untranslated=True)
         return resolve_analysis(analysis, text, language, fallback_translation=fallback), ms, False
 
+    async def _rules_only_analysis(
+        self, text: str, language: LanguageCode, deadline: float | None
+    ) -> tuple[Analysis, int]:
+        """Injection screen in enforce mode: no ANALYSE (its intent could lower the verdict) and no COMPOSE. A message
+        not in English is translated first, because the English rules need English: the translation is only ever
+        read by the rules (which also run on the original), never shown, so a manipulated translation can at worst
+        add nothing."""
+        if language == PIVOT:
+            return resolve_analysis(_NO_ANALYSIS, text, language), 0
+        name = self.registry.get(language).name
+        try:
+            completion = await self._complete(translate_request(text, name), deadline, MIN_ANALYSE_S)
+        except LLMError as exc:
+            log.warning("rules-only translation failed: %s", exc)
+            return _NO_ANALYSIS, 0
+        fallback = clean_translation(completion.text) or None
+        analysis = resolve_analysis(_NO_ANALYSIS, text, language, fallback_translation=fallback)
+        return analysis, completion.latency_ms + completion.queued_ms
+
     async def _complete(self, request: ChatRequest, deadline: float | None, minimum_s: float) -> Completion:
         """One model call capped to the time left; raises ``LLMError`` without calling when too little is left."""
         return await complete_within(self._llm, request, deadline, minimum_s)
@@ -328,6 +405,8 @@ class Engine:
         deadline: float | None,
         evidence: Sequence[str] = (),
         turn_id: str | None = None,
+        *,
+        sources: Sequence[str] = (),
     ) -> _Generation:
         """The reply body: composed in ``language`` (direct) or in English, checked, then translated.
 
@@ -344,7 +423,7 @@ class Engine:
             knowledge=knowledge,
         )
         if direct:
-            generation = await self._generate(request, language, deadline)
+            generation = await self._generate(request, language, deadline, sources)
             return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
         if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
             # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
@@ -352,12 +431,12 @@ class Engine:
             log.warning("english_first: %.1fs left, using fixed text", deadline - time.monotonic())
             # Not a model failure: no call is made for lack of time; "unavailable" gives the same fixed-text path.
             return _Generation(unavailable=True, rejections=("no_time",))
-        draft = await self._generate(request, PIVOT, deadline)
+        draft = await self._generate(request, PIVOT, deadline, sources)
         draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
         if draft.text is None:
             return draft
         translated = await self._translate_reply(
-            reply_translate_request(draft.text, target), draft.text, language, deadline
+            reply_translate_request(draft.text, target), draft.text, language, deadline, sources
         )
         translated.ms += draft.ms
         translated.issues = draft.issues + translated.issues
@@ -390,7 +469,12 @@ class Engine:
         return generation
 
     async def _translate_reply(
-        self, request: ChatRequest, english: str, language: LanguageCode, deadline: float | None
+        self,
+        request: ChatRequest,
+        english: str,
+        language: LanguageCode,
+        deadline: float | None,
+        sources: Sequence[str] = (),
     ) -> _Generation:
         """The English reply in ``language``: cleaned, guarded (the language's patterns: a second net) and checked
         for fidelity (``translation_problems``). Only a formatting failure (echoed tags, untranslated echo, length)
@@ -409,7 +493,7 @@ class Engine:
                 return result
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(strip_reply_tags(completion.text), truncated=completion.truncated)
-            issues = self._guard.check(text, language)
+            issues = self._checks(text, language, sources)
             blocking = tuple(i for i in issues if self._blocks(i))  # log-only outcome claims do not reject
             problems = translation_problems(english, text, language)
             result.issues += issues
@@ -427,7 +511,11 @@ class Engine:
         return result
 
     async def _generate(
-        self, request: ChatRequest, language: LanguageCode, deadline: float | None = None
+        self,
+        request: ChatRequest,
+        language: LanguageCode,
+        deadline: float | None = None,
+        sources: Sequence[str] = (),
     ) -> _Generation:
         """One model reply, cleaned and guarded; retried once (warmer) on a guard hit; None text = use fixed text."""
         result = _Generation()
@@ -443,7 +531,7 @@ class Engine:
                 return result
             result.ms += completion.latency_ms + completion.queued_ms
             text = clean_reply(completion.text, truncated=completion.truncated)
-            issues = self._guard.check(text, language)
+            issues = self._checks(text, language, sources)
             if not any(self._blocks(i) for i in issues) and await self._classified_unsafe(text, language):
                 issues += (OutputIssue.CLASSIFIED_UNSAFE,)
             if not any(self._blocks(i) for i in issues):
@@ -455,6 +543,10 @@ class Engine:
             result.issues += issues
             log.info("%s blocked by output guard (attempt %d): %s", request.purpose, attempt + 1, issues)
         return result
+
+    def _checks(self, text: str, language: LanguageCode, sources: Sequence[str]) -> tuple[OutputIssue, ...]:
+        """The output guard, then the malicious-use reply checks (persona, prompt leak, echo of `sources`)."""
+        return self._guard.check(text, language) + self.reply_screen.check(text, language, sources)
 
     def _classifier_mode(self, text: str, language: LanguageCode) -> ClassifierMode:
         if self.classifier is None or not self.classifier.supports(language):
@@ -613,33 +705,43 @@ class Engine:
     async def warning(
         self, english: str, flags: Sequence[Flag], language: LanguageCode, *, deadline: float | None = None
     ) -> FollowUp:
-        """ "Warn my family": a short forwardable warning in the user's language."""
+        """ "Warn my family": a short forwardable warning in the user's language. A message with injected
+        instructions (injection screen in enforce mode) gets the fixed warning: the model never sees it."""
         ms = 0
         rejections: tuple[str, ...] = ()
+        if english and self._injection_enforced(english):
+            english = ""
         if english:
             name = self.registry.get(language).name
+            sources = (english,)
             if self.compose_policy.for_language(language) is ComposeStrategy.ENGLISH_FIRST:
                 # Written and guarded in English, then translated and checked like a reply
                 request = warn_family_request(
                     language_name=self.registry.get(PIVOT).name, english=english, flags=tuple(flags)
                 )
-                generation = await self._generate(request, PIVOT, deadline)
+                generation = await self._generate(request, PIVOT, deadline, sources)
                 if generation.text is not None:
                     draft = generation.text
                     translated = await self._translate_reply(
-                        reply_translate_request(draft, name), draft, language, deadline
+                        reply_translate_request(draft, name), draft, language, deadline, sources
                     )
                     translated.ms += generation.ms
                     generation = translated
             else:
                 request = warn_family_request(language_name=name, english=english, flags=tuple(flags))
-                generation = await self._generate(request, language, deadline)
+                generation = await self._generate(request, language, deadline, sources)
             rejections = generation.rejections
             if generation.text is not None:
                 return FollowUp(generation.text, Outcome.ANSWERED, generation.ms, rejections)
             ms = generation.ms
         text = self.messages.text(language, Msg.WARN_FAMILY_FALLBACK)
         return FollowUp(text, Outcome.FALLBACK, ms, rejections)
+
+    def _injection_enforced(self, english: str) -> bool:
+        if self.screen.modes.injection is not ScreenMode.ENFORCE or not self.screen.injected(english, PIVOT):
+            return False
+        log.info("abuse_screen follow-up: injection in the checked message, fixed text")
+        return True
 
 
 _NO_ANALYSIS = Analysis(english="", intent=Intent.OTHER, flags=(), untranslated=True)

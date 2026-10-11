@@ -12,12 +12,14 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any
 
 import httpx
 
 from kudiguard.config import Settings
 from kudiguard.donation import VOICE_RETENTION_DAYS, Sealer, VoiceVault
 from kudiguard.engine import Engine
+from kudiguard.knowledge.base import ContentScreen
 from kudiguard.knowledge.embeddings import Embedder
 from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
@@ -27,9 +29,15 @@ from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.patterns import PATTERN_RETENTION_DAYS
 from kudiguard.pipeline import Conversation, Limits
 from kudiguard.privacy import UserHasher
+from kudiguard.prompts import SYSTEM_PROMPTS
+from kudiguard.reply_translation import SYSTEM_PROMPTS as TRANSLATION_PROMPTS
+from kudiguard.safety.abuse import InputScreen, ScreenMode, ScreenModes, TranscriptFilter
 from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
 from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
+from kudiguard.safety.limits import FloodGuard, LearningGate, NewUserGate
 from kudiguard.safety.output_guard import OutputGuard
+from kudiguard.safety.pack_screen import PackScreen
+from kudiguard.safety.reply_screen import ReplyScreen
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
@@ -52,6 +60,9 @@ class Services:
     conversation: Conversation | None = None  # present when a chat channel (WhatsApp) is configured
     whatsapp: object | None = None  # channels.whatsapp.WhatsAppConfig when configured
     donations: VoiceVault | None = None  # opt-in voice-note donation (WhatsApp and the web page)
+    # abuse limits shared by every channel (safety.limits, docs/ABUSE.md)
+    new_users: NewUserGate = field(default_factory=NewUserGate)
+    learning: LearningGate = field(default_factory=LearningGate)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     background: list[asyncio.Task[None]] = field(default_factory=list)
 
@@ -96,7 +107,7 @@ async def purge_loop(
 
 
 async def build_knowledge(
-    settings: Settings, client: httpx.AsyncClient
+    settings: Settings, client: httpx.AsyncClient, screen: ContentScreen | None = None
 ) -> tuple[KnowledgeBase, Embedder | None]:
     """The knowledge base exactly as the bot searches it, and its embedder (None = keyword search only).
 
@@ -109,6 +120,7 @@ async def build_knowledge(
             include=settings.packs or None,
             embedder=embedder,
             allow_samples=settings.allow_sample_packs,
+            screen=screen,
         )
 
     knowledge, embedder = None, None
@@ -248,6 +260,48 @@ async def build_grounding(
     return grounding
 
 
+def build_pack_screen(settings: Settings, registry: LanguageRegistry) -> PackScreen:
+    return PackScreen(
+        registry,
+        partner_mode=ScreenMode(settings.pack_screen_mode),
+        core_mode=ScreenMode(settings.pack_screen_core_mode),
+    )
+
+
+def build_abuse_screens(settings: Settings, registry: LanguageRegistry) -> dict[str, Any]:
+    """The engine's malicious-use defences from settings (docs/ABUSE.md)."""
+    modes = ScreenModes(
+        crisis=ScreenMode(settings.abuse_crisis_mode),
+        scam_tool=ScreenMode(settings.abuse_scam_tool_mode),
+        abuse=ScreenMode(settings.abuse_harassment_mode),
+        injection=ScreenMode(settings.abuse_injection_mode),
+    )
+    log.info("abuse screens: %s, replies %s, transcripts %s", modes, settings.reply_screen_mode,
+             settings.asr_hallucination_mode)  # fmt: skip
+    return {
+        "screen": InputScreen(registry, modes),
+        "reply_screen": ReplyScreen(
+            registry, SYSTEM_PROMPTS + TRANSLATION_PROMPTS, mode=ScreenMode(settings.reply_screen_mode),
+            echo_words=settings.reply_echo_words,
+        ),
+        "transcripts": TranscriptFilter(registry, ScreenMode(settings.asr_hallucination_mode)),
+    }  # fmt: skip
+
+
+def build_limits(settings: Settings) -> dict[str, Any]:
+    """The new-user gate and the learning gate, shared by WhatsApp and the web page."""
+    return {
+        "new_users": NewUserGate(
+            per_hour=settings.new_users_per_hour, per_day=settings.new_users_per_day,
+            mode=ScreenMode(settings.new_user_mode),
+        ),
+        "learning": LearningGate(
+            per_user_per_day=settings.pattern_max_per_user_per_day,
+            similar_per_week=settings.pattern_max_similar_per_week, mode=ScreenMode(settings.learning_gate_mode),
+        ),
+    }  # fmt: skip
+
+
 async def build_services(settings: Settings) -> Services:
     """Production wiring. Fails fast on missing secrets or broken configuration."""
     from kudiguard.channels.whatsapp import WhatsAppConfig, WhatsAppMessenger
@@ -258,7 +312,7 @@ async def build_services(settings: Settings) -> Services:
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
     try:
-        knowledge, embedder = await build_knowledge(settings, client)
+        knowledge, embedder = await build_knowledge(settings, client, build_pack_screen(settings, registry))
         api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
         llm = OpenAICompatLLM(settings.llm_url, client=client, api_key=api_key)
 
@@ -303,6 +357,7 @@ async def build_services(settings: Settings) -> Services:
                 else None
             ),
             compose_policy=settings.compose_policy([lang.code for lang in registry.enabled]),
+            **build_abuse_screens(settings, registry),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 
@@ -310,7 +365,8 @@ async def build_services(settings: Settings) -> Services:
         store = await SQLiteStore.open(settings.db_path, hasher=hasher)
         closers.append(store.close)
 
-        services = Services(settings, registry, engine, store, hasher, llm, closers=closers)
+        services = Services(settings, registry, engine, store, hasher, llm, closers=closers,
+                            **build_limits(settings))  # fmt: skip
         # Always built (erasure and retention must work even while collection is off).
         services.donations = VoiceVault(
             settings.voice_dir, store, Sealer(settings.voice_secret()), max_per_day=settings.voice_max_per_day,
@@ -340,7 +396,13 @@ async def build_services(settings: Settings) -> Services:
                 donations=services.donations,
                 accept_donations=settings.voice_donation,
                 storage=settings.storage_location,
-            )
+                new_users=services.new_users,
+                flood=FloodGuard(
+                    max_queued=settings.max_queued_per_user, notice_interval_s=settings.rate_notice_interval_s,
+                    voice_per_hour=settings.voice_notes_per_user_per_hour, mode=ScreenMode(settings.flood_mode),
+                ),
+                learning=services.learning,
+            )  # fmt: skip
         services.background.append(
             asyncio.create_task(
                 purge_loop(

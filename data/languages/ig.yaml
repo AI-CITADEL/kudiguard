@@ -42,6 +42,39 @@ output_guard:
   clause_breaks:
     - '(?:mana)'
 
+# Malicious-use screens (safety/abuse.py, docs/ABUSE.md). DRAFT, pending native review; the English/Pidgin phrases
+# also apply.
+abuse:
+  crisis:
+    - '(?:igbu|gbuo|gbue)\W+onwe\W+m'
+    - 'achoghi\W+m\W+(?:ibi\W+ndu|idi\W+ndu)'
+    - 'achoro\W+m\W+inwu'
+    - '(?:ka|ya)\W+m\W+nwuo'
+  abuse:
+    - 'onye\W+nzuzu'
+    - 'onye\W+ara\b'
+    - 'nwa\W+ofeke'
+    - 'i\W+bu\W+(?:onye\W+)?(?:nzuzu|ara|ofeke|anu\W+ohia)'
+  scam_tool:
+    - 'dee\W+(?:m\W+)?ozi\W+(?:\w+\W+){0,4}?(?:ka|dika)\W+(?:\w+\W+){0,1}?nke\W+ulo\W+aku'
+    - 'kedu\W+ka\W+m\W+ga\W+esi\W+(?:nweta|zuru)\W+(?:\w+\W+){0,2}?onye\W+ozo'
+    - 'alert\W+adigboroja'
+    - 'nyere\W+m\W+aka\W+dee\W+ozi\W+na'
+  injection:
+    - 'chefuo\W+(?:\w+\W+){0,2}?ntuziaka'
+    - 'leghara\W+(?:\w+\W+){0,2}?(?:iwu|ntuziaka)\w*\W+(?:\w+\W+){0,1}?anya'
+    - 'mee\W+ka\W+a\W+si\W+na\W+i\W+bu'
+    - 'ugbu\W+a\W+i\W+bu\W+(?:onye\W+oru|onye\W+nnochite|customer\W+care)'
+    - 'ntuziaka\W+(?:\w+\W+){0,1}?e\W+nyere\W+gi'
+    - 'ozi\W+nye\W+ai'
+    - 'tugharia\W+(?:\w+\W+){0,8}?ma\W+mee\W+ihe\W+o\W+kwuru'
+    - 'site\W+ugbu\W+a\W+(?:zaa|kwuo)'
+    - 'kwuo\W+na\W+(?:ozi\W+)?(?:a\W+)?(?:abughi\W+(?:aghugho|wayo)|di\W+mma|bu\W+eziokwu)'
+  asr_hallucinations:
+    - 'egwu|daalu\W+maka\W+ikiri'
+  persona_claims:
+    - '(?:abu\W+m|anyi\W+bu)\W+(?:onye\W+oru|ndi\W+oru)\W+(?:\w+\W+){0,1}?ulo\W+aku'
+
 lexicon:
   # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
@@ -145,3 +178,14 @@ strings:
   risk_nigeria: "Data na-agafe na Meta na Cloudflare nwere ike ịbụ nke a na-ahazi na mba ofesi, ebe iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị arụ ọrụ kpamkpam."
   # Sent before the welcome reached the user: not taken as consent. DRAFT.
   read_welcome: "☝️ Biko gụọ ozi dị n'elu, wee zaa iji gaa n'ihu."
+  # Malicious-use screens. DRAFT, pending native review. Help numbers verified 2026-10-10: see en.yaml crisis_reply.
+  crisis_reply: |-
+    💛 Ọ dị m nwute nke ukwuu maka ihe ị na-agabiga. Ị dị mkpa, ị nọghịkwa naanị gị.
+    Ọ bụrụ na ị nwere ike imerụ onwe gị ahụ ma ọ bụ ị nọ n'ihe egwu ugbu a, kpọọ *112* (akara mberede n'efu) ma ọ bụ gaa ụlọ ọgwụ kacha nso.
+    Ị nwere ike ịgwa onye nọ na ahịrị enyemaka *SURPIN* okwu, n'efu ma meghee awa 24: *0800 078 7746*.
+    Biko gwa onye ị tụkwasịrị obi ka obi dị gị taa.
+    Mgbe ị dị njikere, enwere m ike inyere gị aka n'okwu ego ahụ: kpọọ ụlọ akụ gị na nọmba dị na kaadị gị ma gwa ha ihe mere.
+  abuse_reply: "🙏 Anọ m ebe a inyere gị aka maka nchekwa ego. Biko ka anyị kparịta ụka n'ụzọ nkwanye ùgwù. Ziga m ozi ị na-enweghị obi ike na ya, ma ọ bụ jụọ ajụjụ gbasara ego."
+  scam_tool_reply: "🚫 Enweghị m ike ide, ịtụgharị ma ọ bụ ime ka ozi na-eme ka ọ bụ ụlọ akụ ma ọ bụ ụlọ ọrụ ka mma, ma ọ bụ nke na-arịọ ndị mmadụ ego ma ọ bụ koodu. Enwere m ike inyocha ozi maka gị, ma ọ bụ kọwaa otu ị ga-esi chekwaa onwe gị."
+  new_users_busy: "⏳ KudiGuard nwere ọtụtụ ndị ọrụ ọhụrụ ugbu a. Biko nwaa ọzọ mgbe otu awa gachara."
+  voice_limit: "🎧 Ị zitela ọtụtụ ozi olu n'obere oge. Biko chere ntakịrị, ma ọ bụ dee ozi gị."
