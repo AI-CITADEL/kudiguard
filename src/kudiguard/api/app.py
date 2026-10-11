@@ -6,6 +6,12 @@ The REST API is stateless for callers (no phone numbers needed) but every check 
 evidence (channel ``api`` / ``web``). The web page is a public client of the same engine, rate-limited per client IP;
 the API requires an ``X-API-Key`` and is rate-limited per key.
 
+Partner API and the N-ATLaS licence: ``/v1`` is mounted only when ``KUDIGUARD_PARTNER_API`` is on (off in the pilot).
+Not mounting it (rather than answering 404 from live routes) keeps it out of ``/docs`` and leaves nothing to probe.
+When on, every check names its end user with a pseudonymous ``X-KudiGuard-End-User`` id (never a phone number); the id
+is hashed in its own domain (``api:<key name>:<id>``) and counts toward the licence cap of active end-users per
+rolling 30 days, shared with WhatsApp and the website (one admission lock, so a burst cannot overshoot).
+
 Request hygiene (review M9): bodies over ``MAX_REQUEST_BYTES`` are refused before any parsing; authentication,
 consent and rate limits are checked *before* a multipart form is read; validation errors never echo the input back.
 """
@@ -62,6 +68,11 @@ SMALL_REQUEST_BYTES = 64 * 1024  # JSON endpoints: a 4000-char message is ~16 KB
 LARGE_BODY_PATHS = {"/v1/check/audio": MAX_REQUEST_BYTES, "/web/check": MAX_REQUEST_BYTES,
                     "/webhooks/whatsapp": 2 * 1024 * 1024}  # fmt: skip
 SESSION_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
+END_USER_HEADER = "X-KudiGuard-End-User"
+_END_USER = re.compile(r"[A-Za-z0-9._:-]{8,128}")
+# Phone-shaped ids are refused: digits (and separators) only, or a Nigerian mobile number inside (0803..., 234803...).
+_ONLY_DIGITS = re.compile(r"[\d._:-]+")
+_NIGERIAN_MOBILE = re.compile(r"(?<!\d)(?:234|0)[789][01]\d{8}(?!\d)")
 
 
 # --- schemas --------------------------------------------------------------------------------------------------
@@ -245,10 +256,19 @@ def create_app(
     app.state.api_limiter = RateLimiter(config.api_rate_per_minute)
     app.state.web_limiter = RateLimiter(config.web_rate_per_minute)
     app.state.check_slots = asyncio.Semaphore(MAX_CONCURRENT_API_CHECKS)
-    app.state.pending_web_sessions = set()  # new web sessions whose first check is running (licence cap)
-    app.state.web_admission = asyncio.Lock()
+    app.state.pending_users = set()  # user keys new to the window whose first check is running (licence cap)
+    app.state.admission = asyncio.Lock()  # web and API admissions: check + reserve atomically
     app.state.api_keys = api_keys
-    app.include_router(_v1_router())
+    if config.partner_api:
+        if not api_keys:
+            log.warning(
+                "KUDIGUARD_PARTNER_API is on but KUDIGUARD_API_KEYS is empty: every /v1 call is refused"
+            )
+        app.include_router(_v1_router())
+    elif api_keys:
+        log.warning(
+            "KUDIGUARD_API_KEYS is set but the partner API is off (KUDIGUARD_PARTNER_API): /v1 not mounted"
+        )
     app.include_router(_web_router())
     app.include_router(_health_router())
 
@@ -295,6 +315,33 @@ def _api_client(request: Request) -> str:
 
 
 Client = Annotated[str, Depends(_api_client)]
+
+
+def _end_user(request: Request, client: Client) -> str:
+    """The licence-cap identity of a partner call: ``api:<key name>:<end-user id>`` (hashed by ``UserHasher``).
+
+    The partner must name its end user with a stable pseudonymous id (its own random or hashed id), so each person
+    counts toward the shared cap of active end-users; a phone number (or anything shaped like one) is refused."""
+    value = request.headers.get(END_USER_HEADER, "").strip()
+    if not value:
+        raise HTTPException(
+            400,
+            f"missing {END_USER_HEADER}: send a stable pseudonymous id for the end user (8-128 characters), "
+            "never a phone number; each end user counts toward the N-ATLaS licence cap",
+        )
+    if not _END_USER.fullmatch(value):
+        raise HTTPException(
+            400, f"{END_USER_HEADER} must be 8-128 characters: letters, digits, '.', '_', ':', '-'"
+        )
+    if _ONLY_DIGITS.fullmatch(value) or _NIGERIAN_MOBILE.search(value):
+        raise HTTPException(
+            400,
+            f"{END_USER_HEADER} looks like a phone number: send a pseudonymous id (e.g. a random or hashed id)",
+        )
+    return f"api:{client}:{value}"
+
+
+EndUser = Annotated[str, Depends(_end_user)]
 
 
 def client_ip(request: Request, trust_proxy: bool) -> str:
@@ -479,12 +526,18 @@ def _v1_router() -> APIRouter:
 
     @router.post("/check", response_model=CheckResponse, summary="Check a message (JSON text)")
     async def check(
-        body: CheckRequest, request: Request, services: ServicesDep, client: Client
+        body: CheckRequest, request: Request, services: ServicesDep, user: EndUser
     ) -> CheckResponse:
-        answer, transcript, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}", language=body.language,
-            text=body.text, audio=None,
-        )  # fmt: skip
+        async with _admitted(request, services, user):
+            answer, transcript, ms = await _run_check(
+                request,
+                services,
+                channel="api",
+                user_key=user,
+                language=body.language,
+                text=body.text,
+                audio=None,
+            )
         return _check_response(services, answer, transcript, ms)
 
     @router.post(
@@ -493,22 +546,25 @@ def _v1_router() -> APIRouter:
         summary="Check a voice note (multipart upload)",
         openapi_extra=AUDIO_FORM,
     )
-    async def check_audio(request: Request, services: ServicesDep, client: Client) -> CheckResponse:
-        fields, audio = await _form(request)  # only after the key and rate limit were checked
-        if audio is None:
-            raise HTTPException(422, "missing 'audio' file")
-        answer, transcript, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}",
-            language=fields.get("language", "en"), text=None, audio=audio,
-        )  # fmt: skip
+    async def check_audio(request: Request, services: ServicesDep, user: EndUser) -> CheckResponse:
+        async with _admitted(request, services, user):
+            # only after the key, end user, rate limit and licence cap were checked
+            fields, audio = await _form(request)
+            if audio is None:
+                raise HTTPException(422, "missing 'audio' file")
+            answer, transcript, ms = await _run_check(
+                request, services, channel="api", user_key=user,
+                language=fields.get("language", "en"), text=None, audio=audio,
+            )  # fmt: skip
         return _check_response(services, answer, transcript, ms)
 
     @router.post("/ask", response_model=AskResponse, summary="Ask a money-safety question")
-    async def ask(body: AskRequest, request: Request, services: ServicesDep, client: Client) -> AskResponse:
-        answer, _, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}", language=body.language,
-            text=body.question, audio=None,
-        )  # fmt: skip
+    async def ask(body: AskRequest, request: Request, services: ServicesDep, user: EndUser) -> AskResponse:
+        async with _admitted(request, services, user):
+            answer, _, ms = await _run_check(
+                request, services, channel="api", user_key=user, language=body.language,
+                text=body.question, audio=None,
+            )  # fmt: skip
         result = _check_response(services, answer, None, ms)
         return AskResponse(
             answer=result.explanation, verdict=result.verdict, language=result.language,
@@ -538,29 +594,62 @@ def _v1_router() -> APIRouter:
 
 # --- web voice page --------------------------------------------------------------------------------------------
 
+# /privacy, rendered from settings: what reaches partners only when the operator switches it on.
+LIVE_PACKS_NOTICE = (
+    "<li><strong>Partner knowledge sources:</strong> to answer some questions, the English translation of your message "
+    "(most numbers masked; names are not removed) is sent to a partner organisation's server, which searches its own "
+    "help content. The partner follows its own privacy policy.</li>"
+)
+PARTNER_API_OFF = "An API for partner organisations exists but is switched off during this pilot."
+PARTNER_API_ON = (
+    "Partner organisations can also use it through an API for their own customers; each partner names its users only "
+    "by a coded id, never a phone number."
+)
 
-async def _admit_web_session(services: Services, settings: Settings, session: str, pending: set[str]) -> bool:
-    """N-ATLAS licence cap for the website: a session new to the 30-day window needs room in both the web share
-    and the project-wide cap, counting new sessions whose first check is still running (``pending``), so a burst
-    cannot overshoot. Returning sessions are always served. Returns True for a newly admitted session."""
+
+def _fill(page: str, values: dict[str, str]) -> str:
+    """Replace ``{{NAME}}`` placeholders in one pass: a value can never introduce another placeholder."""
+    return re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page)
+
+
+async def _admit(services: Services, settings: Settings, user_key: str, pending: set[str]) -> bool:
+    """N-ATLAS licence cap for the website and the partner API (``user_key`` is ``web:<session>`` or
+    ``api:<key name>:<end user>``): a user new to the 30-day window needs room in the project-wide cap (every
+    channel, WhatsApp included) and, on the website, in the web share, counting new users whose first check is still
+    running (``pending``), so a burst cannot overshoot. Returning users are always served. Returns True for a newly
+    admitted user."""
     if settings.active_user_cap is None:
         return False
     since = utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
-    if session in pending or await services.store.count_interactions_since(
-        services.hasher.user_id(f"web:{session}"), since
+    if user_key in pending or await services.store.count_interactions_since(
+        services.hasher.user_id(user_key), since
     ):
         return False
-    in_flight = len(pending)
+    store = services.store
+    web_in_flight = sum(key.startswith("web:") for key in pending)
     full = (
-        await services.store.count_active_users_since(since, channels={"web"}) + in_flight
+        user_key.startswith("web:")
+        and await store.count_active_users_since(since, channels={"web"}) + web_in_flight
         >= settings.web_session_cap
-        or await services.store.count_active_users_since(since) + in_flight >= settings.active_user_cap
-    )
+    ) or await store.count_active_users_since(since) + len(pending) >= settings.active_user_cap
     if full:
         message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
         raise HTTPException(503, {"problem": "at_capacity", "message": message})
-    pending.add(session)
+    pending.add(user_key)
     return True
+
+
+@asynccontextmanager
+async def _admitted(request: Request, services: Services, user_key: str) -> AsyncIterator[None]:
+    """Admit ``user_key`` under the licence cap (503 ``at_capacity`` when full) for the duration of its check."""
+    pending: set[str] = request.app.state.pending_users
+    async with request.app.state.admission:  # check + reserve atomically (store counts yield)
+        admitted = await _admit(services, request.app.state.settings, user_key, pending)
+    try:
+        yield
+    finally:
+        if admitted:
+            pending.discard(user_key)  # now counted from the evidence log (or never served)
 
 
 def _web_router() -> APIRouter:
@@ -568,14 +657,22 @@ def _web_router() -> APIRouter:
 
     @router.get("/")
     async def page(request: Request) -> HTMLResponse:
-        """The web page, told whether voice donation is on and where data is stored (its texts follow)."""
+        """The web page, told whether voice donation is on, where data is stored and the configured retention
+        periods (its consent texts render them)."""
         settings: Settings = request.app.state.settings
         config = {
             "donation": settings.voice_donation,
             "storageInNigeria": settings.storage_location is StorageLocation.NIGERIA,
+            "retentionDays": settings.retention_days,
+            "patternRetentionDays": settings.pattern_retention_days,
+        }
+        values = {
+            "CONFIG": json.dumps(config),
+            "RETENTION_DAYS": str(settings.retention_days),
+            "PATTERN_RETENTION_DAYS": str(settings.pattern_retention_days),
         }
         page = (STATIC / "voice.html").read_text(encoding="utf-8")
-        return HTMLResponse(page.replace("{{CONFIG}}", json.dumps(config)))
+        return HTMLResponse(_fill(page, values))
 
     @router.get("/privacy")
     async def privacy(request: Request) -> HTMLResponse:
@@ -609,10 +706,11 @@ def _web_router() -> APIRouter:
                 if settings.voice_retention_days == 365
                 else f"{settings.voice_retention_days} days"
             ),
+            "LIVE_PACKS": LIVE_PACKS_NOTICE if settings.allow_live_packs else "",
+            "PARTNER_API": PARTNER_API_ON if settings.partner_api else PARTNER_API_OFF,
         }
         page = (STATIC / "privacy.html").read_text(encoding="utf-8")
-        # One pass: a value can never introduce another placeholder.
-        return HTMLResponse(re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page))
+        return HTMLResponse(_fill(page, values))
 
     @router.post("/web/check")
     async def web_check(
@@ -633,10 +731,7 @@ def _web_router() -> APIRouter:
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
         _too_many(request.app.state.web_limiter, client_ip(request, settings.trust_proxy_headers))
-        pending: set[str] = request.app.state.pending_web_sessions
-        async with request.app.state.web_admission:  # check + reserve atomically (store counts yield)
-            admitted = await _admit_web_session(services, settings, session, pending)
-        try:
+        async with _admitted(request, services, f"web:{session}"):
             fields, audio = await _form(request)
             text = fields.get("text", "")[:MAX_TEXT_CHARS]
             if audio is None and not text.strip():
@@ -657,9 +752,6 @@ def _web_router() -> APIRouter:
                     ),
                 )  # fmt: skip
             return _check_response(services, answer, transcript, ms)
-        finally:
-            if admitted:
-                pending.discard(session)  # now counted from the evidence log (or never served)
 
     @router.post("/web/donation/withdraw")
     async def withdraw_donation(request: Request, services: ServicesDep) -> dict[str, int]:

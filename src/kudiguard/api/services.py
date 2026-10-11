@@ -11,7 +11,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 
@@ -30,7 +30,7 @@ from kudiguard.privacy import UserHasher
 from kudiguard.safety.grounding import GroundingChecker, GroundingMode, GroundingReport
 from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
 from kudiguard.safety.output_guard import OutputGuard
-from kudiguard.speech.audio import find_ffmpeg
+from kudiguard.speech.audio import find_ffmpeg, sweep_stale_audio
 from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
@@ -109,6 +109,7 @@ async def build_knowledge(
             include=settings.packs or None,
             embedder=embedder,
             allow_samples=settings.allow_sample_packs,
+            allow_live=settings.allow_live_packs,
         )
 
     knowledge, embedder = None, None
@@ -129,6 +130,16 @@ async def build_knowledge(
     return knowledge, embedder
 
 
+def pattern_keep_from(now: datetime, retention_days: int, interval_s: float = PURGE_INTERVAL_S) -> date:
+    """The first day whose scam examples may stay until the next pass: every example still kept then is younger
+    than ``retention_days`` (the promise on /privacy and in the consent text), whatever its time of day.
+
+    Examples carry only their week (Monday), so a week is dropped as soon as its Monday falls before this day; the
+    next pass may run ``interval_s`` (plus ``PURGE_MARGIN``) later, so that much is taken off in advance."""
+    next_pass = now + timedelta(seconds=interval_s) + PURGE_MARGIN
+    return (next_pass - timedelta(days=retention_days)).date() + timedelta(days=1)
+
+
 async def _purge_once(
     store: Store,
     now: datetime,
@@ -142,11 +153,12 @@ async def _purge_once(
     # DELETE markers are dropped one interval (plus a margin for slow passes) early, so none ever outlives
     # DELETION_MARKER_DAYS (/privacy), while still outliving every importable form answer (29 days).
     marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s) + PURGE_MARGIN
+    pattern_cutoff = pattern_keep_from(now, pattern_retention_days, interval_s)
     steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
         ("evidence", lambda: store.purge_before(now - timedelta(days=retention_days))),
         (
             "scam examples",
-            lambda: store.purge_patterns_before((now - timedelta(days=pattern_retention_days)).date()),
+            lambda: store.purge_patterns_before(pattern_cutoff),
         ),
         ("deletion markers", lambda: store.purge_deletion_markers(marker_cutoff)),
     ]
@@ -254,6 +266,7 @@ async def build_services(settings: Settings) -> Services:
 
     hasher = UserHasher(settings.hash_secret.get_secret_value().encode())
     settings.api_key_map()  # validate early
+    await asyncio.to_thread(sweep_stale_audio)  # plaintext audio left in the temp dir by a crash mid-decode
     registry = LanguageRegistry.load(settings.data_dir / "languages")
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
     closers: list[Callable[[], Awaitable[None]]] = [client.aclose]
@@ -328,6 +341,8 @@ async def build_services(settings: Settings) -> Services:
                 active_user_cap=settings.active_user_cap,
                 turn_deadline_s=settings.turn_deadline_s,
                 default_language=settings.default_language,
+                retention_days=settings.retention_days,
+                pattern_retention_days=settings.pattern_retention_days,
             )
             services.whatsapp = whatsapp
             services.conversation = Conversation(

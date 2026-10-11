@@ -22,8 +22,8 @@ against the gazetted text before filing.
     preconsent`.
     * Each row needs a valid Nigerian mobile number, all three boxes ticked and a past timestamp; otherwise
       nothing is imported.
-    * A form answer never overrides a later STOP, withdrawal, decline or chat activity, and answers older than 30
-      days are skipped.
+    * A form answer never overrides a later STOP, withdrawal, decline or chat activity, and answers older than 29
+      days are skipped (`voice_cli.PRECONSENT_MAX_AGE_DAYS`).
     * A STOPped user who returns starts without donation consent.
     * Imported testers are not asked again in the chat.
     * An import never implies main consent: the tester's first message, whatever it is, gets the welcome, which

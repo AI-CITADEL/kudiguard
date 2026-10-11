@@ -141,7 +141,9 @@ class Store(Protocol):
         ...
 
     async def purge_patterns_before(self, cutoff: date) -> int:
-        """Delete scam examples from weeks before ``cutoff``'s week (their own, longer retention). Rows removed."""
+        """Delete scam examples whose week starts before ``cutoff`` (their own, longer retention): such a week may
+        hold an example dated before ``cutoff``, so none outlives it (a week's later examples go a few days early).
+        Rows removed."""
         ...
 
     async def export_patterns(self) -> list[dict[str, Any]]:

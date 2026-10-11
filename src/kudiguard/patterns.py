@@ -9,7 +9,8 @@ messages (``storage``), and examples are kept for ``PATTERN_RETENTION_DAYS``, as
 /privacy.
 
 Uses (disclosed): protecting others and improving KudiGuard's detection: new lexicon phrasings and blind test cases
-(written by people, never auto-tuned), scam-trend reports and, after a separate review, training its models.
+(written by people, never auto-tuned) and scam-trend reports. Not model training: no training pipeline exists, and
+neither the consent text nor /privacy offers it (adding it would need a new consent text).
 """
 
 from __future__ import annotations

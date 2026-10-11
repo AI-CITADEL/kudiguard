@@ -28,11 +28,14 @@ VOICE_NOTE = ROOT / "tests" / "fixtures" / "voice_note_en_otp.ogg"
 KEY = "k" * 32
 OTP_SCAM = "Someone called and asked me to send the OTP sent to my phone. Is this a scam?"
 SESSION = "abcdef0123456789abcdef"
+END_USER = "partner-user-0001"  # the partner's pseudonymous id for its customer (licence cap)
+API = {"x-api-key": KEY, "x-kudiguard-end-user": END_USER}
 
 
 def settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "api_keys": (f"tester:{KEY}",),
+        "partner_api": True,
         "whatsapp_enabled": False,
         "hash_secret": "s" * MIN_SECRET_BYTES,
         "_env_file": None,
@@ -49,9 +52,13 @@ class Api:
     asr: FakeASR
     store: MemoryStore
 
-    async def check(self, text: str = OTP_SCAM, language: str = "en", key: str = KEY) -> httpx.Response:
+    async def check(
+        self, text: str = OTP_SCAM, language: str = "en", key: str = KEY, user: str = END_USER
+    ) -> httpx.Response:
         return await self.client.post(
-            "/v1/check", json={"text": text, "language": language}, headers={"x-api-key": key}
+            "/v1/check",
+            json={"text": text, "language": language},
+            headers={"x-api-key": key, "x-kudiguard-end-user": user},
         )
 
 
@@ -106,9 +113,7 @@ async def test_not_ready_before_startup() -> None:
     app = create_app(settings())
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         assert (await client.get("/readyz")).status_code == 503
-        assert (
-            await client.post("/v1/check", json={"text": "x"}, headers={"x-api-key": KEY})
-        ).status_code == 503
+        assert (await client.post("/v1/check", json={"text": "x"}, headers=API)).status_code == 503
 
 
 # --- /v1/check -------------------------------------------------------------------------------------------------
@@ -137,7 +142,7 @@ async def test_check_scam_in_hausa(api: Api) -> None:
     [({"text": "x", "language": "fr"}, 422), ({"text": ""}, 422), ({"text": "x" * 4001}, 422), ({}, 422)],
 )
 async def test_check_validation(api: Api, payload: dict[str, object], status: int) -> None:
-    response = await api.client.post("/v1/check", json=payload, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check", json=payload, headers=API)
     assert response.status_code == status
 
 
@@ -175,9 +180,7 @@ async def test_evidence_failure_never_breaks_the_answer(api: Api, monkeypatch: p
 
 async def test_check_audio(api: Api) -> None:
     files = {"audio": ("note.ogg", VOICE_NOTE.read_bytes(), "audio/ogg")}
-    response = await api.client.post(
-        "/v1/check/audio", files=files, data={"language": "en"}, headers={"x-api-key": KEY}
-    )
+    response = await api.client.post("/v1/check/audio", files=files, data={"language": "en"}, headers=API)
     body = response.json()
     assert response.status_code == 200 and body["transcript"] == OTP_SCAM and body["verdict"] == "likely_scam"
     assert (await api.store.export_interactions())[-1]["kind"] == "audio"
@@ -186,32 +189,31 @@ async def test_check_audio(api: Api) -> None:
 @pytest.mark.parametrize(("content", "status"), [(b"", 422), (b"not audio at all", 422)])
 async def test_bad_audio(api: Api, content: bytes, status: int) -> None:
     files = {"audio": ("x.ogg", content, "audio/ogg")}
-    response = await api.client.post("/v1/check/audio", files=files, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check/audio", files=files, headers=API)
     assert response.status_code == status
 
 
 async def test_audio_too_large(api: Api, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "MAX_AUDIO_BYTES", 10)
     files = {"audio": ("x.ogg", b"x" * 11, "audio/ogg")}
-    response = await api.client.post("/v1/check/audio", files=files, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check/audio", files=files, headers=API)
     assert response.status_code == 413
 
 
 async def test_speech_failure_is_503(api: Api) -> None:
     api.asr.error = ASRError("model missing")
     files = {"audio": ("note.ogg", VOICE_NOTE.read_bytes(), "audio/ogg")}
-    response = await api.client.post("/v1/check/audio", files=files, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check/audio", files=files, headers=API)
     assert response.status_code == 503
 
 
 async def test_voice_disabled_is_501(registry: LanguageRegistry) -> None:
     async for api in _start(registry, settings(), speech=False):
         files = {"audio": ("note.ogg", VOICE_NOTE.read_bytes(), "audio/ogg")}
-        response = await api.client.post("/v1/check/audio", files=files, headers={"x-api-key": KEY})
+        response = await api.client.post("/v1/check/audio", files=files, headers=API)
         assert response.status_code == 501
         assert all(
-            lang["voice"] is False
-            for lang in (await api.client.get("/v1/languages", headers={"x-api-key": KEY})).json()
+            lang["voice"] is False for lang in (await api.client.get("/v1/languages", headers=API)).json()
         )
 
 
@@ -224,7 +226,7 @@ async def test_ask(api: Api) -> None:
     response = await api.client.post(
         "/v1/ask",
         json={"question": "How do I open a savings account?", "language": "en"},
-        headers={"x-api-key": KEY},
+        headers=API,
     )
     body = response.json()
     assert response.status_code == 200 and body["verdict"] == "not_a_check" and "BVN" in body["answer"]
@@ -232,9 +234,9 @@ async def test_ask(api: Api) -> None:
 
 
 async def test_languages_and_topics(api: Api) -> None:
-    languages = (await api.client.get("/v1/languages", headers={"x-api-key": KEY})).json()
+    languages = (await api.client.get("/v1/languages", headers=API)).json()
     assert [lang["code"] for lang in languages] == ["ha", "yo", "ig", "en"]
-    topics = (await api.client.get("/v1/topics", headers={"x-api-key": KEY})).json()
+    topics = (await api.client.get("/v1/topics", headers=API)).json()
     assert any(t["id"] == "flag-asks-credentials" and t["pack"] == "kudiguard-core" for t in topics)
 
 
@@ -330,7 +332,7 @@ async def test_oversized_bodies_are_refused_before_parsing(api: Api, monkeypatch
     from kudiguard.api.app import MAX_REQUEST_BYTES
 
     big = b"x" * (MAX_REQUEST_BYTES + 1)
-    declared = await api.client.post("/v1/check/audio", content=big, headers={"x-api-key": KEY})
+    declared = await api.client.post("/v1/check/audio", content=big, headers=API)
     assert declared.status_code == 413
 
     async def chunks():  # type: ignore[no-untyped-def]
@@ -353,20 +355,18 @@ async def test_auth_and_consent_are_checked_before_the_form_is_read(api: Api) ->
     garbage = {"content-type": "multipart/form-data; boundary=x"}
     assert (await api.client.post("/v1/check/audio", content=b"garbage", headers=garbage)).status_code == 401
     assert (await api.client.post("/web/check", content=b"garbage", headers=garbage)).status_code == 403
-    malformed = await api.client.post(
-        "/v1/check/audio", content=b"garbage", headers={**garbage, "x-api-key": KEY}
-    )
+    malformed = await api.client.post("/v1/check/audio", content=b"garbage", headers={**garbage, **API})
     assert malformed.status_code == 422
 
 
 async def test_audio_form_without_file(api: Api) -> None:
-    response = await api.client.post("/v1/check/audio", data={"language": "en"}, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check/audio", data={"language": "en"}, headers=API)
     assert response.status_code == 422 and "audio" in response.json()["detail"]
 
 
 async def test_validation_errors_do_not_echo_input(api: Api) -> None:
     secret = "my pin is 1234 " * 400
-    response = await api.client.post("/v1/check", json={"text": secret}, headers={"x-api-key": KEY})
+    response = await api.client.post("/v1/check", json={"text": secret}, headers=API)
     assert response.status_code == 422 and "my pin" not in response.text
 
 
@@ -520,7 +520,7 @@ async def test_json_endpoints_have_a_small_body_cap(api: Api) -> None:
             yield b"x" * SMALL_REQUEST_BYTES
 
     streamed = await api.client.post(
-        "/v1/check", content=chunked(), headers={"content-type": "application/json", "x-api-key": KEY}
+        "/v1/check", content=chunked(), headers={"content-type": "application/json", **API}
     )
     assert streamed.status_code == 413  # not FastAPI's generic 400
 
@@ -595,7 +595,7 @@ async def test_a_burst_of_new_web_sessions_cannot_overshoot_the_share(registry: 
 
         codes = await asyncio.gather(*(new_session(n) for n in range(5)))
         assert sorted(codes) == [200, 200, 503, 503, 503]
-        assert api.app.state.pending_web_sessions == set()
+        assert api.app.state.pending_users == set()
 
 
 async def test_outdated_web_consent_is_refused(api: Api) -> None:
@@ -654,3 +654,169 @@ async def test_check_passes_a_hashed_turn_id(api: Api, monkeypatch: pytest.Monke
     # the stored row keeps the same hashed key (storage.protect), so logs and evidence can be joined later
     stored = list(api.store._interactions.values())[-1]  # type: ignore[attr-defined]
     assert isinstance(turn_id, str) and len(turn_id) == 32 and turn_id == stored.message_id
+
+
+# --- partner API: off by default, end users named and counted (N-ATLaS licence) ------------------------------
+
+
+async def test_partner_api_is_off_by_default(
+    registry: LanguageRegistry, caplog: pytest.LogCaptureFixture
+) -> None:
+    async for api in _start(registry, settings(partner_api=False)):
+        for path in ("/v1/check", "/v1/ask", "/v1/check/audio"):
+            assert (await api.client.post(path, json={"text": "x"}, headers=API)).status_code == 404
+        assert (await api.client.get("/v1/languages", headers=API)).status_code == 404
+        assert not any(p.startswith("/v1") for p in (await api.client.get("/openapi.json")).json()["paths"])
+        assert (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)).status_code == 200
+    assert "partner API is off" in caplog.text  # keys configured but unused: say so
+    assert Settings(_env_file=None).partner_api is False  # type: ignore[call-arg]
+
+
+def test_partner_api_on_without_keys_warns(caplog: pytest.LogCaptureFixture) -> None:
+    create_app(settings(api_keys=()))
+    assert "every /v1 call is refused" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        (None, "missing"),
+        ("", "missing"),
+        ("short", "8-128"),
+        ("x" * 129, "8-128"),
+        ("has space inside", "8-128"),
+        ("+2348031234567", "8-128"),  # '+' is not allowed at all
+        ("08031234567", "phone"),
+        ("2348031234567", "phone"),
+        ("0803-123-4567", "phone"),
+        ("447911123456", "phone"),  # digits only: any country
+        ("user_08031234567", "phone"),
+        ("tel:2348031234567", "phone"),
+    ],
+)
+async def test_every_partner_call_names_a_pseudonymous_end_user(
+    api: Api, value: str | None, reason: str
+) -> None:
+    headers = {"x-api-key": KEY} | ({} if value is None else {"x-kudiguard-end-user": value})
+    for path, body in (("/v1/check", {"text": OTP_SCAM}), ("/v1/ask", {"question": "What is BVN?"})):
+        response = await api.client.post(path, json=body, headers=headers)
+        assert response.status_code == 400 and reason in response.json()["detail"]
+    audio = await api.client.post("/v1/check/audio", content=b"garbage", headers=headers)
+    assert audio.status_code == 400  # before the form is read
+    assert await api.store.export_interactions() == []
+
+
+@pytest.mark.parametrize(
+    "value", ["550e8400-e29b-41d4-a716-446655440000", "a3f9c2d17be04c55a1e2f3b4c5d6e7f8", "cust.000123:web"]
+)
+async def test_pseudonymous_ids_are_accepted(api: Api, value: str) -> None:
+    assert (await api.check(user=value)).status_code == 200
+
+
+async def test_a_missing_key_is_401_before_the_end_user_is_checked(api: Api) -> None:
+    response = await api.client.post(
+        "/v1/check", json={"text": "x"}, headers={"x-kudiguard-end-user": "08031234567"}
+    )
+    assert response.status_code == 401
+
+
+async def test_each_end_user_is_hashed_in_the_partner_domain(api: Api) -> None:
+    await api.check(user="customer-aaaa")
+    await api.check(user="customer-bbbb")
+    await api.check(user="customer-aaaa")
+    rows = list(api.store._interactions.values())  # type: ignore[attr-defined]
+    hasher = api.app.state.services.hasher
+    hashes = {r.user_hash for r in rows}
+    assert {r.channel for r in rows} == {"api"}
+    assert len(hashes) == 2  # one per end user, not one per partner key
+    assert hasher.user_id("api:tester:customer-aaaa") in hashes
+    assert hasher.user_id("web:customer-aaaa") != hasher.user_id("api:tester:customer-aaaa")  # own domain
+    assert "customer-aaaa" not in str(rows)
+
+
+async def test_partner_end_users_count_toward_the_shared_licence_cap(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(active_user_cap=2, web_session_cap=50)):
+        assert (await api.check(user="customer-aaaa")).status_code == 200
+        assert (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)).status_code == 200
+        full = await api.check(user="customer-bbbb")  # a new end user: the project-wide cap is reached
+        assert full.status_code == 503 and full.json()["detail"]["problem"] == "at_capacity"
+        assert full.json()["detail"]["message"]
+        bbbb = {**API, "x-kudiguard-end-user": "customer-bbbb"}
+        assert (await api.client.post("/v1/ask", json={"question": "x"}, headers=bbbb)).status_code == 503
+        audio = await api.client.post("/v1/check/audio", content=b"garbage", headers=bbbb)
+        assert audio.status_code == 503  # refused before the upload is read
+        assert (await api.check(user="customer-aaaa")).status_code == 200  # a returning end user is served
+        other = {**WEB, "x-kudiguard-session": "zzzzzzzzzzzzzzzzzzzz"}
+        assert (
+            await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=other)
+        ).status_code == 503
+        assert api.app.state.pending_users == set()
+
+
+async def test_whatsapp_users_fill_the_cap_for_partners_too(registry: LanguageRegistry) -> None:
+    from kudiguard.domain import Interaction, MessageKind
+
+    async for api in _start(registry, settings(active_user_cap=1)):
+        await api.store.add_interaction(
+            Interaction(
+                channel="whatsapp", message_id="m1", user_hash="h" * 32, language="en", kind=MessageKind.TEXT
+            )
+        )
+        assert (await api.check()).status_code == 503
+
+
+async def test_the_web_share_does_not_limit_partner_users(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(active_user_cap=10, web_session_cap=1)):
+        assert (await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)).status_code == 200
+        assert (
+            await api.check(user="customer-aaaa")
+        ).status_code == 200  # the web share is full, the cap is not
+
+
+async def test_a_burst_of_new_partner_users_cannot_overshoot_the_cap(registry: LanguageRegistry) -> None:
+    import asyncio
+
+    async for api in _start(registry, settings(active_user_cap=2, api_rate_per_minute=100)):
+        api.llm.delay_s = 0.05  # first checks overlap
+
+        async def new_user(n: int, api: Api = api) -> int:
+            return (await api.check(user=f"burst-user-{n:04d}")).status_code
+
+        codes = await asyncio.gather(*(new_user(n) for n in range(6)))
+        assert sorted(codes) == [200, 200, 503, 503, 503, 503]
+        assert api.app.state.pending_users == set()
+        assert len({r.user_hash for r in api.store._interactions.values()}) == 2  # type: ignore[attr-defined]
+
+
+async def test_privacy_page_says_whether_the_partner_api_and_live_packs_are_on(
+    registry: LanguageRegistry,
+) -> None:
+    from kudiguard.api.app import LIVE_PACKS_NOTICE, PARTNER_API_OFF, PARTNER_API_ON
+
+    async for api in _start(registry, settings(partner_api=False)):
+        page = (await api.client.get("/privacy")).text
+        assert PARTNER_API_OFF in page and PARTNER_API_ON not in page and LIVE_PACKS_NOTICE not in page
+        assert "training" not in page and "{{" not in page
+        assert "the deletion check runs every 6 hours" in page
+    async for api in _start(registry, settings(allow_live_packs=True)):
+        page = (await api.client.get("/privacy")).text
+        assert PARTNER_API_ON in page and LIVE_PACKS_NOTICE in page and "{{" not in page
+
+
+async def test_web_page_renders_the_configured_retention(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(retention_days=30, pattern_retention_days=400)):
+        page = (await api.client.get("/")).text
+        assert "for up to 30 days" in page and "for up to 400 days" in page  # the no-JavaScript fallback
+        assert '"retentionDays": 30, "patternRetentionDays": 400' in page and "{{" not in page
+        assert "90 days" not in page and "2 years" not in page
+        assert page.count("{days}") == page.count("{patternDays}") == 5  # 4 languages + the renderer
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("retention_days", 91), ("pattern_retention_days", 731), ("retention_days", 0)]
+)
+def test_retention_cannot_exceed_the_published_promise(field: str, value: int) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        settings(**{field: value})

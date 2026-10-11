@@ -446,7 +446,7 @@ class SQLiteStore:
 
     async def purge_patterns_before(self, cutoff: date) -> int:
         cursor = await self._run(
-            lambda db: db.execute("DELETE FROM scam_patterns WHERE week < ?", (week_of(cutoff).isoformat(),))
+            lambda db: db.execute("DELETE FROM scam_patterns WHERE week < ?", (cutoff.isoformat(),))
         )
         return int(cursor.rowcount)
 

@@ -80,6 +80,8 @@ class Harness:
         # The default storage location fills the welcome's and the offer's {where} and {risk}.
         params.setdefault("where", self.messages.text(lang, Msg.WHERE_OUTSIDE))
         params.setdefault("risk", self.messages.text(lang, Msg.RISK_OUTSIDE))
+        params.setdefault("retention_days", "90")  # Limits' defaults (= Settings')
+        params.setdefault("pattern_retention_days", "730")
         return self.messages.text(lang, key, **params)
 
     @property
@@ -119,6 +121,14 @@ async def test_first_contact_gets_welcome_and_language_menu_without_processing(h
     assert h.llm.requests == [] and await interactions(h) == []  # nothing processed before consent
     user = await h.store.get_user(h.user_hash)
     assert user is not None and user.consented_at is None
+
+
+@pytest.mark.parametrize("language", ["en", "ha", "yo", "ig"])
+async def test_welcome_states_the_configured_retention_periods(h: Harness, language: str) -> None:
+    h.configure(retention_days=30, pattern_retention_days=400)
+    texts = await h.say({"en": "hello", "ha": "Sannu", "yo": "Ẹ n lẹ", "ig": "Ndewo"}[language])
+    welcome = h.t(Msg.WELCOME, language, retention_days="30", pattern_retention_days="400")
+    assert texts[0] == welcome and "30" in welcome and "400" in welcome and "{" not in welcome
 
 
 async def test_greeting_in_hausa_gets_hausa_welcome(h: Harness) -> None:

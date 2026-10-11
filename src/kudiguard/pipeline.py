@@ -38,7 +38,7 @@ from kudiguard.engine import Answer, AnswerKind, Engine
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageStatus
-from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
+from kudiguard.patterns import PATTERN_CHANNELS, PATTERN_RETENTION_DAYS, ScamPattern
 from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
 from kudiguard.speech.audio import MAX_SECONDS
@@ -147,6 +147,9 @@ class Limits:
     max_waiting_turns: int = 200  # beyond this, new turns get a "busy, try again" reply (bounded memory)
     turn_deadline_s: float = 60.0  # hard limit per turn, including model queueing
     default_language: LanguageCode = "en"
+    # Shown in the welcome (consent) text: the configured retention periods (Settings), so the text never drifts.
+    retention_days: int = 90
+    pattern_retention_days: int = PATTERN_RETENTION_DAYS
 
     def __post_init__(self) -> None:
         if (
@@ -819,10 +822,13 @@ class Conversation:
         return len(await self._store.delete_voice_samples(user_hash))  # no files on this server; the rows go
 
     def _hosting(self, language: LanguageCode) -> dict[str, str]:
-        """``{where}`` and ``{risk}`` of the welcome and offer texts, for the configured storage location."""
+        """``{where}`` and ``{risk}`` (the configured storage location) and the retention periods of the welcome and
+        offer texts."""
         return {
             "where": self._messages.text(language, self._storage.message),
             "risk": self._messages.text(language, self._storage.risk),
+            "retention_days": str(self._limits.retention_days),
+            "pattern_retention_days": str(self._limits.pattern_retention_days),
         }
 
     # --- helpers ----------------------------------------------------------------------------------------

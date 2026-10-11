@@ -181,7 +181,7 @@ class MemoryStore:
 
     async def purge_patterns_before(self, cutoff: date) -> int:
         self._ensure_open()
-        old = [k for k, p in self._patterns.items() if p.week < week_of(cutoff)]
+        old = [k for k, p in self._patterns.items() if p.week < cutoff]  # see Store.purge_patterns_before
         for key in old:
             del self._patterns[key]
         return len(old)
