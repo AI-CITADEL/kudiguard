@@ -209,6 +209,7 @@ async def test_build_sources_default_is_every_enabled_real_pack() -> None:
     async with httpx.AsyncClient() as client:
         sources = build_sources(PACKS, client=client)
     assert [s.manifest.id for s in sources] == [
+        "genuine-notices",
         "kudiguard-core",
         "money-skills",
     ]  # fictional samples stay off
