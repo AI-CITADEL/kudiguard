@@ -199,7 +199,10 @@ def test_purge_removes_expired_voice_samples(
     assert (
         capsys.readouterr()
         .out.strip()
-        .endswith("0 donated voice samples older than 365 days; 0 DELETE markers older than 30 days")
+        .endswith(
+            "0 donated voice samples older than 365 days; 0 DELETE markers older than 30 days; "
+            "0 scam examples older than 730 days"
+        )
     )
     monkeypatch.setenv("KUDIGUARD_VOICE_RETENTION_DAYS", "1")
     assert cli.main(["purge"]) == 0

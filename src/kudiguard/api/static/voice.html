@@ -90,10 +90,10 @@
     <div style="margin-top: 14px;" class="consent">
       <input type="checkbox" id="consent">
       <label for="consent" style="font-weight: 400; margin: 0;" data-i18n="consent">
-        I agree that KudiGuard keeps my message (most numbers removed) for up to 90 days to improve the service;
-        a few trusted reviewers under written confidentiality may read a de-identified sample (numbers masked, no id)
+        I agree that KudiGuard keeps my message (most numbers removed) for up to {{RETENTION_DAYS}} days to improve the service;
+        a few trusted reviewers under written confidentiality may read a de-identified sample (most numbers masked, no id)
         to check quality and safety, and delete their copies afterwards. Voice recordings are deleted after
-        transcription unless I choose to donate them below. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard. Guidance only, not financial advice.
+        transcription unless I choose to donate them below. Scam examples (most numbers removed) are kept separately for up to {{PATTERN_RETENTION_DAYS}} days to protect others and improve KudiGuard. Guidance only, not financial advice.
         Messages pass through Cloudflare outside Nigeria and are stored on our server (see Privacy for where).
       </label>
     </div>
@@ -138,7 +138,7 @@
     en: { placeholder: "Someone called and said my BVN is blocked…", tagline: "Not sure about a message or call? Check it here in your language.", language: "Language",
           record: "🎤 Tap to record", stop: "⏹️ Tap to stop", describe: "Describe the call or read out the message.",
           or: "or type / paste it", check: "Check", clear: "Clear", checking: "🔎 Checking…",
-          consent: "I agree that KudiGuard keeps my message (most numbers removed) for up to 90 days to improve the service; a few trusted reviewers under written confidentiality may read a de-identified sample (numbers masked, no id) to check quality and safety, and delete their copies afterwards. Voice recordings are deleted after transcription unless I choose to donate them below. Scam examples (most numbers removed) are kept separately for up to 2 years to protect others and improve KudiGuard. Guidance only, not financial advice. Messages pass through Cloudflare outside Nigeria and are stored on our server {where}. {risk} I agree to this transfer.",
+          consent: "I agree that KudiGuard keeps my message (most numbers removed) for up to {days} days to improve the service; a few trusted reviewers under written confidentiality may read a de-identified sample (most numbers masked, no id) to check quality and safety, and delete their copies afterwards. Voice recordings are deleted after transcription unless I choose to donate them below. Scam examples (most numbers removed) are kept separately for up to {patternDays} days to protect others and improve KudiGuard. Guidance only, not financial advice. Messages pass through Cloudflare outside Nigeria and are stored on our server {where}. {risk} I agree to this transfer.",
           donate: "Optional: donate my voice recordings to help KudiGuard understand Nigerian languages. I am 18 or older and will record only my own voice, not other people. Kept encrypted on our server {where} for up to 12 months, heard only by trusted reviewers and transcribers under confidentiality, never used to identify me. Untick at any time to stop and delete them. {risk}",
           whereOutside: "outside Nigeria during the pilot", whereNigeria: "in Nigeria",
           riskOutside: "Nigerian data-protection law may not fully protect data held abroad.", riskNigeria: "Data passing through Cloudflare may be processed abroad, where Nigerian data-protection law may not fully apply.", copied: "Copied", copy: "Copy",
@@ -150,7 +150,7 @@
     ha: { placeholder: "Wani ya kira ni ya ce an toshe BVN ɗina…", tagline: "Kuna shakka game da saƙo ko kira? Ku duba shi a nan da harshenku.", language: "Harshe",
           record: "🎤 Taɓa don yin rikodi", stop: "⏹️ Taɓa don tsayawa", describe: "Ku bayyana kiran ko ku karanta saƙon.",
           or: "ko ku rubuta / liƙa shi", check: "Duba", clear: "Share", checking: "🔎 Ana dubawa…",
-          consent: "Na amince KudiGuard ta adana saƙona (an cire yawancin lambobi) har kwanaki 90 don inganta aikin; wasu ƙalilan amintattun masu bita ƙarƙashin yarjejeniyar sirri a rubuce za su iya karanta wasu da aka cire bayanan gane mutum (an ɓoye lambobi, babu alamar gane ni) don duba inganci da tsaro, sannan su share kwafinsu. Ana share rikodin murya bayan an rubuta shi, sai dai idan na zaɓi ba da gudummawarsa a ƙasa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard. Jagora ce kawai, ba shawarar kuɗi ba. Saƙonni suna wucewa ta Cloudflare a wajen Najeriya kuma ana adana su a sabarmu {where}. {risk} Na amince da wannan canja wurin.",
+          consent: "Na amince KudiGuard ta adana saƙona (an cire yawancin lambobi) har kwanaki {days} don inganta aikin; wasu ƙalilan amintattun masu bita ƙarƙashin yarjejeniyar sirri a rubuce za su iya karanta wasu da aka cire bayanan gane mutum (an ɓoye yawancin lambobi, babu alamar gane ni) don duba inganci da tsaro, sannan su share kwafinsu. Ana share rikodin murya bayan an rubuta shi, sai dai idan na zaɓi ba da gudummawarsa a ƙasa. Ana adana misalan damfara (an cire yawancin lambobi) daban har kwanaki {patternDays} don kare wasu da inganta KudiGuard. Jagora ce kawai, ba shawarar kuɗi ba. Saƙonni suna wucewa ta Cloudflare a wajen Najeriya kuma ana adana su a sabarmu {where}. {risk} Na amince da wannan canja wurin.",
           donate: "Zaɓi ne: in ba da gudummawar rikodin muryata don taimaka wa KudiGuard ta fahimci harsunan Najeriya. Na kai shekara 18 ko fiye kuma muryata kawai zan yi rikodi, ba ta wasu ba. Ana adana su a ɓoye a sabarmu {where} har watanni 12, amintattun masu bita da masu rubutawa ƙarƙashin yarjejeniyar sirri ne kawai ke jin su, ba a taɓa amfani da su don gane ni. Ku cire alamar a kowane lokaci don dakatarwa da share su. {risk}",
           whereOutside: "a wajen Najeriya a lokacin gwaji", whereNigeria: "a Najeriya",
           riskOutside: "Dokar kare bayanai ta Najeriya ba za ta iya kare bayanan da ke ƙasashen waje gaba ɗaya ba.", riskNigeria: "Bayanan da ke wucewa ta Cloudflare ana iya sarrafa su a ƙasashen waje, inda dokar kare bayanai ta Najeriya ba za ta yi aiki gaba ɗaya ba.", copied: "An kwafa", copy: "Kwafa",
@@ -162,7 +162,7 @@
     yo: { placeholder: "Ẹnìkan pè mí pé wọ́n ti dí BVN mi…", tagline: "Ṣé ẹ ń ṣiyèméjì nípa ìfiránṣẹ́ tàbí ìpè kan? Ẹ ṣàyẹ̀wò rẹ̀ níbí ní èdè yín.", language: "Èdè",
           record: "🎤 Tẹ̀ láti gbohùn sílẹ̀", stop: "⏹️ Tẹ̀ láti dúró", describe: "Ẹ ṣàlàyé ìpè náà tàbí kí ẹ ka ìfiránṣẹ́ náà.",
           or: "tàbí kí ẹ tẹ̀ ẹ́ / lẹ̀ ẹ́ síbí", check: "Ṣàyẹ̀wò", clear: "Pa á rẹ́", checking: "🔎 À ń ṣàyẹ̀wò…",
-          consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (a yọ ọ̀pọ̀ nọ́ńbà kúrò) fún ọjọ́ 90 láti mú iṣẹ́ náà dára sí i; àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀ lè ka díẹ̀ lára wọn láìsí àmì ìdánimọ̀ (a bo nọ́ńbà mọ́lẹ̀) láti ṣàyẹ̀wò dídára àti ààbò, wọ́n á sì pa ẹ̀dà wọn rẹ́. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí mo bá yàn láti fi tọrẹ nísàlẹ̀. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó. Àwọn ọ̀rọ̀ ń kọjá láàárín Cloudflare lẹ́yìn òde Nàìjíríà, a sì ń tọ́jú wọn sórí sáfà wa {where}. {risk} Mo gbà sí gbígbé e lọ.",
+          consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (a yọ ọ̀pọ̀ nọ́ńbà kúrò) fún ọjọ́ {days} láti mú iṣẹ́ náà dára sí i; àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀ lè ka díẹ̀ lára wọn láìsí àmì ìdánimọ̀ (a bo ọ̀pọ̀ nọ́ńbà mọ́lẹ̀) láti ṣàyẹ̀wò dídára àti ààbò, wọ́n á sì pa ẹ̀dà wọn rẹ́. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí mo bá yàn láti fi tọrẹ nísàlẹ̀. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọjọ́ {patternDays} jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó. Àwọn ọ̀rọ̀ ń kọjá láàárín Cloudflare lẹ́yìn òde Nàìjíríà, a sì ń tọ́jú wọn sórí sáfà wa {where}. {risk} Mo gbà sí gbígbé e lọ.",
           donate: "Àṣàyàn ni: mo fi ohùn mi tọrẹ láti ran KudiGuard lọ́wọ́ láti gbọ́ èdè Nàìjíríà. Mo ti pé ọmọ ọdún 18 tàbí jù bẹ́ẹ̀ lọ, ohùn ara mi nìkan ni màá gbà sílẹ̀, kì í ṣe ti ẹlòmíì. A ń tọ́jú wọn ní ìpamọ́ sórí sáfà wa {where} fún oṣù 12 jù lọ, kìkì àwọn olùyẹ̀wò àti akọ̀wé tí a gbẹ́kẹ̀lé lábẹ́ àdéhùn àṣírí ló ń gbọ́ wọn, a kì í lò wọ́n láti dá mi mọ̀. Ẹ yọ àmì náà nígbàkígbà láti dá a dúró àti láti pa wọ́n rẹ́. {risk}",
           whereOutside: "lẹ́yìn òde Nàìjíríà nígbà ìdánwò yìí", whereNigeria: "ní Nàìjíríà",
           riskOutside: "Òfin ààbò dátà Nàìjíríà lè má dáàbò bo dátà tí ó wà lókè òkun pátápátá.", riskNigeria: "Dátà tí ó ń kọjá láàárín Cloudflare lè jẹ́ ṣíṣe lókè òkun, níbi tí òfin ààbò dátà Nàìjíríà lè má ṣiṣẹ́ pátápátá.", copied: "A ti ṣàdàkọ", copy: "Ṣàdàkọ",
@@ -174,7 +174,7 @@
     ig: { placeholder: "Mmadụ kpọrọ m sị na e mechiela BVN m…", tagline: "Ị na-enwe obi abụọ maka ozi ma ọ bụ oku? Lelee ya ebe a n'asụsụ gị.", language: "Asụsụ",
           record: "🎤 Pịa ka ị dekọọ", stop: "⏹️ Pịa ka ị kwụsị", describe: "Kọwaa oku ahụ ma ọ bụ gụọ ozi ahụ.",
           or: "ma ọ bụ dee / mado ya", check: "Lelee", clear: "Hichapụ", checking: "🔎 Ana-elele…",
-          consent: "Ekwere m ka KudiGuard chekwaa ozi m (e wepụrụ ọtụtụ nọmba) ruo ụbọchị 90 iji meziwanye ọrụ ahụ; ndị nyocha ole na ole a tụkwasịrị obi n'okpuru nkwekọrịta nzuzo e dere ede nwere ike ịgụ ụfọdụ na-enweghị ihe na-egosi onye m bụ (e zochiri nọmba) iji lelee ịdị mma na nchekwa, ma hichapụ mbipụta ha mgbe e mesịrị. A na-ehichapụ ndekọ olu mgbe e dechara ya, ma ọ bụrụ na m họrọghị inye ya n'onyinye n'okpuru. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego. Ozi na-agafe na Cloudflare na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. {risk} Ekwere m na mbufe a.",
+          consent: "Ekwere m ka KudiGuard chekwaa ozi m (e wepụrụ ọtụtụ nọmba) ruo ụbọchị {days} iji meziwanye ọrụ ahụ; ndị nyocha ole na ole a tụkwasịrị obi n'okpuru nkwekọrịta nzuzo e dere ede nwere ike ịgụ ụfọdụ na-enweghị ihe na-egosi onye m bụ (e zochiri ọtụtụ nọmba) iji lelee ịdị mma na nchekwa, ma hichapụ mbipụta ha mgbe e mesịrị. A na-ehichapụ ndekọ olu mgbe e dechara ya, ma ọ bụrụ na m họrọghị inye ya n'onyinye n'okpuru. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo ụbọchị {patternDays} iji chebe ndị ọzọ ma melite KudiGuard. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego. Ozi na-agafe na Cloudflare na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. {risk} Ekwere m na mbufe a.",
           donate: "Ọ bụ nhọrọ: enye m ndekọ olu m n'onyinye iji nyere KudiGuard aka ịghọta asụsụ Naịjirịa. Agbaala m afọ 18 ma ọ bụ karịa, ọ bụkwa naanị olu m ka m ga-edekọ, ọ bụghị nke ndị ọzọ. A na-echekwa ha na nzuzo na sava anyị {where} ruo ọnwa 12, naanị ndị nyocha na ndị odee a tụkwasịrị obi n'okpuru nkwekọrịta nzuzo na-anụ ha, a naghị eji ha amata onye m bụ. Wepụ akara ahụ n'oge ọ bụla iji kwụsị ma hichapụ ha. {risk}",
           whereOutside: "na mpụga Naịjirịa n'oge nnwale a", whereNigeria: "na Naịjirịa",
           riskOutside: "Iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị echedo data dị na mba ofesi kpamkpam.", riskNigeria: "Data na-agafe na Cloudflare nwere ike ịbụ nke a na-ahazi na mba ofesi, ebe iwu nchekwa data nke Naịjirịa nwere ike ọ gaghị arụ ọrụ kpamkpam.", copied: "E detuola", copy: "Detuo",
@@ -197,7 +197,7 @@
   let lang = store.get("kg_lang") || (navigator.language || "en").slice(0, 2);
   if (!UI[lang]) lang = "ha";  // Hausa-first: other browser languages start in Hausa (selector above)
   $("language").value = lang;
-  const CONSENT_VERSION = "2026-10-10";  // keep in step with pipeline.CONSENT_VERSION
+  const CONSENT_VERSION = "2026-10-11";  // keep in step with pipeline.CONSENT_VERSION
   $("consent").checked = store.get("kg_consent") === CONSENT_VERSION;
   // Voice donation: a separate, optional box (off by default) with its own version; unticking deletes.
   const DONATION_VERSION = "2026-10-10";  // keep in step with donation.DONATION_VERSION
@@ -211,7 +211,9 @@
   const raw = (key) => (UI[lang] && UI[lang][key]) || UI.en[key];
   const t = (key) => raw(key)
     .replace("{where}", raw(CONFIG.storageInNigeria ? "whereNigeria" : "whereOutside"))
-    .replace("{risk}", raw(CONFIG.storageInNigeria ? "riskNigeria" : "riskOutside"));
+    .replace("{risk}", raw(CONFIG.storageInNigeria ? "riskNigeria" : "riskOutside"))
+    .replace("{days}", String(CONFIG.retentionDays))  // the configured retention periods (server settings)
+    .replace("{patternDays}", String(CONFIG.patternRetentionDays));
   function applyLabels() {
     document.documentElement.lang = lang;
     document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });

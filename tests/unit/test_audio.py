@@ -164,6 +164,116 @@ async def test_temp_file_is_removed(tmp_path: Path) -> None:
     assert list(work.iterdir()) == []
 
 
+@needs_ffmpeg
+async def test_decoding_uses_its_own_temp_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import tempfile
+
+    from kudiguard.speech import audio as audio_module
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    seen: list[str] = []
+    real_mkstemp = tempfile.mkstemp
+
+    def spy(*args: object, **kwargs: object) -> tuple[int, str]:
+        fd, name = real_mkstemp(*args, **kwargs)  # type: ignore[call-overload]
+        seen.append(name)
+        return fd, name
+
+    monkeypatch.setattr(audio_module.tempfile, "mkstemp", spy)
+    data = encode(tmp_path, "note.ogg", "sine=duration=1", "-c:a", "libopus")
+    await decode(data, ffmpeg=FFMPEG)
+    (name,) = seen
+    assert Path(name).parent == tmp_path / audio_module.TEMP_FOLDER and Path(name).name.startswith(
+        "kg-audio-"
+    )
+    assert list((tmp_path / audio_module.TEMP_FOLDER).iterdir()) == []
+
+
+def test_audio_temp_dir_falls_back_to_the_system_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+    import tempfile
+
+    from kudiguard.speech.audio import TEMP_FOLDER, audio_temp_dir
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    assert audio_temp_dir() == tmp_path / TEMP_FOLDER
+    monkeypatch.setattr(os, "getuid", lambda: -1, raising=False)  # POSIX: someone else owns the folder
+    assert audio_temp_dir() is None
+    monkeypatch.setattr(os, "getuid", lambda: (tmp_path / TEMP_FOLDER).stat().st_uid, raising=False)
+    assert audio_temp_dir() == tmp_path / TEMP_FOLDER  # POSIX: ours
+    (tmp_path / TEMP_FOLDER).rmdir()
+    (tmp_path / TEMP_FOLDER).write_text("a file in the way", encoding="utf-8")
+    assert audio_temp_dir() is None
+
+
+def test_a_symlink_in_place_of_the_temp_folder_is_not_followed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+    import tempfile
+
+    from kudiguard.speech.audio import TEMP_FOLDER, audio_temp_dir
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    try:
+        os.symlink(elsewhere, tmp_path / TEMP_FOLDER, target_is_directory=True)
+    except OSError:  # Windows without the symlink privilege: simulate what lstat would report
+        real_lstat = Path.lstat
+
+        def fake_lstat(self: Path) -> os.stat_result:
+            info = real_lstat(self)
+            if self.name == TEMP_FOLDER:
+                return os.stat_result((0o120777, *tuple(info)[1:]))  # S_IFLNK
+            return info
+
+        (tmp_path / TEMP_FOLDER).mkdir()
+        monkeypatch.setattr(Path, "lstat", fake_lstat)
+    assert audio_temp_dir() is None
+
+
+def test_stale_temp_audio_is_swept_and_nothing_else(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import os
+    import tempfile
+    import time
+
+    from kudiguard.speech.audio import STALE_AUDIO_S, TEMP_FOLDER, sweep_stale_audio
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    own = tmp_path / TEMP_FOLDER
+    own.mkdir()
+    old = time.time() - STALE_AUDIO_S - 60
+    stale = [tmp_path / "kg-audio-legacy", own / "kg-audio-crash"]
+    keep = [own / "kg-audio-fresh", tmp_path / "other-app.tmp", tmp_path / "kg-audiox", own / "notes.txt"]
+    for path in stale + keep:
+        path.write_bytes(b"voice")
+    for path in [*stale, *keep[1:]]:
+        os.utime(path, (old, old))
+    (tmp_path / "kg-audio-dir").mkdir()  # never a folder
+    os.utime(tmp_path / "kg-audio-dir", (old, old))
+    assert sweep_stale_audio() == 2
+    assert not any(p.exists() for p in stale) and all(p.exists() for p in keep)
+    assert (tmp_path / "kg-audio-dir").is_dir() and "deleted 2 leftover" in caplog.text
+    assert sweep_stale_audio([tmp_path / "missing"]) == 0
+
+
+def test_sweep_skips_files_it_cannot_delete(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from kudiguard.speech.audio import sweep_stale_audio
+
+    (tmp_path / "kg-audio-busy").write_bytes(b"voice")
+
+    def locked(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(Path, "unlink", locked)
+    assert sweep_stale_audio([tmp_path], max_age_s=-60) == 0
+
+
 def test_find_ffmpeg_explicit_missing() -> None:
     with pytest.raises(FileNotFoundError):
         find_ffmpeg("Z:/nope/ffmpeg.exe")
