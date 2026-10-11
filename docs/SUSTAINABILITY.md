@@ -3,7 +3,7 @@
 ## Cost per check (estimates; to be confirmed with pilot data)
 | Item | Pilot (this PC) | Cloud |
 |---|---|---|
-| N-ATLAS on one GPU (~10–12 checks/min: ~5 s per check, one at a time, on the RTX 4070 laptop; English text p50 is 3.4 s, Yoruba/Igbo and voice take longer) | electricity only | assumed ~US$0.6–1/h for a 24 GB GPU VM (not a quote) ⇒ ~US$0.001–0.002 per check at full load |
+| N-ATLAS on one GPU (~10–12 checks/min: ~5 s per check, one at a time, on the RTX 4070 laptop; English text p50 2.8 s on the shipped code, 2.9 s at b4f96f8; all languages p50 4.0 s; Yoruba/Igbo and voice take longer) | electricity only | assumed ~US$0.6–1/h for a 24 GB GPU VM (not a quote) ⇒ ~US$0.001–0.002 per check at full load |
 | Speech (CPU), search, storage | included | included in the same VM |
 | WhatsApp replies | free (user-initiated service conversations, while KudiGuard never sends templates) | free |
 | Tunnel / HTTPS | free (Cloudflare) | free / a few dollars a month |

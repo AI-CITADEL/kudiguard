@@ -152,6 +152,10 @@ class MemoryStore:
         self._ensure_open()
         return self._deleted.get(self._hasher.deletion_marker(user_hash))
 
+    async def count_deletions_since(self, since: datetime) -> int:
+        self._ensure_open()
+        return sum(at >= aware(since) for at in self._deleted.values())
+
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
         self._ensure_open()
         old = [k for k, at in self._deleted.items() if at < aware(cutoff)]

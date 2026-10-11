@@ -41,7 +41,8 @@ against the gazetted text before filing.
   * language, channel and ISO week (no timestamp);
   * the version of the donation text accepted;
   * the duration, when known (not recorded on the web);
-  * the automatic transcript, with numbers and emails masked (`text.redact`).
+  * the automatic transcript, with most numbers and emails masked (`text.redact`; not every format, and names
+    are kept).
 * **What is never kept:**
   * Text messages.
   * WhatsApp voice notes not recorded in the app (Meta's `audio.voice` is not true), or marked forwarded

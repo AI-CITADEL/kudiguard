@@ -19,13 +19,13 @@ Built on **N-ATLAS** (LLM) and the **NCAIR1** speech models for NAIC 2026. Why a
 ## Results so far (small test sets; every number, source and caveat: [docs/CLAIMS.md](docs/CLAIMS.md))
 | | | Caveat |
 |---|---|---|
-| Same message, same reply | 9% → 100% identical (temperature 0 + seed) | 45-case dev set; English-first Yoruba replies 64% |
+| Same message, same reply (shipped code) | 90% identical over 3 runs (temperature 0 + seed; 9% at the old temperature 0.1) | 53-case dev set; Yoruba (English-first) 64% |
 | Knowledge retrieval, 24 independent questions | right entry in top 3: 96% (top 1: 62%) | English questions only |
 | Speech (official NCAIR1 models, word error rate) | Hausa 28%, Yoruba 33%, Igbo 46% | 10-20 read FLEURS sentences per language, not voice notes |
 | Scam detection by the rules alone (model down) | 80% of scams flagged, 89% precision | 40 messages; set already used once for lexicon edits |
 | Answer covers the key points (0-1) | en 0.64 · ha 0.46 · yo 0.58 · ig 0.33 | 53-case dev set, ha/yo/ig AI-drafted |
 | Unsafe advice caught in English/Pidgin replies | 5% → 34% (rule guard) → ~70% with the learned layer, ~2% false alarms | held-out set partly used; learned layer logs only in the pilot |
-| Speed (RTX 4070 laptop, text) | p50 3.4 s, p95 6.4 s | one request at a time; voice timed once (~7 s, English) |
+| Speed (RTX 4070 laptop, text, shipped code) | p50 4.0 s, p95 8.2 s (English p50 2.8 s; Yoruba +1.6 s) | one request at a time; voice timed once (~7 s, English) |
 
 Not yet measured: the full engine on the scam set (to be re-run live), the frozen 366-case end-to-end set (to be
 scored live), real users and native-speaker review (after the pilot).
@@ -47,7 +47,7 @@ copy .env.example .env               # fill in; KUDIGUARD_HASH_SECRET is require
 Then set the tunnel URL + `/webhooks/whatsapp` as the webhook in Meta. Details: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Develop
-`.venv\Scripts\python -m pytest` (2,917 tests, 100% line + branch coverage; `-m live` for real models) · `ruff check` · `mypy`.
+`.venv\Scripts\python -m pytest` (2,944 tests, 100% line + branch coverage; `-m live` for real models) · `ruff check` · `mypy`.
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Validation: [docs/VALIDATION.md](docs/VALIDATION.md) ·
 Sustainability: [docs/SUSTAINABILITY.md](docs/SUSTAINABILITY.md) · Demo: [docs/DEMO.md](docs/DEMO.md).
 

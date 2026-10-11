@@ -19,6 +19,7 @@ import logging
 import math
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -52,9 +53,12 @@ def audio_temp_dir() -> Path | None:
     folder = Path(tempfile.gettempdir()) / TEMP_FOLDER
     try:
         folder.mkdir(mode=0o700, exist_ok=True)
-        owner = folder.stat().st_uid
+        info = folder.lstat()  # the folder itself, never what a planted symlink points to
     except OSError:
         return None
+    if not stat.S_ISDIR(info.st_mode):  # a symlink (or anything else) in its place: use the system temp dir
+        return None
+    owner = info.st_uid
     getuid = getattr(os, "getuid", None)  # POSIX only; on Windows the folder sits in the per-user temp dir
     if getuid is not None and owner != getuid():
         return None

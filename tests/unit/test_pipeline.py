@@ -358,6 +358,25 @@ async def test_licence_cap_counts_dormant_and_unconsented_users_as_new(h: Harnes
     assert await h.say("thanks", user="+2348022222222") == [h.t(Msg.AT_CAPACITY)]
 
 
+async def test_a_delete_does_not_free_a_licence_cap_slot(h: Harness) -> None:
+    h.configure(active_user_cap=1)
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert await h.say("DELETE") == [h.t(Msg.DELETED)]
+    assert await h.say("hello", user="+2348099999999") == [
+        h.t(Msg.AT_CAPACITY)
+    ]  # the erased user still counts
+
+
+async def test_a_new_users_slot_is_released_once_the_turn_is_logged(h: Harness) -> None:
+    h.configure(active_user_cap=5)
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert h.conversation._admission.in_flight == 0  # type: ignore[attr-defined]
+    await h.say(OTP_SCAM, user="+2348077777777")  # welcomed only: no log, the slot is still released
+    assert h.conversation._admission.in_flight == 0  # type: ignore[attr-defined]
+
+
 async def test_consent_text_change_asks_again(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
     await h.onboard("ha")
     monkeypatch.setattr("kudiguard.pipeline.CONSENT_VERSION", "2099-01-01")

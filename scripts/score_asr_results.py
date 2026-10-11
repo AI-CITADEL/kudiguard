@@ -23,6 +23,8 @@ def main() -> None:
     # per language: word edits/words (folded), word edits/words (diacritics kept), char edits/chars, clips, rejected
     totals: dict[str, list[int]] = defaultdict(lambda: [0] * 8)
     for line in args.results.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
         row = json.loads(line)
         hypothesis = row.get("hypothesis") or ""  # rejected clips have none: all words deleted
         counts = (

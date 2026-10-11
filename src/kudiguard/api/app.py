@@ -28,7 +28,6 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -39,6 +38,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from kudiguard.admission import AtCapacity
 from kudiguard.api.ratelimit import RateLimiter
 from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
@@ -52,7 +52,7 @@ from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -70,9 +70,30 @@ LARGE_BODY_PATHS = {"/v1/check/audio": MAX_REQUEST_BYTES, "/web/check": MAX_REQU
 SESSION_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
 END_USER_HEADER = "X-KudiGuard-End-User"
 _END_USER = re.compile(r"[A-Za-z0-9._:-]{8,128}")
-# Phone-shaped ids are refused: digits (and separators) only, or a Nigerian mobile number inside (0803..., 234803...).
+# A guardrail against mistakes, not proof of pseudonymity: ids that look like a phone number or an email address are
+# refused. Hex digests (32/40/64 hex characters) and UUIDs, optionally behind a short letter tag ("c-<sha256>"), are
+# accepted as they are: what partners should send. Anything else may not hold a run of 10+ digits once the separators
+# are removed (catches "user-0803-123-4567", "x8031234567", "cust-447911123456"), nor be digits only.
+_HASHED_ID = re.compile(
+    r"(?i)(?:[a-z]{1,8}[._:-]?)?(?:[0-9a-f]{64}|[0-9a-f]{40}|[0-9a-f]{32}"
+    r"|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+)
 _ONLY_DIGITS = re.compile(r"[\d._:-]+")
-_NIGERIAN_MOBILE = re.compile(r"(?<!\d)(?:234|0)[789][01]\d{8}(?!\d)")
+_SEPARATORS = re.compile(r"[._:-]")
+_LONG_DIGITS = re.compile(r"\d{10,}")
+_EMAIL_LIKE = re.compile(
+    r"(?i)(?:^|[._:-])(?:gmail|googlemail|yahoo|ymail|hotmail|outlook|icloud|aol|proton|protonmail)(?:[._:-]|$)"
+    r"|[._-](?:com|net|org|ng|edu|gov|io|co)$"
+)
+
+
+def contact_shaped(value: str) -> bool:
+    """True for an end-user id that looks like a phone number or an email address (see the guardrail above)."""
+    if _HASHED_ID.fullmatch(value):
+        return False
+    if _ONLY_DIGITS.fullmatch(value):
+        return True
+    return bool(_LONG_DIGITS.search(_SEPARATORS.sub("", value)) or _EMAIL_LIKE.search(value))
 
 
 # --- schemas --------------------------------------------------------------------------------------------------
@@ -256,8 +277,6 @@ def create_app(
     app.state.api_limiter = RateLimiter(config.api_rate_per_minute)
     app.state.web_limiter = RateLimiter(config.web_rate_per_minute)
     app.state.check_slots = asyncio.Semaphore(MAX_CONCURRENT_API_CHECKS)
-    app.state.pending_users = set()  # user keys new to the window whose first check is running (licence cap)
-    app.state.admission = asyncio.Lock()  # web and API admissions: check + reserve atomically
     app.state.api_keys = api_keys
     if config.partner_api:
         if not api_keys:
@@ -322,7 +341,10 @@ def _end_user(request: Request, client: Client) -> str:
 
     The partner must name its end user with a stable pseudonymous id (its own random or hashed id), so each person
     counts toward the shared cap of active end-users; a phone number (or anything shaped like one) is refused."""
-    value = request.headers.get(END_USER_HEADER, "").strip()
+    values = request.headers.getlist(END_USER_HEADER)
+    if len(values) > 1:
+        raise HTTPException(400, f"send {END_USER_HEADER} once")
+    value = values[0].strip() if values else ""
     if not value:
         raise HTTPException(
             400,
@@ -333,10 +355,11 @@ def _end_user(request: Request, client: Client) -> str:
         raise HTTPException(
             400, f"{END_USER_HEADER} must be 8-128 characters: letters, digits, '.', '_', ':', '-'"
         )
-    if _ONLY_DIGITS.fullmatch(value) or _NIGERIAN_MOBILE.search(value):
+    if contact_shaped(value):
         raise HTTPException(
             400,
-            f"{END_USER_HEADER} looks like a phone number: send a pseudonymous id (e.g. a random or hashed id)",
+            f"{END_USER_HEADER} looks like a phone number or an email address: send a pseudonymous id, e.g. a "
+            "SHA-256 hex digest of your own customer id, or a UUID",
         )
     return f"api:{client}:{value}"
 
@@ -597,14 +620,27 @@ def _v1_router() -> APIRouter:
 # /privacy, rendered from settings: what reaches partners only when the operator switches it on.
 LIVE_PACKS_NOTICE = (
     "<li><strong>Partner knowledge sources:</strong> to answer some questions, the English translation of your message "
-    "(most numbers masked; names are not removed) is sent to a partner organisation's server, which searches its own "
-    "help content. The partner follows its own privacy policy.</li>"
+    "(most numbers masked; names are not removed), the warning signs we found and your language are sent to a partner "
+    "organisation's server, which searches its own help content. The partner follows its own privacy policy.</li>"
 )
 PARTNER_API_OFF = "An API for partner organisations exists but is switched off during this pilot."
+PARTNER_API_COLLECT_ON = (
+    "<li><strong>Partner organisations' customers</strong> (through our API): the message or voice note the partner "
+    "sends, our reply, the channel (API), and a coded form of the partner's own id for that customer (never a phone "
+    "number), kept and deleted like the messages above. The partner is responsible for telling its customers and "
+    "getting their agreement.</li>"
+)
 PARTNER_API_ON = (
     "Partner organisations can also use it through an API for their own customers; each partner names its users only "
     "by a coded id, never a phone number."
 )
+
+
+def _days(days: int) -> str:
+    """ "1 day", "90 days", "730 days (2 years)"."""
+    text = f"{days} day{'s' if days != 1 else ''}"
+    years, rest = divmod(days, 365)
+    return f"{text} ({years} year{'s' if years > 1 else ''})" if years and not rest else text
 
 
 def _fill(page: str, values: dict[str, str]) -> str:
@@ -612,44 +648,20 @@ def _fill(page: str, values: dict[str, str]) -> str:
     return re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page)
 
 
-async def _admit(services: Services, settings: Settings, user_key: str, pending: set[str]) -> bool:
-    """N-ATLAS licence cap for the website and the partner API (``user_key`` is ``web:<session>`` or
-    ``api:<key name>:<end user>``): a user new to the 30-day window needs room in the project-wide cap (every
-    channel, WhatsApp included) and, on the website, in the web share, counting new users whose first check is still
-    running (``pending``), so a burst cannot overshoot. Returning users are always served. Returns True for a newly
-    admitted user."""
-    if settings.active_user_cap is None:
-        return False
-    since = utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
-    if user_key in pending or await services.store.count_interactions_since(
-        services.hasher.user_id(user_key), since
-    ):
-        return False
-    store = services.store
-    web_in_flight = sum(key.startswith("web:") for key in pending)
-    full = (
-        user_key.startswith("web:")
-        and await store.count_active_users_since(since, channels={"web"}) + web_in_flight
-        >= settings.web_session_cap
-    ) or await store.count_active_users_since(since) + len(pending) >= settings.active_user_cap
-    if full:
-        message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
-        raise HTTPException(503, {"problem": "at_capacity", "message": message})
-    pending.add(user_key)
-    return True
-
-
 @asynccontextmanager
 async def _admitted(request: Request, services: Services, user_key: str) -> AsyncIterator[None]:
-    """Admit ``user_key`` under the licence cap (503 ``at_capacity`` when full) for the duration of its check."""
-    pending: set[str] = request.app.state.pending_users
-    async with request.app.state.admission:  # check + reserve atomically (store counts yield)
-        admitted = await _admit(services, request.app.state.settings, user_key, pending)
+    """N-ATLaS licence cap for the website and the partner API (``user_key`` is ``web:<session>`` or
+    ``api:<key name>:<end user>``), through the admission gate shared with WhatsApp (``Services.admission``): a user
+    new to the 30-day window is refused with 503 ``at_capacity`` when the cap (or the web share) is full. The slot is
+    held for the check, which logs the interaction before it ends."""
+    channel = user_key.partition(":")[0]
     try:
-        yield
-    finally:
-        if admitted:
-            pending.discard(user_key)  # now counted from the evidence log (or never served)
+        async with services.admission.admitted(services.hasher.user_id(user_key), channel):
+            yield
+    except AtCapacity as exc:
+        settings: Settings = request.app.state.settings
+        message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
+        raise HTTPException(503, {"problem": "at_capacity", "message": message}) from exc
 
 
 def _web_router() -> APIRouter:
@@ -679,7 +691,7 @@ def _web_router() -> APIRouter:
         """Privacy notice (required by Meta for Live mode; NDPA). Operator and contact come from settings."""
         settings: Settings = request.app.state.settings
         contact = settings.privacy_contact.strip()
-        years, rest = divmod(settings.pattern_retention_days, 365)
+
         values = {
             "OPERATOR": html.escape(settings.operator_name),
             "CONTACT": (
@@ -688,11 +700,7 @@ def _web_router() -> APIRouter:
                 else "contact the operator"
             ),
             "RETENTION_DAYS": str(settings.retention_days),
-            "PATTERN_RETENTION": (
-                f"{years} year{'s' if years > 1 else ''}"
-                if years and not rest
-                else f"{settings.pattern_retention_days} days"
-            ),
+            "PATTERN_RETENTION": _days(settings.pattern_retention_days),
             "STORAGE_LOCATION": html.escape(settings.storage_location.english),
             "STORAGE_RISK": html.escape(settings.storage_location.english_risk),
             "DELETION_MARKER_DAYS": str(DELETION_MARKER_DAYS),
@@ -702,12 +710,11 @@ def _web_router() -> APIRouter:
                 else "Not switched on yet: this describes how it will work once it is."
             ),
             "VOICE_RETENTION": (
-                "12 months"
-                if settings.voice_retention_days == 365
-                else f"{settings.voice_retention_days} days"
+                "12 months" if settings.voice_retention_days == 365 else _days(settings.voice_retention_days)
             ),
             "LIVE_PACKS": LIVE_PACKS_NOTICE if settings.allow_live_packs else "",
             "PARTNER_API": PARTNER_API_ON if settings.partner_api else PARTNER_API_OFF,
+            "PARTNER_API_COLLECT": PARTNER_API_COLLECT_ON if settings.partner_api else "",
         }
         page = (STATIC / "privacy.html").read_text(encoding="utf-8")
         return HTMLResponse(_fill(page, values))

@@ -595,7 +595,7 @@ async def test_a_burst_of_new_web_sessions_cannot_overshoot_the_share(registry: 
 
         codes = await asyncio.gather(*(new_session(n) for n in range(5)))
         assert sorted(codes) == [200, 200, 503, 503, 503]
-        assert api.app.state.pending_users == set()
+        assert api.app.state.services.admission.in_flight == 0
 
 
 async def test_outdated_web_consent_is_refused(api: Api) -> None:
@@ -637,6 +637,92 @@ async def test_burst_cannot_overshoot_the_share_with_sqlite(
 
                 codes = await asyncio.gather(*(new_session(n) for n in range(8)))
     assert codes.count(200) == 2 and codes.count(503) == 6
+
+
+@pytest.mark.parametrize("trial", range(3))
+async def test_a_mixed_whatsapp_web_and_api_burst_never_exceeds_the_cap(
+    registry: LanguageRegistry, tmp_path: Path, trial: int
+) -> None:
+    """One admission gate (Services.admission) for every channel: 90 new users at once on SQLite, cap 20, web share
+    10. Before it, each channel saw only its own in-flight users and 36 got in."""
+    import asyncio
+    from datetime import UTC, datetime
+
+    from fakes import FakeMessenger
+    from kudiguard.domain import InboundMessage, MessageKind
+    from kudiguard.pipeline import Conversation, Limits
+    from kudiguard.storage.base import UserState
+    from kudiguard.storage.sqlite import SQLiteStore
+
+    cap = 20
+    config = settings(
+        active_user_cap=cap, web_session_cap=10, web_rate_per_minute=1000, api_rate_per_minute=1000
+    )
+    llm = FakeLLM(analyse=analysis("x", "scam_check"), compose="1. Do not share the code.")
+    llm.delay_s = 0.02  # first checks overlap
+    hasher = UserHasher(b"s" * MIN_SECRET_BYTES)
+    store = await SQLiteStore.open(tmp_path / "kg.db", hasher=hasher)
+    phones = [f"+23480{trial}{n:07d}" for n in range(30)]
+    long_ago = datetime(2026, 1, 1, tzinfo=UTC)
+    for phone in phones:  # consented WhatsApp users with no interaction in the window: new to the cap
+        await store.save_user(
+            UserState(
+                hasher.user_id(phone), language="en", consented_at=long_ago, consent_version=CONSENT_VERSION,
+                welcome_version=CONSENT_VERSION, welcome_at=long_ago, created_at=long_ago, last_seen_at=long_ago,
+            )
+        )  # fmt: skip
+    messenger = FakeMessenger()
+    async with httpx.AsyncClient() as http:
+        knowledge = knowledge_base_from_packs(
+            ROOT / "data" / "packs", client=http, include=["kudiguard-core"]
+        )
+        engine = Engine(registry=registry, llm=llm, knowledge=knowledge)
+
+        async def factory(_: Settings) -> Services:
+            services = Services(config, registry, engine, store, hasher, llm, closers=[store.close])
+            services.conversation = Conversation(
+                engine=engine, store=store, messenger=messenger, hasher=hasher,
+                limits=Limits(active_user_cap=cap), admission=services.admission,
+            )  # fmt: skip
+            return services
+
+        app = create_app(config, services_factory=factory)
+        async with app.router.lifespan_context(app):
+            services = app.state.services
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+
+                async def api_user(n: int) -> int:
+                    headers = {**API, "x-kudiguard-end-user": f"burst-user-{trial}-{n:04d}"}
+                    return (
+                        await client.post("/v1/check", json={"text": OTP_SCAM}, headers=headers)
+                    ).status_code
+
+                async def web_user(n: int) -> int:
+                    headers = {**WEB, "x-kudiguard-session": f"websess-{trial}-{n:04d}-xxxxxx"}
+                    return (
+                        await client.post("/web/check", data={"text": OTP_SCAM}, headers=headers)
+                    ).status_code
+
+                for n, phone in enumerate(phones):
+                    services.conversation.submit(
+                        InboundMessage(channel="whatsapp", message_id=f"wamid.{trial}.{n}", user_id=phone,
+                                       kind=MessageKind.TEXT, text=OTP_SCAM)
+                    )  # fmt: skip
+                codes = await asyncio.gather(
+                    *(api_user(n) for n in range(30)),
+                    *(web_user(n) for n in range(30)),
+                    services.conversation.wait_idle(),
+                )
+                await services.conversation.drain()
+                assert services.admission.in_flight == 0
+                since = datetime(2000, 1, 1, tzinfo=UTC)
+                total = await store.count_active_users_since(since)
+                web = await store.count_active_users_since(since, channels={"web"})
+                whatsapp = await store.count_active_users_since(since, channels={"whatsapp"})
+    served = codes[:60].count(200)
+    assert cap - 3 <= total <= cap and web <= 10  # never one more (a transient double count may waste a slot)
+    assert served + whatsapp == total and set(codes[:60]) <= {200, 503}
 
 
 async def test_check_passes_a_hashed_turn_id(api: Api, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -692,6 +778,16 @@ def test_partner_api_on_without_keys_warns(caplog: pytest.LogCaptureFixture) -> 
         ("447911123456", "phone"),  # digits only: any country
         ("user_08031234567", "phone"),
         ("tel:2348031234567", "phone"),
+        # the review's bypasses of the first version: separators, bare 10 digits, other countries, emails
+        ("user-0803-123-4567", "phone"),
+        ("ab.0803.123.4567", "phone"),
+        ("0701-234-5678-ab", "phone"),
+        ("x8031234567", "phone"),
+        ("x2340803123456", "phone"),
+        ("cust-447911123456", "phone"),
+        ("u15551234567", "phone"),
+        ("john.doe_gmail.com", "email"),
+        ("jd.at.yahoo-mail", "email"),
     ],
 )
 async def test_every_partner_call_names_a_pseudonymous_end_user(
@@ -750,7 +846,7 @@ async def test_partner_end_users_count_toward_the_shared_licence_cap(registry: L
         assert (
             await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=other)
         ).status_code == 503
-        assert api.app.state.pending_users == set()
+        assert api.app.state.services.admission.in_flight == 0
 
 
 async def test_whatsapp_users_fill_the_cap_for_partners_too(registry: LanguageRegistry) -> None:
@@ -784,14 +880,14 @@ async def test_a_burst_of_new_partner_users_cannot_overshoot_the_cap(registry: L
 
         codes = await asyncio.gather(*(new_user(n) for n in range(6)))
         assert sorted(codes) == [200, 200, 503, 503, 503, 503]
-        assert api.app.state.pending_users == set()
+        assert api.app.state.services.admission.in_flight == 0
         assert len({r.user_hash for r in api.store._interactions.values()}) == 2  # type: ignore[attr-defined]
 
 
 async def test_privacy_page_says_whether_the_partner_api_and_live_packs_are_on(
     registry: LanguageRegistry,
 ) -> None:
-    from kudiguard.api.app import LIVE_PACKS_NOTICE, PARTNER_API_OFF, PARTNER_API_ON
+    from kudiguard.api.app import LIVE_PACKS_NOTICE, PARTNER_API_COLLECT_ON, PARTNER_API_OFF, PARTNER_API_ON
 
     async for api in _start(registry, settings(partner_api=False)):
         page = (await api.client.get("/privacy")).text
@@ -801,6 +897,7 @@ async def test_privacy_page_says_whether_the_partner_api_and_live_packs_are_on(
     async for api in _start(registry, settings(allow_live_packs=True)):
         page = (await api.client.get("/privacy")).text
         assert PARTNER_API_ON in page and LIVE_PACKS_NOTICE in page and "{{" not in page
+        assert PARTNER_API_COLLECT_ON in page  # what is kept for partners' customers, only when the API is on
 
 
 async def test_web_page_renders_the_configured_retention(registry: LanguageRegistry) -> None:
@@ -820,3 +917,41 @@ def test_retention_cannot_exceed_the_published_promise(field: str, value: int) -
 
     with pytest.raises(ValidationError):
         settings(**{field: value})
+
+
+async def test_the_end_user_header_must_be_sent_once(api: Api) -> None:
+    headers = [
+        ("x-api-key", KEY),
+        ("x-kudiguard-end-user", "goodid-1234"),
+        ("x-kudiguard-end-user", "08031234567"),
+    ]
+    response = await api.client.post("/v1/check", json={"text": OTP_SCAM}, headers=headers)
+    assert response.status_code == 400 and "once" in response.json()["detail"]
+
+
+def test_hashed_and_random_ids_are_never_mistaken_for_contacts() -> None:
+    """The guardrail's false positives on what partners are told to send (seeded; measured 0 in 200,000 each)."""
+    import hashlib
+    import random
+    import uuid
+
+    from kudiguard.api.app import contact_shaped
+
+    rng = random.Random(7)
+    for _ in range(5000):
+        digest = hashlib.sha256(rng.randbytes(16)).hexdigest()
+        ident = uuid.UUID(int=rng.getrandbits(128), version=4)
+        for value in (digest, "c-" + digest, digest[:40], digest[:32], str(ident), ident.hex):
+            assert not contact_shaped(value), value
+
+
+def test_day_counts_read_naturally() -> None:
+    from kudiguard.api.app import _days
+
+    assert (_days(1), _days(90), _days(730), _days(400)) == (
+        "1 day",
+        "90 days",
+        "730 days (2 years)",
+        "400 days",
+    )
+    assert _days(365) == "365 days (1 year)"

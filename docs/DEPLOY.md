@@ -39,18 +39,24 @@ sent (accepted by WhatsApp). That compares WhatsApp's timestamp with this PC's c
 
 **Keep the server on during the pilot.** Retention purges run every 6 hours while it runs. If the PC sleeps or is off
 for days, purges run late, so DELETE markers and expired data can outlive their limits until the next run.
-`KUDIGUARD_RETENTION_DAYS` (at most 90) and `KUDIGUARD_PATTERN_RETENTION_DAYS` (at most 730) may be lowered; the
+`KUDIGUARD_RETENTION_DAYS` (30 to 90) and `KUDIGUARD_PATTERN_RETENTION_DAYS` (30 to 730) may be lowered; the
 welcome, the web page and /privacy show the configured values. Longer periods are refused at startup: they would
-need a new consent text and `CONSENT_VERSION`.
+need a new consent text and `CONSENT_VERSION`. Messages cannot be kept less than 30 days: the licence cap counts
+active users from them over a rolling 30 days. Messages are purged one pass early, so "up to N days" holds while the
+server runs.
 
 **Partner API (off in the pilot).** `/v1/check`, `/v1/check/audio` and `/v1/ask` are not mounted unless
 `KUDIGUARD_PARTNER_API=true` (with `KUDIGUARD_API_KEYS`). The N-ATLaS licence caps *active end-users*, not API keys,
 so when it is on every call must send `X-KudiGuard-End-User`: a stable pseudonymous id for the partner's customer
-(8-128 characters, letters, digits, `. _ : -`; never a phone number: phone-shaped ids get 400). It is hashed as
-`api:<key name>:<id>`, logged as channel `api`, and counts toward `KUDIGUARD_ACTIVE_USER_CAP` with WhatsApp and web
-users; a new end user gets 503 `at_capacity` when the cap is full. A partner who needs more than our share of the
-cap needs its own N-ATLaS licence cover (its own deployment) or a commercial licence. Partners' end users did not see
-our welcome, so their messages never feed the scam-pattern library.
+(8-128 characters: letters, digits, `. _ : -`). Send a SHA-256 hex digest of your own customer id, or a UUID,
+optionally behind a short letter tag (`c-<sha256>`). A guardrail refuses (400) ids that look like a phone number or an
+email address (digits only, a run of 10+ digits once separators are removed, a mail provider or a domain ending); it
+catches mistakes, not deliberate abuse. The id is hashed as `api:<key name>:<id>`, logged as channel `api`, and
+counts toward `KUDIGUARD_ACTIVE_USER_CAP` with WhatsApp and web users through the same admission gate; a new end user
+gets 503 `at_capacity` when the cap is full. Renaming a key (`name:key`) re-counts its users as new for 30 days. A
+partner who needs more than our share of the cap needs its own N-ATLaS licence cover (its own deployment) or a
+commercial licence. **The partner must tell its own customers and get their agreement** (they never see our
+welcome); /privacy then describes what is kept for them. Their messages never feed the scam-pattern library.
 
 **Partner knowledge packs in live mode** (`mode: live`) send the English text of each message to the partner's
 server; they are refused at startup unless `KUDIGUARD_ALLOW_LIVE_PACKS=true`, which also adds that disclosure to

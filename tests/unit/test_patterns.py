@@ -179,9 +179,11 @@ def test_no_scam_example_outlives_the_promised_period() -> None:
             if monday >= keep_from:  # kept: even its earliest possible example (Monday 00:00) is young enough
                 oldest = datetime(monday.year, monday.month, monday.day, tzinfo=UTC)
                 assert next_pass - oldest < timedelta(days=730)
-    # never deleted more than a week (plus a pass and a day) early
+    # and never much earlier than needed: the cutoff day is at most two days after "730 days ago"
     now = datetime(2026, 10, 10, 12, tzinfo=UTC)
-    assert (now - timedelta(days=730)).date() - pattern_keep_from(now, 730) < timedelta(days=1)
+    assert (
+        timedelta(0) < pattern_keep_from(now, 730) - (now - timedelta(days=730)).date() <= timedelta(days=2)
+    )
 
 
 async def test_purge_drops_weeks_starting_before_the_cutoff(store) -> None:  # type: ignore[no-untyped-def]

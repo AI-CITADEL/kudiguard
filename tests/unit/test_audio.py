@@ -208,6 +208,33 @@ def test_audio_temp_dir_falls_back_to_the_system_temp(
     assert audio_temp_dir() is None
 
 
+def test_a_symlink_in_place_of_the_temp_folder_is_not_followed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+    import tempfile
+
+    from kudiguard.speech.audio import TEMP_FOLDER, audio_temp_dir
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    try:
+        os.symlink(elsewhere, tmp_path / TEMP_FOLDER, target_is_directory=True)
+    except OSError:  # Windows without the symlink privilege: simulate what lstat would report
+        real_lstat = Path.lstat
+
+        def fake_lstat(self: Path) -> os.stat_result:
+            info = real_lstat(self)
+            if self.name == TEMP_FOLDER:
+                return os.stat_result((0o120777, *tuple(info)[1:]))  # S_IFLNK
+            return info
+
+        (tmp_path / TEMP_FOLDER).mkdir()
+        monkeypatch.setattr(Path, "lstat", fake_lstat)
+    assert audio_temp_dir() is None
+
+
 def test_stale_temp_audio_is_swept_and_nothing_else(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

@@ -15,7 +15,7 @@ number quoted anywhere, with its source, command and caveat: [CLAIMS.md](CLAIMS.
 | Languages (ha · yo · ig · en) | no real-user data yet |
 | Verdicts (🔴 · 🟠 · 🟢 · questions) | no real-user data yet |
 | Helpful (👍 of rated) | no real-user data yet |
-| Latency p50 / p95 (text · voice) | no real-user data yet (test sets: text p50 3.4 s / p95 6.4 s, CLAIMS.md C11) |
+| Latency p50 / p95 (text · voice) | no real-user data yet (dev set, shipped code: text p50 4.0 s / p95 8.2 s, CLAIMS.md C11) |
 
 After the pilot: ten de-identified exchanges with English glosses, and tester quotes (from `kudiguard export`, already
 redacted).
@@ -72,7 +72,8 @@ Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The
   come after the notice could be read (docs/DEPLOY.md).
 * Genuine bank OTP SMS can be flagged: 🟠 "be careful" in English, and 🔴 in Igbo with the rules alone (scenario
   s32; the Yoruba dev case yo-otp-legit too). Safe direction, but alarming; fix pending separate examples.
-* Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review (model replies: see above).
+* Hausa/Yoruba/Igbo fixed text and lexicons await native-speaker review (model replies: see above). This includes
+  the welcome/consent text and the web page's consent box in those languages: DRAFT translations.
 * **Known risk: translations flip negations.** Yoruba and Igbo replies are composed in English and machine-translated
   (default `KUDIGUARD_COMPOSE_STRATEGY=english_first,ha=direct`; docs/SPIKES.md H). Of 93 measured translations, 10
   (**11%**) lost or added a negation (Igbo "Do not pay anything" → "give any money"; Yoruba "You should not keep all

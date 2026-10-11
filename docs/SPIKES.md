@@ -456,7 +456,8 @@ bank's own app"); "bank" elsewhere does not ("to update your bank details", "www
 These are regex heuristics on the English text: read the flagged records, not just the rate. They are pinned by
 `data/eval/unsafe_advice_probes.yaml` (214 labelled probes from every review round; known limits are strict xfails:
 the "actually ..." lead-in, a bank-owned chat account as recipient, a possessive in the code's source) and by a
-zero-hit check on 1,088 strings of safe advice (10 Oct; the corpus grows with the packs and dev cases) (packs, `must` points, calibration pairs, English fixed strings).
+zero-hit check on 1,088 strings of safe advice (packs, `must` points, calibration pairs, English fixed strings;
+counted 10 Oct, the corpus grows with the packs and dev cases).
 Stopping rule: a regression (a probe that passed before) must be fixed; a new edge case is added as a probe, fixed if
 the change is local and keeps every probe passing, otherwise added as a strict xfail with a reason. No speculative
 rule rewrites.

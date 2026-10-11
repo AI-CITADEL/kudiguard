@@ -197,7 +197,7 @@
   let lang = store.get("kg_lang") || (navigator.language || "en").slice(0, 2);
   if (!UI[lang]) lang = "ha";  // Hausa-first: other browser languages start in Hausa (selector above)
   $("language").value = lang;
-  const CONSENT_VERSION = "2026-10-10";  // keep in step with pipeline.CONSENT_VERSION
+  const CONSENT_VERSION = "2026-10-11";  // keep in step with pipeline.CONSENT_VERSION
   $("consent").checked = store.get("kg_consent") === CONSENT_VERSION;
   // Voice donation: a separate, optional box (off by default) with its own version; unticking deletes.
   const DONATION_VERSION = "2026-10-10";  // keep in step with donation.DONATION_VERSION

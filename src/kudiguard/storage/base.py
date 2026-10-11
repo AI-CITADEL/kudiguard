@@ -127,6 +127,11 @@ class Store(Protocol):
         Read only by the sign-up form import."""
         ...
 
+    async def count_deletions_since(self, since: datetime) -> int:
+        """DELETE markers dated since ``since``: a user who erased their data keeps their licence-cap slot for the
+        rest of the window (``admission``)."""
+        ...
+
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
         """Remove DELETE markers older than ``cutoff``. Returns markers removed."""
         ...

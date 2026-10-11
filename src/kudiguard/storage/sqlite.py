@@ -408,6 +408,14 @@ class SQLiteStore:
         )
         return _dt(row[0]) if row else None
 
+    async def count_deletions_since(self, since: datetime) -> int:
+        row = await self._run(
+            lambda db: db.execute(
+                "SELECT COUNT(*) FROM deletion_markers WHERE deleted_at >= ?", (_ts(since),)
+            ).fetchone()
+        )
+        return int(row[0])
+
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
         cursor = await self._run(
             lambda db: db.execute("DELETE FROM deletion_markers WHERE deleted_at < ?", (_ts(cutoff),))

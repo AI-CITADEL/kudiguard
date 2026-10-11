@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 
 import httpx
 
+from kudiguard.admission import Admission
 from kudiguard.config import Settings
 from kudiguard.donation import VOICE_RETENTION_DAYS, Sealer, VoiceVault
 from kudiguard.engine import Engine
@@ -54,6 +55,13 @@ class Services:
     donations: VoiceVault | None = None  # opt-in voice-note donation (WhatsApp and the web page)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     background: list[asyncio.Task[None]] = field(default_factory=list)
+    # The one licence-cap gate for every channel (WhatsApp, website, partner API); new-user gates plug in here.
+    admission: Admission = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.admission = Admission(
+            self.store, self.settings.active_user_cap, shares={"web": self.settings.web_session_cap}
+        )
 
     async def aclose(self) -> None:
         for task in self.background:
@@ -154,8 +162,10 @@ async def _purge_once(
     # DELETION_MARKER_DAYS (/privacy), while still outliving every importable form answer (29 days).
     marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s) + PURGE_MARGIN
     pattern_cutoff = pattern_keep_from(now, pattern_retention_days, interval_s)
+    # Messages likewise: "up to N days" holds until the next pass, so purge one interval (plus margin) early.
+    evidence_cutoff = now - timedelta(days=retention_days) + timedelta(seconds=interval_s) + PURGE_MARGIN
     steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
-        ("evidence", lambda: store.purge_before(now - timedelta(days=retention_days))),
+        ("evidence", lambda: store.purge_before(evidence_cutoff)),
         (
             "scam examples",
             lambda: store.purge_patterns_before(pattern_cutoff),
@@ -355,6 +365,7 @@ async def build_services(settings: Settings) -> Services:
                 donations=services.donations,
                 accept_donations=settings.voice_donation,
                 storage=settings.storage_location,
+                admission=services.admission,
             )
         services.background.append(
             asyncio.create_task(

@@ -31,6 +31,7 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, Protocol
 
+from kudiguard.admission import Admission, AtCapacity, Reservation
 from kudiguard.commands import Command, CommandMatcher, Match
 from kudiguard.domain import InboundMessage, Interaction, LanguageCode, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation, VoiceVault
@@ -44,12 +45,12 @@ from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report,
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, Store, UserState, utcnow
+from kudiguard.storage.base import Store, UserState, utcnow
 from kudiguard.text import redact
 
 log = logging.getLogger(__name__)
 
-CONSENT_VERSION = "2026-10-10"  # bump when the welcome/consent text changes materially (also in voice.html)
+CONSENT_VERSION = "2026-10-11"  # bump when the welcome/consent text changes materially (also in voice.html)
 REPLY_RESERVE_S = 3.0  # of the turn deadline, kept for rendering, logging and sending the reply
 FAILURE_DEADLINE_S = (
     10.0  # for the error reply/log after a failed turn (a hung channel must not wedge a user)
@@ -185,6 +186,8 @@ class _Turn:
     received_at: datetime | None = None  # when the turn started (donation consent must stand at this time)
     # Own (not forwarded) voice notes of this turn with their transcripts, for donation after the reply.
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
+    # A new user's licence-cap slot, held until this turn's interaction is logged (or the turn ends).
+    reservation: Reservation = dataclasses.field(default_factory=Reservation)
 
 
 class _KeyedLocks:
@@ -224,7 +227,10 @@ class Conversation:
         donations: VoiceVault | None = None,
         accept_donations: bool = False,
         storage: StorageLocation = StorageLocation.OUTSIDE_NIGERIA,
+        admission: Admission | None = None,
     ) -> None:
+        """``admission``: the licence-cap gate shared with the website and the partner API (``Services``); without
+        one, a private gate for ``limits.active_user_cap`` (tests, single-channel hosts)."""
         self._engine = engine
         self._registry = engine.registry
         self._messages: Messages = engine.messages
@@ -237,6 +243,7 @@ class Conversation:
         self._donations = donations  # also used to erase when collection is off
         self._collecting = donations is not None and accept_donations  # KUDIGUARD_VOICE_DONATION
         self._storage = storage
+        self._admission = admission or Admission(store, limits.active_user_cap, clock=clock)
         self._matcher = CommandMatcher(self._registry)
         self._slots = asyncio.Semaphore(limits.max_concurrent_turns)
         self._waiting = 0  # turns queued for a slot
@@ -350,6 +357,8 @@ class Conversation:
         except Exception as exc:
             log.exception("turn failed (%s)", type(exc).__name__)
             await self._fail(turn, exc)
+        finally:
+            turn.reservation.release()  # normally already released by _log
 
     async def _fail(self, turn: _Turn, exc: Exception) -> None:
         """Never silence, never two answers: an error reply only if no answer was delivered; one log row."""
@@ -429,7 +438,9 @@ class Conversation:
         if match.command is Command.STOP_DONATING:  # withdrawal works for everyone, at any time
             await self._withdraw_donation(turn, user)
             return
-        if not await self._admitted(turn):
+        try:
+            turn.reservation = await self._admission.reserve(turn.user_hash, message.channel)
+        except AtCapacity:
             await self._send(turn, self._messages.text(turn.language, Msg.AT_CAPACITY))
             return
 
@@ -904,18 +915,6 @@ class Conversation:
         found = await self._store.get_interaction(int(ref))
         return found if found is not None and found.user_hash == turn.user_hash else None
 
-    async def _admitted(self, turn: _Turn) -> bool:
-        """N-ATLAS licence cap: a user not active in the window counts as new, whatever their stored state."""
-        cap = self._limits.active_user_cap
-        if cap is None:
-            return True
-        since = self._clock() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
-        if await self._store.count_interactions_since(turn.user_hash, since):
-            return True
-        # The licence caps the whole project: every channel counts. Web sessions (client-chosen ids) have their own
-        # sub-cap in the web endpoint, so they can never use up more than their share (review M9).
-        return await self._store.count_active_users_since(since) < cap
-
     async def _rate_limited(self, turn: _Turn) -> bool:
         since = self._clock() - timedelta(hours=1)
         count = await self._store.count_interactions_since(turn.user_hash, since)
@@ -975,6 +974,7 @@ class Conversation:
         turn.logged = True
         turn.logged_at = logged_at
         turn.interaction_id = interaction_id
+        turn.reservation.release()  # the store counts this user now
         return interaction_id
 
 

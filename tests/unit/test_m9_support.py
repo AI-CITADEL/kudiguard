@@ -645,3 +645,49 @@ async def test_grounding_warm_up_failure_is_not_fatal(
         grounding = await build_grounding(base_settings(tmp_path), registry, Broken(), knowledge)  # type: ignore[arg-type]
     assert grounding is not None and "grounding evidence not pre-embedded: onnx" in caplog.text
     await grounding.aclose()
+
+
+async def test_evidence_is_purged_one_pass_early_so_up_to_n_days_holds() -> None:
+    """Messages are dropped one interval (plus margin) before they turn N days old: "up to 90 days" stays true until
+    the next pass, while the server runs."""
+    from datetime import datetime, timedelta
+
+    from kudiguard.api.services import PURGE_MARGIN, _purge_once
+    from kudiguard.storage.base import utcnow
+
+    cutoffs: list[datetime] = []
+
+    class Store:
+        async def purge_before(self, cutoff: datetime) -> int:
+            cutoffs.append(cutoff)
+            return 0
+
+        async def purge_patterns_before(self, cutoff: object) -> int:
+            return 0
+
+        async def purge_deletion_markers(self, cutoff: object) -> int:
+            return 0
+
+    now = utcnow()
+    await _purge_once(Store(), now, 90, 730, 3600, None, 365)  # type: ignore[arg-type]
+    assert cutoffs == [now - timedelta(days=90) + timedelta(seconds=3600) + PURGE_MARGIN]
+
+
+def test_cli_purge_also_expires_scam_examples(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from datetime import date
+
+    from kudiguard import cli
+    from kudiguard.domain import Flag, Verdict
+    from kudiguard.patterns import ScamPattern
+    from kudiguard.storage.sqlite import SQLiteStore
+
+    async def seed() -> None:
+        store = await SQLiteStore.open(cli_env / "kg.db", hasher=UserHasher(SECRET.encode()))
+        await store.add_pattern(ScamPattern.from_check(language="en", channel="whatsapp", verdict=Verdict.CAUTION,
+                                                       flags=(Flag.URGENCY,), text="pay now", english="pay now",
+                                                       day=date(2020, 1, 6)))  # fmt: skip
+        await store.close()
+
+    asyncio.run(seed())
+    assert cli.main(["purge"]) == 0
+    assert "1 scam examples older than 730 days" in capsys.readouterr().out
