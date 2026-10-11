@@ -91,8 +91,9 @@ _SECRET = re.compile(
     + r")){2,})"
     # the value before its name, joined by "is"/"as" (up to two words between): "482913 is your code",
     # "Use 652-137 as your one-time password", "415-984 is your Opay login code"; never a year ("2024 code of
-    # conduct", "the 2026 pin") nor without "is"/"as" ("Section 419 code"). Bounded and possessive: linear.
-    r"|(?<![\w.,])(?!(?:19|20)\d\d\s)(?P<before>\d(?:[ ._\-]?+\d){2,11}+)\s+(?:is|as)\s+"
+    # conduct", "the 2026 pin"; a bare year-shaped value "1999 is your pin" is kept, but "2048 13 is your OTP" is a
+    # code) nor without "is"/"as" ("Section 419 code"). Bounded and possessive: linear.
+    r"|(?<![\w.,])(?!(?:19|20)\d\d\s+(?:is|as)\s)(?P<before>\d(?:[ ._\-]?+\d){2,11}+)\s+(?:is|as)\s+"
     r"(?:(?:your|the)\s+)?(?:[a-z]{1,20}\s+){0,2}"  # bounded: constant backtracking
     r"(?:one[ -]time password|otp|code|pin|passcode|password|token)(?![a-z])"
     r"|(?<![a-z0-9\]])(?:exp|expiry|expires|expiry date)[\s:.-]*(?P<expiry>\d\d?\s?/\s?\d\d(?:\d\d)?)(?!\d)"

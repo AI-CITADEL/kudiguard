@@ -618,6 +618,12 @@ def test_only_uvicorn_access_lines_are_redacted_argument_by_argument() -> None:
         ("about 500 code words", "about 500 code words"),
         ("pay 2000 as code fee", "pay 2000 as code fee"),
         ("1000 is the code limit", "[number] is the code limit"),  # could be the code: masked
+        # a code that merely starts like a year is still a code
+        ("2048 13 is your OTP", "[number] is your OTP"),
+        ("1987 65 is your code", "[number] is your code"),
+        ("Use 2019 45 as your pin", "Use [number] as your pin"),
+        ("2019 4567 is your code", "[number] is your code"),
+        ("1999 is your pin", "1999 is your pin"),  # a year-shaped PIN alone: documented trade-off
         ("error code 404", "error code 404"),
         ("bank code 058", "bank code 058"),
         ("zip code 23401", "zip code 23401"),
