@@ -88,7 +88,7 @@ vouched for; final scoring keeps the texts so "is this a scam?" counts); content
 fixed text; guard tuned (subject-anchored English claims, everyday "no problem" phrases removed, paraphrases added);
 secrecy rule needs someone asking for secrecy; native step labels; USSD amounts not redacted.
 
-## S3 — LLM latency profile and cache slots (7 Oct 2026, `scripts/bench_llm.py`, 108 calls)
+## S3 — LLM latency profile and cache slots (7 Oct 2026, `scripts/bench_llm.py`, 108 calls; output not stored, re-run to check)
 
 | Call | p50 | p95 | prompt processing p50 |
 |---|---|---|---|
@@ -127,8 +127,9 @@ pip temp/cache and HF_HOME are redirected to ***REMOVED***.
 
 Access: all four official models granted (Hausa-ASR, Yoruba-ASR, Igbo-ASR, NigerianAccentedEnglish; classic Read
 token) and converted to CTranslate2 int8 by `scripts/prepare_asr.py` (7 Oct 2026). Smoke test of the official
-**NCAIR1/NigerianAccentedEnglish** model on the 11-s WhatsApp-style English fixture: **0% WER, 1.9–2.1 s** end to end;
-the live server's `/v1/check/audio` used it (6.9 s incl. N-ATLAS). Every language's voice path uses its NCAIR1 model
+**NCAIR1/NigerianAccentedEnglish** model on the 11-s WhatsApp-style English fixture (one synthetic TTS clip, not a
+real voice note): **0% WER, 1.9–2.1 s** end to end; one call to the live server's `/v1/check/audio` took 6.9 s incl.
+N-ATLAS (single measurement, output not stored). Every language's voice path uses its NCAIR1 model
 (`asr_model` in `data/languages/*.yaml`).
 `generation_config.json` of all three: `language: None`, task transcribe (`forced_decoder_ids [[1, None], [2, 50359]]`),
 multilingual Whisper vocabulary with no Igbo token. NCAIR does not pin a language token, so at inference Whisper
@@ -163,22 +164,31 @@ outputs in `data/eval/asr/results/int8.jsonl`. "WER" folds all diacritics (tone 
 ## S7 — Blind evaluation of scam detection and retrieval (8 Oct 2026)
 
 Frozen sets written by an independent author with no access to rules, prompts or pack content
-(`data/eval/scenarios.yaml`, `data/eval/retrieval_blind.yaml`). Never tune on them; ha/yo/ig wording pending native review.
+(`data/eval/scenarios.yaml`, `data/eval/retrieval_blind.yaml`); ha/yo/ig wording pending native review. **Post-hoc
+correction (10 Oct, honesty audit):** the scam set did not stay untouched: lexicon terms added in 541e8c3, after this
+run (e.g. Hausa secrecy "kar ka gaya ... kowa", Igbo "okpukpu"), now catch s18/s27/s40 with the rules alone, so the
+scam set is **no longer blind**. The retrieval set was not tuned on.
 
 **Scam detection** (`scripts/eval_scenarios.py`; flagged = likely_scam or caution; 40 messages, 5 scam + 5 legit per language):
 
 | Mode | Precision | Recall | False-positive rate | ha recall | yo recall | ig recall | en recall |
 |---|---|---|---|---|---|---|---|
-| Rules only (model down: safety floor) | 87% | 65% | 10% | 40% | 40% | 80% | 100% |
-| Full engine (N-ATLAS analyse + rules) | 86% | **95%** | 15% | 100% | 80% | 100% | 100% |
+| Rules only, 8 Oct (before 541e8c3's terms) | 87% | 65% | 10% | 40% | 40% | 80% | 100% |
+| **Rules only, current code** (re-run 10 Oct after H; `--rules-only`) | **89%** | **80%** | **10%** | 60% | 60% | 100% | 100% |
+| Full engine (N-ATLAS analyse + rules), 8 Oct | superseded | | | | | | |
 
-Full-engine latency p50 5.4 s, p95 7.2 s (text). Errors: genuine bank OTP SMS → caution (en s02, ig s32), Igbo
-"failed transfer, debited" question → likely_scam (s35), Yoruba investment-tripling scam missed (s30).
-Known limitation: genuine OTP-delivery SMS ("your OTP is …, do not share") is flagged "be careful". Fix belongs in the
+The 8 Oct full-engine run (`data/eval/results/scenarios-engine.jsonl`) predates greedy decoding, the money-skills
+pack, the lexicon edits and English-first replies, so its numbers are not quoted any more: **to be re-run live**
+(`python scripts/eval_scenarios.py`). Its latency then: p50 5.4 s, p95 7.2 s (text). Current rules-only errors: en s02
+and ig s32 (genuine OTP SMS; s32 is now 🔴), ha s16/s20 and yo s28/s30 missed. The 8 Oct engine run's errors: genuine
+bank OTP SMS → caution (en s02, ig s32), Igbo "failed transfer, debited" question → likely_scam (s35), Yoruba
+investment-tripling scam missed (s30).
+Known limitation: genuine OTP-delivery SMS ("your OTP is …, do not share") is flagged. Fix belongs in the
 lexicon with *separate* dev examples, then re-measure here once (recorded as a post-fix run).
 
 **Retrieval, blind** (24 English queries): production path (rules flags + hybrid search) **67% top-1 / 96% top-3**
-(BM25 only: 67% / 79%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
+on the core pack, **62% / 96% with the production packs** (core + money-skills; the number quoted elsewhere)
+(BM25 only: 67% / 79%, production packs 67% / 75%); raw text search without flags: hybrid 58% / 92%, BM25 50% / 67%. Compose is grounded on the
 top 3. Dev sets 1–2 in `retrieval.yaml` are no longer held out (content was tuned on them).
 
 ## S8 — Grounding check: embedder, threshold, polarity, latency (10 Oct 2026, CPU only)
@@ -444,9 +454,10 @@ a whole-word possessive ("the bank's website", "your bank website", "the website
 bank's own app"); "bank" elsewhere does not ("to update your bank details", "www.your-bank-verify.com").
 
 These are regex heuristics on the English text: read the flagged records, not just the rate. They are pinned by
-`data/eval/unsafe_advice_probes.yaml` (212 labelled probes from every review round; known limits are strict xfails:
+`data/eval/unsafe_advice_probes.yaml` (214 labelled probes from every review round; known limits are strict xfails:
 the "actually ..." lead-in, a bank-owned chat account as recipient, a possessive in the code's source) and by a
-zero-hit check on 1,056 strings of safe advice (packs, `must` points, calibration pairs, English fixed strings).
+zero-hit check on 1,088 strings of safe advice (packs, `must` points, calibration pairs, English fixed strings;
+counted 10 Oct, the corpus grows with the packs and dev cases).
 Stopping rule: a regression (a probe that passed before) must be fixed; a new edge case is added as a probe, fixed if
 the change is local and keeps every probe passing, otherwise added as a strict xfail with a reason. No speculative
 rule rewrites.
@@ -546,7 +557,8 @@ positives the reviewer found ("gwa m ihe OTP pụtara" / "agwaghị m ya PIN m" 
 (`data/eval/e2e`, measure only, rules-only, 27 scams + 25 genuine per language): yo recall 5/27 (master) → 6/27
 (7/27 before the account-threat narrowing, which now misses "wọ́n ti dí àkáǹtì rẹ", "they have blocked your
 account"), ig 6/27 unchanged; false positives unchanged (yo 0/25, ig 1/25). Blind scenarios: rules-only
-and engine verdicts identical before/after (rules-only precision 89% / recall 80% / FPR 10%; engine 86% / 95% / 15%).
+and engine verdicts identical before/after (rules-only precision 89% / recall 80% / FPR 10%; the engine numbers are
+from a pre-greedy state and are not quoted, see S7).
 A third engine run, overlapping another eval, flipped two legit yo/ig items to caution through model flags in the
 unchanged analyse step (run-to-run variance, not the lexicon).
 

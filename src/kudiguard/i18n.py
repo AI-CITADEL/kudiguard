@@ -53,6 +53,7 @@ class Msg(StrEnum):
     FALLBACK_STEPS = "fallback_steps"
     WARN_FAMILY_FALLBACK = "warn_family_fallback"
     AT_CAPACITY = "at_capacity"
+    NEW_USERS_BUSY = "new_users_busy"  # too many new users at once (admission.NewUsersBusy)
     BUSY = "busy"
     PRIVACY_LINK = "privacy_link"
     DONATION_OFFER = "donation_offer"
@@ -73,7 +74,6 @@ class Msg(StrEnum):
     CRISIS_OTHER_REPLY = "crisis_other_reply"
     ABUSE_REPLY = "abuse_reply"
     SCAM_TOOL_REPLY = "scam_tool_reply"
-    NEW_USERS_BUSY = "new_users_busy"
     NEW_USERS_BUSY_TODAY = "new_users_busy_today"
     SCREEN_NEUTRAL = "screen_neutral"
     VOICE_LIMIT = "voice_limit"

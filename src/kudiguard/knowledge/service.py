@@ -267,19 +267,16 @@ def knowledge_base_from_packs(
     include: Iterable[str] | None = None,
     embedder: Embedder | None = None,
     allow_samples: bool = False,
+    allow_live: bool = False,
     deadline_s: float = 1.5,
     limits: Limits = DEFAULT_LIMITS,
     screen: ContentScreen | None = None,
 ) -> KnowledgeBase:
     """The supported way to wire a KnowledgeBase: one embedder shared by every index and the query path."""
     sources = build_sources(
-        packs_dir,
-        client=client,
-        include=include,
-        embedder=embedder,
-        allow_samples=allow_samples,
-        screen=screen,
-    )
+        packs_dir, client=client, include=include, embedder=embedder, allow_samples=allow_samples,
+        allow_live=allow_live, screen=screen,
+    )  # fmt: skip
     return KnowledgeBase(sources, embedder=embedder, deadline_s=deadline_s, limits=limits)
 
 
@@ -290,13 +287,16 @@ def build_sources(
     include: Iterable[str] | None = None,
     embedder: Embedder | None = None,
     allow_samples: bool = False,
+    allow_live: bool = False,
     env: Mapping[str, str] = os.environ,
     clock: Callable[[], float] = time.monotonic,
     screen: ContentScreen | None = None,
 ) -> list[KnowledgeSource]:
     """Instantiate sources from ``packs_dir``: every enabled pack, or exactly the ``include`` list.
 
-    Fictional sample packs (``sample: true``) are refused unless ``allow_samples`` (demos and tests only).
+    Fictional sample packs (``sample: true``) are refused unless ``allow_samples`` (demos and tests only). Partner
+    packs in ``mode: live`` send the English text of each user message to the partner, so they are refused unless
+    ``allow_live`` (``KUDIGUARD_ALLOW_LIVE_PACKS``, which also discloses it on /privacy).
     """
     available = {d.name: d for d in sorted(packs_dir.iterdir()) if (d / "pack.yaml").is_file()}
     manifests = {name: load_manifest(d) for name, d in available.items()}
@@ -312,6 +312,12 @@ def build_sources(
             raise KnowledgeConfigError(f"unknown knowledge packs {unknown} in {packs_dir}")
     if not allow_samples and (samples := [n for n in selected if manifests[n].sample]):
         raise KnowledgeConfigError(f"sample packs {samples} are fictional; pass allow_samples=True for demos")
+    live = [n for n in selected if isinstance(s := manifests[n].source, HttpSourceSpec) and s.mode == "live"]
+    if live and not allow_live:
+        raise KnowledgeConfigError(
+            f"packs {live} use mode: live, which sends users' messages (in English) to the partner; use mode: sync, "
+            "or set KUDIGUARD_ALLOW_LIVE_PACKS=true (disclosed on /privacy)"
+        )
 
     sources: list[KnowledgeSource] = []
     for name in selected:

@@ -236,6 +236,28 @@ async def test_build_sources_include_creates_http_source() -> None:
     assert [type(s) for s in sources] == [FilePackSource, HttpSource]
 
 
+async def test_live_partner_packs_are_refused_unless_allowed(tmp_path: Path) -> None:
+    """mode: live sends each user's message (in English) to the partner: off unless the operator allows and discloses."""
+    for name, mode in (("live-bank", "live"), ("sync-bank", "sync")):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "pack.yaml").write_text(
+            f"id: {name}\nname: B\nowner: B\nkind: partner\nsource:\n  type: http\n"
+            f"  base_url: https://partner.example\n  mode: {mode}\n",
+            encoding="utf-8",
+        )
+    async with httpx.AsyncClient() as client:
+        assert len(build_sources(tmp_path, client=client, include=["sync-bank"])) == 1
+        with pytest.raises(KnowledgeConfigError, match=r"live-bank.*mode: live"):
+            build_sources(tmp_path, client=client)
+        assert len(build_sources(tmp_path, client=client, allow_live=True)) == 2
+        from kudiguard.knowledge.service import knowledge_base_from_packs
+
+        with pytest.raises(KnowledgeConfigError, match="KUDIGUARD_ALLOW_LIVE_PACKS"):
+            knowledge_base_from_packs(tmp_path, client=client)
+        with pytest.raises(KnowledgeConfigError, match="core knowledge pack"):  # got past the live check
+            knowledge_base_from_packs(tmp_path, client=client, allow_live=True)
+
+
 async def test_build_sources_unknown_pack() -> None:
     async with httpx.AsyncClient() as client:
         with pytest.raises(KnowledgeConfigError, match="nope"):

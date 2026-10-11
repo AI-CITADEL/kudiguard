@@ -575,7 +575,9 @@ class Engine:
             result.rejections += tuple(dict.fromkeys(problem_kind(p) for p in problems)) + (
                 ("guard",) if blocking else ()
             )
-            log.info("reply translation rejected (attempt %d): %s %s", attempt + 1, issues, problems)
+            # kinds only: a "new numbers" problem lists digits from the reply, which must not reach the logs
+            log.info("reply translation rejected (attempt %d): %s %s", attempt + 1, issues,
+                     [problem_kind(p) for p in problems])  # fmt: skip
             if blocking or not all(problem_kind(p) in RETRYABLE_PROBLEMS for p in problems):
                 break
         return result

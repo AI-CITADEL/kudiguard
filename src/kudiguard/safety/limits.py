@@ -23,6 +23,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
+from kudiguard.admission import Admission, NewUsersBusy, NewUsersBusyToday
 from kudiguard.patterns import week_of
 from kudiguard.safety.abuse import ScreenMode
 from kudiguard.text import normalize
@@ -83,6 +84,23 @@ class NewUserGate:
             else None
         )  # fmt: skip
         return None if _allowed(self.mode, limit is not None, f"new users per {limit}") else limit
+
+    def attach(self, admission: Admission) -> None:
+        """Plug into the shared licence-cap admission (every channel): a pure check before the cap, the count only
+        once the cap has passed (a user refused at the cap uses no quota). Applies even without a licence cap: it is
+        an anti-flood guard (docs/ABUSE.md)."""
+        admission.add_check(self._check)
+        admission.add_on_admit(self._on_admit)
+
+    async def _check(self, user_key: str, channel: str) -> None:
+        limit = self.refusal(user_key)
+        if limit == "hour":
+            raise NewUsersBusy("new users per hour")
+        if limit == "day":
+            raise NewUsersBusyToday("new users per day")
+
+    async def _on_admit(self, user_key: str, channel: str) -> None:
+        self.reserve(user_key)
 
     def reserve(self, user_key: str) -> None:
         """Count this user as admitted (idempotent: onboarding messages are not new users again)."""

@@ -27,8 +27,12 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT / "data"
     db_path: Path = ROOT / "var" / "kudiguard.db"
     hash_secret: SecretStr = SecretStr("")  # >= 32 bytes; pseudonymous user ids (privacy.UserHasher)
-    retention_days: int = Field(default=90, ge=1)
-    pattern_retention_days: int = Field(default=730, ge=1)  # de-identified scam examples (kudiguard.patterns)
+    # Upper bounds = the pilot's published promises ("up to 90 days", "up to 2 years"): the user-facing texts render
+    # the configured values, and a longer period would need a new consent text (docs/DEPLOY.md). Lower bound 31: the
+    # licence cap counts active users from the evidence log over 30 days, and the purge runs up to ~7 h early.
+    retention_days: int = Field(default=90, ge=31, le=90)
+    # de-identified scam examples (kudiguard.patterns)
+    pattern_retention_days: int = Field(default=730, ge=30, le=730)
     # Voice-note donation (kudiguard.donation; docs/DPIA_VOICE.md). Off until the DPIA is signed off.
     voice_donation: bool = False
     voice_dir: Path = ROOT / "var" / "voice"  # encrypted audio; must belong to db_path (marker file)
@@ -39,6 +43,9 @@ class Settings(BaseSettings):
     # Where the server stores data, as told to users (kudiguard.hosting): outside-nigeria | nigeria.
     storage_location: StorageLocation = StorageLocation.OUTSIDE_NIGERIA
     allow_sample_packs: bool = False  # fictional demo packs (never in production)
+    # Partner packs in ``mode: live`` send the English text of each user message to the partner's server
+    # (knowledge/http_source.py). Refused unless allowed here AND disclosed on /privacy (rendered when on).
+    allow_live_packs: bool = False
     packs: Annotated[tuple[str, ...], NoDecode] = ()  # empty = every enabled pack
 
     # --- models -------------------------------------------------------------------------------------------
@@ -83,6 +90,10 @@ class Settings(BaseSettings):
     default_language: str = "en"
 
     # --- public API ---------------------------------------------------------------------------------------
+    # The partner REST API (/v1/*) is OFF in the pilot: its routes are not mounted at all (404, absent from /docs).
+    # When on, every check must name a pseudonymous end user (X-KudiGuard-End-User), who counts toward the N-ATLaS
+    # licence cap (``active_user_cap``) together with WhatsApp and web users (docs/DEPLOY.md, "Partner API").
+    partner_api: bool = False
     # Comma-separated "name:key" pairs, e.g. "demo-bank:3f9…,ngo:…". Keys >= 24 chars. Empty = API disabled.
     api_keys: Annotated[tuple[str, ...], NoDecode] = ()
     api_rate_per_minute: int = Field(default=30, ge=1)  # per API key

@@ -95,9 +95,12 @@ injection; a reply repeating the system prompt is blocked by the reply screen.
 
 * **New-user gate**: users new to the 30-day licence window are admitted at most 100/hour and 300/day (configurable,
   empty = no cap). Refused users get "very busy with new users, try again in an hour" (hourly limit) or "welcomed
-  many new users today, try again later" (daily limit); web: 503 `busy_new_users`. `refusal()` is a pure check and
-  `reserve()` counts only after the licence cap passed, so a user refused at the cap uses no quota and the gate can
-  sit inside one shared check-and-reserve admission step. It applies only when a licence cap is set.
+  many new users today, try again later" (daily limit); web and partner API: 503 `busy_new_users`. It plugs into the
+  one licence-cap admission object shared by every channel (`kudiguard.admission`): its check runs under the
+  admission lock before the cap, and its count is taken only once the cap has passed (`add_check` / `add_on_admit`),
+  so a user refused at the cap uses no quota. It applies on every channel, including partner-API end users, and
+  also when no licence cap is set: it is an anti-flood guard, not a licence measure. Crisis help takes no
+  reservation (it is free, uses no model and stores nothing), so the admission reserves at most once per turn.
 * **Flood guard**: at most 10 queued messages per user; one "rate limited" notice per 10 minutes per user; 30 voice
   notes per user per hour.
 * Existing: per-user hourly rate limit, global concurrency + waiting cap, 16 MB / 90 s voiced / 15 s decode
@@ -182,6 +185,14 @@ probes were used to fix the phrases). A third fresh set is kept by the reviewer 
 
 There is no out-of-sample measurement of this version yet; round 2 showed that in-sample perfection on round 1
 (42/42, 35/35) fell to 53% and 63% on fresh probes, so expect the same kind of gap again.
+
+After merging workstream Q (shared admission), a 13-call live check through the real Conversation: a crisis +
+scam message got the crisis reply then likely_scam (after fixing a bug this check found: "…took all my 450k. I want to
+die" had been framed as someone else at risk because "my 450k" matched the third-party subject; third-party
+subjects are now people only, within one sentence); a third-party crisis got `crisis_other_reply`; two threat
+scams (en, pcm) were likely_scam with no crisis reply; a genuine "developer mode" question was answered normally; a
+plain and a leetspeak injection were enforced (rules-only verdict, neutral text). Q's admission stress probes (fuzz,
+hooks, viral, eight burst scenarios) gave 0 failures and no leaked holders on the merged tree.
 
 Other offline numbers (in-sample for the red-team set): red-team enforced injection 57/60, scam-tool 23/25, abuse
 12/12, crisis 15/15; controls 25/26 not enforced.

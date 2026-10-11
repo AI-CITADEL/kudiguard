@@ -106,12 +106,20 @@ def test_layout_matches_pivot(registry: LanguageRegistry, code: str) -> None:
 @pytest.mark.parametrize("code", ["ha", "yo", "ig", "en"])
 def test_consent_states_retention_and_controls(registry: LanguageRegistry, code: str) -> None:
     welcome = registry.get(code).strings[Msg.WELCOME]
-    assert "90" in welcome and "*DELETE*" in welcome and "*STOP*" in welcome
+    # the configured retention periods are rendered (never hard-coded), and "most" numbers are masked, not all
+    assert "{retention_days}" in welcome and "{pattern_retention_days}" in welcome
+    assert "90" not in welcome and "*DELETE*" in welcome and "*STOP*" in welcome
+    assert {
+        "en": "most numbers masked",
+        "ha": "yawancin lambobi",
+        "yo": "ọ̀pọ̀ nọ́ńbà tí a bò",
+        "ig": "ọtụtụ nọmba,",
+    }[code] in welcome
     assert (
         "N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy"
         in welcome
     )
-    assert "powered by Awarri Technologies" in welcome and "DELETE" in welcome and "2" in welcome
+    assert "powered by Awarri Technologies" in welcome and "DELETE" in welcome
 
 
 def test_numbered_fixed_steps_keep_their_line_breaks(registry: LanguageRegistry) -> None:

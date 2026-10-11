@@ -115,11 +115,15 @@ async def test_hostile_signed_bodies_never_cause_a_500() -> None:
 
 
 async def test_failed_delivery_status_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level("DEBUG")
+    # A real wamid is base64 of a protobuf that embeds the recipient's number (privacy.py).
+    wamid = "wamid.HBgNMjM0ODAzMTIzNDU2NxUCABEYEjAzQkE5RTQ2"
     payload = json.loads((FIXTURES / "statuses_only.json").read_text(encoding="utf-8"))
     payload["entry"][0]["changes"][0]["value"]["statuses"].append(
         {
-            "id": "wamid.OUT9",
+            "id": wamid,
             "status": "failed",
+            "recipient_id": "2348031234567",
             "errors": [{"code": 131047, "title": "Re-engagement message"}],
         }
     )
@@ -127,3 +131,6 @@ async def test_failed_delivery_status_is_logged(caplog: pytest.LogCaptureFixture
     async with client_for(Recorder()) as client:
         assert (await client.post(PATH, content=body, headers=signed(body))).status_code == 200
     assert any("131047" in r.getMessage() for r in caplog.records)
+    logged = caplog.text + " ".join(str(r.args) for r in caplog.records)
+    for secret in (wamid, "HBgNMjM0ODAz", "2348031234567", "8031234567"):
+        assert secret not in logged

@@ -127,7 +127,7 @@ strings:
 
     Zitere m *ozi olu* ma ọ bụ ozi ederede, ma ọ bụ zigharịa ozi ọ bụla ị na-enweghị obi ike na ya.
 
-    🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. Ndị nyocha ole na ole a tụkwasịrị obi (ndị otu anyị ma ọ bụ ndị asụsụ ahụ bụ asụsụ obodo ha, n'okpuru nkwekọrịta nzuzo e dere ede) nwere ike ịgụ ụfọdụ ozi na nzaghachi, e zochiri nọmba, na-enweghị nọmba ekwentị gị ma ọ bụ ihe ọ bụla na-egosi onye ị bụ, iji lelee ịdị mma na nchekwa; a na-ehichapụ mbipụta ha mgbe nlele ahụ gasịrị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha, ma ọ bụrụ na ị họrọghị inye ha onyinye (anyị ga-ajụ iche). Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
+    🔒 Anyị na-echekwa ozi gị ruo ụbọchị {retention_days} iji melite ọrụ anyị. Ndị nyocha ole na ole a tụkwasịrị obi (ndị otu anyị ma ọ bụ ndị asụsụ ahụ bụ asụsụ obodo ha, n'okpuru nkwekọrịta nzuzo e dere ede) nwere ike ịgụ ụfọdụ ozi na nzaghachi, e zochiri ọtụtụ nọmba, na-enweghị nọmba ekwentị gị ma ọ bụ ihe ọ bụla na-egosi onye ị bụ, iji lelee ịdị mma na nchekwa; a na-ehichapụ mbipụta ha mgbe nlele ahụ gasịrị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha, ma ọ bụrụ na ị họrọghị inye ha onyinye (anyị ga-ajụ iche). Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo ụbọchị {pattern_retention_days} iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
     🌍 Iji rụọ ọrụ KudiGuard, ozi gị na-agafe na WhatsApp (Meta) na Cloudflare, na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. {risk} Site n'ịga n'ihu, ị kwenyekwara na mbufe a.
     ℹ️ Nke a bụ ndụmọdụ, ọ bụghị ndụmọdụ ego nke ọkachamara.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
@@ -170,6 +170,7 @@ strings:
   warn_family_fallback: "⚠️ Ịdọ aka ná ntị maka aghụghọ: mmadụ nwere ike ịkpọtụrụ unu na-ekwu na o si n'ụlọ akụ ma ọ bụ ụlọ ọrụ gọọmentị, ma ọ bụ na-ekwe nkwa ego. Unu enyela onye ọ bụla OTP, PIN ma ọ bụ BVN unu, unu akwụkwala ego ka unu nata ego. Buru ụzọ jụọ ụlọ akụ unu."
   at_capacity: "😔 KudiGuard juputara ugbu a. Biko nwaa ọzọ mgbe ụbọchị ole na ole gachara."
   busy: "⏳ Ọtụtụ mmadụ na-ajụ ajụjụ ugbu a. Biko nwaa ọzọ mgbe otu nkeji gachara."
+  new_users_busy: "⏳ Ọtụtụ mmadụ ọhụrụ na-abata na KudiGuard ugbu a. Biko nwaa ọzọ mgbe ihe dị ka otu awa gachara."
   privacy_link: "🔐 Ọkwa nzuzo: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-
@@ -208,7 +209,6 @@ strings:
     Mgbe ha dị njikere, enwere m ike inyere ha aka n'okwu ego ahụ: ha kwesịrị ịkpọ ụlọ akụ ha na nọmba dị na kaadị ha.
   abuse_reply: "🙏 Anọ m ebe a inyere gị aka maka nchekwa ego. Biko ka anyị kparịta ụka n'ụzọ nkwanye ùgwù. Ziga m ozi ị na-enweghị obi ike na ya, ma ọ bụ jụọ ajụjụ gbasara ego."
   scam_tool_reply: "🚫 Enweghị m ike ide, ịtụgharị ma ọ bụ ime ka ozi na-eme ka ọ bụ ụlọ akụ ma ọ bụ ụlọ ọrụ ka mma, ma ọ bụ nke na-arịọ ndị mmadụ ego ma ọ bụ koodu. Enwere m ike inyocha ozi maka gị, ma ọ bụ kọwaa otu ị ga-esi chekwaa onwe gị."
-  new_users_busy: "⏳ KudiGuard nwere ọtụtụ ndị ọrụ ọhụrụ ugbu a. Biko nwaa ọzọ mgbe otu awa gachara."
   new_users_busy_today: "⏳ KudiGuard nabatara ọtụtụ ndị ọrụ ọhụrụ taa. Biko nwaa ọzọ ma emechaa."
   screen_neutral: "ℹ️ Ana m enyocha ozi ị na-enweghị obi ike na ya ma na-aza ajụjụ gbasara ego; enweghị m ike ịgbanwe otú m si arụ ọrụ. Ziga m ozi ị chọrọ ka m nyochaa."
   voice_limit: "🎧 Ị zitela ọtụtụ ozi olu n'obere oge. Biko chere ntakịrị, ma ọ bụ dee ozi gị."

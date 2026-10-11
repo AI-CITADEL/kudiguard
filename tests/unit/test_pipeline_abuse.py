@@ -246,7 +246,7 @@ async def test_unsupported_message_kinds_are_not_screened(h: Harness) -> None:
 
 def test_conversation_defaults_are_production_defaults(h: Harness) -> None:
     conversation = h.conversation
-    assert conversation._new_users.per_hour == 100 and conversation._new_users.per_day == 300
+    assert conversation._admission.checks == []  # no new-user gate unless given (Services attaches one)
     assert conversation._flood.max_queued == 10 and conversation._learning.mode is ScreenMode.ENFORCE
     assert dataclasses.is_dataclass(Limits())
 
@@ -379,3 +379,19 @@ async def test_stored_reply_never_quotes_the_crisis(h: Harness) -> None:
     await h.say("I want to die. Someone asked for my OTP on the phone, is it a scam?")
     [row] = await interactions(h)
     assert "kill" not in row["reply"] and "This is a scam." in row["reply"]
+
+
+async def test_crisis_from_a_refused_new_user_takes_no_slot(h: Harness) -> None:
+    """Crisis help reserves nothing; the admission after it refuses quietly and leaks no holder."""
+    wire(h, new_users=NewUserGate(per_hour=1))
+    await h.say("hello")
+    assert await h.say(CRISIS, user=OTHER) == [h.t(Msg.CRISIS_REPLY)]
+    assert h.conversation._admission.in_flight == 0
+
+
+async def test_crisis_from_an_admitted_user_reserves_once(h: Harness) -> None:
+    gate = NewUserGate(per_hour=2)
+    wire(h, new_users=gate)
+    texts = await h.say(CRISIS)  # first contact: help, then the welcome (one reservation, released)
+    assert texts[0] == h.t(Msg.CRISIS_REPLY) and h.conversation._admission.in_flight == 0
+    assert len(gate._seen) == 1

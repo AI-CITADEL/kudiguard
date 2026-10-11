@@ -11,7 +11,15 @@ from typing import Any
 from kudiguard.domain import Interaction, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
+from kudiguard.storage.base import (
+    CAP_MARKER_PREFIX,
+    StoreClosedError,
+    UserState,
+    VoiceSample,
+    aware,
+    cap_window_start,
+    utcnow,
+)
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -104,7 +112,13 @@ class MemoryStore:
 
     async def delete_user(self, user_hash: str) -> int:
         self._ensure_open()
-        self._deleted[self._hasher.deletion_marker(user_hash)] = utcnow()
+        marker = self._hasher.deletion_marker(user_hash)
+        self._deleted[marker] = utcnow()
+        times = [i.created_at for i in self._interactions.values() if i.user_hash == user_hash]
+        if (
+            times and max(times) >= cap_window_start()
+        ):  # the slot outlives the erasure; dated with the last one
+            self._deleted[CAP_MARKER_PREFIX + marker] = max(times)
         removed = int(self._users.pop(user_hash, None) is not None)
         for item in self._interactions.values():  # examples taken from this user's stored messages
             if (
@@ -152,9 +166,23 @@ class MemoryStore:
         self._ensure_open()
         return self._deleted.get(self._hasher.deletion_marker(user_hash))
 
-    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+    async def count_deletions_since(self, since: datetime) -> int:
         self._ensure_open()
-        old = [k for k, at in self._deleted.items() if at < aware(cutoff)]
+        return sum(m.startswith(CAP_MARKER_PREFIX) and at >= aware(since) for m, at in self._deleted.items())
+
+    async def purge_deletion_markers(self, cutoff: datetime) -> int:
+        return self._purge_markers(cutoff, cap=False)
+
+    async def purge_cap_markers(self, cutoff: datetime) -> int:
+        return self._purge_markers(cutoff, cap=True)
+
+    def _purge_markers(self, cutoff: datetime, *, cap: bool) -> int:
+        self._ensure_open()
+        old = [
+            k
+            for k, at in self._deleted.items()
+            if k.startswith(CAP_MARKER_PREFIX) == cap and at < aware(cutoff)
+        ]
         for key in old:
             del self._deleted[key]
         return len(old)
@@ -181,7 +209,7 @@ class MemoryStore:
 
     async def purge_patterns_before(self, cutoff: date) -> int:
         self._ensure_open()
-        old = [k for k, p in self._patterns.items() if p.week < week_of(cutoff)]
+        old = [k for k, p in self._patterns.items() if p.week < cutoff]  # see Store.purge_patterns_before
         for key in old:
             del self._patterns[key]
         return len(old)

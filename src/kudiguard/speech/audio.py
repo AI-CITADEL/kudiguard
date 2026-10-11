@@ -5,6 +5,10 @@ with the index at the end decode — Android recorders, Safari's MediaRecorder) 
 thread, which kills ffmpeg on timeout and works on every asyncio loop type. Defences: a size cap before ffmpeg starts,
 an input-format allowlist (audio containers only: no playlists/concat, so no reading of other files or URLs), a
 ``file``-only protocol allowlist, a raw-duration cap and a wall-clock timeout.
+
+The temp file holds the user's audio in plain form for the length of one decode (deleted in ``finally``). A crash or
+power cut in between could leave it behind, so decoding uses its own folder (``kudiguard-audio`` in the system temp
+dir) and ``sweep_stale_audio`` (run at startup) deletes leftover ``kg-audio-*`` files, never anything else.
 """
 
 from __future__ import annotations
@@ -15,8 +19,10 @@ import logging
 import math
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -36,6 +42,47 @@ SILENCE_BELOW_PEAK_DB = 35.0  # ...and otherwise: 35 dB below the loudest frame 
 FRAME_S = 0.02
 PAD_S = 0.2
 CUT_SEARCH_S = 3.0  # search this far either side of an ideal cut for the quietest moment
+TEMP_PREFIX = "kg-audio-"
+TEMP_FOLDER = "kudiguard-audio"
+STALE_AUDIO_S = 300.0  # far longer than any decode (DECODE_TIMEOUT_S): such a file was left by a crash
+
+
+def audio_temp_dir() -> Path | None:
+    """The decode folder (``<temp>/kudiguard-audio``, private to this account), or None (= the system temp dir) when
+    it cannot be created or belongs to someone else."""
+    folder = Path(tempfile.gettempdir()) / TEMP_FOLDER
+    try:
+        folder.mkdir(mode=0o700, exist_ok=True)
+        info = folder.lstat()  # the folder itself, never what a planted symlink points to
+    except OSError:
+        return None
+    if not stat.S_ISDIR(info.st_mode):  # a symlink (or anything else) in its place: use the system temp dir
+        return None
+    owner = info.st_uid
+    getuid = getattr(os, "getuid", None)  # POSIX only; on Windows the folder sits in the per-user temp dir
+    if getuid is not None and owner != getuid():
+        return None
+    return folder
+
+
+def sweep_stale_audio(folders: list[Path] | None = None, *, max_age_s: float = STALE_AUDIO_S) -> int:
+    """Delete ``kg-audio-*`` files older than ``max_age_s`` (left behind by a crash mid-decode) from the decode folder
+    and the system temp dir (older versions decoded there). Only that prefix, only plain files. Returns the count."""
+    if folders is None:
+        folders = [Path(tempfile.gettempdir()), Path(tempfile.gettempdir()) / TEMP_FOLDER]
+    cutoff = time.time() - max_age_s
+    removed = 0
+    for folder in folders:
+        for path in folder.glob(f"{TEMP_PREFIX}*"):
+            try:
+                if path.is_file() and not path.is_symlink() and path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue  # in use or already gone
+    if removed:
+        log.warning("deleted %d leftover temporary audio files (an earlier run stopped mid-decode)", removed)
+    return removed
 
 
 def find_ffmpeg(explicit: str | None = None) -> str:
@@ -76,7 +123,7 @@ async def decode(
 def _decode_file(
     data: bytes, ffmpeg: str, raw_limit: float, timeout_s: float, temp_dir: Path | None
 ) -> Audio:
-    fd, name = tempfile.mkstemp(prefix="kg-audio-", dir=temp_dir)
+    fd, name = tempfile.mkstemp(prefix=TEMP_PREFIX, dir=temp_dir or audio_temp_dir())
     path = Path(name)
     try:
         with os.fdopen(fd, "wb") as handle:

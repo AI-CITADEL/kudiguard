@@ -29,12 +29,20 @@ async def api(registry: LanguageRegistry) -> AsyncIterator[Api]:
         yield running
 
 
+def use_gate(api: Api, gate: NewUserGate) -> None:
+    """Replace the new-user gate on the shared admission (Services attaches the default one)."""
+    admission = api.app.state.services.admission
+    admission.checks.clear()
+    admission.on_admit.clear()
+    gate.attach(admission)
+
+
 def session(n: int) -> dict[str, str]:
     return {**WEB, "x-kudiguard-session": f"abuse-session-{n:04d}-xxxxx"}
 
 
 async def test_minted_web_sessions_meet_the_new_user_gate(api: Api, registry: LanguageRegistry) -> None:
-    api.app.state.services.new_users = NewUserGate(per_hour=1)
+    use_gate(api, NewUserGate(per_hour=1))
     assert (
         await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(1))
     ).status_code == 200
@@ -45,7 +53,7 @@ async def test_minted_web_sessions_meet_the_new_user_gate(api: Api, registry: La
                       "message": plain_text(Messages(registry).text("en", Msg.NEW_USERS_BUSY))}  # fmt: skip
     again = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(1))
     assert again.status_code == 200  # a returning session is always served
-    assert api.app.state.pending_web_sessions == set()
+    assert api.app.state.services.admission.in_flight == 0  # no leaked holder
 
 
 async def test_web_crisis_reply_keeps_no_text(api: Api, registry: LanguageRegistry) -> None:
@@ -123,7 +131,8 @@ async def test_build_services_wires_the_defences(tmp_path: Path, monkeypatch: py
     try:
         conversation = services.conversation
         assert conversation is not None
-        assert conversation._new_users is services.new_users and conversation._learning is services.learning
+        assert conversation._admission is services.admission and conversation._learning is services.learning
+        assert len(services.admission.checks) == 1 and len(services.admission.on_admit) == 1  # the gate
         assert conversation._flood.mode is ScreenMode.SHADOW and conversation._flood.max_queued == 3
         assert services.engine.screen.modes.scam_tool is ScreenMode.SHADOW
     finally:
@@ -131,7 +140,7 @@ async def test_build_services_wires_the_defences(tmp_path: Path, monkeypatch: py
 
 
 async def test_web_new_users_beyond_the_daily_cap(api: Api, registry: LanguageRegistry) -> None:
-    api.app.state.services.new_users = NewUserGate(per_hour=5, per_day=1)
+    use_gate(api, NewUserGate(per_hour=5, per_day=1))
     assert (
         await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(1))
     ).status_code == 200
@@ -201,3 +210,15 @@ async def test_web_crisis_first_skips_voice_and_large_or_malformed_bodies(api: A
     assert plain.status_code == 403
     calm = await api.client.post("/web/check", data={"text": "how do I save money"}, headers={})
     assert calm.status_code == 403
+
+
+async def test_the_new_user_gate_also_applies_without_a_licence_cap(registry: LanguageRegistry) -> None:
+    """An anti-flood guard, not a licence measure (docs/ABUSE.md): it holds with KUDIGUARD_ACTIVE_USER_CAP unset."""
+    async for api in _start(registry, settings(active_user_cap=None)):
+        use_gate(api, NewUserGate(per_hour=1))
+        assert (
+            await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(1))
+        ).status_code == 200
+        busy = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=session(2))
+        assert busy.status_code == 503 and busy.json()["detail"]["problem"] == "busy_new_users"
+        assert api.app.state.services.admission.in_flight == 0  # no leaked holder

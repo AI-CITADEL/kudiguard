@@ -31,6 +31,7 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, Protocol
 
+from kudiguard.admission import Admission, AtCapacity, Reservation
 from kudiguard.commands import Command, CommandMatcher, Match
 from kudiguard.domain import InboundMessage, Interaction, LanguageCode, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation, VoiceVault
@@ -38,7 +39,7 @@ from kudiguard.engine import Answer, AnswerKind, Engine, crisis_message
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Messages, Msg
 from kudiguard.languages import LanguageStatus
-from kudiguard.patterns import PATTERN_CHANNELS, ScamPattern
+from kudiguard.patterns import PATTERN_CHANNELS, PATTERN_RETENTION_DAYS, ScamPattern
 from kudiguard.privacy import UserHasher
 from kudiguard.render import REPORT_VERDICTS, render_check_reply, render_report, render_steps, render_warning
 from kudiguard.safety.abuse import CRISES, INJECTIONS
@@ -46,12 +47,12 @@ from kudiguard.safety.limits import FloodGuard, LearningGate, NewUserGate
 from kudiguard.speech.audio import MAX_SECONDS
 from kudiguard.speech.base import AudioError, AudioProblem
 from kudiguard.speech.service import SpeechResult
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, Store, UserState, utcnow
+from kudiguard.storage.base import Store, UserState, utcnow
 from kudiguard.text import redact
 
 log = logging.getLogger(__name__)
 
-CONSENT_VERSION = "2026-10-10"  # bump when the welcome/consent text changes materially (also in voice.html)
+CONSENT_VERSION = "2026-10-11"  # bump when the welcome/consent text changes materially (also in voice.html)
 REPLY_RESERVE_S = 3.0  # of the turn deadline, kept for rendering, logging and sending the reply
 FAILURE_DEADLINE_S = (
     10.0  # for the error reply/log after a failed turn (a hung channel must not wedge a user)
@@ -149,6 +150,9 @@ class Limits:
     max_waiting_turns: int = 200  # beyond this, new turns get a "busy, try again" reply (bounded memory)
     turn_deadline_s: float = 60.0  # hard limit per turn, including model queueing
     default_language: LanguageCode = "en"
+    # Shown in the welcome (consent) text: the configured retention periods (Settings), so the text never drifts.
+    retention_days: int = 90
+    pattern_retention_days: int = PATTERN_RETENTION_DAYS
 
     def __post_init__(self) -> None:
         if (
@@ -186,6 +190,9 @@ class _Turn:
     crisis_sent: bool = False  # the crisis reply already went out (before any gate), never twice
     # Own (not forwarded) voice notes of this turn with their transcripts, for donation after the reply.
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
+    # A new user's licence-cap slot, held until this turn's interaction is logged (or the turn ends).
+    reservation: Reservation = dataclasses.field(default_factory=Reservation)
+    admitted: bool = False  # passed the licence-cap gate: only such turns are logged (a row means "admitted")
 
 
 class _KeyedLocks:
@@ -225,11 +232,15 @@ class Conversation:
         donations: VoiceVault | None = None,
         accept_donations: bool = False,
         storage: StorageLocation = StorageLocation.OUTSIDE_NIGERIA,
+        admission: Admission | None = None,
         new_users: NewUserGate | None = None,
         flood: FloodGuard | None = None,
         learning: LearningGate | None = None,
     ) -> None:
-        """`new_users`, `flood`, `learning`: abuse limits (`safety.limits`, docs/ABUSE.md); None = each at its
+        """``admission``: the licence-cap gate shared with the website and the partner API (``Services``); without
+        one, a private gate for ``limits.active_user_cap`` (tests, single-channel hosts).
+        ``new_users``: a new-user rate gate to attach to that admission (``Services`` attaches its own; None here =
+        none added). ``flood``, ``learning``: abuse limits (``safety.limits``, docs/ABUSE.md); None = each at its
         default limits and mode (as in production with no settings changed)."""
         self._engine = engine
         self._registry = engine.registry
@@ -243,7 +254,9 @@ class Conversation:
         self._donations = donations  # also used to erase when collection is off
         self._collecting = donations is not None and accept_donations  # KUDIGUARD_VOICE_DONATION
         self._storage = storage
-        self._new_users = new_users or NewUserGate()
+        self._admission = admission or Admission(store, limits.active_user_cap, clock=clock)
+        if new_users is not None:
+            new_users.attach(self._admission)
         self._flood = flood or FloodGuard()
         self._learning = learning or LearningGate()
         self._matcher = CommandMatcher(self._registry)
@@ -369,6 +382,8 @@ class Conversation:
         except Exception as exc:
             log.exception("turn failed (%s)", type(exc).__name__)
             await self._fail(turn, exc)
+        finally:
+            turn.reservation.release()  # normally already released by _log
 
     async def _fail(self, turn: _Turn, exc: Exception) -> None:
         """Never silence, never two answers: an error reply only if no answer was delivered; one log row."""
@@ -379,6 +394,8 @@ class Conversation:
                     await self._send(turn, self._messages.text(turn.language, Msg.ERROR_RETRY))
         except Exception:
             log.exception("could not tell the user about the failure")
+        if not turn.admitted:
+            return  # never logged: a row would make this user "returning" and let them past the licence cap
         if turn.logged:
             if turn.interaction_id is not None and not delivered:  # logged as answered, never delivered
                 try:
@@ -450,9 +467,13 @@ class Conversation:
             return
         if message.kind is MessageKind.TEXT and await self._crisis_first(turn, user):
             return
-        if (refusal := await self._admission(turn)) is not None:
-            await self._send(turn, self._messages.text(turn.language, refusal))
+        try:
+            turn.reservation = await self._admission.reserve(turn.user_hash, message.channel)
+        except AtCapacity as exc:  # the cap, or a new-user gate (e.g. NewUsersBusy)
+            if not turn.crisis_sent:  # after a crisis reply, the help is the answer: no "full" or "busy" text
+                await self._send(turn, self._messages.text(turn.language, exc.message))
             return
+        turn.admitted = True
 
         chosen = match.language or self._chosen_language(message)
         if user is None or user.stopped or not _consented(user):
@@ -466,8 +487,8 @@ class Conversation:
 
     async def _crisis_first(self, turn: _Turn, user: UserState | None) -> bool:
         """A typed crisis message gets the crisis reply at once, before consent, the licence cap, the new-user gate
-        and the rate limit (docs/ABUSE.md). Returns True when the turn ends here: the user could not be checked
-        now, and nothing about the message is stored. Otherwise the check follows (its crisis reply is not sent
+        and the rate limit (docs/ABUSE.md). Returns True when the turn ends here (a rate-limited user: nothing about
+        the message is stored); a refusal by the admission that follows also ends it without another message. Otherwise the check follows (its crisis reply is not sent
         twice); a voice note is only known to be a crisis after transcription, inside the check."""
         text = turn.message.text or ""
         category = self._engine.screen.crisis(text)
@@ -477,8 +498,8 @@ class Conversation:
             turn.language = self._engine.screen.crisis_language(text) or turn.language
         await self._send(turn, self._messages.text(turn.language, crisis_message(category)))
         turn.crisis_sent = True
-        if await self._admission(turn) is not None:  # full or busy: the help was the answer
-            return True
+        # No reservation is taken here: the crisis reply is free, uses no model and is stored nowhere. The admission
+        # that follows reserves once (and, if it refuses, sends nothing more: the help was the answer).
         if user is None or user.stopped or not _consented(user):
             return False  # first contact: the welcome and language menu follow, so they can come back to us
         return await self._rate_limited(turn)
@@ -913,10 +934,13 @@ class Conversation:
         return len(await self._store.delete_voice_samples(user_hash))  # no files on this server; the rows go
 
     def _hosting(self, language: LanguageCode) -> dict[str, str]:
-        """``{where}`` and ``{risk}`` of the welcome and offer texts, for the configured storage location."""
+        """``{where}`` and ``{risk}`` (the configured storage location) and the retention periods of the welcome and
+        offer texts."""
         return {
             "where": self._messages.text(language, self._storage.message),
             "risk": self._messages.text(language, self._storage.risk),
+            "retention_days": str(self._limits.retention_days),
+            "pattern_retention_days": str(self._limits.pattern_retention_days),
         }
 
     # --- helpers ----------------------------------------------------------------------------------------
@@ -995,24 +1019,6 @@ class Conversation:
         found = await self._store.get_interaction(int(ref))
         return found if found is not None and found.user_hash == turn.user_hash else None
 
-    async def _admission(self, turn: _Turn) -> Msg | None:
-        """N-ATLAS licence cap: a user not active in the window counts as new, whatever their stored state. New users
-        also pass the new-user rate gate (throwaway numbers must not burn the cap in one go). None = admitted."""
-        cap = self._limits.active_user_cap
-        if cap is None:  # no licence cap: nothing for the new-user gate to protect either
-            return None
-        since = self._clock() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
-        if await self._store.count_interactions_since(turn.user_hash, since):
-            return None
-        # The licence caps the whole project: every channel counts. Web sessions (client-chosen ids) have their own
-        # sub-cap in the web endpoint, so they can never use up more than their share (review M9).
-        if await self._store.count_active_users_since(since) >= cap:
-            return Msg.AT_CAPACITY
-        if limit := self._new_users.refusal(turn.user_hash):
-            return Msg.NEW_USERS_BUSY if limit == "hour" else Msg.NEW_USERS_BUSY_TODAY
-        self._new_users.reserve(turn.user_hash)  # only after the cap passed: a refused user uses no quota
-        return None
-
     async def _rate_limited(self, turn: _Turn) -> bool:
         since = self._clock() - timedelta(hours=1)
         count = await self._store.count_interactions_since(turn.user_hash, since)
@@ -1046,7 +1052,33 @@ class Conversation:
         reply_to: int | None = None,
     ) -> int:
         logged_at = self._clock()
-        interaction_id = await self._store.add_interaction(
+        try:
+            interaction_id = await self._add_interaction(turn, outcome=outcome, answer=answer, reply=reply,
+                                                         error=error, intent=intent, llm_ms=llm_ms,
+                                                         reply_to=reply_to, logged_at=logged_at)  # fmt: skip
+        except Exception:
+            turn.reservation.hold()  # served but not in the store: the user keeps their cap slot for the window
+            raise
+        turn.logged = True
+        turn.logged_at = logged_at
+        turn.interaction_id = interaction_id
+        turn.reservation.release()  # the store counts this user now
+        return interaction_id
+
+    async def _add_interaction(
+        self,
+        turn: _Turn,
+        *,
+        outcome: Outcome,
+        answer: Answer | None,
+        reply: str | None,
+        error: str | None,
+        intent: str | None,
+        llm_ms: int | None,
+        reply_to: int | None,
+        logged_at: datetime,
+    ) -> int:
+        return await self._store.add_interaction(
             Interaction(
                 channel=turn.message.channel,
                 message_id=turn.message.message_id,
@@ -1069,10 +1101,6 @@ class Conversation:
                 reply_to=reply_to,
             )
         )
-        turn.logged = True
-        turn.logged_at = logged_at
-        turn.interaction_id = interaction_id
-        return interaction_id
 
 
 AUDIO = MessageKind.AUDIO

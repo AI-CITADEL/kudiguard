@@ -22,8 +22,8 @@ against the gazetted text before filing.
     preconsent`.
     * Each row needs a valid Nigerian mobile number, all three boxes ticked and a past timestamp; otherwise
       nothing is imported.
-    * A form answer never overrides a later STOP, withdrawal, decline or chat activity, and answers older than 30
-      days are skipped.
+    * A form answer never overrides a later STOP, withdrawal, decline or chat activity, and answers older than 29
+      days are skipped (`voice_cli.PRECONSENT_MAX_AGE_DAYS`).
     * A STOPped user who returns starts without donation consent.
     * Imported testers are not asked again in the chat.
     * An import never implies main consent: the tester's first message, whatever it is, gets the welcome, which
@@ -41,7 +41,8 @@ against the gazetted text before filing.
   * language, channel and ISO week (no timestamp);
   * the version of the donation text accepted;
   * the duration, when known (not recorded on the web);
-  * the automatic transcript, with numbers and emails masked (`text.redact`).
+  * the automatic transcript, with most numbers and emails masked (`text.redact`; not every format, and names
+    are kept).
 * **What is never kept:**
   * Text messages.
   * WhatsApp voice notes not recorded in the app (Meta's `audio.voice` is not true), or marked forwarded
@@ -162,7 +163,8 @@ against the gazetted text before filing.
   of mid-2026, and these rules are already in force under the NDPA and GAID 2025.
 * **The location is a setting:** `KUDIGUARD_STORAGE_LOCATION=outside-nigeria` (default) or `nigeria`. Every text
   renders the setting, so it stays true after the move. Nothing claims "stored in Nigeria" by default.
-* Moving the server abroad again requires a new `CONSENT_VERSION`. Moving it into Nigeria needs no new consent, but
+* Moving the server abroad again requires a new `CONSENT_VERSION` (an operator step: the code does not detect the
+  move). Moving it into Nigeria needs no new consent, but
   the transfer through Meta and Cloudflare remains.
 * The CBN payment-data localisation circular (in force January 2027) covers payment-system participants. It does
   not apply to KudiGuard, though it is relevant to partner banks' own data.
@@ -243,7 +245,7 @@ lawyer confirms this.
   |---|---|
   | Activity | Voice-note donation for speech-recognition testing |
   | Data subjects | Adult users who opt in (chat, web, tester form) |
-  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source, withdrawal time); DELETE markers (keyed HMAC and time, 30 days) |
+  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source, withdrawal time); DELETE markers (keyed HMAC and time, 30 days; for erased users who were active in the last 30 days, a second keyed marker with the time of their last message, for the licence cap) |
   | Basis | Consent (s.25, s.30 explicit consent) |
   | Recipients | Named reviewers and transcribers under written confidentiality |
   | Transfers | Outside Nigeria during the pilot: our server, and Meta and Cloudflare in transit. Basis: informed consent (s.43) |

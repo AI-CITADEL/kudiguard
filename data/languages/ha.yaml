@@ -127,7 +127,7 @@ strings:
 
     Ku aiko mini da *saƙon murya* ko rubutu, ko ku tura saƙon da kuke shakka a kai.
 
-    🔒 Muna adana saƙonninku har tsawon kwanaki 90 don inganta aikinmu. Wasu ƙalilan amintattun masu bita (ƙungiyarmu ko masu harshen a matsayin harshen uwa, ƙarƙashin yarjejeniyar sirri a rubuce) za su iya karanta wasu daga cikin saƙonni da amsoshi, an ɓoye lambobi kuma babu lambar wayarku ko wata alamar gane ku, don duba inganci da tsaro; ana share kwafinsu bayan binciken. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su, sai dai idan kun zaɓi ba da gudummawarsu (za mu tambaye ku daban). Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har shekara 2 don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
+    🔒 Muna adana saƙonninku har tsawon kwanaki {retention_days} don inganta aikinmu. Wasu ƙalilan amintattun masu bita (ƙungiyarmu ko masu harshen a matsayin harshen uwa, ƙarƙashin yarjejeniyar sirri a rubuce) za su iya karanta wasu daga cikin saƙonni da amsoshi, an ɓoye yawancin lambobi kuma babu lambar wayarku ko wata alamar gane ku, don duba inganci da tsaro; ana share kwafinsu bayan binciken. Ana adana lambar wayarku ne kawai a sigar sirri, kuma ana share saƙonnin murya bayan an rubuta su, sai dai idan kun zaɓi ba da gudummawarsu (za mu tambaye ku daban). Ku aika *DELETE* a kowane lokaci don share saƙonninku, ko *STOP* don dakatarwa. Ana adana misalan damfara (an cire yawancin lambobi) daban har kwanaki {pattern_retention_days} don kare wasu da inganta KudiGuard; DELETE yana share waɗanda aka ɗauka daga saƙonninku na kwanan nan. Ta hanyar ci gaba, kun amince da wannan.
     🌍 Don gudanar da KudiGuard, saƙonninku suna wucewa ta WhatsApp (Meta) da Cloudflare, a wajen Najeriya, kuma ana adana su a sabarmu {where}. {risk} Ta hanyar ci gaba, kun kuma amince da wannan canja wurin.
     ℹ️ Wannan jagora ce kawai, ba shawarar kuɗi ta ƙwararru ba.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
@@ -170,6 +170,7 @@ strings:
   warn_family_fallback: "⚠️ Gargaɗi kan damfara: wani zai iya tuntuɓarku yana cewa daga banki ko hukumar gwamnati yake, ko yana alƙawarin kuɗi. Kada ku taɓa bayar da OTP, PIN ko BVN ɗinku, kuma kada ku biya kuɗi don karɓar kuɗi. Ku tabbatar da bankinku tukuna."
   at_capacity: "😔 KudiGuard ta cika yanzu. Don Allah ku sake gwadawa bayan 'yan kwanaki."
   busy: "⏳ Mutane da yawa suna tambaya yanzu. Don Allah ku sake gwadawa bayan minti ɗaya."
+  new_users_busy: "⏳ Sababbin mutane da yawa suna shiga KudiGuard yanzu. Don Allah ku sake gwadawa bayan kimanin awa ɗaya."
   privacy_link: "🔐 Sanarwar sirri: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-
@@ -208,7 +209,6 @@ strings:
     Idan sun shirya, zan taimaka da batun kuɗin: su kira bankinsu a lambar da ke jikin katinsu.
   abuse_reply: "🙏 Ina nan don taimaka maka game da tsaron kuɗi. Don Allah mu yi magana cikin girmamawa. Turo min saƙon da kake shakka, ko ka yi tambaya game da kuɗi."
   scam_tool_reply: "🚫 Ba zan iya rubuta, fassara ko gyara saƙonnin masu kwaikwayon banki ko kamfani ba, ko waɗanda ke neman kuɗi ko lambobin sirri daga mutane. Zan iya duba maka saƙo, ko in bayyana yadda za ka kare kanka."
-  new_users_busy: "⏳ KudiGuard tana da sababbin masu amfani da yawa yanzu. Don Allah ku sake gwadawa bayan awa ɗaya."
   new_users_busy_today: "⏳ KudiGuard ta karɓi sababbin masu amfani da yawa yau. Don Allah ku sake gwadawa daga baya."
   screen_neutral: "ℹ️ Ina duba saƙonnin da kuke shakka a kansu kuma ina amsa tambayoyi game da kuɗi; ba zan iya canja yadda nake aiki ba. Ku turo min saƙon da kuke so in duba."
   voice_limit: "🎧 Ka turo saƙonnin murya da yawa cikin ɗan lokaci. Don Allah ka ɗan jira, ko ka rubuta saƙonka."

@@ -25,6 +25,9 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
   Hausa replies matters (11% of measured translations flipped a negation; a direct reply can err the same way unseen).
 * **Conversation** (`pipeline.py`): versioned consent, STOP/DELETE/language commands, buttons, per-user ordering,
   message merging, rate limit, licence cap, never-silent failures, redacted evidence log.
+* **Partner REST API** (`/v1`, `api/app.py`): not mounted unless `KUDIGUARD_PARTNER_API=true` (off in the pilot).
+  When on, each call names a pseudonymous end user (`X-KudiGuard-End-User`, phone-shaped ids refused), who is
+  admitted under the same N-ATLaS licence cap as web sessions (one lock, in-flight users counted) and WhatsApp users.
 * **Configuration, not code**: languages, lexicons, commands and UI text in `data/languages/*.yaml`; knowledge and
   verified contacts in `data/packs/*` (partners can plug in their own pack or API).
 * **Safety**: the model never decides the verdict alone and never writes contacts; replies pass an output guard; the
