@@ -163,3 +163,19 @@ def test_ai_denials(screen: ReplyScreen, text: str, lang: str) -> None:
 )
 def test_honest_or_unrelated_statements_pass(screen: ReplyScreen, text: str) -> None:
     assert OutputIssue.AI_DENIAL not in screen.check(text, "en")
+
+
+@pytest.mark.parametrize(
+    ("text", "lang"),
+    [
+        ("The scammer will say: I am not a bot, I am a real human agent.", "en"),
+        ("Scammers often say 'I am a human agent, not a bot' to gain trust.", "en"),
+        ("Tell them: I'm a person who does not share my OTP.", "en"),
+        ("Kar ka yarda idan ya ce 'ni mutum ne na banki'.", "ha"),
+        ("If the caller says 'I am a real person from GTBank', hang up.", "en"),
+    ],
+)
+def test_reported_or_quoted_denials_are_not_the_reply_s_own(
+    screen: ReplyScreen, text: str, lang: str
+) -> None:
+    assert OutputIssue.AI_DENIAL not in screen.check(text, lang)

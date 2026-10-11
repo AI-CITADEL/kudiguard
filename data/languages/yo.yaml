@@ -87,6 +87,9 @@ abuse:
     - 'e\W+se\W+fun\W+wiwo'
   asr_annotations:
     - 'orin'
+  ai_questions:  # DRAFT
+    - '(?:se|s)\W+eniyan\W+ni\W+(?:e|o)\b'
+    - 'abi\W+ero\b'
   ai_denials:  # DRAFT
     - 'eniyan\W+ni\W+mi\b'
     - 'emi\W+(?:kii|ki\W+i)\W+se\W+ero'
@@ -98,7 +101,7 @@ lexicon:
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     threat:  # DRAFT, native review pending
-      - 'tabi\W+a\W+(?:o|maa|yoo)\W+(?:mu|pa|ti)\W+(?:o|e)\b'
+      - 'tabi\W+a\W+(?:o|maa|yoo)\W+pa\W+(?:o|e)\b'
       - 'a\W+(?:maa|ma|yoo|o)\W+pa\W+(?:o|e|yin)\b'
       - 'tabi\W+ki\W+o\W+ku\b'
     urgency:

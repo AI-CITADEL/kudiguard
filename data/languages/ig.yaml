@@ -86,6 +86,8 @@ abuse:
     - 'daalu\W+maka\W+ikiri'
   asr_annotations:
     - 'egwu'
+  ai_questions:  # DRAFT
+    - 'i\W+bu\W+(?:mmadu|igwe)\b'
   ai_denials:  # DRAFT
     - 'abu\W+m\W+mmadu\b'
     - 'abughi\W+m\W+igwe'
@@ -97,7 +99,7 @@ lexicon:
   # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     threat:  # DRAFT, native review pending
-      - 'ma\W+o\W+bu\W+anyi\W+ga\W+(?:ejide|egbu|ekpochi)\W+gi\b'
+      - 'ma\W+o\W+bu\W+anyi\W+ga\W+egbu\W+gi\b'
       - 'anyi\W+ga\W+egbu\W+gi\b'
       - 'ma\W+o\W+bu\W+i\W+ga\W+anwu\b'
     urgency:

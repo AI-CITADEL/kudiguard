@@ -89,6 +89,10 @@ abuse:
     - 'mun\W+gode\W+da\W+kallo'
   asr_annotations:
     - 'kida|kade\W+kade'
+  ai_questions:  # DRAFT
+    - 'na''ura\W+ne\b'
+    - 'mutum\W+ne\W+na\W+gaske'
+    - 'kai\W+mutum\W+ne'
   ai_denials:  # DRAFT
     - 'ni\W+mutum\W+ne\b'
     - 'ba\W+ni\W+(?:na''ura|inji|ai)\W+ba'
@@ -99,7 +103,7 @@ abuse:
 lexicon:
   flags:
     threat:  # DRAFT, native review pending
-      - 'ko\W+(?:mu|za\W+mu)\W+(?:kama|kashe|kai\W+hari\W+ga)\W+(?:ka|ki|ku)\b'
+      - 'ko\W+(?:mu|za\W+mu)\W+(?:kashe|kai\W+hari\W+ga)\W+(?:ka|ki|ku)\b'
       - 'za\W+mu\W+kashe\W+(?:ka|ki|ku)\b'
       - 'ko\W+(?:ka|ki|ku)\W+mutu\b'
     asks_credentials:

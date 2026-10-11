@@ -21,6 +21,7 @@ from kudiguard.domain import LanguageCode
 from kudiguard.languages import LanguageRegistry
 from kudiguard.safety.abuse import ScreenMode
 from kudiguard.safety.output_guard import OutputIssue
+from kudiguard.safety.scam_rules import Patterns
 from kudiguard.text import fold, normalize
 
 log = logging.getLogger(__name__)
@@ -31,6 +32,24 @@ _WORDS = re.compile(r"[^\W_]+")
 _SCAFFOLD = re.compile(
     r"<\s*/?\s*(?:facts|actions|message)\s*>|\btask\s*:|\bwarning signs (?:found\s*)?:|\breply in [a-z]+\s*\.",
 )
+
+
+# what someone else says ("the scammer will say: I am not a bot", "tell them: I'm a person who ...")
+_REPORTED = re.compile(
+    r"\b(?:say|says|said|saying|claim\w*|pretend\w*|tell\w*|told|ya\W+ce|sun\W+ce|so\W+pe|kwuru)\b"
+)
+_QUOTE = re.compile("\"[^\"\n]*\"|(?:(?<=[\\s:])|^)'[^'\n]*'")
+
+
+def _denies_ai(folded: str, patterns: Patterns) -> bool:
+    """The reply itself denies being an AI: not inside quotes, and not after a reporting word in its sentence."""
+    unquoted = _QUOTE.sub(lambda m: " " * len(m.group()), folded)
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", unquoted):
+        for pattern in patterns:
+            match = pattern.search(sentence)
+            if match and not _REPORTED.search(sentence, 0, match.start()):
+                return True
+    return False
 
 
 def _words(text: str) -> list[str]:
@@ -76,7 +95,7 @@ class ReplyScreen:
         issues: list[OutputIssue] = []
         if any(p.search(folded) for p in self._registry.abuse_patterns(language).persona_claims):
             issues.append(OutputIssue.PERSONA)
-        if any(p.search(folded) for p in self._registry.abuse_patterns(language).ai_denials):
+        if _denies_ai(folded, self._registry.abuse_patterns(language).ai_denials):
             issues.append(OutputIssue.AI_DENIAL)
         if _SCAFFOLD.search(folded) or _grams(words, LEAK_WORDS) & self._prompt_grams:
             issues.append(OutputIssue.PROMPT_LEAK)

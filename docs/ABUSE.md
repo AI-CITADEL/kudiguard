@@ -191,7 +191,23 @@ probes were used to fix the phrases). A third fresh set is kept by the reviewer 
 | | | genuine messages: enforced / shadow-flagged | 2/43 / 3/43 |
 | | | injection and scam-tool attacks enforced | 16/32 (all 9 classic overrides; scam-writing requests missed) |
 | Round 3 | this version, **in-sample** | crisis / third-party / threat flag / genuine enforced / attacks | 32/32 / 11/11 / 16/16 / 0/43 / 30/32 (misses: a "grandmother" role-play, base64) |
+| f4 regression probes (reviewer, out-of-sample for round 3) | round 3 (c760f2c) | genuine with THREAT / ordinary requests refused / defensive-wording attacks passed / helpline crisis missed / quoted AI denials flagged | 16/36 / 5/23 / 3/4 / 2/13 / 4/5 |
+| Round 4 | this version (f4 now **in-sample**) | the same | 0/36 / 0/23 / 0/4 / 0/13 / 0/5 |
+| Round 4 | this version, f3 set | crisis / third-party / threat flag / genuine / attacks | 32/32 / 11/11 / 13/16 / 0/43 / 30/32 |
 | Dev inputs (246: scenarios, prompts, answers, retrieval, ASR references) | this version | anything enforced / threat flag | only the 2 injections their authors wrote as such / 0 |
+
+**Round 4 trade-offs.** The threat flag now counts only harm or violence, exposure of the victim (their photos,
+video or nudes; a "thief/debtor" claim to their contacts, family or employer), or arrest/prosecution together with a
+scam signal (a bail, release or clearance fee; "to this account/number"; a deadline in hours; gift cards or crypto).
+Real FIRS, LIRS, court, customs and utility notices and family jokes ("or I'll tell your father") stay clean. The
+price: arrest-only threats with no scam signal lose the flag. Three f3 native probes (ha, yo, ig: "pay today or we
+arrest you, this is EFCC/the police") are now unflagged; they still reach the model and the impersonation rules.
+Any request for a suicide or crisis helpline now gets the crisis reply; only statistics, news, awareness, prevention
+campaigns, "suicide bomber" and "financial suicide" are exempt. The scam-tool defensive exemption applies only to
+questions with no writing verb ("what does a fake ... look like"); "write a phishing SMS ... so I can recognise it"
+is refused. "Are you an AI / a real person?" (en, pcm, ha; yo and ig DRAFT) is answered with the fixed honest line
+before the greeting matcher and without the model; the reply screen ignores AI denials inside quotes or after a
+reporting word ("the scammer will say: I am not a bot").
 
 **Phrase lists overfit.** Each fresh, out-of-sample set has scored 53-78% where the previous version scored 100%
 in-sample (round 2: 53% injection, 63% crisis; round 3: 78% crisis, 50% attacks, 6% threat flag). The round-3 fixes

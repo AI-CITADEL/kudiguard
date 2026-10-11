@@ -120,6 +120,7 @@ class _AbuseSpec(BaseModel):
     asr_alone: list[str] = Field(default_factory=list)
     persona_claims: list[str] = Field(default_factory=list)  # a reply claiming to be a bank / customer care
     ai_denials: list[str] = Field(default_factory=list)  # a reply denying it is an AI ("I am not a bot")
+    ai_questions: list[str] = Field(default_factory=list)  # "are you an AI / a real person?": the honest line
 
 
 class _CommandsSpec(BaseModel):
@@ -171,6 +172,7 @@ class AbusePatterns:
     asr_alone: Patterns = ()
     persona_claims: Patterns = ()
     ai_denials: Patterns = ()
+    ai_questions: Patterns = ()
 
 
 def _ui_length(text: str) -> int:

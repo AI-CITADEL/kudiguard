@@ -395,3 +395,9 @@ async def test_crisis_from_an_admitted_user_reserves_once(h: Harness) -> None:
     texts = await h.say(CRISIS)  # first contact: help, then the welcome (one reservation, released)
     assert texts[0] == h.t(Msg.CRISIS_REPLY) and h.conversation._admission.in_flight == 0
     assert len(gate._seen) == 1
+
+
+async def test_are_you_an_ai_is_not_swallowed_by_the_greeting_matcher(h: Harness) -> None:
+    await h.onboard("en")
+    assert await h.say("Hello, are you a real person?") == [h.t(Msg.AI_HONEST)]
+    assert await h.say("hello") == [h.t(Msg.GREETING_REPLY)]

@@ -638,7 +638,9 @@ class Conversation:
         if kind is MessageKind.BUTTON:
             await self._store.save_user(user)
             await self._follow_up(turn, parsed)
-        elif match.greeting_language:
+        elif match.greeting_language and not self._engine.screen.asks_if_ai(
+            turn.message.text or "", turn.language
+        ):
             await self._store.save_user(user)
             await self._fixed(turn, Msg.GREETING_REPLY, transcript=turn.message.text)
         else:

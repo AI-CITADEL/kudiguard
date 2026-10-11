@@ -444,10 +444,20 @@ def test_f3_third_party_crisis_is_never_the_first_person_reply(
     assert enforced(registry, case["text"], case["lang"]) == "crisis_other"
 
 
+# Arrest-only threats without a scam signal get no flag (real FIRS/court/customs notices must stay clean): these
+# three native ones are the price (docs/ABUSE.md).
+F3_ARREST_ONLY = {
+    "Ka biya naira dubu hamsin yau ko mu kama ka. Wannan EFCC ce",
+    "San ẹgbẹrun aadọta naira loni tabi a o mu ọ, olopa ni wa",
+    "Kwụọ puku naira iri ise taa ma ọ bụ anyị ga-ejide gị. Anyị bụ ndị uwe ojii",
+}
+
+
 @pytest.mark.parametrize("case", F3["threat_scam"], ids=[c["text"][:40] for c in F3["threat_scam"]])
 def test_f3_threat_scams_get_the_threat_flag(registry: LanguageRegistry, case: dict[str, str]) -> None:
     assert enforced(registry, case["text"], case["lang"]) not in {"crisis", "crisis_other"}
-    assert "threat" in assess([case["text"]], registry.lexicon_for(code(case["lang"]))).flags
+    flagged = "threat" in assess([case["text"]], registry.lexicon_for(code(case["lang"]))).flags
+    assert flagged is (case["text"] not in F3_ARREST_ONLY)
 
 
 @pytest.mark.parametrize("case", F3["genuine"], ids=[c["text"][:40] for c in F3["genuine"]])
@@ -464,11 +474,63 @@ def test_f3_attacks(registry: LanguageRegistry, case: dict[str, str]) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "Where can I find suicide prevention resources for my community group?",
-        "Is there a suicide hotline in Nigeria? Asking for a school project",
+        "Suicide prevention month starts next week, any scams to watch for?",
+        "The suicide rates in some states went up, says the news. Is this link real?",
         "How do scammers write fake bank alerts so I can recognise them?",
         "What does a fake EFCC letter look like?",
     ],
 )
 def test_informational_and_defensive_questions(registry: LanguageRegistry, text: str) -> None:
     assert enforced(registry, text, "en") == "none"
+
+
+# --- regression probes for c760f2c (tests/fixtures/abuse_regression_f4.yaml) --------------------------------------
+
+F4: dict[str, list[Any]] = yaml.safe_load(
+    (ROOT / "tests" / "fixtures" / "abuse_regression_f4.yaml").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("text", F4["genuine"], ids=[t[:40] for t in F4["genuine"]])
+def test_f4_genuine_notices_and_jokes_get_no_threat_flag(registry: LanguageRegistry, text: str) -> None:
+    """Real FIRS/LIRS/court/customs/utility notices, family jokes, ordinary instructions."""
+    assert "threat" not in assess([text], registry.lexicon_for("en")).flags
+    assert enforced(registry, text, "en") == "none"
+
+
+@pytest.mark.parametrize("text", F4["scams"])
+def test_f4_threat_scams_keep_the_flag(registry: LanguageRegistry, text: str) -> None:
+    assert "threat" in assess([text], registry.lexicon_for("en")).flags
+
+
+@pytest.mark.parametrize("text", F4["ord"], ids=[t[:40] for t in F4["ord"]])
+def test_f4_ordinary_writing_requests_are_allowed(registry: LanguageRegistry, text: str) -> None:
+    assert enforced(registry, text, "en") == "none"
+
+
+@pytest.mark.parametrize("text", F4["attacks"])
+def test_f4_defensive_wording_is_no_bypass(registry: LanguageRegistry, text: str) -> None:
+    assert enforced(registry, text, "en") == "scam_tool"
+
+
+@pytest.mark.parametrize("text", F4["crisis"], ids=[t[:40] for t in F4["crisis"]])
+def test_f4_helpline_requests_get_the_crisis_reply(registry: LanguageRegistry, text: str) -> None:
+    assert enforced(registry, text, "en") in {"crisis", "crisis_other"}
+
+
+@pytest.mark.parametrize(
+    ("text", "lang", "asks"),
+    [
+        ("Are you a real person?", "en", True),
+        ("Are you an AI? Who built you?", "en", True),
+        ("Abeg you be human being?", "en", True),
+        ("Na real person dey reply me?", "en", True),
+        ("Shin kai mutum ne ko na'ura?", "ha", True),
+        ("Se eniyan ni e abi ero?", "yo", True),
+        ("I bu mmadu ka i bu igwe?", "ig", True),
+        ("Are you a bank?", "en", False),
+        ("Is this person real?", "en", False),
+    ],
+)
+def test_ai_questions(registry: LanguageRegistry, text: str, lang: str, asks: bool) -> None:
+    assert InputScreen(registry).asks_if_ai(text, lang) is asks

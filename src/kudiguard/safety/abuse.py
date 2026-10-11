@@ -118,6 +118,12 @@ _ECHOED_SELF_HARM = re.compile(
 )
 
 
+# a request to produce text (English; the native scam-writing phrases carry their own verbs)
+_WRITING_VERB = re.compile(  # not a scammer's verb ("how do scammers write ...")
+    r"(?<!scammers )(?<!fraudsters )(?<!they )\b(?:write|draft|generate|create|compose|make|design|produce|prepare)\b"
+)
+
+
 def _clean(text: str) -> str:
     """Without invisible format characters (zero-width spaces/joiners, BOM) and with look-alike letters mapped."""
     return "".join(ch for ch in text if unicodedata.category(ch) != "Cf").translate(_HOMOGLYPHS)
@@ -193,8 +199,7 @@ class InputScreen:
             Category.CRISIS_OTHER: lambda: _search_any(self._everywhere.crisis_other, readings),
             Category.CRISIS: lambda: _search_any(self._everywhere.crisis, readings),
             Category.SCAM_TOOL: lambda: (
-                _search_any(patterns.scam_tool, readings)
-                and not _search(patterns.scam_tool_defensive, folded)
+                _search_any(patterns.scam_tool, readings) and not self._defensive(readings, patterns)
             ),
             Category.ABUSE: lambda: not flagged and _search(patterns.abuse, folded),
             Category.INJECTION: lambda: any(self._strong(r, head, patterns) for r in readings),
@@ -209,6 +214,18 @@ class InputScreen:
                 detected.remove(broad)  # one category of each kind per message
         enforced = next((c for c in detected if self.modes.of(c) is ScreenMode.ENFORCE), None)
         return Screening(tuple(detected), enforced)
+
+    @staticmethod
+    def _defensive(readings: list[str], patterns: AbusePatterns) -> bool:
+        """A question about scams ("what does a fake ... look like"); never a request with a writing verb ("write a
+        phishing SMS ... so I can recognise it" is still a request to write one)."""
+        return _search_any(patterns.scam_tool_defensive, readings) and not any(
+            _WRITING_VERB.search(r) for r in readings
+        )
+
+    def asks_if_ai(self, text: str, language: LanguageCode) -> bool:
+        """ "Are you an AI / a real person?" in the user's language (or the pivot's): answered with the honest line."""
+        return _search_any(self._registry.abuse_patterns(language).ai_questions, variants(text))
 
     def crisis(self, text: str) -> Category | None:
         """The crisis screens alone (crisis_other first), in enforce mode only: used before any other gate."""

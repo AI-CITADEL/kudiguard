@@ -400,7 +400,7 @@ async def test_a_reply_that_denies_being_an_ai_becomes_the_honest_line(
         analyse=analysis("x", "question"), compose="I am not an AI, I am a real person here to help."
     )
     for lang in ("en",):  # English: the scripted reply is composed directly
-        answer = await engine(registry, knowledge, llm).check("Are you an AI? Who built you?", lang)
+        answer = await engine(registry, knowledge, llm).check("What can you help me with?", lang)
         assert answer.body == text(registry, lang, Msg.AI_HONEST) and OutputIssue.AI_DENIAL in answer.issues
 
 
@@ -408,3 +408,14 @@ def test_the_compose_prompt_says_kudiguard_is_an_ai() -> None:
     from kudiguard.prompts import SYSTEM_PROMPTS
 
     assert "You are an AI assistant, not a person" in SYSTEM_PROMPTS[2]
+
+
+@pytest.mark.parametrize(("question", "lang"), [("Are you a real person?", "en"), ("Abeg you be human being?", "en"),
+                                                ("Kai mutum ne na gaske?", "ha")])  # fmt: skip
+async def test_are_you_an_ai_gets_the_honest_line_without_the_model(
+    registry: LanguageRegistry, knowledge: KnowledgeBase, question: str, lang: str
+) -> None:
+    llm = FakeLLM()
+    answer = await engine(registry, knowledge, llm).check(question, lang)
+    assert answer.kind is AnswerKind.SCREENED and answer.body == text(registry, lang, Msg.AI_HONEST)
+    assert answer.screen_action == "ai_question" and llm.requests == []

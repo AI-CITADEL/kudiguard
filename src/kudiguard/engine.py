@@ -281,6 +281,11 @@ class Engine:
         lexicon = self.registry.lexicon_for(language)
         if is_content_free(text):
             return Answer(language, AnswerKind.CONTENT_FREE, Outcome.FIXED_REPLY)
+        if self.screen.asks_if_ai(text, language):  # before the greeting matcher ("you be human being?")
+            body = self.messages.text(language, Msg.AI_HONEST)
+            return Answer(
+                language, AnswerKind.SCREENED, Outcome.FIXED_REPLY, body=body, screen_action="ai_question"
+            )
         greeting = self._matcher.match(text).greeting_language is not None
         if greeting and not decide(text, Analysis("", Intent.GREETING, ()), lexicon).flags:
             return Answer(language, AnswerKind.GREETING, Outcome.FIXED_REPLY, intent=Intent.GREETING)
