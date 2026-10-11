@@ -58,7 +58,14 @@ class NewUsersBusy(AtCapacity):
 
     message = Msg.NEW_USERS_BUSY
     problem = "busy_new_users"
-    retry_after_s = 3600
+    retry_after_s: int | None = 3600
+
+
+class NewUsersBusyToday(NewUsersBusy):
+    """The new-user gate's daily limit: "try again later" (not "in an hour")."""
+
+    message = Msg.NEW_USERS_BUSY_TODAY
+    retry_after_s = None
 
 
 @dataclass

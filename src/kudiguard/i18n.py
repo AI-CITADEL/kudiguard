@@ -69,6 +69,15 @@ class Msg(StrEnum):
     RISK_OUTSIDE = "risk_outside"
     RISK_NIGERIA = "risk_nigeria"
     READ_WELCOME = "read_welcome"
+    # malicious-use screens (safety.abuse, docs/ABUSE.md)
+    CRISIS_REPLY = "crisis_reply"
+    CRISIS_OTHER_REPLY = "crisis_other_reply"
+    ABUSE_REPLY = "abuse_reply"
+    SCAM_TOOL_REPLY = "scam_tool_reply"
+    NEW_USERS_BUSY_TODAY = "new_users_busy_today"
+    AI_HONEST = "ai_honest"  # the honest fixed line when a reply denied being an AI
+    SCREEN_NEUTRAL = "screen_neutral"
+    VOICE_LIMIT = "voice_limit"
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

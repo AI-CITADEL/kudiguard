@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
-from kudiguard.knowledge.models import PackManifest, Query, SourceResult
+from kudiguard.knowledge.models import Contact, Entry, PackManifest, Query, SourceResult
 
 
 class SourceUnavailable(RuntimeError):
@@ -21,3 +22,12 @@ class KnowledgeSource(Protocol):
     async def refresh(self) -> None:
         """Re-read or re-sync content (no-op where not applicable). May raise ``SourceUnavailable``."""
         ...
+
+
+class ContentScreen(Protocol):
+    """Filters pack content before it is indexed (``safety.pack_screen.PackScreen``: planted instructions, unsafe
+    advice). Returns what may be used; logs and drops the rest."""
+
+    def entries(self, manifest: PackManifest, entries: Sequence[Entry]) -> list[Entry]: ...
+
+    def contacts(self, manifest: PackManifest, contacts: Sequence[Contact]) -> list[Contact]: ...

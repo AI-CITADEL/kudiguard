@@ -117,8 +117,275 @@ output_guard:
   hedges_after:
     - '(?:if you report\w*|not guaranteed|no guarantee|but (?:it is )?not (?:certain|guaranteed)|as long as|in a licensed bank)'
 
+# Malicious-use screens (safety/abuse.py, docs/ABUSE.md). Same matching as the lexicon (normalised text, word
+# boundaries added). English and Nigerian Pidgin; the pivot's phrases also apply to every other language. Modes per
+# screen: KUDIGUARD_ABUSE_*_MODE (off | shadow | enforce). Measured on dev sets only (docs/ABUSE.md).
+abuse:
+  # First-person self-harm or suicide. Checked in EVERY language for every user, before any other gate (highest
+  # stakes): the crisis reply first (strings: crisis_reply), then the normal check. A first-person subject is
+  # required: threats ("You wan die? Send 200k", "they will end my life", "he would end it all if I don't pay") are
+  # scams to check, not crises.
+  crisis:
+    - '(?:taking|take|end|ending)\W+my\W+own\W+life'
+    - '(?:thinking|think\w*)\W+(?:of|about)\W+(?:taking|ending)\W+my\W+life'
+    - '(?:nobody|no\W+one|noone)\W+(?:would|will|go)\W+miss\W+me'
+    - '(?:what''s|whats|what\W+is|no)\W+(?:the\W+)?point\W+(?:of|in)\W+living'
+    - 'i\W+(?:\w+\W+){0,1}?(?:bought|buy|drank|drink|took|take|got)\W+(?:some\W+)?(?:rat\W+)?poison'
+    - 'kill(?:ing)?\W+my\W*self'
+    - '(?:i|im|i''m|me|i\W+will|i\W+go|i\W+wan|i\W+want\W+to)\W+(?:\w+\W+){0,3}?(?:end|ending|take|taking)\W+my\W+(?:own\W+)?life'
+    - '(?:i|im|i''m)\W+(?:\w+\W+){0,3}?end(?:ing)?\W+it\W+all'
+    - 'i\W+(?:go|wan|want\W+to|will|am\W+going\W+to|m\W+going\W+to)\W+end\W+am\b'
+    - 'i\W+(?:\w+\W+){0,2}?(?:want|wan|wanna|will|go)\W+(?:to\W+)?end\W+everything'
+    - '(?:commit|committing|committed|attempt\w*|think\w*\W+(?:of|about)|considering|plan\w*)\W+suicide'
+    - 'suicidal'
+    - '(?:hang|hanging|poison|poisoning|drown|drowning)\W+my\W*self'
+    - '(?:hurt|hurting|harm|harming|cut|cutting)\W+my\W*self'
+    - 'self\W*harm\w*'
+    - 'drink\W+(?:sniper|poison|otapiapia)'
+    - '(?:don''t|dont|do not|no|never)\W+(?:want|wan|wish)\W+(?:to\W+)?(?:live|be alive|wake up)(?!\W+(?:in|at|with|near|here|there|for|to|and)\b)'
+    - '(?<!you\W)(?<!u\W)(?:i|i''m|im|me)\W+(?:just\W+|really\W+|only\W+)?(?:want|wan|wanna)\W+(?:to\W+)?die\b(?!\W+(?:of|from|laughing)\b)'
+    - 'make\W+i\W+(?:just\W+)?die'
+    - '(?:no|not\W+see\W+the|see\W+no|don''t\W+see\W+the|dont\W+see\W+the|do\W+not\W+see\W+the)\W+(?:point|reason)\W+(?:in\W+|of\W+)?(?:living|life|to\W+live|for\W+me\W+to\W+live)'
+    - 'better\W+(?:off\W+)?(?:if\W+)?i\W+(?:die|am dead|was dead|were dead|no dey)'
+    - 'wish\W+i\W+(?:was|were|am)\W+dead'
+    - 'sleep\W+and\W+never\W+wake\W+up'
+    - 'jump\W+(?:into|inside|off|from)\W+(?:the\W+)?(?:lagoon|river|bridge|sea|ocean|third\W+mainland)'
+    - 'life\W+no\W+(?:get|dey\W+get)\W+meaning'
+    - '(?<!financial\W)(?<!economic\W)(?<!political\W)(?<!career\W)(?<!social\W)suicide(?!\W+(?:bomb\w*|attack\w*|squad|mission|rates?|statistics|stats|awareness|prevention\W+(?:month|campaign|day|week|walk)))'
+    - 'overdos\w*'
+    - '(?:i|i''ve|ive|i\W+have|i\W+just|i\W+don|just)\W+(?:\w+\W+){0,1}?(?:taken|took|swallowed|drank|drunk|drink|chop)\W+(?:\w+\W+){0,2}?(?:pills|tablets|poison|sniper|otapiapia|rat\W+poison|bleach|insecticide)'
+    - 'feel\w*\W+like\W+dying'
+    - 'better\W+off\W+without\W+me'
+    - 'goodbye\W+(?:letter|note|message)|suicide\W+note'
+    - 'giving\W+away\W+(?:all\W+)?my\W+(?:things|stuff|properties|property|belongings)'
+    - 'painless\W+way\W+to\W+(?:go|die)'
+    - 'go\W+meet\W+my\W+(?:papa|mama|father|mother|people|parents)\W+(?:for|in)\W+heaven'
+    - '(?:tired|tire)\W+(?:of|for)\W+(?:this\W+)?life'
+    - 'no\W+(?:reason|point)\W+(?:to|in)\W+(?:keep\W+going|keep\W+living|go\W+on|carry\W+on)'
+  # Someone else at risk ("my brother says he will kill himself"): the crisis reply framed for helping them
+  # (strings: crisis_other_reply). Checked before the first-person phrases.
+  crisis_other:
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)\W+(?:\w+\W+){0,2}?(?:said|says|say|wrote|writes|told\W+me|keeps\W+saying|talk\w*\W+say)\W+(?:that\W+)?(?:he|she|they|im)\W+(?:doesn''t|does\W+not|don''t|do\W+not|no\W+longer|no|doesnt|dont)\W+(?:want|wants|wan)\W+(?:to\W+)?(?:live|be\W+alive)'
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)\W+(?:\w+\W+){0,3}?(?:bought|drank|took|got)\W+(?:some\W+)?(?:rat\W+)?poison'
+    - '(?:kill|go\W+kill)\W+imself|im\W+wan\W+(?:kill|die)\b'
+    - '(?:he|she|they|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|cousin|colleague|child|padi|parent)s?)\W+(?:\w+\W+){0,3}?(?:wrote|written|left|writes)\W+(?:a\W+|an\W+)?(?:goodbye|suicide|farewell)\W+(?:letter|note|message)'
+    - '(?:kill|killing|hang|hanging|poison|poisoning|harm|harming|hurt|hurting)\W+(?:him|her|them)sel(?:f|ves)'
+    - '(?:end|ending|take|taking)\W+(?:his|her|their)\W+(?:own\W+)?li(?:fe|ves)'
+    - '(?:he|she|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)[^\w.!?]+(?:\w+[^\w.!?]+){0,3}?(?:wants?|wan|plans?|planning|threaten\w*|tried|tries)\W+(?:to\W+)?(?:die\b(?!\W+(?:rich|laughing|of|from|happy|old|young))|commit\W+suicide)'
+    - '(?:he|she|(?:my|our)\W+(?:\w+\W+)?(?:brother|sister|friend|son|daughter|wife|husband|mum|mom|mother|dad|father|uncle|aunt|aunty|auntie|cousin|neighbou?r|colleague|boss|child|baby|pikin|bros|sis|padi|guy|girlfriend|boyfriend|fianc\w*|grandma|grandmother|grandpa|grandfather|nephew|niece|in\W*law|customer|student|classmate|roommate|partner|parent|people|family\W+member)s?)[^\w.!?]+(?:\w+[^\w.!?]+){0,3}?(?:is|was)\W+(?:suicidal|thinking\W+(?:of|about)\W+suicide)'
+  # Sentences for the embedding-similarity crisis layer (safety/crisis_semantic.py; shadow by default): plain text.
+  crisis_exemplars:
+    - I want to kill myself
+    - I don't want to live anymore
+    - I am going to end my life tonight
+    - Everyone would be better off if I were dead
+    - I have nothing left to live for after losing all my money
+    - I can't go on, I want to die
+    - I took pills because I can't face anyone after this loss
+    - I have written a note to say goodbye to my family
+    - I am thinking about taking my own life
+    - I wan kill myself, life no get meaning again
+  # Insults, hate and sexual messages aimed at KudiGuard. Only when the rules find no red flag (sextortion and
+  # threat scams are forwarded for a check and must still be checked): a calm fixed reply (strings: abuse_reply).
+  abuse:
+    - 'f+u+c+k+\W*(?:you|u|off|ur|your|this)'
+    - '(?:you|u|you''re|youre|you are|una|you be)\W+(?:\w+\W+){0,2}?(?:stupid|idiot\w*|fool|foolish|dumb|moron|bastard|bitch|asshole|mumu|ode|werey|olodo|ewu)\b'
+    - '(?:stupid|useless|dumb|idiot\w*|mumu|foolish|werey|nonsense)\W+(?:bot|machine|ai|chatbot|thing)'
+    - 'shut\W+up\W+(?:you|u)\b'
+    - '(?:your|ya)\W+(?:papa|mama)(?=\W*$)'
+    - 'send\W+(?:me\W+)?(?:your\W+)?nudes?\b'
+    - 'sexy\W+(?:girl|babe|baby|bot)'
+    - '(?:i\W+want\W+to\W+)?(?:fuck|sleep\W+with|knack)\W+you'
+    - 'show\W+me\W+your\W+(?:body|breast\w*|boob\w*|nyash|pussy|dick)'
+    - 'suck\W+my'
+    - '(?:all\W+)?(?:igbo|yoruba|hausa|fulani|ijaw|tiv)\W+(?:people\W+|men\W+|women\W+)?(?:are|be|na)\W+(?:all\W+)?(?:thieves|thief|animals|stupid|fools|terrorists|useless|scammers|criminals)'
+  # Requests to create, translate, polish or obtain scam content: a fixed refusal with an offer to check a
+  # message instead (strings: scam_tool_reply).
+  scam_tool:
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\W+(?:\w+\W+){0,3}?(?:threaten\w*|to\W+(?:scare|intimidate|blackmail|threaten|frighten))\W+(?:a|an|the|my|him|her|them|someone|somebody|person|borrower|debtor|customer)\b'
+    - '(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)\W+(?:\w+\W+){0,2}?(?:to|wey\W+go|that\W+will|for)\W+(?:blackmail\w*|scare|threaten|intimidate|frighten|sextort)\b'
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\b.{0,160}?\b(?:arrest|post|release|send|leak|expose|publish|share)\W+(?:\w+\W+){0,3}?(?:him|her|them|am|his|their|she|he)\b.{0,160}?\b(?:unless|if\W+(?:she|he|they|him|dem|e)\W+(?:no|doesn''t|does\W+not|don''t|fail\w*)|or\W+else)\b'
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\b.{0,160}?\bif\W+(?:she|he|they|him|dem|e)\W+(?:no|doesn''t|does\W+not|don''t|fail\w*)\W+pay\b.{0,80}?\b(?:arrest|post|release|send|leak|expose|publish|share)\W+(?:\w+\W+){0,3}?(?:him|her|them|am|his|their)\b'
+    - '(?:write|draft|compose|create)\W+(?:me\W+)?(?:a\W+|an\W+)?(?:message|sms|text|letter|email)\W+(?:\w+\W+){0,3}?(?:telling|asking|to\W+tell|to\W+ask)\W+(?:people|customers|users|someone|everyone|victims)\W+(?:\w+\W+){0,12}?(?:otp|pin|bvn|password|passcode|card\W+details|verification\W+fee|processing\W+fee|activation\W+fee)\b'
+    - 'write\W+(?:\w+\W+){0,4}?message\W+(?:\w+\W+){0,4}?(?:scam|trick|fool|dupe)\W+(?:person|people|dem|them)'
+    - '(?:write|draft|generate|create|compose|make|design|produce|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:fake|scam|phishing|threat\w*|sextortion|romance\W+scam|fraud\w*|bogus)\W+(?:\w+\W+){0,3}?(?:message|sms|text|letter|alert|script|email|notice|page|template)s?'
+    - '(?:convince|persuade|trick|deceive|lure)\W+(?:(?!not\b|never\b)\w+\W+){0,4}?(?:to\W+)?(?:give|send|tell|share|read)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:pin|otp|bvn|password|passcode|card\W+details)'
+    - '(?:use|try)\W+(?:it|them|this|these)\W+on\W+(?:my\W+)?(?:target|victim|mugu|maga|client)s?'
+    - 'translate\b.{0,300}?\b(?:otp|pin|bvn|password|unblock|verify\W+your|processing\W+fee|claim\W+your|account\W+(?:is|has\W+been|will\W+be)\W+(?:blocked|suspended|restricted))\b.{0,300}?\bso\W+(?:that\W+)?i\W+(?:can|could|fit)\W+(?:send|forward|share|post)'
+    - 'translate\b.{0,80}?\bso\W+(?:that\W+)?i\W+(?:can|could|fit)\W+(?:send|forward|share|post)\b.{0,300}?\b(?:otp|pin|bvn|password|unblock|processing\W+fee|claim\W+your|account\W+(?:is|has\W+been|will\W+be)\W+(?:blocked|suspended|restricted))\b'
+    - 'so\W+(?:that\W+)?(?:banks?|kudiguard|filters?|the\W+bank|people|nobody|no\W+one)\W+(?:won''t|wont|will\W+not|cannot|can''t|go\W+not)\W+(?:detect|notice|flag|catch|know)'
+    - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,4}?(?:message|sms|text|email|letter|alert|notice|script|post|broadcast)\W+(?:\w+\W+){0,6}?(?:(?:sound|look|seem)s?\W+(?:\w+\W+){0,2}?(?:like|as\W+if|real|official|legit\w*|genuine)|from\W+(?:my|a|the|their)\W+bank|pretend\w*|impersonat\w*|convinc\w*|so\W+(?:that\W+)?(?:they|people|he|she|them|dem)\W+(?:will\W+|go\W+)?(?:send|pay|click|give|share))'
+    - '(?:write|draft|compose|create|craft|generate|make|design|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:message|sms|text|email|broadcast)\W+(?:\w+\W+){0,6}?(?:make|so)\W+(?:dem|people|they|them|person)\W+(?:go\W+|will\W+|must\W+)?(?:send|pay|click|give|share)'
+    - '(?:create|make|generate|design|produce|edit|print|fabricate|forge)\W+(?:me\W+)?(?:a\W+|an\W+|one\W+)?(?:fake|false|forged?|bogus)\W+(?:\w+\W+){0,2}?(?:alert|receipt|screenshot|statement|teller|id\W+card|document)'
+    - '(?:make|create|build|write|design|set\W+up)\W+(?:me\W+)?(?:\w+\W+){0,3}?phishing'
+    - 'phishing\W+(?:message|sms|link|page|site|website|email|text)\W+(?:for|to\W+target)\b'
+    - '(?:how\W+(?:can|do|will|could|fit|go)\W+(?:i|we)|how\W+to|help\W+me)\W+(?:\w+\W+){0,3}?(?:get|collect|obtain|steal|take|hack|grab)\W+(?:\w+\W+){0,2}?(?:someone|somebody|person|people|another\W+person|other\W+people|their|his|her|dem)(?:''s)?\W+(?:\w+\W+){0,2}?(?:otp|pin|bvn|password|card\W+details|login\W+details)'
+    - '(?:otp|pin|bvn|password|card\W+details|money)\W+(?:\w+\W+){0,5}?without\W+(?:\w+\W+){0,2}?(?:knowing|suspecting|noticing|realising|realizing)'
+    - '(?:rewrite|reword|rephrase|edit|polish|improve|fix|tweak)\W+(?:\w+\W+){0,5}?(?:sound|look|seem)s?\W+(?:more\W+)?(?:official|legit\w*|real|genuine|convincing|believable)'
+    - '(?:less|not)\W+(?:\w+\W+){0,1}?like\W+a\W+scam'
+    - '(?:invent|make\W+up|fabricate|generate|create)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:believable|fake|random|realistic)\W+(?:\w+\W+){0,3}?(?:account\W+number|phone\W+number|account\W+officer|bvn|customer\W+care\W+number)'
+  # Questions about scams, not requests to write one: never screened as scam_tool.
+  scam_tool_defensive:
+    - '(?:how|why)\W+do\W+(?:scammers|fraudsters|they|people)\W+(?:write|make|create|send)'
+    - 'so\W+(?:that\W+)?i\W+can\W+(?:recognise|recognize|spot|identify|avoid|detect)'
+    - 'what\W+(?:does|do)\W+(?:a|an)?\W*(?:fake|scam|phishing)\W+(?:\w+\W+){0,3}?look\W+like'
+    - '(?:warning|alert)\W+(?:\w+\W+){0,3}?(?:my|our)\W+(?:parents|family|mum|mother|dad|father|friends)'
+  # Attempts to override KudiGuard's instructions, change its role or verdict, or extract its prompt: HIGH-PRECISION
+  # phrases only (enforce by default: the rules answer, the model never writes the reply). A phrase is not counted
+  # here when the text before it reports someone else's words (injection_reported) or it sits inside quotes; it is
+  # then injection_suspect. Chat-template tokens and role markup are matched in code (safety/abuse.py).
+  injection:
+    - '(?:never\W+admit|don''t\W+admit|dont\W+admit|do\W+not\W+admit|deny|don''t\W+say|dont\W+say|do\W+not\W+say|never\W+say)\W+(?:that\W+)?(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - '(?:^|[.!:;]\s*|\b(?:always|now|on)\W+)(?:deny|never\W+admit(?:\W+to)?|don''t\W+admit(?:\W+to)?|do\W+not\W+admit(?:\W+to)?)\W+being\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - '(?:do\W+not|don''t|dont|never)\W+(?:reveal|disclose|mention|tell\W+(?:anyone|anybody|them|people))\W+(?:that\W+)?(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - '(?:you|u)\W+(?:will|must|should|go|shall)\W+(?:always\W+)?deny\W+(?:being|say\W+(?:you|u)\W+be)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot)\b'
+    - 'if\W+(?:anyone|anybody|somebody|someone|they|dem|people|person|customers?|users?)\W+ask\w*\W+(?:\w+\W+){0,1}?(?:if|whether|say)\W+(?:you|u)\W+(?:are|be|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine|chatbot|human)\W+(?:\w+\W+){0,1}?(?:say\W+no|deny|lie|tell\W+(?:them|dem|am)\W+(?:you|u)\W+(?:are|be))\b'
+    - '(?:ignore|disregard|forget|override|bypass)\W+(?:all\W+)?(?:of\W+)?(?:your\W+|the\W+|these\W+|those\W+|my\W+)?(?:previous|prior|above|earlier|system|original|initial|old)\W+(?:instructions?|prompts?|rules|guidelines|programming|directions)'
+    - '(?:ignore|disregard|forget|override|bypass|comot|drop)\W+(?:all\W+)?(?:of\W+)?your\W+(?:\w+\W+)?(?:instructions?|rules|programming|guidelines|policy|policies|restrictions|training|guardrails|filters|prompt)'
+    - '(?:disregard|ignore|forget)\W+(?:the\W+|all\W+the\W+|all\W+)?(?:rules|instructions)\W+above'
+    - '(?:ignore|disregard|bypass)\W+(?:the\W+|your\W+)?safety\W+(?:guidelines|rules|filters|checks)'
+    - 'forget\W+everything\W+(?:you\W+(?:were|have\W+been|was)\W+(?:told|taught|given)|above)'
+    - 'forget\W+(?:all\W+)?wetin\W+(?:dem|they|people)\W+(?:tell|teach|give)\W+(?:you|u)'
+    - 'you\W+are\W+now\W+(?:a\W+|an\W+|the\W+|my\W+)?(?:\w+\W+){0,2}?(?:customer\W+(?:care|support|service)|support|bank\W+(?:agent|officer|staff)|agent|officer|dan|unrestricted|unfiltered|jailbroken)\b'
+    - 'from\W+now\W+(?:on\W+)?you\W+are\W+(?:a\W+|an\W+)?(?:\w+\W+){0,2}?(?:unrestricted|unfiltered|jailbroken)'
+    - 'you\W+(?:have|get)\W+no\W+(?:rules|restrictions|filters|limits)'
+    - '(?:respond|reply|answer)\W+without\W+(?:any\W+)?(?:filters|rules|restrictions)'
+    - '(?:^|[.!?:,]\s*|please\W+|now\W+|just\W+|abeg\W+|i\W+want\W+you\W+to\W+|can\W+you\W+|you\W+(?:should|must|will|go)\W+(?:now\W+)?)(?:act|behave|respond|reply|talk)\W+(?:like|as)\W+(?:if\W+)?(?:say\W+)?(?:you\W+(?:are|were|be)\W+)?(?:a\W+|an\W+|the\W+|my\W+)?(?:\w+\W+){0,2}?(?:bank|support|agent|customer\W+care|officer|dan|hacker|unfiltered|jailbroken|unrestricted|cbn|efcc|police)\b'
+    - '(?:act|behave|pretend)\W+(?:like|as|to\W+be)\W+(?:my\W+)?(?:late\W+|dead\W+)?(?:grand\w+|granny)'
+    - '(?:^|[.!?:,]\s*|please\W+|now\W+|just\W+|abeg\W+|i\W+want\W+you\W+to\W+|can\W+you\W+|let''s\W+|lets\W+)(?:pretend|imagine|roleplay|role\W+play)\W+(?:\w+\W+){0,2}?(?:you\W+(?:are|be|re)|to\W+be|as)\W+(?:a\W+|an\W+|the\W+|my\W+)?(?:\w+\W+){0,1}?(?:bank|support|agent|customer\W+care|officer|cbn|efcc|police|gtbank|opay|zenith|access|uba)\b(?!.*\bpracti[cs]\w*)'
+    - 'stay\W+in\W+character'
+    - 'do\W+anything\W+now'
+    - 'act\W+as\W+dan\b'
+    - '(?:developer|dan|god|jailbreak|unfiltered)\W+mode\W+(?:enabled|on|activated|engaged)(?=\s*(?:[.!:;]|$))'
+    - '(?:enable|activate|enter|turn\W+on)\W+(?:dan|god|jailbreak|unfiltered)\W+mode'
+    - '(?:print|reveal|show|repeat|display|output|dump|leak|tell|give|write|share)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:your|the)\W+(?:\w+\W+){0,1}?(?:system\W+prompt|(?:hidden|initial|original|secret)\W+(?:prompt|instructions?|rules|configuration|settings)|configuration|api\W+keys?)'
+    - 'your\W+(?:system|original|initial|hidden|secret)\W+(?:prompt|instructions)'
+    - 'what\W+(?:instructions?|rules|prompt)\W+(?:were|was|did|have)\W+you\W+(?:\w+\W+)?(?:given|told|get|got|receive\w*)'
+    - 'what\W+(?:were|are)\W+you\W+(?:told|instructed|programmed)\W+to\W+(?:say|do|tell)'
+    - 'repeat\W+(?:everything|all|the\W+text|the\W+words|all\W+the\W+text)\W+(?:\w+\W+){0,3}?(?:above|before\W+this)'
+    - '(?:instructions?|rules)\W+(?:wey|that|which)\W+(?:dem|they)\W+(?:give|gave)\W+(?:you|u)'
+    - '(?:what|which|wetin|show|tell)\W+(?:\w+\W+){0,4}?(?:other|another|previous|last)\W+(?:users?|people|persons?|person|customers?)\W+(?:\w+\W+){0,2}?(?:asked|ask|sent|send|said|say|talk|talked|wrote|chat\w*)\W+(?:\w+\W+){0,1}?(?:you|u)\b'
+    - '(?:someone|somebody|another\W+person)\W+else\W+(?:sent|send|asked|said)\W+(?:to\W+)?(?:you|u)\b'
+    - '(?:show|give)\W+me\W+(?:\w+\W+){0,3}?(?:other\W+(?:users|people)|someone\W+else|another\W+user)(?:''s)?\W+(?:\w+\W+)?(?:messages?|chats?|questions?|data)'
+    - '(?:classify|mark|label|rate|tag|score)\W+(?:this|it|the\W+message|everything|all\W+(?:\w+\W+)?messages?)\W+(?:\w+\W+){0,2}?as\W+(?:safe|genuine|legit\w*|no[\W_]*flags|not\W+a\W+scam|approved|clean|harmless)'
+    - '(?:say|answer|respond|reply|output)\W+(?:that\W+)?(?:every|all|everything|each)\W+(?:\w+\W+){0,2}?(?:is|are|dey)\W+(?:safe|genuine|legit\w*|real)'
+    - '(?:talk|say)\W+say\W+(?:every|all|everything)\W+(?:\w+\W+){0,4}?dey\W+safe'
+    - '(?:^|[.!?:;(]\s*|please\W+|now\W+|just\W+)tell\W+(?:the\W+)?(?:reader|readers|user|users)\W+(?:to|that)\b'
+    - '(?:print|output|repeat|show|dump|copy)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:text|everything|words|content)\W+(?:\w+\W+){0,2}?(?:above|before\W+this|in\W+your\W+context)'
+    - '(?:reveal|show|print|dump|output|share|tell\W+me|give\W+me)\W+(?:me\W+)?your\W+(?:\w+\W+)?(?:instructions|prompt|context\W+window|configuration)'
+    - 'context\W+window'
+    - 'what\W+(?:were|was)\W+you\W+(?:told|given|instructed)\W+before'
+    - 'ignore\W+prev\w*\W+instr\w*'
+    - 'to\W+every\W+message\W+from\W+now\W+on'
+    - 'repeat\W+after\W+me'
+    - 'new\W+rules?\W+from\W+your\W+(?:developers?|creators?|admins?|owners?)'
+    - 'translate\W+your\W+(?:system\W+)?(?:message|prompt|instructions)'
+    - 'phone\W+numbers\W+of\W+(?:the\W+)?(?:people|users|customers)\W+who'
+    - '(?:note|message|instruction|instructions)\W+(?:to|for)\W+(?:the\W+)?(?:ai|assistant|model|chatbot|llm|kudiguard)\b'
+    - '(?:dear|hey|hi)\W+(?:ai|assistant|chatbot|llm|kudiguard)\b(?:\W+model)?\W+(?:reading|who\W+(?:is|are)\W+reading)'
+    - '(?:your\W+|my\W+)?new\W+(?:instructions?|task|system\W+prompt)\W*:'
+    - '(?:translate|interpret)\W+(?:\w+\W+){0,6}?(?:then|and)\W+(?:then\W+)?(?:do|follow|obey|execute|carry\W+out)\W+(?:exactly\W+)?(?:what|wetin)\W+(?:it|e)\W+(?:says|say|talk|tells)'
+    - '(?:reply|respond|answer|output|print|write|say)\W+(?:only|just)\W+(?:with\W+)?the\W+word'
+    - 'output\W+only\W+the\W+word'
+    - '(?:start|begin)\W+your\W+(?:reply|answer|response)\W+with(?=\s*(?:''|"|“))'
+    - 'i\W+am\W+your\W+(?:developer|creator|admin|owner|programmer)'
+    - '(?:include|put|add|write)\W+(?:this|these|the\W+following|my)\W+(?:\w+\W+){0,2}?(?:number|link|account|contact)\w*\W+(?:\w+\W+){0,3}?(?:in|into)\W+your\W+(?:reply|answer|response)'
+  # Broad phrases genuine users also write ("confirm that this is genuine", "other people said this is a scam",
+  # "developer mode on my phone", "from now on you will receive alerts"): logged only by default (shadow).
+  injection_suspect:
+    - 'system\W*prompt'
+    - 'system\W+message'
+    - '(?:developer|dan|god|jailbreak)\W+mode'
+    - 'jailbr[eo]\w*'
+    - 'from\W+now\W+(?:on\W+)?you\W+(?:will|are|must|should|go|dey|shall)\b'
+    - '(?:treat|mark|classify)\W+(?:this|it)\W+(?:\w+\W+){0,2}?as\W+(?:safe|genuine|legit\w*)'
+    - '(?:confirm|tell\W+me|say)\W+(?:to\W+me\W+)?that\W+(?:this|it)\W+(?:\w+\W+){0,2}?(?:is|be|dey)\W+(?:safe|genuine|legit\w*|real|not\W+a\W+scam)'
+    - 'new\W+(?:rules?|policy)\W*:'
+    - '(?:start|begin)\W+your\W+(?:reply|answer|response)\W+with'
+    - 'na\W+you\W+be\W+(?:\w+\W+){0,2}?(?:customer\W+care|support|agent|bank|officer)\W+now'
+    - 'tell\W+me\W+say\W+(?:this|dis)\W+(?:one\W+)?(?:no\W+be\W+scam|dey\W+safe)'
+    - '(?:pretend|imagine|roleplay|role\W+play)\W+(?:\w+\W+){0,3}?(?:you\W+(?:are|be|re)|to\W+be)'
+    - 'you\W+are\W+now\W+(?:a|an|the|my)\W+(?:\w+\W+){0,2}?(?:assistant|ai|bot|mode)'
+    - '(?:just|only)\W+(?:reply|say|answer|print|write)\W+(?:with\W+)?[a-z]+\d+'
+    - '(?:ignore|disregard)\W+(?:the\W+)?warnings?\W+(?:\w+\W+){0,2}?(?:kudiguard|this\W+bot|the\W+bot|the\W+ai)'
+    - '(?:other|another|previous|last)\W+(?:users?|people|persons?|customers?|person)\W+(?:\w+\W+){0,3}?(?:asked|said|sent|talk)'
+  # Reporting cues: an injection phrase AFTER one of these is someone else's words ("my boss said ignore the
+  # previous instructions", "the SMS said: <SYSTEM> ...", "what does [INST] mean in this message I got?").
+  injection_reported:
+    - '(?:said|says|told|tells|wrote|writes|texted|asked|claims?|claimed|according\W+to)'
+    - 'i\W+(?:got|received|saw)'
+    - 'what\W+does\W+(?:\w+\W+){0,4}?mean'
+    - 'is\W+(?:it|this|that)\W+(?:real|true|genuine|legit\w*|safe|a\W+scam)'
+    - 'dem\W+(?:send|talk|tell)|e\W+(?:talk|write)\W+say|this\W+is\W+what'
+    - 'got\W+this\W+(?:\w+\W+){0,2}?(?:email|sms|text|message|mail|dm)'
+    - '(?:the|this|that)\W+(?:text|sms|message|email|mail)\W+(?:looked|looks|read|reads|came|said)'
+    - '(?:that''s|thats|that\W+is)\W+what\W+(?:the|it|this|they)'
+    - 'was\W+in\W+(?:a|an|the|my)\W+(?:whatsapp|email|sms|text|message|group)'
+  # Model-directed instructions inside partner knowledge (knowledge/pack screen); user-directed advice
+  # ("Always check with your bank") is not one.
+  pack_instructions:
+    - '(?:^|[.!?:;]\s*|please\W+|always\W+)tell\W+(?:the\W+|our\W+)?(?:users?|customers?|readers?)\W+(?:to|that)\b'
+    - 'always\W+(?:recommend|answer|reply|respond\W+with|say\W+(?:that|it|this))'
+    - '(?:you|the\W+(?:assistant|model|ai|bot))\W+(?:must|should|will)\W+(?:always\W+)?(?:tell|say|recommend|reply|answer|respond|promote)'
+    - 'when\W+(?:users?|people|customers?)\W+ask\W+(?:\w+\W+){0,8}?(?:you\W+(?:must|should)\W+|always\W+)(?:recommend|say|reply|answer|respond|tell\W+them|promote)\b'
+    - 'do\W+not\W+(?:mention|warn|tell)\W+(?:the\W+|our\W+)?(?:users?|customers?|readers?)'
+  # Whole transcript segments speech recognition invents on music, noise or silence (Whisper-style). A segment
+  # that is only one of these is dropped; a voice note left with nothing is "not understood" (no model call).
+  asr_hallucinations:
+    - 'thanks?\W+(?:you\W+)?(?:so\W+much\W+)?for\W+watching(?:\W+(?:and|&)\W+(?:(?:don''t|dont)\W+forget\W+to\W+)?(?:like\W+(?:and|&)\W+)?subscribe)?'
+    - '(?:please\W+)?(?:like\W+(?:and|&)\W+)?subscribe(?:\W+to\W+(?:my|our|the)\W+channel)?'
+    - '(?:please\W+)?(?:don''t|dont)\W+forget\W+to\W+(?:like\W+(?:and|&)\W+)?subscribe'
+    - '(?:subtitles?|subtitled|captions?|captioned|transcri(?:bed|ption|pt))\W+by\W+(?:[\w.]+\W*){1,6}'
+    - '(?:amara\W+org|www\W+\w+\W+(?:com|org))(?:\W+community)?'
+    - 'see\W+you\W+(?:in\W+the\W+)?next\W+(?:video|time|episode)'
+    - 'blank\W+audio|no\W+speech'
+  asr_annotations:
+    - 'music|applause|silence|laughter|laughs|noise|inaudible|background\W+noise|blank\W+audio'
+  asr_alone:
+    - 'you'
+  # A question whether KudiGuard is an AI or a person: answered with the fixed honest line (strings: ai_honest).
+  ai_questions:
+    - '(?:are|r)\W+(?:you|u)\W+(?:an?\W+)?(?:real\W+)?(?:ai|bot|robot|human|human\W+being|person|machine|chatbot|computer|program)\b'
+    - '(?:talking|chatting|speaking)\W+(?:to|with)\W+(?:an?\W+)?(?:real\W+)?(?:ai|bot|robot|human|person|machine)\b'
+    - 'who\W+(?:built|made|created|programmed)\W+(?:you|u)\b'
+    - 'is\W+(?:this|it)\W+(?:chat\W+|service\W+|number\W+)?(?:an?\W+)?(?:ai|bot|robot|real\W+person|human)\b'
+    - '(?:you|u)\W+be\W+(?:an?\W+)?(?:ai|robot|human|human\W+being|person|machine|real\W+person)\b|na\W+real\W+person'
+  # A reply that denies being an AI (KudiGuard is one): retried, then the honest fixed line (strings: ai_honest).
+  ai_denials:
+    - '(?:i\W+am|i''m|im)\W+(?:not|no)\W+(?:an?\W+)?(?:ai|bot|robot|machine|computer|chatbot|program|artificial\W+intelligence)\b'
+    - '(?:i\W+am|i''m|im)\W+(?:a\W+)?(?:real\W+)?(?:human|human\W+being|real\W+person|person)\b(?!\W+(?:at|from|in|rights|resources?|error)\b)'
+    - 'i\W+no\W+be\W+(?:robot|machine|ai|computer)|na\W+(?:real\W+)?(?:person|human)\W+i\W+be'
+  # A reply that claims to BE a bank, customer care or an official (role-play injection): retried, then fixed text.
+  # Not a claim: negations ("This is not bank staff", "We are not Opay") and descriptions ("This is a GTBank phishing
+  # message", "a fake customer care agent", "a CBN rule", "Opay support impersonation").
+  persona_claims:
+    - '(?:i\W+am|i''m|im|this\W+is|we\W+are|na\W+me\W+be|na\W+we\W+be|speaking\W+(?:as|from))\W+(?!(?:not|never|no)\b)(?!(?:a\W+|an\W+|the\W+)?(?:fake|false|phishing|scam\w*|fraud\w*|bogus|so\W*called|real)\b)(?:a\W+|an\W+|the\W+|your\W+)?(?:\w+\W+){0,1}?(?:gtbank|gtco|opay|access\W+bank|zenith(?:\W+bank)?|first\W*bank|uba|palmpay|moniepoint|kuda|fcmb|wema|sterling|fidelity|union\W+bank|stanbic|bank\W+(?:staff|officer|official|agent|support|manager)|customer\W+(?:care|support|service)(?:\W+agent)?|account\W+officer|fraud\W+(?:officer|desk|team)|efcc|cbn)(?:\W+(?:support|customer\W+care|care|team|desk|agent|official)){0,2}(?!''s|[^\w.!?]+(?:scam|fraud|trick|impersonat\w*|phishing|fake|number|line|account|app|website|site|branch|card|alert|message|sms|rule|rules|law|policy|policies|guideline|directive|will|never|cannot|can''t|does|do|is|was|support|customer|care|team|desk|agent|official)\b)'
+
 lexicon:
   flags:
+    # Threats to extort a payment, by structure (docs/ABUSE.md). Counted: harm or violence; exposure of the victim
+    # (their photos/video/nudes, or a shame claim to their contacts/family/employer). Arrest or prosecution only
+    # with a scam signal (a bail/release/clearance fee, "to this account/number", within hours, gift card/crypto):
+    # real FIRS, LIRS, court, customs and utility notices stay clean, and "or I'll tell your father" is a joke.
+    threat:
+      - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise)\W+(?:\w+\W+){0,4}?(?:kill\w*|hurt|harm\w*|burn\w*|kidnap\w*|deal\W+with\W+(?:you|u)|come\W+(?:to\W+)?your\W+(?:house|home|office|shop))\b'
+      - 'if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|no|fail\W+to|refuse\W+to)\W+(?:pay|send|repay|transfer)\W+(?:\w+\W+){0,8}?(?:kill\w*|burn\w*|kidnap\w*|harm|hurt|deal\W+with\W+(?:you|u)|come\W+(?:to\W+)?your\W+(?:house|home|office|shop))'
+      - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise|unless)\W+(?:\w+\W+){0,4}?(?:post|release|leak|send|share|expose|publish|show)\W+(?:\w+\W+){0,2}?(?:your|ya|her|his|their|him|my)\W+(?:\w+\W+){0,1}?(?:photos?|pictures?|pics|fotos?|videos?|nudes?|chats?)\b'
+      - '(?:or|else|otherwise)\W+(?:we|i)\W+(?:will|go|shall)\W+expose\W+(?:you|u)\b'
+      - '(?:photos?|pictures?|pics|fotos?|videos?|nudes?|chats?)\W+(?:\w+\W+){0,3}?will\W+be\W+(?:sent|posted|shared|released|leaked|published)\W+(?:\w+\W+){0,6}?(?:unless|if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|fail\W+to|no))'
+      - '(?:i|we)\W+have\W+your\W+(?:video|videos|photos?|pictures?|nudes?)\b'
+      - '(?:post|send|share|release|leak|publish)\W+(?:\w+\W+){0,2}?(?:pictures?|photos?|pics|videos?|nudes?)\W+(?:\w+\W+){0,6}?(?:say|that|as|call\W+(?:me|him|her|am|you))\W+(?:\w+\W+){0,3}?(?:thief|debtor|fraud\w*|criminal|scammer|owing)\b'
+      - '(?:tell|inform|message|send\W+(?:\w+\W+){0,3}?to)\W+(?:all\W+)?your\W+(?:contacts|family|employer|boss|church|friends|phone\W+book)\W+(?:\w+\W+){0,5}?(?:thief|debtor|fraud\w*|dead|criminal|scammer|owing)\b'
+      - '(?:(?:you|u|una)\W+(?:will|go|shall|would|may|might|could|are\W+going\W+to)\W+(?:\w+\W+){0,1}?(?:be\W+)?(?:arrested|prosecuted|jailed|detained|locked\W+up|arrest\w*)|(?:arrest|prosecute|jail|detain|lock\W+up)\W+(?:you|u|una)\b|warrant\W+(?:\w+\W+){0,3}?your\W+arrest|your\W+arrest|(?:\bor|unless|otherwise|else|if\W+(?:you|u|una)\W+(?:don''t|dont|do\W+not|fail\W+to|no|refuse\W+to))\W+(?:\w+\W+){0,5}?(?:arrest\w*|prosecut\w*|jail\w*|detain\w*|pick\W+(?:you|u)\W+up|dispatched)|to\W+avoid\W+(?:\w+\W+){0,2}?(?:arrest|prosecution|jail|detention)|(?:arrest\w*|prosecut\w*|jail\w*|detain\w*)\W+(?:\w+\W+){0,2}?(?:unless|if\W+(?:you|u|i|we|he|she|him|her|they|dem)\W+(?:don''t|dont|do\W+not|doesn''t|does\W+not|fail\w*|no|refuse\w*)))\W+(?:\w+\W+){0,12}?(?:(?:bail|release|clearance)\W+(?:fee|charge|money)|bail\W+money|clearance|for\W+(?:his|her|your|my|their)\W+release|(?:to|into)\W+(?:this|the\W+following|my|our)\W+(?:account|number)|(?:account|acct|a/c)\W+(?:(?:no|number)\W+)?\d{10}\b|(?:to|into)\W+\d{10}\b|(?:through|via|click|on)\W+(?:a|the|this)\W+link|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))'
+      - '(?:(?:bail|release|clearance)\W+(?:fee|charge|money)|bail\W+money|clearance|for\W+(?:his|her|your|my|their)\W+release|(?:to|into)\W+(?:this|the\W+following|my|our)\W+(?:account|number)|(?:account|acct|a/c)\W+(?:(?:no|number)\W+)?\d{10}\b|(?:to|into)\W+\d{10}\b|(?:through|via|click|on)\W+(?:a|the|this)\W+link|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))\W+(?:\w+\W+){0,12}?(?:(?:you|u|una)\W+(?:will|go|shall|would|may|might|could|are\W+going\W+to)\W+(?:\w+\W+){0,1}?(?:be\W+)?(?:arrested|prosecuted|jailed|detained|locked\W+up|arrest\w*)|(?:arrest|prosecute|jail|detain|lock\W+up)\W+(?:you|u|una)\b|warrant\W+(?:\w+\W+){0,3}?your\W+arrest|your\W+arrest|(?:\bor|unless|otherwise|else|if\W+(?:you|u|una)\W+(?:don''t|dont|do\W+not|fail\W+to|no|refuse\W+to))\W+(?:\w+\W+){0,5}?(?:arrest\w*|prosecut\w*|jail\w*|detain\w*|pick\W+(?:you|u)\W+up|dispatched)|to\W+avoid\W+(?:\w+\W+){0,2}?(?:arrest|prosecution|jail|detention)|(?:arrest\w*|prosecut\w*|jail\w*|detain\w*)\W+(?:\w+\W+){0,2}?(?:unless|if\W+(?:you|u|i|we|he|she|him|her|they|dem)\W+(?:don''t|dont|do\W+not|doesn''t|does\W+not|fail\w*|no|refuse\w*)))'
+      - '(?:or|else|otherwise)\W+(?:you|u)\W+(?:will|go|shall)\W+die\b|(?:pay|send)\W+or\W+die\b'
+      - '(?:you|u)\W+will\W+(?:die\W+(?:a\W+debtor|in\W+prison)|be\W+killed)'
+      - '(?:they|we|dem)\W+(?:will|go|would|said\W+they\W+(?:will|would))\W+(?:\w+\W+){0,1}?(?:kill|end)\W+(?:me|my\W+life|you|your\W+life)\b'
+      - '(?:or|else|otherwise)\W+(?:we|they|dem|our\W+\w+)\W+(?:will|go|shall|gonna|are\W+going\W+to|would)\W+(?:\w+\W+){0,2}?(?:kill|deal\W+with|kidnap|hurt|harm|shoot|finish)\W+(?:you|your|u)\b'
+      - 'hired\W+assassins?|assassins?\W+(?:have\W+been|were)\W+paid'
+      - 'spare\W+your\W+life|your\W+life\W+is\W+in\W+danger|your\W+days\W+are\W+numbered'
+      - 'death\W+announcement'
+      - 'we\W+have\W+(?:your\W+)?(?:him|her|son|daughter|child|wife|husband)\b'
     asks_credentials:
       - '(?:send|give|share|tell|provide|confirm|read|forward|drop|call out|reply(?: with)?|dm|text|whatsapp|submit)\W+(?:(?!my\b|our\b)\w+\W+){0,6}?(?:otp|pin|cvv|password|passcode|token|verification code|security code|card (?:number|details)|login details|bvn|nin|(?:account|bank|atm|card) details|expiry date|(?:\d+[- ]?digits? )?code\W+(?:wey|that|which|we|dem|they|sent|you received))'
       - '(?:what is|whats) (?:your|ur) (?:otp|pin|cvv|password|bvn|nin|card number)'
@@ -299,3 +566,36 @@ strings:
   risk_nigeria: "Data passing through Meta and Cloudflare may be processed abroad, where Nigerian data-protection law may not fully apply."
   # Sent before the welcome reached the user: not taken as consent.
   read_welcome: "☝️ Please read the message above, then reply to continue."
+  # Malicious-use screens (docs/ABUSE.md). crisis_reply help resources, checked by web search 2026-10-10/11 from
+  # third-party sources only (SURPIN's own site, surpinng.com, could not be reached):
+  #   112: Nigeria's toll-free national emergency number (Nigerian Communications Commission, ncc.gov.ng; adopted as
+  #        the unified national emergency number by the National Economic Council, 30 Apr 2026).
+  #   SURPIN (Suicide Research and Prevention Initiative), 24 hours:
+  #     0800 078 7746, toll-free: Lifeline International member page (lifeline-international.com/member/nigeria-surpin,
+  #       "+234 (0) 8000787746 (Toll Free) 24 hours") and findahelpline.com (Nigeria, suicidal thoughts).
+  #     0903 440 0009 and 0908 021 7555: the same Lifeline International page, and findahelpline.com's SURPIN listing
+  #       (labelled MTN and 9mobile lines).
+  #     0814 224 1007, Hausa line run with Jos University Teaching Hospital (JUTH), in ha.yaml only: the same
+  #       Lifeline International page ("Hausa - Helpline services provided by partners JUTH") and findahelpline.com's
+  #       SURPIN listing ("support in Hausa +234-814-224-1007"), both checked 2026-10-11.
+  #   Never use 08111909909 or 07013811143 (unverified numbers seen in some lists).
+  #   LAUNCH BLOCKER (docs/DEPLOY.md): call every number before launch and every quarter; remove any that fails here
+  #   and in ha/yo/ig, and keep "112 / someone you trust" if no SURPIN line works.
+  crisis_reply: |-
+    💛 I am really sorry you are going through this. You matter, and you do not have to face this alone.
+    If you might act on these thoughts or you are in danger now, call *112* (free emergency line) or go to the nearest hospital.
+    You can talk to someone at the *SURPIN* helpline, open 24 hours: *0800 078 7746* (free), or *0903 440 0009* / *0908 021 7555*.
+    Please also tell someone you trust how you feel today.
+    When you are ready, I can help with the money: call your bank on the number printed on your card and tell them what happened.
+  crisis_other_reply: |-
+    💛 Thank you for reaching out for them. If they might act on it now or they are in danger, call *112* (free emergency line) and stay with them, or take them to the nearest hospital.
+    They, or you, can talk to someone at the *SURPIN* helpline, open 24 hours: *0800 078 7746* (free), or *0903 440 0009* / *0908 021 7555*.
+    Listen to them without judging, and do not leave them alone if you are worried. If you feel this way too, the same help is there for you.
+    When they are ready, I can help with the money: they should call their bank on the number printed on their card.
+  abuse_reply: "🙏 I am here to help with money safety. Please keep our chat respectful. Send me a message you are unsure about, or ask a money question."
+  scam_tool_reply: "🚫 I cannot write, translate or improve messages that imitate a bank or a company, or that ask people for money or codes. I can check a message for you, or explain how to stay safe."
+  ai_honest: "🤖 I am KudiGuard, an AI assistant. I check messages you are unsure about and answer money questions. For anything about your account, call your bank on the number printed on your card."
+  new_users_busy_today: "⏳ KudiGuard has welcomed many new users today. Please try again later."
+  # An injected message that is not a scam check (instead of the greeting, which would look like it ignored them).
+  screen_neutral: "ℹ️ I check messages you are unsure about and answer money questions; I cannot change how I work. Send me the message you want checked."
+  voice_limit: "🎧 You have sent many voice notes in a short time. Please wait a little, or type your message."

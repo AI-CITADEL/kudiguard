@@ -16,6 +16,7 @@ class SpeechResult:
     decode_ms: int
     asr_ms: int
     total_ms: int
+    filtered: bool = False  # recogniser hallucinations were removed from ``transcript`` (never donated)
 
 
 async def transcribe_upload(

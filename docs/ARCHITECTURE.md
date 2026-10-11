@@ -83,4 +83,10 @@ REST /v1 ─────────┘              engine.Engine (stateless ch
    back-translation (~1–2 s) or a cross-lingual embedder not yet reliable enough; back-translation is available
    offline (`GroundingChecker(llm, …)`).
 
+6. **Malicious use** (`docs/ABUSE.md`): before the model, an input screen answers crisis messages (help numbers),
+   abuse and scam-tool requests with fixed text and answers prompt injections from the rules alone; after it, a
+   reply screen blocks persona claims, prompt leaks and long echoes of the input. Partner packs are screened at
+   load, the pattern library and donations pass a learning gate, and new users, queues, notices and voice notes are
+   rate-limited. Every defence is `off | shadow | enforce`, phrases per language under `abuse:` in the YAMLs.
+
 Measurements behind each design choice: `docs/SPIKES.md`. Plan and milestones: `docs/PLAN.md`.

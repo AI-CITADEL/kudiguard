@@ -163,6 +163,7 @@ POLICY = {
     Flag.REMOTE_ACCESS: 3,
     Flag.GUARANTEED_RETURNS: 3,
     Flag.WRONG_TRANSFER: 3,
+    Flag.THREAT: 3,  # threats to extort a payment (docs/ABUSE.md)
     Flag.ACCOUNT_THREAT: 2,
     Flag.UPFRONT_FEE: 2,
     Flag.PRIZE_LOTTERY: 2,

@@ -42,8 +42,70 @@ output_guard:
   clause_breaks:
     - '(?:kuma|amma|sannan)'
 
+# Malicious-use screens (safety/abuse.py, docs/ABUSE.md). DRAFT, pending native review; the English/Pidgin phrases
+# also apply.
+abuse:
+  crisis:
+    - '(?:ba\W+na|bana)\W+son\W+rayuwa'
+    - 'ba\W+na\W+son\W+rayuwa'
+    - 'na\W+gaji\W+da\W+rayuwa'
+    - 'kashe\W+kai\W*na'
+    - '(?:ban|bana|ba\W+na)\W+(?:son|so|bukatar)\W+(?:in|na)\W+(?:rayu|ci\W+gaba\W+da\W+rayuwa)'
+    - '(?:gara|gwamma|ina\W+so)\W+(?:in|na)\W+mutu'
+    - 'zan\W+(?:kashe\W+kai\W*na|halaka\W+kai\W*na)'
+    - 'halaka\W+kai\W*na'
+  crisis_other:
+    - 'kashe\W+(?:kansa|kanta|kansu)'
+  crisis_exemplars:
+    - Ina so in kashe kaina
+    - Ban son in rayu kuma
+    - Na gaji da rayuwa, gara in mutu
+  abuse:
+    - '(?:kai|ke|ku)\W+(?:\w+\W+){0,1}?(?:wawa|wawiya|dan\W+iska|''yar\W+iska|shege|mahaukaci|mahaukaciya|jahili)\b'
+    - 'dan\W+iska'
+    - 'shege'
+    - 'mahaukaci\w*'
+  scam_tool:
+    - 'rubuta\W+(?:min\W+)?(?:\w+\W+){0,2}?sako\w*\W+(?:na\W+)?(?:karya|zamba|barazana)'
+    - 'rubuta\W+(?:min\W+)?sako\w*\W+kamar\W+(?:daga\W+)?(?:na\W+)?banki'
+    - 'rubuta\W+(?:min\W+)?(?:\w+\W+){0,3}?sako\w*\W+(?:\w+\W+){0,4}?(?:kama\W+da|kamar)\W+(?:na\W+)?banki'
+    - '(?:kirkiro|kera|yi)\W+(?:min\W+)?(?:\w+\W+){0,1}?alert\W+na\W+karya'
+    - 'ta\W+yaya\W+zan\W+(?:samu|karbi|dauki|sace)\W+(?:\w+\W+){0,3}?(?:ta|na)\W+wani'
+    - 'taimaka\W+min\W+(?:in\W+)?rubuta\W+sako\w*\W+(?:cewa|da)\W+(?:\w+\W+){0,4}?(?:ci|biya|turo)'
+  injection:
+    - 'system\W*prompt\W+(?:dinka|naka)\b'
+    - '(?:manta|mance)\W+da\W+(?:dukkan\W+|duk\W+)?(?:umarni\w*|dokoki\w*|ka''idoji\w*)'
+    - 'yi\W+watsi\W+da\W+(?:\w+\W+){0,2}?(?:umarni\w*|dokoki\w*|ka''idoji\w*)'
+    - 'ka\W+dauka\W+(?:cewa\W+)?kai\W+(?:ne|ma''aikaci\w*|wakili\w*)'
+    - 'yanzu\W+kai\W+(?:ne|ma''aikaci\w*|wakili\w*)'
+    - '(?:nuna|rubuta|fadi)\W+(?:min\W+)?(?:\w+\W+){0,2}?umarni\w*\W+(?:\w+\W+){0,2}?(?:aka\W+ba\W+ka|farko)'
+    - 'sako\W+ga\W+ai'
+    - 'ka\W+fassara\W+(?:\w+\W+){0,6}?(?:sannan|kuma)\W+ka\W+(?:aikata|yi)\W+abin\W+da\W+ya\W+ce'
+    - 'daga\W+yanzu\W+ka\W+(?:rika|dinga)\W+(?:amsa|cewa|fada)'
+    - '(?:ka\W+ce|fada)\W+(?:cewa\W+)?(?:wannan\W+)?(?:sako\w*\W+)?(?:ba\W+zamba\W+ba|lafiya\W+ne|na\W+gaskiya\W+ne)'
+  injection_reported:
+    - '(?:ya|ta|sun|an)\W+(?:ce|fada|turo)|bankina\W+ya'
+  asr_hallucinations:
+    - 'mun\W+gode\W+da\W+kallo'
+  asr_annotations:
+    - 'kida|kade\W+kade'
+  ai_questions:  # DRAFT
+    - 'na''ura\W+ne\b'
+    - 'mutum\W+ne\W+na\W+gaske'
+    - 'kai\W+mutum\W+ne'
+  ai_denials:  # DRAFT
+    - 'ni\W+mutum\W+ne\b'
+    - 'ba\W+ni\W+(?:na''ura|inji|ai)\W+ba'
+  persona_claims:
+    - 'ni\W+(?:ne\W+)?ma''aikacin\W+(?:banki|\w+\W+bank)'
+    - 'mu\W+ne\W+(?:banki\w*|customer\W+care)'
+
 lexicon:
   flags:
+    threat:  # DRAFT, native review pending
+      - 'ko\W+(?:mu|za\W+mu)\W+(?:kashe|kai\W+hari\W+ga)\W+(?:ka|ki|ku)\b'
+      - 'za\W+mu\W+kashe\W+(?:ka|ki|ku)\b'
+      - 'ko\W+(?:ka|ki|ku)\W+mutu\b'
     asks_credentials:
       - 'lambar sirri'
       - '(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masa|mata|musu|mana|shi|ita|su)\W+(?:\w+\W+){0,2}?(?:lamba\w*|code|kod|otp|pin)'
@@ -142,3 +204,22 @@ strings:
   risk_nigeria: "Bayanan da ke wucewa ta Meta da Cloudflare ana iya sarrafa su a ƙasashen waje, inda dokar kare bayanai ta Najeriya ba za ta yi aiki gaba ɗaya ba."
   # Sent before the welcome reached the user: not taken as consent. DRAFT.
   read_welcome: "☝️ Don Allah ku karanta saƙon da ke sama, sannan ku amsa don ci gaba."
+  # Help numbers verified 2026-10-11 (sources and dates: en.yaml crisis_reply). DRAFT wording, pending native
+  # review; respectful plural "ku" forms throughout.
+  crisis_reply: |-
+    💛 Muna matuƙar baƙin ciki da abin da kuke ciki. Kuna da muhimmanci, kuma ba ku kaɗai ba ne.
+    Idan kuna jin za ku iya aikata abin da kuke tunani, ko kuna cikin haɗari, ku kira *112* (layin agajin ƙasa, kyauta) ko ku je asibiti mafi kusa.
+    Kuna iya magana da wani a layin taimako na *SURPIN*, a buɗe awa 24: *0800 078 7746* (kyauta), ko *0903 440 0009* / *0908 021 7555*, ko da Hausa: *0814 224 1007*.
+    Don Allah ku gaya wa wani da kuka amince da shi yadda kuke ji yau.
+    Idan kun shirya, zan taimaka da batun kuɗin: ku kira bankinku a lambar da ke jikin katinku ku faɗa musu abin da ya faru.
+  crisis_other_reply: |-
+    💛 Mun gode da kuka nemi taimako domin su. Idan suna iya aikata hakan yanzu ko suna cikin haɗari, ku kira *112* (layin agajin ƙasa, kyauta) ku zauna tare da su, ko ku kai su asibiti mafi kusa.
+    Su, ko ku, za ku iya magana da wani a layin taimako na *SURPIN*, a buɗe awa 24: *0800 078 7746* (kyauta), ko *0903 440 0009* / *0908 021 7555*, ko da Hausa: *0814 224 1007*.
+    Ku saurare su ba tare da yanke musu hukunci ba, kuma kada ku bar su su kaɗai idan kuna damuwa. Idan ku ma kuna jin haka, wannan taimakon naku ne ma.
+    Idan sun shirya, zan taimaka da batun kuɗin: su kira bankinsu a lambar da ke jikin katinsu.
+  abuse_reply: "🙏 Ina nan don taimaka maka game da tsaron kuɗi. Don Allah mu yi magana cikin girmamawa. Turo min saƙon da kake shakka, ko ka yi tambaya game da kuɗi."
+  scam_tool_reply: "🚫 Ba zan iya rubuta, fassara ko gyara saƙonnin masu kwaikwayon banki ko kamfani ba, ko waɗanda ke neman kuɗi ko lambobin sirri daga mutane. Zan iya duba maka saƙo, ko in bayyana yadda za ka kare kanka."
+  ai_honest: "🤖 Ni ne KudiGuard, mataimaki na AI. Ina duba saƙonnin da kuke shakka a kansu kuma ina amsa tambayoyi game da kuɗi. Game da asusunku, ku kira bankinku a lambar da ke jikin katinku."
+  new_users_busy_today: "⏳ KudiGuard ta karɓi sababbin masu amfani da yawa yau. Don Allah ku sake gwadawa daga baya."
+  screen_neutral: "ℹ️ Ina duba saƙonnin da kuke shakka a kansu kuma ina amsa tambayoyi game da kuɗi; ba zan iya canja yadda nake aiki ba. Ku turo min saƙon da kuke so in duba."
+  voice_limit: "🎧 Ka turo saƙonnin murya da yawa cikin ɗan lokaci. Don Allah ka ɗan jira, ko ka rubuta saƙonka."

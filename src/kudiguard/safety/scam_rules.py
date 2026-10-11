@@ -30,6 +30,9 @@ WEIGHTS: Mapping[Flag, int] = MappingProxyType(
         Flag.IMPERSONATION: 1,
         Flag.URGENCY: 1,
         Flag.SECRECY: 1,
+        # Threats to extort a payment ("pay or we will kill you", "you will die a debtor"): the lexicon's phrases tie the
+        # threat to a demand, so it is decisive on its own (docs/ABUSE.md).
+        Flag.THREAT: 3,
     }
 )
 SCAM_THRESHOLD = 3

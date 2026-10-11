@@ -149,6 +149,18 @@
     - Tell someone you trust before you send money.
   keywords: [secret, don't tell, confidential]
 
+- id: flag-threat
+  title: Threats to make you pay
+  flags: [threat]
+  facts:
+    - Scammers and illegal loan apps send threats of death, violence or public shame to scare you into paying quickly.
+    - A threat that demands money is extortion, which is a crime. Paying often brings more demands, not an end to the threats.
+  actions:
+    - Do not pay and do not reply. Keep the messages and the numbers they came from.
+    - If you feel in danger, call 112 or go to the nearest police station and show them the messages.
+    - If it is a loan app, report it to the FCCPC, which regulates digital lenders.
+  keywords: [threat, threaten, kill you, death, kidnap, shame, extortion, assassin]
+
 # --- everyday money literacy ---------------------------------------------------------------------------
 - id: bvn-basics
   title: What a BVN is

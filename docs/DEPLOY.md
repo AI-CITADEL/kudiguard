@@ -58,7 +58,10 @@ separators are removed, a mail provider or a domain ending); it catches mistakes
 formats (short hex tokens, date-based order numbers such as `order-2024-10-11-1234`) may be refused too. The id is
 hashed as `api:<key name>:<id>`, logged as channel `api`, and counts toward `KUDIGUARD_ACTIVE_USER_CAP` with WhatsApp
 and web users through the same admission gate; a new end user gets 503 `at_capacity` when the cap is full (or 503
-`busy_new_users` with `Retry-After: 3600` from a new-user rate gate, when one is installed). Renaming a key
+`busy_new_users` from the new-user rate gate: `Retry-After: 3600` at the hourly limit, none at the daily one). The
+new-user gate (`KUDIGUARD_NEW_USERS_PER_HOUR` / `_PER_DAY`, docs/ABUSE.md §5) is installed on this shared admission,
+so it applies to WhatsApp, web and partner-API end users alike, and also when `KUDIGUARD_ACTIVE_USER_CAP` is unset
+(it is an anti-flood guard, not a licence measure). Renaming a key
 (`name:key`) re-counts its users as new for 30 days. A partner who needs more than our share of the cap needs its own N-ATLaS licence cover (its own deployment) or a
 commercial licence. **The partner must tell its own customers and get their agreement** (they never see our
 welcome); /privacy then describes what is kept for them. Their messages never feed the scam-pattern library.
@@ -96,6 +99,12 @@ account that runs the watchdog:
 * *Flagged samples* (a child's voice, someone else's voice, or credentials read out):
   `kudiguard voice remove <id> ...`.
 * *Tester sign-up form:* see docs/TESTER_SIGNUP.md.
+
+**Launch checklist: crisis help numbers (hard requirement, docs/ABUSE.md §6).** Do not launch, and re-check every
+quarter: call every number in the `crisis_reply` string of each language (`data/languages/*.yaml`): 112, SURPIN
+0800 078 7746 (toll-free), 0903 440 0009, 0908 021 7555 and the Hausa line 0814 224 1007 (in the Hausa replies). Each must reach a person. Remove any number that does
+not (in all four languages), and record the date and result next to the string. If none of the SURPIN lines works,
+keep "112 / someone you trust" only.
 
 **Incident** (personal-data breach): contain; assess; notify the NDPC within 72 hours when people's rights are at
 risk; tell affected people immediately when the risk to them is high; record it (docs/DPIA_VOICE.md §8).

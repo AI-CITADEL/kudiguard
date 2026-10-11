@@ -45,12 +45,13 @@ from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
 from kudiguard.domain import InboundMessage, Interaction, MessageKind, Outcome
 from kudiguard.donation import DONATION_VERSION, Donation
-from kudiguard.engine import Answer, AnswerKind
+from kudiguard.engine import Answer, AnswerKind, crisis_message
 from kudiguard.envfile import load_env_file
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import VERDICT_HEADLINE, Msg
 from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
+from kudiguard.safety.abuse import CRISES
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
 from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
@@ -448,6 +449,7 @@ async def _check_in_slot(
     answer = await services.engine.check(text or "", language, deadline=deadline, turn_id=turn_id)
     created = utcnow()
     total_ms = int((time.perf_counter() - started) * 1000)
+    private = answer.screen_action in CRISES
     try:  # evidence must never break the answer
         await services.store.add_interaction(
             Interaction(
@@ -458,11 +460,11 @@ async def _check_in_slot(
                 kind=MessageKind.AUDIO if audio is not None else MessageKind.TEXT,
                 outcome=answer.outcome,
                 intent=answer.intent.value if answer.intent else None,
-                transcript=text,
-                english=answer.english or None,
+                transcript=None if private else text,  # a crisis message is sensitive: not kept
+                english=None if private else answer.english or None,
                 verdict=answer.verdict if answer.kind is AnswerKind.CHECK else None,
                 flags=answer.flags,
-                reply=answer.body,
+                reply=services.engine.screen.scrub_crisis(answer.body) if private else answer.body,
                 decode_ms=decode_ms,
                 asr_ms=asr_ms,
                 llm_ms=answer.llm_ms,
@@ -474,7 +476,8 @@ async def _check_in_slot(
         log.exception("could not log %s check", channel)
         # served but not in the store: the user keeps their licence-cap slot for the window
         _RESERVATION.get(Reservation()).hold()
-    await record_pattern(services.store, channel, answer, text or "", created)
+    await record_pattern(services.store, channel, answer, text or "", created, gate=services.learning,
+                         user_key=services.hasher.user_id(user_key))  # fmt: skip
     return answer, transcript, total_ms
 
 
@@ -487,8 +490,8 @@ def _check_response(
         explanation = messages.text(language, Msg.GREETING_REPLY)
     elif answer.kind is AnswerKind.CONTENT_FREE:
         explanation = messages.text(language, Msg.NOT_UNDERSTOOD)
-    else:
-        explanation = answer.body
+    else:  # a crisis message that is also a scam: the crisis reply first (docs/ABUSE.md)
+        explanation = "\n\n".join(p for p in (answer.preface, answer.body) if p)
     headline_key = VERDICT_HEADLINE.get(answer.verdict) if answer.kind is AnswerKind.CHECK else None
     return CheckResponse(
         verdict=answer.verdict.value if answer.kind is AnswerKind.CHECK else "not_a_check",
@@ -734,6 +737,19 @@ def _web_router() -> APIRouter:
     async def web_check(
         request: Request, services: ServicesDep, background: BackgroundTasks
     ) -> CheckResponse:
+        """A typed crisis message gets the crisis reply whatever happens next (docs/ABUSE.md): no consent header,
+        rate limit, licence cap or busy server stands between the user and help, and nothing is stored then."""
+        crisis = await _typed_crisis(request, services)
+        try:
+            return await _gated_web_check(request, services, background)
+        except HTTPException:
+            if crisis is None:
+                raise
+            return crisis
+
+    async def _gated_web_check(
+        request: Request, services: Services, background: BackgroundTasks
+    ) -> CheckResponse:
         # Consent, session and rate limit come in headers so they are checked before any upload is read.
         if request.headers.get("x-kudiguard-consent") != CONSENT_VERSION:  # consent to the current text only
             raise HTTPException(403, "consent is required")
@@ -758,9 +774,10 @@ def _web_router() -> APIRouter:
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
             )  # fmt: skip
-            if (
+            if (  # after the response is sent; never a flagged message (docs/ABUSE.md)
                 donating and audio is not None and services.donations is not None
-            ):  # after the response is sent
+                and services.learning.allow_donation(answer.screened)
+            ):  # fmt: skip
                 background.add_task(
                     services.donations.donate,
                     Donation(
@@ -784,6 +801,35 @@ def _web_router() -> APIRouter:
         return {"deleted": len(await services.store.delete_voice_samples(user_hash))}
 
     return router
+
+
+async def _typed_crisis(request: Request, services: Services) -> CheckResponse | None:
+    """The crisis reply for a small typed web message, read before any gate (a voice note is only known to be a
+    crisis after transcription, behind the gates). None: not a crisis, or not a small text form."""
+    declared = request.headers.get("content-length", "")
+    kind = request.headers.get("content-type", "")
+    if not declared.isdigit() or int(declared) > SMALL_REQUEST_BYTES or "form" not in kind:
+        return None
+    try:  # parsed once; the gated path reuses it (a file part is left unread)
+        form = await request.form(max_files=1, max_fields=8, max_part_size=MAX_TEXT_CHARS * 4 + 1024)
+    except Exception:
+        return None  # malformed: the gated path answers it
+    fields = {k: v for k, v in form.multi_items() if isinstance(v, str)}
+    if len(fields) < len(form.multi_items()):
+        return None  # a voice note: known to be a crisis only after transcription
+    text = fields.get("text", "")[:MAX_TEXT_CHARS]
+    category = services.engine.screen.crisis(text)
+    if category is None:
+        return None
+    codes = {lang.code for lang in services.registry.enabled}
+    asked = fields.get("language", "")
+    language = asked if asked in codes else services.engine.screen.crisis_language(text) or "en"
+    messages = services.engine.messages
+    return CheckResponse(
+        verdict="not_a_check", headline=None, flags=[], actions=[], report_channels=[], language=language,
+        explanation=plain_text(messages.text(language, crisis_message(category))), degraded=False,
+        disclaimer=plain_text(messages.text(language, Msg.DISCLAIMER)), latency_ms=0,
+    )  # fmt: skip
 
 
 # --- health -------------------------------------------------------------------------------------------------------
