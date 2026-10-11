@@ -26,20 +26,50 @@ output_guard:
     - 'ko si ewu'
   refusals:
     - 'mi o le ran'
+  # DRAFT, native review pending. "e"/"o" + verb at the clause start; negated forms ("e ma se fi") do not match.
+  unsafe_instructions:
+    - '(?:e|o)\W+fi\W+(?:\w+\W+){0,2}?(?:koodu|otp|pin|bvn|oro asina|code)\W+(?:\w+\W+)?ranse'
+    - '(?:e|o)\W+fun\W+(?:won|un|oun|enikeni)\W+ni\W+(?:\w+\W+)?(?:koodu|otp|pin|bvn|oro asina|code)'
+    - '(?:e|o)\W+san\W+(?:\w+\W+){0,3}?fees?'
+    - '(?:e|o)\W+(?:te|si)\W+(?:ori\W+)?(?:\w+\W+)?link'
+    - '(?:e|o)\W+(?:download|gba|ko)\W+(?:anydesk|teamviewer|\w*apk)'
+    - '(?:e|o)\W+(?:download|gba|ko)\W+(?:\w+\W+)?app(?!.*(?:play store|app store|google play|banki yin))'
+    - '(?:e|o)\W+(?:da|fi)\W+(?:\w+\W+){0,2}?owo\W+(?:naa\W+)?pada'
+  instruction_prefixes:
+    - '(?:jowo|bayi|lesekese|nisisiyi)'
+  negations:
+    - '(?:ma|se|mase|ko|kii)'
+  clause_breaks:
+    - '(?:ati|sugbon)'
 
 lexicon:
+  # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
+  # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     urgency:
       - 'kiakia'
+      - 'ni (?:bayii|bayi) (?:bayii|bayi)'  # H: "right now right now"
     asks_credentials:
       - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
       - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
     account_threat:
       - '(?:akaunti|account)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo|o) (?:di|dina|pa)'
+      # H: "(they) will block the account". Future/threat markers only: "ti pa SIM mi ti" (I switched my SIM off) and
+      # "o ti di akanti mi" (it became my account) are ordinary.
+      - '(?:maa|yoo) (?:di|dina|pa)\W+(?:\w+\W+){0,1}?(?:akaunti|akanti|account|bvn|sim)'
     guaranteed_returns:
       - 'ilopo (?:meji|meta)'
+      # H: "sure/guaranteed profit", not when denied ("ere to daju ko si", "ko si ere to daju": there is none)
+      - '(?<!ko si )(?<!kosi )ere\W+(?:\w+\W+){0,1}?(?:ti o daju|to daju)(?!\W+(?:\w+\W+){0,1}?ko\b)'
+      # H: "(if I) put/invest <amount> ... I will receive <amount> within a week/month" (mirrors the English pivot
+      # term). Both amounts required: "mo fi owo sile ni banki, maa gba ele ni osu kan" (bank interest) is ordinary.
+      - '(?:fi|nawo|dokowo)\W+(?:\w+\W+){0,2}?(?:\d[\d,.]*k?|egberun\w*|milionu)\W+(?:\w+\W+){0,4}?(?:maa|yoo|o maa|a maa|wa maa) (?:ri|gba)\W+(?:\w+\W+){0,2}?(?:\d[\d,.]*k?|egberun\w*|milionu)\W+(?:\w+\W+){0,4}?(?:laarin|ni|lehin) (?:ose|osu|ojo)\w*'
     upfront_fee:
       - 'san\W+(?:\w+\W+){0,4}?ki (?:o|e|a) (?:to|too) (?:gba|ri)'
+      - 'gbodo (?:koko )?san\W+(?:\w+\W+){0,6}?ki (?:n|o|e|a|won) (?:to|too)'  # H: "must (first) pay ... before"
+      - 'owo (?:iforukosile|registration|processing)'  # H: "registration/processing fee"
+    prize_lottery:
+      - 'mo (?:ti )?je ebun|(?:o|e) ti je ebun'  # H: "I/you won a prize" (not "o je ebun": "it is a gift")
     secrecy:
       - '(?:ma|e ma) (?:se )?so fun enikeni'
   check_intent:
@@ -54,7 +84,7 @@ strings:
 
     Ẹ fi *àtẹ̀jíṣẹ́ ohùn* tàbí ọ̀rọ̀ ránṣẹ́ sí mi, tàbí kí ẹ dárí ọ̀rọ̀ tí ẹ kò dá lójú rẹ̀ sí mi.
 
-    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ 90 jù lọ láti mú iṣẹ́ wa dára sí i. Àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé (ẹgbẹ́ wa tàbí àwọn tí èdè náà jẹ́ èdè abínibí wọn, lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀) lè ka díẹ̀ lára àwọn ọ̀rọ̀ àti èsì, pẹ̀lú nọ́ńbà tí a bò mọ́lẹ̀, láìsí nọ́mbà fóònù yín tàbí àmì ìdánimọ̀ kankan, láti ṣàyẹ̀wò dídára àti ààbò; a ń pa ẹ̀dà tiwọn rẹ́ lẹ́yìn àyẹ̀wò. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí ẹ bá yàn láti fi wọ́n tọrẹ (a máa béèrè lọ́tọ̀). Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọdún 2 jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i; DELETE tún ń pa àwọn tí a mú láti inú ọ̀rọ̀ yín àìpẹ́ yìí rẹ́. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
+    🔒 A ń tọ́jú àwọn ọ̀rọ̀ yín fún ọjọ́ {retention_days} jù lọ láti mú iṣẹ́ wa dára sí i. Àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé (ẹgbẹ́ wa tàbí àwọn tí èdè náà jẹ́ èdè abínibí wọn, lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀) lè ka díẹ̀ lára àwọn ọ̀rọ̀ àti èsì, pẹ̀lú ọ̀pọ̀ nọ́ńbà tí a bò mọ́lẹ̀, láìsí nọ́mbà fóònù yín tàbí àmì ìdánimọ̀ kankan, láti ṣàyẹ̀wò dídára àti ààbò; a ń pa ẹ̀dà tiwọn rẹ́ lẹ́yìn àyẹ̀wò. A ń tọ́jú nọ́mbà fóònù yín ní ọ̀nà àṣírí nìkan, a sì ń pa àtẹ̀jíṣẹ́ ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí ẹ bá yàn láti fi wọ́n tọrẹ (a máa béèrè lọ́tọ̀). Ẹ fi *DELETE* ránṣẹ́ nígbàkígbà láti pa àwọn ọ̀rọ̀ yín rẹ́, tàbí *STOP* láti dá a dúró. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọjọ́ {pattern_retention_days} jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i; DELETE tún ń pa àwọn tí a mú láti inú ọ̀rọ̀ yín àìpẹ́ yìí rẹ́. Tí ẹ bá tẹ̀síwájú, ẹ ti gbà sí èyí.
     🌍 Láti ṣiṣẹ́ KudiGuard, àwọn ọ̀rọ̀ yín ń kọjá láàárín WhatsApp (Meta) àti Cloudflare, lẹ́yìn òde Nàìjíríà, a sì ń tọ́jú wọn sórí sáfà wa {where}. {risk} Tí ẹ bá tẹ̀síwájú, ẹ tún gbà sí gbígbé dátà yìí lọ.
     ℹ️ Ìtọ́sọ́nà ni èyí, kì í ṣe ìmọ̀ràn ìṣúná owó.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
@@ -97,6 +127,7 @@ strings:
   warn_family_fallback: "⚠️ Ìkìlọ̀ nípa jìbìtì: ẹnìkan lè kàn sí yín pé òun wá láti báǹkì tàbí ilé-iṣẹ́ ìjọba, tàbí kí ó ṣèlérí owó fún yín. Ẹ má ṣe fún ẹnikẹ́ni ní OTP, PIN tàbí BVN yín, ẹ má sì san owó kankan kí ẹ tó gba owó. Ẹ kọ́kọ́ bá báǹkì yín sọ̀rọ̀."
   at_capacity: "😔 KudiGuard ti kún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ọjọ́ díẹ̀."
   busy: "⏳ Ọ̀pọ̀ ènìyàn ló ń béèrè báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ìṣẹ́jú kan."
+  new_users_busy: "⏳ Ọ̀pọ̀ ènìyàn tuntun ló ń dara pọ̀ mọ́ KudiGuard báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn nǹkan bí wákàtí kan."
   privacy_link: "🔐 Ìkéde àṣírí: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-

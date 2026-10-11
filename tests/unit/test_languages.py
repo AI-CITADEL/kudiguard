@@ -152,7 +152,8 @@ def test_asr_configuration_is_per_language(registry: LanguageRegistry) -> None:
     assert registry.asr_models()["ha"] == "NCAIR1/Hausa-ASR"
     tokens = registry.asr_whisper_languages()
     assert tokens["NCAIR1/Hausa-ASR"] == "ha"
-    assert tokens["NCAIR1/Igbo-ASR"] is None  # Whisper has no Igbo token
+    # Whisper has no Igbo token; the Igbo model detects "yo" on its own, so it is forced (docs/SPIKES.md H).
+    assert tokens["NCAIR1/Igbo-ASR"] == "yo"
 
 
 @pytest.mark.parametrize("template", ["Send {} now", "Send {0} now", "Hi {user.name}", "Hi {names[0]}"])

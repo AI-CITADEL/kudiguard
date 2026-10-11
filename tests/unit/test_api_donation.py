@@ -152,9 +152,10 @@ async def test_the_web_page_is_told_whether_donation_is_on_and_where_data_is(
             and "text/html" in (await running.client.get("/")).headers["content-type"]
         )
         assert (
-            f'const CONFIG = {{"donation": {str(enabled).lower()}, "storageInNigeria": {str(nigeria).lower()}}};'
-            in page
+            f'const CONFIG = {{"donation": {str(enabled).lower()}, "storageInNigeria": {str(nigeria).lower()}, '
+            '"retentionDays": 90, "patternRetentionDays": 730};' in page
         )
+        assert "{{" not in page
 
 
 async def test_with_donation_off_the_header_is_refused(registry: LanguageRegistry) -> None:

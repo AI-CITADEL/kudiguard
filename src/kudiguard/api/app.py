@@ -6,6 +6,12 @@ The REST API is stateless for callers (no phone numbers needed) but every check 
 evidence (channel ``api`` / ``web``). The web page is a public client of the same engine, rate-limited per client IP;
 the API requires an ``X-API-Key`` and is rate-limited per key.
 
+Partner API and the N-ATLaS licence: ``/v1`` is mounted only when ``KUDIGUARD_PARTNER_API`` is on (off in the pilot).
+Not mounting it (rather than answering 404 from live routes) keeps it out of ``/docs`` and leaves nothing to probe.
+When on, every check names its end user with a pseudonymous ``X-KudiGuard-End-User`` id (never a phone number); the id
+is hashed in its own domain (``api:<key name>:<id>``) and counts toward the licence cap of active end-users per
+rolling 30 days, shared with WhatsApp and the website (one admission lock, so a burst cannot overshoot).
+
 Request hygiene (review M9): bodies over ``MAX_REQUEST_BYTES`` are refused before any parsing; authentication,
 consent and rate limits are checked *before* a multipart form is read; validation errors never echo the input back.
 """
@@ -22,7 +28,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -33,6 +39,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from kudiguard.admission import AtCapacity, Reservation
 from kudiguard.api.ratelimit import RateLimiter
 from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
@@ -46,7 +53,7 @@ from kudiguard.pipeline import CONSENT_VERSION, record_pattern
 from kudiguard.render import plain_text
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
-from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
+from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +69,34 @@ SMALL_REQUEST_BYTES = 64 * 1024  # JSON endpoints: a 4000-char message is ~16 KB
 LARGE_BODY_PATHS = {"/v1/check/audio": MAX_REQUEST_BYTES, "/web/check": MAX_REQUEST_BYTES,
                     "/webhooks/whatsapp": 2 * 1024 * 1024}  # fmt: skip
 SESSION_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
+# The licence-cap reservation of the request being served (set by ``_admitted``): kept if its log cannot be written.
+_RESERVATION: ContextVar[Reservation] = ContextVar("kudiguard_reservation")
+END_USER_HEADER = "X-KudiGuard-End-User"
+_END_USER = re.compile(r"[A-Za-z0-9._:-]{8,137}")  # 137 = a short tag + a SHA-512 hex digest
+# A guardrail against mistakes, not proof of pseudonymity: ids that look like a phone number or an email address are
+# refused. Hex digests (32/40/64/128 hex characters) and UUIDs, optionally behind a short letter tag ("c-<sha256>"), are
+# accepted as they are: what partners should send. Anything else may not hold a run of 10+ digits once the separators
+# are removed (catches "user-0803-123-4567", "x8031234567", "cust-447911123456"), nor be digits only.
+_HASHED_ID = re.compile(
+    r"(?i)(?:[a-z]{1,8}[._:-]?)?(?:[0-9a-f]{128}|[0-9a-f]{64}|[0-9a-f]{40}|[0-9a-f]{32}"
+    r"|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+)
+_ONLY_DIGITS = re.compile(r"[\d._:-]+")
+_SEPARATORS = re.compile(r"[._:-]")
+_LONG_DIGITS = re.compile(r"\d{10,}")
+_EMAIL_LIKE = re.compile(
+    r"(?i)(?:^|[._:-])(?:gmail|googlemail|yahoo|ymail|hotmail|outlook|icloud|aol|proton|protonmail)(?:[._:-]|$)"
+    r"|[._-](?:com|net|org|ng|edu|gov|io|co)$"
+)
+
+
+def contact_shaped(value: str) -> bool:
+    """True for an end-user id that looks like a phone number or an email address (see the guardrail above)."""
+    if _HASHED_ID.fullmatch(value):
+        return False
+    if _ONLY_DIGITS.fullmatch(value):
+        return True
+    return bool(_LONG_DIGITS.search(_SEPARATORS.sub("", value)) or _EMAIL_LIKE.search(value))
 
 
 # --- schemas --------------------------------------------------------------------------------------------------
@@ -245,10 +280,17 @@ def create_app(
     app.state.api_limiter = RateLimiter(config.api_rate_per_minute)
     app.state.web_limiter = RateLimiter(config.web_rate_per_minute)
     app.state.check_slots = asyncio.Semaphore(MAX_CONCURRENT_API_CHECKS)
-    app.state.pending_web_sessions = set()  # new web sessions whose first check is running (licence cap)
-    app.state.web_admission = asyncio.Lock()
     app.state.api_keys = api_keys
-    app.include_router(_v1_router())
+    if config.partner_api:
+        if not api_keys:
+            log.warning(
+                "KUDIGUARD_PARTNER_API is on but KUDIGUARD_API_KEYS is empty: every /v1 call is refused"
+            )
+        app.include_router(_v1_router())
+    elif api_keys:
+        log.warning(
+            "KUDIGUARD_API_KEYS is set but the partner API is off (KUDIGUARD_PARTNER_API): /v1 not mounted"
+        )
     app.include_router(_web_router())
     app.include_router(_health_router())
 
@@ -295,6 +337,37 @@ def _api_client(request: Request) -> str:
 
 
 Client = Annotated[str, Depends(_api_client)]
+
+
+def _end_user(request: Request, client: Client) -> str:
+    """The licence-cap identity of a partner call: ``api:<key name>:<end-user id>`` (hashed by ``UserHasher``).
+
+    The partner must name its end user with a stable pseudonymous id (its own random or hashed id), so each person
+    counts toward the shared cap of active end-users; a phone number (or anything shaped like one) is refused."""
+    values = request.headers.getlist(END_USER_HEADER)
+    if len(values) > 1:
+        raise HTTPException(400, f"send {END_USER_HEADER} once")
+    value = values[0].strip() if values else ""
+    if not value:
+        raise HTTPException(
+            400,
+            f"missing {END_USER_HEADER}: send a stable pseudonymous id for the end user (8-137 characters), "
+            "never a phone number; each end user counts toward the N-ATLaS licence cap",
+        )
+    if not _END_USER.fullmatch(value):
+        raise HTTPException(
+            400, f"{END_USER_HEADER} must be 8-137 characters: letters, digits, '.', '_', ':', '-'"
+        )
+    if contact_shaped(value):
+        raise HTTPException(
+            400,
+            f"{END_USER_HEADER} looks like a phone number or an email address: send a pseudonymous id, e.g. a "
+            "SHA-256 hex digest of your own customer id, or a UUID",
+        )
+    return f"api:{client}:{value}"
+
+
+EndUser = Annotated[str, Depends(_end_user)]
 
 
 def client_ip(request: Request, trust_proxy: bool) -> str:
@@ -370,14 +443,16 @@ async def _check_in_slot(
         transcript = speech.transcript.text.strip()
         decode_ms, asr_ms = speech.decode_ms, speech.asr_ms
         text = transcript
-    answer = await services.engine.check(text or "", language, deadline=deadline)
+    message_id = uuid.uuid4().hex
+    turn_id = services.hasher.message_key(channel, message_id)  # same key scheme as WhatsApp turns
+    answer = await services.engine.check(text or "", language, deadline=deadline, turn_id=turn_id)
     created = utcnow()
     total_ms = int((time.perf_counter() - started) * 1000)
     try:  # evidence must never break the answer
         await services.store.add_interaction(
             Interaction(
                 channel=channel,
-                message_id=uuid.uuid4().hex,
+                message_id=message_id,
                 user_hash=services.hasher.user_id(user_key),
                 language=language,
                 kind=MessageKind.AUDIO if audio is not None else MessageKind.TEXT,
@@ -397,6 +472,8 @@ async def _check_in_slot(
         )
     except Exception:
         log.exception("could not log %s check", channel)
+        # served but not in the store: the user keeps their licence-cap slot for the window
+        _RESERVATION.get(Reservation()).hold()
     await record_pattern(services.store, channel, answer, text or "", created)
     return answer, transcript, total_ms
 
@@ -477,12 +554,18 @@ def _v1_router() -> APIRouter:
 
     @router.post("/check", response_model=CheckResponse, summary="Check a message (JSON text)")
     async def check(
-        body: CheckRequest, request: Request, services: ServicesDep, client: Client
+        body: CheckRequest, request: Request, services: ServicesDep, user: EndUser
     ) -> CheckResponse:
-        answer, transcript, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}", language=body.language,
-            text=body.text, audio=None,
-        )  # fmt: skip
+        async with _admitted(request, services, user):
+            answer, transcript, ms = await _run_check(
+                request,
+                services,
+                channel="api",
+                user_key=user,
+                language=body.language,
+                text=body.text,
+                audio=None,
+            )
         return _check_response(services, answer, transcript, ms)
 
     @router.post(
@@ -491,22 +574,25 @@ def _v1_router() -> APIRouter:
         summary="Check a voice note (multipart upload)",
         openapi_extra=AUDIO_FORM,
     )
-    async def check_audio(request: Request, services: ServicesDep, client: Client) -> CheckResponse:
-        fields, audio = await _form(request)  # only after the key and rate limit were checked
-        if audio is None:
-            raise HTTPException(422, "missing 'audio' file")
-        answer, transcript, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}",
-            language=fields.get("language", "en"), text=None, audio=audio,
-        )  # fmt: skip
+    async def check_audio(request: Request, services: ServicesDep, user: EndUser) -> CheckResponse:
+        async with _admitted(request, services, user):
+            # only after the key, end user, rate limit and licence cap were checked
+            fields, audio = await _form(request)
+            if audio is None:
+                raise HTTPException(422, "missing 'audio' file")
+            answer, transcript, ms = await _run_check(
+                request, services, channel="api", user_key=user,
+                language=fields.get("language", "en"), text=None, audio=audio,
+            )  # fmt: skip
         return _check_response(services, answer, transcript, ms)
 
     @router.post("/ask", response_model=AskResponse, summary="Ask a money-safety question")
-    async def ask(body: AskRequest, request: Request, services: ServicesDep, client: Client) -> AskResponse:
-        answer, _, ms = await _run_check(
-            request, services, channel="api", user_key=f"api:{client}", language=body.language,
-            text=body.question, audio=None,
-        )  # fmt: skip
+    async def ask(body: AskRequest, request: Request, services: ServicesDep, user: EndUser) -> AskResponse:
+        async with _admitted(request, services, user):
+            answer, _, ms = await _run_check(
+                request, services, channel="api", user_key=user, language=body.language,
+                text=body.question, audio=None,
+            )  # fmt: skip
         result = _check_response(services, answer, None, ms)
         return AskResponse(
             answer=result.explanation, verdict=result.verdict, language=result.language,
@@ -536,29 +622,57 @@ def _v1_router() -> APIRouter:
 
 # --- web voice page --------------------------------------------------------------------------------------------
 
+# /privacy, rendered from settings: what reaches partners only when the operator switches it on.
+LIVE_PACKS_NOTICE = (
+    "<li><strong>Partner knowledge sources:</strong> to answer some questions, the English translation of your message "
+    "(most numbers masked; names are not removed), the warning signs we found and your language are sent to a partner "
+    "organisation's server, which searches its own help content. The partner follows its own privacy policy.</li>"
+)
+PARTNER_API_OFF = "An API for partner organisations exists but is switched off during this pilot."
+PARTNER_API_COLLECT_ON = (
+    "<li><strong>Partner organisations' customers</strong> (through our API): the message or voice note the partner "
+    "sends, our reply, the channel (API), and a coded form of the partner's own id for that customer (never a phone "
+    "number), kept and deleted like the messages above. The partner is responsible for telling its customers and "
+    "getting their agreement.</li>"
+)
+PARTNER_API_ON = (
+    "Partner organisations can also use it through an API for their own customers; each partner names its users only "
+    "by a coded id, never a phone number."
+)
 
-async def _admit_web_session(services: Services, settings: Settings, session: str, pending: set[str]) -> bool:
-    """N-ATLAS licence cap for the website: a session new to the 30-day window needs room in both the web share
-    and the project-wide cap, counting new sessions whose first check is still running (``pending``), so a burst
-    cannot overshoot. Returning sessions are always served. Returns True for a newly admitted session."""
-    if settings.active_user_cap is None:
-        return False
-    since = utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
-    if session in pending or await services.store.count_interactions_since(
-        services.hasher.user_id(f"web:{session}"), since
-    ):
-        return False
-    in_flight = len(pending)
-    full = (
-        await services.store.count_active_users_since(since, channels={"web"}) + in_flight
-        >= settings.web_session_cap
-        or await services.store.count_active_users_since(since) + in_flight >= settings.active_user_cap
-    )
-    if full:
-        message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
-        raise HTTPException(503, {"problem": "at_capacity", "message": message})
-    pending.add(session)
-    return True
+
+def _days(days: int) -> str:
+    """ "1 day", "90 days", "730 days (2 years)"."""
+    text = f"{days} day{'s' if days != 1 else ''}"
+    years, rest = divmod(days, 365)
+    return f"{text} ({years} year{'s' if years > 1 else ''})" if years and not rest else text
+
+
+def _fill(page: str, values: dict[str, str]) -> str:
+    """Replace ``{{NAME}}`` placeholders in one pass: a value can never introduce another placeholder."""
+    return re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page)
+
+
+@asynccontextmanager
+async def _admitted(request: Request, services: Services, user_key: str) -> AsyncIterator[None]:
+    """N-ATLaS licence cap for the website and the partner API (``user_key`` is ``web:<session>`` or
+    ``api:<key name>:<end user>``), through the admission gate shared with WhatsApp (``Services.admission``): a user
+    new to the 30-day window is refused with 503 ``at_capacity`` when the cap (or the web share) is full. The slot is
+    held for the check, which logs the interaction before it ends."""
+    channel = user_key.partition(":")[0]
+    try:
+        reservation = await services.admission.reserve(services.hasher.user_id(user_key), channel)
+    except AtCapacity as exc:  # the cap, the web share, or a new-user gate (e.g. NewUsersBusy)
+        settings: Settings = request.app.state.settings
+        message = plain_text(services.engine.messages.text(settings.default_language, exc.message))
+        headers = {"Retry-After": str(exc.retry_after_s)} if exc.retry_after_s else None
+        raise HTTPException(503, {"problem": exc.problem, "message": message}, headers=headers) from exc
+    token = _RESERVATION.set(reservation)
+    try:
+        yield
+    finally:
+        _RESERVATION.reset(token)
+        reservation.release()
 
 
 def _web_router() -> APIRouter:
@@ -566,21 +680,29 @@ def _web_router() -> APIRouter:
 
     @router.get("/")
     async def page(request: Request) -> HTMLResponse:
-        """The web page, told whether voice donation is on and where data is stored (its texts follow)."""
+        """The web page, told whether voice donation is on, where data is stored and the configured retention
+        periods (its consent texts render them)."""
         settings: Settings = request.app.state.settings
         config = {
             "donation": settings.voice_donation,
             "storageInNigeria": settings.storage_location is StorageLocation.NIGERIA,
+            "retentionDays": settings.retention_days,
+            "patternRetentionDays": settings.pattern_retention_days,
+        }
+        values = {
+            "CONFIG": json.dumps(config),
+            "RETENTION_DAYS": str(settings.retention_days),
+            "PATTERN_RETENTION_DAYS": str(settings.pattern_retention_days),
         }
         page = (STATIC / "voice.html").read_text(encoding="utf-8")
-        return HTMLResponse(page.replace("{{CONFIG}}", json.dumps(config)))
+        return HTMLResponse(_fill(page, values))
 
     @router.get("/privacy")
     async def privacy(request: Request) -> HTMLResponse:
         """Privacy notice (required by Meta for Live mode; NDPA). Operator and contact come from settings."""
         settings: Settings = request.app.state.settings
         contact = settings.privacy_contact.strip()
-        years, rest = divmod(settings.pattern_retention_days, 365)
+
         values = {
             "OPERATOR": html.escape(settings.operator_name),
             "CONTACT": (
@@ -589,11 +711,7 @@ def _web_router() -> APIRouter:
                 else "contact the operator"
             ),
             "RETENTION_DAYS": str(settings.retention_days),
-            "PATTERN_RETENTION": (
-                f"{years} year{'s' if years > 1 else ''}"
-                if years and not rest
-                else f"{settings.pattern_retention_days} days"
-            ),
+            "PATTERN_RETENTION": _days(settings.pattern_retention_days),
             "STORAGE_LOCATION": html.escape(settings.storage_location.english),
             "STORAGE_RISK": html.escape(settings.storage_location.english_risk),
             "DELETION_MARKER_DAYS": str(DELETION_MARKER_DAYS),
@@ -603,14 +721,14 @@ def _web_router() -> APIRouter:
                 else "Not switched on yet: this describes how it will work once it is."
             ),
             "VOICE_RETENTION": (
-                "12 months"
-                if settings.voice_retention_days == 365
-                else f"{settings.voice_retention_days} days"
+                "12 months" if settings.voice_retention_days == 365 else _days(settings.voice_retention_days)
             ),
+            "LIVE_PACKS": LIVE_PACKS_NOTICE if settings.allow_live_packs else "",
+            "PARTNER_API": PARTNER_API_ON if settings.partner_api else PARTNER_API_OFF,
+            "PARTNER_API_COLLECT": PARTNER_API_COLLECT_ON if settings.partner_api else "",
         }
         page = (STATIC / "privacy.html").read_text(encoding="utf-8")
-        # One pass: a value can never introduce another placeholder.
-        return HTMLResponse(re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values.get(m.group(1), m.group(0)), page))
+        return HTMLResponse(_fill(page, values))
 
     @router.post("/web/check")
     async def web_check(
@@ -631,10 +749,7 @@ def _web_router() -> APIRouter:
         if not re.fullmatch(SESSION_PATTERN, session):
             raise HTTPException(422, "invalid session id")
         _too_many(request.app.state.web_limiter, client_ip(request, settings.trust_proxy_headers))
-        pending: set[str] = request.app.state.pending_web_sessions
-        async with request.app.state.web_admission:  # check + reserve atomically (store counts yield)
-            admitted = await _admit_web_session(services, settings, session, pending)
-        try:
+        async with _admitted(request, services, f"web:{session}"):
             fields, audio = await _form(request)
             text = fields.get("text", "")[:MAX_TEXT_CHARS]
             if audio is None and not text.strip():
@@ -655,9 +770,6 @@ def _web_router() -> APIRouter:
                     ),
                 )  # fmt: skip
             return _check_response(services, answer, transcript, ms)
-        finally:
-            if admitted:
-                pending.discard(session)  # now counted from the evidence log (or never served)
 
     @router.post("/web/donation/withdraw")
     async def withdraw_donation(request: Request, services: ServicesDep) -> dict[str, int]:

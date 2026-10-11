@@ -53,6 +53,7 @@ class Msg(StrEnum):
     FALLBACK_STEPS = "fallback_steps"
     WARN_FAMILY_FALLBACK = "warn_family_fallback"
     AT_CAPACITY = "at_capacity"
+    NEW_USERS_BUSY = "new_users_busy"  # too many new users at once (admission.NewUsersBusy)
     BUSY = "busy"
     PRIVACY_LINK = "privacy_link"
     DONATION_OFFER = "donation_offer"

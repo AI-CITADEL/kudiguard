@@ -2,23 +2,33 @@
 
 **Not sure? Forward it to KudiGuard.** A WhatsApp scam verifier for Nigeria: send a voice note or forward a suspicious
 message in **Hausa, Yoruba, Igbo or English** and get 🔴 / 🟠 / 🟢 with what to do and where to report, in seconds.
+Yoruba and Igbo are in beta, and no native speaker has reviewed the Hausa, Yoruba or Igbo texts yet (docs/VALIDATION.md).
 Built on **N-ATLAS** (LLM) and the **NCAIR1** speech models for NAIC 2026. Why and how: [docs/WHY_KUDIGUARD.md](docs/WHY_KUDIGUARD.md).
 
 > N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by
-> Awarri Technologies. Used under the N-ATLaS licence (≤ 1,000 active end-users, enforced in code).
+> Awarri Technologies. Used under the N-ATLaS licence: at most 1,000 active end-users per rolling 30 days across all
+> channels, enforced in code (WhatsApp, website and, when switched on, the partner API).
 
 ## Channels
 * **WhatsApp**: voice notes, text, forwarded messages; buttons for next steps, reporting and "warn my family".
-* **REST API** for banks, fintechs and NGOs: `POST /v1/check`, `/v1/check/audio`, `/v1/ask` (docs at `/docs`).
+* **Partner REST API** (`POST /v1/check`, `/v1/check/audio`, `/v1/ask`): **off in the pilot**. When switched on,
+  every call names its end user with a pseudonymous id, and each end user counts toward the licence cap
+  (docs/DEPLOY.md, "Partner API").
 * **Web voice page** at `/` (fallback, no install).
 
-## Results (blind test sets, docs/SPIKES.md)
-| | |
-|---|---|
-| Scam detection, 40 unseen messages in 4 languages | 95% of scams flagged (red/orange), 86% precision |
-| Knowledge grounding, 24 unseen questions | right entry in top 3: 96% |
-| Speech (official NCAIR1 models, WER) | Hausa 28%, Yoruba 33%, Igbo 46% |
-| Latency (RTX 4070 laptop) | text p50 5.4 s; 11-s English voice note ~7 s end to end |
+## Results so far (small test sets; every number, source and caveat: [docs/CLAIMS.md](docs/CLAIMS.md))
+| | | Caveat |
+|---|---|---|
+| Same message, same reply (shipped code) | 90% identical over 3 runs (temperature 0 + seed; 9% at the old temperature 0.1) | 53-case dev set; Yoruba (English-first) 64% |
+| Knowledge retrieval, 24 independent questions | right entry in top 3: 96% (top 1: 62%) | English questions only |
+| Speech (official NCAIR1 models, word error rate) | Hausa 28%, Yoruba 33%, Igbo 46% | 10-20 read FLEURS sentences per language, not voice notes |
+| Scam detection by the rules alone (model down) | 80% of scams flagged, 89% precision | 40 messages; set already used once for lexicon edits |
+| Answer covers the key points (0-1) | en 0.64 · ha 0.46 · yo 0.58 · ig 0.33 | 53-case dev set, ha/yo/ig AI-drafted |
+| Unsafe advice caught in English/Pidgin replies | 5% → 34% (rule guard) → ~70% with the learned layer, ~2% false alarms | held-out set partly used; learned layer logs only in the pilot |
+| Speed (RTX 4070 laptop, text, shipped code) | p50 4.0 s, p95 8.2 s (English p50 2.8 s; Yoruba +1.6 s) | one request at a time; voice timed once (~7 s, English) |
+
+Not yet measured: the full engine on the scam set (to be re-run live), the frozen 366-case end-to-end set (to be
+scored live), real users and native-speaker review (after the pilot).
 
 ## Run (Windows, NVIDIA GPU ≥ 8 GB)
 Tools and models (not in git):
@@ -37,10 +47,12 @@ copy .env.example .env               # fill in; KUDIGUARD_HASH_SECRET is require
 Then set the tunnel URL + `/webhooks/whatsapp` as the webhook in Meta. Details: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Develop
-`.venv\Scripts\python -m pytest` (921 tests, 100% coverage; `-m live` for real models) · `ruff check` · `mypy`.
+`.venv\Scripts\python -m pytest` (2,963 tests, 100% line + branch coverage; `-m live` for real models) · `ruff check` · `mypy`.
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Validation: [docs/VALIDATION.md](docs/VALIDATION.md) ·
 Sustainability: [docs/SUSTAINABILITY.md](docs/SUSTAINABILITY.md) · Demo: [docs/DEMO.md](docs/DEMO.md).
 
 ## Privacy
-Phone numbers stored only as keyed hashes; message text redacted; voice notes deleted after transcription; 90-day
-retention; users send `DELETE` to erase or `STOP` to stop. Guidance only, not financial advice.
+Phone numbers stored only as keyed hashes; most numbers and emails in messages masked (names are kept); voice notes
+deleted after transcription unless the user opts in to donate them; messages deleted after about 90 days and scam
+examples within 2 years (configurable, never longer; the purge runs every 6 hours while the server is on); users send
+`DELETE` to erase their WhatsApp data or `STOP` to stop. Guidance only, not financial advice.

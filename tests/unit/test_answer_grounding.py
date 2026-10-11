@@ -38,6 +38,7 @@ from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLMError, Purpose
 from kudiguard.pipeline import REPLY_RESERVE_S
+from kudiguard.reply_translation import ComposePolicy, ComposeStrategy
 
 PACKS = Path(__file__).resolve().parents[2] / "data" / "packs"
 
@@ -108,8 +109,8 @@ def test_support_threshold_follows_workstream_b(
     monkeypatch: pytest.MonkeyPatch, registry: LanguageRegistry
 ) -> None:
     monkeypatch.setitem(sys.modules, GROUNDING_MODULE, None)
-    assert support_threshold() == DEFAULT_SUPPORT_THRESHOLD == 0.73
-    assert FallbackGrounding(FakeLLM(), WordEmbedder(), registry).threshold == 0.73
+    assert support_threshold() == DEFAULT_SUPPORT_THRESHOLD == 0.75
+    assert FallbackGrounding(FakeLLM(), WordEmbedder(), registry).threshold == 0.75
     monkeypatch.setitem(sys.modules, GROUNDING_MODULE, SimpleNamespace(DEFAULT_THRESHOLD=0.7))
     assert support_threshold() == 0.7
 
@@ -220,7 +221,9 @@ async def knowledge() -> Any:
 
 
 def engine(registry: LanguageRegistry, knowledge: KnowledgeBase, llm: FakeLLM) -> Engine:
-    return Engine(registry=registry, llm=llm, knowledge=knowledge)
+    """Direct compose: these tests script the reply in the user's language (english_first: test_reply_translation)."""
+    direct = ComposePolicy(ComposeStrategy.DIRECT)
+    return Engine(registry=registry, llm=llm, knowledge=knowledge, compose_policy=direct)
 
 
 def test_turn_deadline_mirrors_the_pipeline() -> None:

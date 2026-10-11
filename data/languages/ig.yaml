@@ -6,7 +6,9 @@ native_name: Igbo
 order: 3
 status: beta
 asr_model: NCAIR1/Igbo-ASR
-asr_whisper_language: null  # Whisper has no Igbo token: the fine-tuned model decides
+# Whisper has no Igbo token. Left on auto, the NCAIR1 Igbo model detects "yo" on every FLEURS clip (p ~1.0), so
+# forcing "yo" gives identical transcripts (10/10) and skips detection: ~3 s faster (docs/SPIKES.md H, 10 Oct 2026).
+asr_whisper_language: yo
 review:
   lexicon: pending-native-review
   strings: pending-native-review
@@ -25,20 +27,45 @@ output_guard:
     - 'enweghi ihe ize ndu'
   refusals:
     - 'enweghi m ike inyere'
+  # DRAFT, native review pending. Positive imperatives only: negative ones are different words ("enyela", "akwula").
+  unsafe_instructions:
+    - '(?:zite|ziga|nye|gwa)\W+(?:(?:ha|ya|onye)\W+)?(?:\w+\W+)?(?:otp|pin|bvn|koodu|okwuntughe|code)'
+    - 'kwuo\W+(?:\w+\W+)?(?:fee|ugwo nhazi|ugwo ndebanye)'
+    - '(?:pia|meghe)\W+(?:\w+\W+)?link'
+    - '(?:budata|wunye)\W+(?:anydesk|teamviewer|\w*apk)'
+    - '(?:budata|wunye)\W+(?:\w+\W+)?app(?!.*(?:play store|app store|google play|ulo aku))'
+    - '(?:zighachi|weghachi|nyeghachi)\W+(?:\w+\W+)?ego'
+  instruction_prefixes:
+    - '(?:biko|ugbu|ozugbo)'
+  negations:
+    - '(?:ekwela|agaghi|ebula)'
+  clause_breaks:
+    - '(?:mana)'
 
 lexicon:
+  # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.
+  # Each is pinned by a firing message and a no-fire check on the packs and safe advice (tests/unit/test_scam_rules.py).
   flags:
     urgency:
       - 'ngwa ngwa'
+      - 'ozugbo ozugbo'  # H: "immediately, immediately"
     asks_credentials:
       - '(?:zitere|zite|ziga|nye)\W+(?:ya|ha|anyi|m|mu)\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin|okwuntughe)'
+      # H: "tell him/them the code". Third-person objects only: "gwa m ihe OTP putara" (tell me what OTP means) and
+      # "agwaghi m ya PIN m" (I did not tell him my PIN) are ordinary.
+      - '(?:agwa|gwa|agwaghi)\W+(?:ya|ha)\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin|okwuntughe)'
     account_threat:
       - '(?:akauntu|account)\W+(?:\w+\W+){0,4}?(?:emechi|akpochi|mechie|kpochie)'
       - '(?:emechi|akpochi|mechie|kpochie)\W+(?:\w+\W+){0,1}?(?:akauntu|account)'
     guaranteed_returns:
       - 'okpukpu (?:abuo|ato)'
+      # H: "if I put in ... I/they will get/give ... within N weeks/months" (mirrors the English pivot term)
+      - 'tinye\W+(?:\w+\W+){0,6}?(?:ga-enweta|ga-enye|ga-anata|ga enweta|ga enye|ga anata)\W+(?:\w+\W+){0,6}?(?:n\Wime|kwa) (?:\w+\W+){0,1}?(?:izu|onwa|ubochi)'
     upfront_fee:
       - 'kwu\w*\W+(?:\w+\W+){0,4}?(?:tupu|ka i nweta|ka i nata)'
+      - 'ugwo (?:ndebanye aha|nhazi|registration|processing)'  # H: "registration/processing fee"
+    prize_lottery:
+      - 'meriri\W+(?:\w+\W+){0,2}?(?:ego|onyinye|nrite)'  # H: "won money/a prize"
     secrecy:
       - 'agwala onye (?:obula|o bula)'
   check_intent:
@@ -52,7 +79,7 @@ strings:
 
     Zitere m *ozi olu* ma ọ bụ ozi ederede, ma ọ bụ zigharịa ozi ọ bụla ị na-enweghị obi ike na ya.
 
-    🔒 Anyị na-echekwa ozi gị ruo ụbọchị 90 iji melite ọrụ anyị. Ndị nyocha ole na ole a tụkwasịrị obi (ndị otu anyị ma ọ bụ ndị asụsụ ahụ bụ asụsụ obodo ha, n'okpuru nkwekọrịta nzuzo e dere ede) nwere ike ịgụ ụfọdụ ozi na nzaghachi, e zochiri nọmba, na-enweghị nọmba ekwentị gị ma ọ bụ ihe ọ bụla na-egosi onye ị bụ, iji lelee ịdị mma na nchekwa; a na-ehichapụ mbipụta ha mgbe nlele ahụ gasịrị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha, ma ọ bụrụ na ị họrọghị inye ha onyinye (anyị ga-ajụ iche). Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo afọ 2 iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
+    🔒 Anyị na-echekwa ozi gị ruo ụbọchị {retention_days} iji melite ọrụ anyị. Ndị nyocha ole na ole a tụkwasịrị obi (ndị otu anyị ma ọ bụ ndị asụsụ ahụ bụ asụsụ obodo ha, n'okpuru nkwekọrịta nzuzo e dere ede) nwere ike ịgụ ụfọdụ ozi na nzaghachi, e zochiri ọtụtụ nọmba, na-enweghị nọmba ekwentị gị ma ọ bụ ihe ọ bụla na-egosi onye ị bụ, iji lelee ịdị mma na nchekwa; a na-ehichapụ mbipụta ha mgbe nlele ahụ gasịrị. A na-echekwa nọmba ekwentị gị naanị n'ụdị nzuzo, a na-ehichapụkwa ozi olu mgbe e dechara ha, ma ọ bụrụ na ị họrọghị inye ha onyinye (anyị ga-ajụ iche). Zipu *DELETE* n'oge ọ bụla iji hichapụ ozi gị, ma ọ bụ *STOP* iji kwụsị. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo ụbọchị {pattern_retention_days} iji chebe ndị ọzọ ma melite KudiGuard; DELETE na-ehichapụkwa ndị e si n'ozi gị nso nso a wepụta. Site n'ịga n'ihu, ị kwenyere na nke a.
     🌍 Iji rụọ ọrụ KudiGuard, ozi gị na-agafe na WhatsApp (Meta) na Cloudflare, na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. {risk} Site n'ịga n'ihu, ị kwenyekwara na mbufe a.
     ℹ️ Nke a bụ ndụmọdụ, ọ bụghị ndụmọdụ ego nke ọkachamara.
     _N-ATLaS is an initiative of the Federal Ministry of Communications, Innovation and Digital Economy and powered by Awarri Technologies._
@@ -95,6 +122,7 @@ strings:
   warn_family_fallback: "⚠️ Ịdọ aka ná ntị maka aghụghọ: mmadụ nwere ike ịkpọtụrụ unu na-ekwu na o si n'ụlọ akụ ma ọ bụ ụlọ ọrụ gọọmentị, ma ọ bụ na-ekwe nkwa ego. Unu enyela onye ọ bụla OTP, PIN ma ọ bụ BVN unu, unu akwụkwala ego ka unu nata ego. Buru ụzọ jụọ ụlọ akụ unu."
   at_capacity: "😔 KudiGuard juputara ugbu a. Biko nwaa ọzọ mgbe ụbọchị ole na ole gachara."
   busy: "⏳ Ọtụtụ mmadụ na-ajụ ajụjụ ugbu a. Biko nwaa ọzọ mgbe otu nkeji gachara."
+  new_users_busy: "⏳ Ọtụtụ mmadụ ọhụrụ na-abata na KudiGuard ugbu a. Biko nwaa ọzọ mgbe ihe dị ka otu awa gachara."
   privacy_link: "🔐 Ọkwa nzuzo: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-

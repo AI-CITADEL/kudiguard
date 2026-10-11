@@ -5,6 +5,8 @@ This package imports nothing else from ``kudiguard`` so it can be lifted unchang
 
 from __future__ import annotations
 
+import dataclasses
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -25,6 +27,7 @@ class Purpose(StrEnum):
     ANALYSE = "analyse"
     TRANSLATE = "translate"
     COMPOSE = "compose"
+    REPLY_TRANSLATE = "reply_translate"  # an English-composed reply into the user's language
     WARN = "warn"
     STEPS = "steps"
     GENERAL = "general"
@@ -35,6 +38,7 @@ DEFAULT_TIMEOUTS: Mapping[Purpose, float] = {
     Purpose.ANALYSE: 10.0,
     Purpose.TRANSLATE: 10.0,
     Purpose.COMPOSE: 20.0,
+    Purpose.REPLY_TRANSLATE: 15.0,
     Purpose.WARN: 10.0,
     Purpose.STEPS: 10.0,
     Purpose.GENERAL: 30.0,
@@ -107,3 +111,19 @@ class LLM(Protocol):
     async def ready(self) -> bool:
         """True when the backend is loaded and accepting requests."""
         ...
+
+
+async def complete_within(
+    llm: LLM, request: ChatRequest, deadline: float | None, minimum_s: float
+) -> Completion:
+    """One call capped to the time left before ``deadline`` (``time.monotonic()`` seconds).
+
+    Raises ``LLMError`` without calling when less than ``minimum_s`` is left: a turn's fixed text must still go out.
+    """
+    if deadline is not None:
+        left = deadline - time.monotonic()
+        if left < minimum_s:
+            raise LLMError(f"{request.purpose}: skipped, {left:.1f}s left in the turn")
+        budget = min(request.timeout_s or DEFAULT_TIMEOUTS[request.purpose], left)
+        request = dataclasses.replace(request, timeout_s=budget)
+    return await llm.complete(request)

@@ -163,6 +163,38 @@ async def test_purge_loop_also_expires_patterns() -> None:
     assert await store.export_patterns() == []
 
 
+def test_no_scam_example_outlives_the_promised_period() -> None:
+    """Examples carry only their week; whatever the day and time they arrived, none is still stored (until the next
+    pass, 6 hours later plus margin) once it is older than the retention period (730 days, /privacy)."""
+    from datetime import UTC, datetime
+
+    from kudiguard.api.services import PURGE_INTERVAL_S, PURGE_MARGIN, pattern_keep_from
+
+    start = datetime(2024, 1, 1, tzinfo=UTC)  # a Monday
+    for hours in range(0, 24 * 21, 5):  # passes at many times of day across three weeks
+        now = start + timedelta(days=730, hours=hours)
+        keep_from = pattern_keep_from(now, 730)
+        next_pass = now + timedelta(seconds=PURGE_INTERVAL_S) + PURGE_MARGIN
+        for week in (keep_from + timedelta(days=d) for d in range(-14, 14)):
+            monday = week - timedelta(days=week.weekday())
+            if monday >= keep_from:  # kept: even its earliest possible example (Monday 00:00) is young enough
+                oldest = datetime(monday.year, monday.month, monday.day, tzinfo=UTC)
+                assert next_pass - oldest < timedelta(days=730)
+    # and never much earlier than needed: the cutoff day is at most two days after "730 days ago"
+    now = datetime(2026, 10, 10, 12, tzinfo=UTC)
+    assert (
+        timedelta(0) < pattern_keep_from(now, 730) - (now - timedelta(days=730)).date() <= timedelta(days=2)
+    )
+
+
+async def test_purge_drops_weeks_starting_before_the_cutoff(store) -> None:  # type: ignore[no-untyped-def]
+    monday = date(2026, 10, 5)
+    await store.add_pattern(pattern(monday + timedelta(days=6), "sunday scam"))  # stored as week 2026-10-05
+    assert await store.purge_patterns_before(monday) == 0  # its week starts on the cutoff: kept
+    # a cutoff one day later: the week may hold an example older than it, so it goes
+    assert await store.purge_patterns_before(monday + timedelta(days=1)) == 1
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -313,7 +345,9 @@ def test_length_caps() -> None:
 def test_retention_and_channels_match_what_users_are_told(registry: LanguageRegistry) -> None:
     from kudiguard.patterns import PATTERN_CHANNELS, PATTERN_RETENTION_DAYS
 
-    assert PATTERN_RETENTION_DAYS == 730 and "up to 2 years" in registry.get("en").strings[Msg.WELCOME]
+    welcome = registry.get("en").strings[Msg.WELCOME]
+    # the period is filled in from settings
+    assert PATTERN_RETENTION_DAYS == 730 and "for up to {pattern_retention_days} days" in welcome
     assert {"whatsapp", "web"} == PATTERN_CHANNELS  # end users who consented, never API partners' users
 
 

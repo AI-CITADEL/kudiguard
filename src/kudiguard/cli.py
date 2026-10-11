@@ -3,7 +3,7 @@
     kudiguard serve [--host 127.0.0.1] [--port 8000]
     kudiguard stats [--json] [--exclude-users FILE] [--channels whatsapp,web]
     kudiguard export --out evidence.jsonl
-    kudiguard purge [--days 90]          (also donated voice notes past KUDIGUARD_VOICE_RETENTION_DAYS)
+    kudiguard purge [--days 90]   (also donated voice notes, DELETE + licence-cap markers, old scam examples)
     kudiguard review export [--out-dir var/review] [--n 50] [--languages ha,yo,ig] [--seed 0]
     kudiguard review score graded.csv [more.csv ...] [--markdown]
     kudiguard review check sheet.csv [more.csv ...]
@@ -34,7 +34,7 @@ from kudiguard.donation import Sealer, VoiceVault
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
-from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 
@@ -102,7 +102,15 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
-    async def run() -> tuple[int, int, int]:
+    from kudiguard.api.services import pattern_keep_from
+
+    if settings.active_user_cap is not None and args.days < ACTIVE_USER_WINDOW_DAYS:
+        raise ValueError(
+            f"--days must be at least {ACTIVE_USER_WINDOW_DAYS} while the licence cap is on: it counts active users "
+            "from the evidence log"
+        )
+
+    async def run() -> tuple[int, int, int, int]:
         if not settings.db_path.is_file():  # never create an empty database (its vault would match no files)
             raise ValueError(f"no evidence database at {settings.db_path} (check KUDIGUARD_DB_PATH)")
         store = await SQLiteStore.open(settings.db_path, hasher=_hasher(settings))
@@ -110,15 +118,20 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
             vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
             voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
             markers = await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
-            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice, markers
+            markers += await store.purge_cap_markers(utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS))
+            patterns = await store.purge_patterns_before(
+                pattern_keep_from(utcnow(), settings.pattern_retention_days, interval_s=0)
+            )
+            return await store.purge_before(utcnow() - timedelta(days=args.days)), voice, markers, patterns
         finally:
             await store.close()
 
-    rows, voice, markers = asyncio.run(run())
+    rows, voice, markers, patterns = asyncio.run(run())
     print(
         f"removed {rows} rows older than {args.days} days; "
         f"{voice} donated voice samples older than {settings.voice_retention_days} days; "
-        f"{markers} DELETE markers older than {DELETION_MARKER_DAYS} days"
+        f"{markers} DELETE and licence-cap markers older than {DELETION_MARKER_DAYS} days; "
+        f"{patterns} scam examples older than {settings.pattern_retention_days} days"
     )
     return 0
 

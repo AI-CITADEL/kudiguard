@@ -20,19 +20,25 @@ Meta WhatsApp Cloud ──webhook──► KudiGuard server
 ```
 
 No human operator and no autonomous "agent": a fixed, tested pipeline. The user installs nothing. One number serves
-everyone in parallel. Banks, fintechs and NGOs can call the same engine through the REST API (`/v1/check`).
+everyone, but the model runs one request at a time on one GPU (~10-12 checks a minute); when too many people write at
+once, they get a "busy, try again" reply. Banks, fintechs and NGOs could call the same engine through a partner REST
+API (`/v1/check`); it is **off in the pilot**, and when on, each of their end users counts toward the N-ATLaS licence
+cap of 1,000 active end-users per rolling 30 days.
 
 ## What it can be used for
 
 1. **Personal scam check**: the core use. Anyone forwards a suspicious SMS or WhatsApp message, or describes a call by
    voice, in their own language, and gets 🔴/🟠/🟢 plus what to do, before they send money or an OTP.
 2. **Banks and fintechs, via the API**: screen messages customers report, power the bank's own WhatsApp or app
-   "Is this real?" button, or check a transfer narration before payout. One integration protects millions of customers.
-3. **Telcos (MTN, Airtel, Glo)**: flag scam SMS in bulk, and point users to the NCC 622 complaint flow.
+   "Is this real?" button, or check a transfer narration before payout. Future potential: serving a bank's whole
+   customer base would need a commercial N-ATLaS licence (or the partner's own) and more GPUs.
+3. **Telcos (MTN, Airtel, Glo)**: check scam SMS that customers report (one message per call, ~3-5 s; there is no
+   bulk endpoint yet), and point users to the NCC 622 complaint flow.
 4. **Call centres / IVR**: the same engine answering "is this call a scam?" on a phone line, for people without
    smartphones (backlog).
-5. **Scam-trend intelligence**: the de-identified pattern library reveals new scams by language early (region later),
-   for EFCC, CBN, NCC, banks and the media. It is also a sellable dashboard.
+5. **Scam-trend intelligence**: the de-identified pattern library could reveal new scams by language early (region
+   later), for EFCC, CBN, NCC, banks and the media. Today it is a JSON export (`kudiguard patterns`); a dashboard is
+   future work.
 6. **Financial literacy at scale**: cooperatives, NGOs, schools and religious groups. "Ask anything about money" in
    Hausa, Yoruba or Igbo by voice reaches low-literacy users that apps miss.
 7. **Family protection**: the "Warn my family" button spreads warnings to elderly parents, who are the most targeted.
@@ -54,7 +60,8 @@ Two layers, on purpose:
 | Claims to be bank staff / CBN / EFCC; "do it now"; "don't tell anyone" | 1 |
 
 * **3+ points** → 🔴 *This looks like a SCAM* · **2 points**, or any sign in a check → 🟠 *Be careful* ·
-  **no signs** → 🟢 *No red flags found. Still confirm with your bank.* KudiGuard never says "it's safe".
+  **no signs** → 🟢 *No red flags found. Still confirm with your bank.* The fixed texts never say "it's safe";
+  model-written text is screened by pattern-based guards (the Hausa/Yoruba/Igbo patterns are not yet native-reviewed).
 * Example: *"Bank staff called, said my account will be blocked, asked for my OTP"* → impersonation (1) + account
   threat (2) + credentials (3) = 6 → 🔴.
 * Model-only warning signs (when the rules found none) are used cautiously: they are capped at 🟠 unless the user
@@ -64,8 +71,10 @@ Two layers, on purpose:
   (configuration, not code). A genuinely new *type* of red flag is a small code change (the `Flag` list and its
   weight in `safety/scam_rules.py`).
 
-Measured on 40 blind messages (never seen during development): **95% of scams flagged red or orange, 86%
-precision** with N-ATLAS; 65% with rules alone. N-ATLAS translation is what lifts Hausa and Yoruba (docs/SPIKES.md S7).
+Measured on 40 test messages (10 per language, half of them genuine): the **rules alone flag 80% of the scams, with
+89% precision** (`python scripts/eval_scenarios.py --rules-only`). The set was written blind, but Hausa/Igbo lexicon
+terms were added after its first run, so it is no longer blind. With N-ATLAS in the loop the 8 Oct run caught more
+Hausa and Yoruba scams, but it predates later changes: **to be re-run live** before we quote it (docs/CLAIMS.md C4-C5).
 
 ## Why Hausa, Yoruba and Igbo, and why WhatsApp rather than an app?
 
@@ -74,7 +83,8 @@ precision** with N-ATLAS; 65% with rules alone. N-ATLAS translation is what lift
   integration". An English-only scam app could be built with any generic AI and would score poorly on exactly that.
 * **It's where the victims are.** The people scammers target most are often more comfortable in their own language,
   may read less easily, and prefer voice. Scam calls increasingly use local languages. An English text app misses them.
-* **Reach and evidence.** NAIC wants a working product with real users (≥50 interactions):
+* **Reach and evidence.** NAIC wants a working product with real users (our reading of the PS2 brief: ≥ 50
+  documented interactions; check the official criteria):
   * **WhatsApp:** almost every Nigerian phone already has it. No install, works on cheap phones, users can start today.
   * **An app:** download, storage, Play Store review and user trust. Getting 50+ real users in 4 days would be very hard.
 * **An app isn't wrong, it's the next step.** An auto-detect app (below) would use the same rules, languages and API.

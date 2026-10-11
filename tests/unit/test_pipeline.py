@@ -81,6 +81,8 @@ class Harness:
         # The default storage location fills the welcome's and the offer's {where} and {risk}.
         params.setdefault("where", self.messages.text(lang, Msg.WHERE_OUTSIDE))
         params.setdefault("risk", self.messages.text(lang, Msg.RISK_OUTSIDE))
+        params.setdefault("retention_days", "90")  # Limits' defaults (= Settings')
+        params.setdefault("pattern_retention_days", "730")
         return self.messages.text(lang, key, **params)
 
     @property
@@ -120,6 +122,14 @@ async def test_first_contact_gets_welcome_and_language_menu_without_processing(h
     assert h.llm.requests == [] and await interactions(h) == []  # nothing processed before consent
     user = await h.store.get_user(h.user_hash)
     assert user is not None and user.consented_at is None
+
+
+@pytest.mark.parametrize("language", ["en", "ha", "yo", "ig"])
+async def test_welcome_states_the_configured_retention_periods(h: Harness, language: str) -> None:
+    h.configure(retention_days=30, pattern_retention_days=400)
+    texts = await h.say({"en": "hello", "ha": "Sannu", "yo": "Ẹ n lẹ", "ig": "Ndewo"}[language])
+    welcome = h.t(Msg.WELCOME, language, retention_days="30", pattern_retention_days="400")
+    assert texts[0] == welcome and "30" in welcome and "400" in welcome and "{" not in welcome
 
 
 async def test_greeting_in_hausa_gets_hausa_welcome(h: Harness) -> None:
@@ -354,6 +364,79 @@ async def test_licence_cap_counts_dormant_and_unconsented_users_as_new(h: Harnes
     await h.say(OTP_SCAM)  # the one active user
     assert await h.say(OTP_SCAM, user=dormant) == [h.t(Msg.AT_CAPACITY)]
     assert await h.say("thanks", user="+2348022222222") == [h.t(Msg.AT_CAPACITY)]
+
+
+async def test_a_delete_does_not_free_a_licence_cap_slot(h: Harness) -> None:
+    h.configure(active_user_cap=1)
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert await h.say("DELETE") == [h.t(Msg.DELETED)]
+    assert await h.say("hello", user="+2348099999999") == [
+        h.t(Msg.AT_CAPACITY)
+    ]  # the erased user still counts
+
+
+async def test_a_new_users_slot_is_released_once_the_turn_is_logged(h: Harness) -> None:
+    h.configure(active_user_cap=5)
+    await h.onboard("en")
+    await h.say(OTP_SCAM)
+    assert h.conversation._admission.in_flight == 0  # type: ignore[attr-defined]
+    await h.say(OTP_SCAM, user="+2348077777777")  # welcomed only: no log, the slot is still released
+    assert h.conversation._admission.in_flight == 0  # type: ignore[attr-defined]
+
+
+async def test_a_viral_burst_of_timed_out_turns_cannot_make_users_returning(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Turns that time out waiting for a slot never passed admission, so they leave no row (a row would make the user
+    "returning" and let them past the cap next time). Cap 2, one slot, a check that hangs."""
+    phones = [f"+2348055{k:06d}" for k in range(6)]
+    for phone in phones:
+        await h.onboard("en", user=phone)
+    real = h.engine.check
+
+    async def hang(*args: object, **kwargs: object) -> object:
+        await asyncio.sleep(5)
+        return await real(*args, **kwargs)  # type: ignore[arg-type]  # pragma: no cover - cancelled by the deadline
+
+    monkeypatch.setattr(h.engine, "check", hang)
+    h.configure(active_user_cap=2, max_concurrent_turns=1, turn_deadline_s=1.0)
+    for n, phone in enumerate(phones):
+        h.conversation.submit(h.msg(OTP_SCAM, user=phone, message_id=f"wamid.viral.{n}"))
+    await h.conversation.wait_idle()
+    rows = await interactions(h)
+    assert len(rows) <= 1 and all(r["outcome"] == "error" for r in rows)  # only the turn that got a slot
+    monkeypatch.setattr(h.engine, "check", real)
+    h.configure(active_user_cap=2)
+    served = 0
+    for phone in phones:
+        texts = await h.say(OTP_SCAM, user=phone)
+        served += texts != [h.t(Msg.AT_CAPACITY)]
+    assert served == 2
+
+
+async def test_new_user_gate_refusals_are_told_their_own_message(h: Harness) -> None:
+    from kudiguard.admission import NewUsersBusy
+
+    async def busy(user_hash: str, channel: str) -> None:
+        raise NewUsersBusy("too many new users")
+
+    h.conversation._admission.add_check(busy)  # type: ignore[attr-defined]
+    assert await h.say("hello", user="+2348066666666") == [h.t(Msg.NEW_USERS_BUSY)]
+
+
+async def test_a_failed_log_keeps_the_users_cap_slot(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    h.configure(active_user_cap=1)
+    await h.onboard("en")
+
+    async def broken(*args: object) -> int:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(h.store, "add_interaction", broken)
+    await h.say(OTP_SCAM)  # answered, but the evidence row (and the failure row) cannot be written
+    assert h.conversation._admission.in_flight == 1  # type: ignore[attr-defined]
+    monkeypatch.undo()
+    assert await h.say("hello", user="+2348099999999") == [h.t(Msg.AT_CAPACITY)]
 
 
 async def test_consent_text_change_asks_again(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -911,3 +994,30 @@ async def test_licence_cap_is_project_wide(h: Harness) -> None:
             )
         )
     assert await h.say("hello") == [h.t(Msg.AT_CAPACITY)]
+
+
+async def test_grounding_hook_gets_a_hashed_turn_id_never_the_provider_id(
+    h: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    from kudiguard.api.services import log_grounding
+    from kudiguard.safety.grounding import GroundingReport
+
+    class Stub:
+        def supports(self, language: str) -> bool:
+            return True
+
+        async def check(self, *args: object, **kwargs: object) -> GroundingReport:
+            return GroundingReport("x", ())
+
+    seen: list[str | None] = []
+    h.engine.grounding = Stub()  # type: ignore[assignment]
+    h.engine.on_grounding = lambda turn_id, report, ms: (
+        seen.append(turn_id),
+        log_grounding(turn_id, report, ms),
+    )
+    await h.onboard()
+    with caplog.at_level("INFO"):
+        await h.conversation.handle(h.msg(OTP_SCAM, message_id="wamid.HBgNMjM0ODAzMTIzNDU2NxUCABIYFjNFQjA"))
+        await h.engine.aclose()
+    assert seen == [h.hasher.message_key("whatsapp", "wamid.HBgNMjM0ODAzMTIzNDU2NxUCABIYFjNFQjA")]
+    assert "wamid" not in caplog.text and "2348031234567" not in caplog.text

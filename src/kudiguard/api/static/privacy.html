@@ -31,7 +31,7 @@
   <section>
     <h2>What KudiGuard does</h2>
     <p>KudiGuard checks messages and voice notes for signs of money scams and answers money-safety questions, on
-    WhatsApp, on this website and through an API for partner organisations. It gives guidance only, not financial advice.</p>
+    WhatsApp and on this website. {{PARTNER_API}} It gives guidance only, not financial advice.</p>
   </section>
 
   <section>
@@ -46,6 +46,7 @@
         language, when you agreed to this notice, your 👍/👎 feedback, and timing information.</li>
       <li><strong>Voice notes</strong> are turned into text and then deleted; the audio itself is not stored, unless
         you choose to donate your voice notes (see <a href="#donation">Voice-note donation</a>).</li>
+      {{PARTNER_API_COLLECT}}
     </ul>
     <p>We do not ask for your contacts, location or photos, and we never ask for PINs, OTPs or passwords.</p>
   </section>
@@ -53,7 +54,7 @@
   <section>
     <h2>Why (legal basis)</h2>
     <p>To answer you, to improve the service and measure how well it works, and to protect others from scams
-    (including improving KudiGuard's scam detection and, after review, training its models), based on
+    (including improving KudiGuard's scam detection), based on
     your <strong>consent</strong>, which you give by continuing after our welcome message (or ticking the box on this
     website). Voice-note donation has its own, separate consent (below); KudiGuard works the same without it.</p>
   </section>
@@ -111,6 +112,7 @@
     <ul>
       <li>The AI models (N-ATLAS and the NCAIR1 speech models) run on KudiGuard's own server. Your messages are not sent
         to outside AI companies.</li>
+      {{LIVE_PACKS}}
       <li><strong>Meta (WhatsApp)</strong> carries messages between you and us; <strong>Cloudflare</strong> provides the
         secure network connection to our server. Each follows its own privacy policy and may process data outside
         Nigeria under its own safeguards.</li>
@@ -126,12 +128,14 @@
   <section>
     <h2>How long</h2>
     <ul>
-      <li>Messages and replies: deleted automatically <strong>{{RETENTION_DAYS}} days</strong> after they were sent.</li>
+      <li>Messages and replies: deleted automatically about <strong>{{RETENTION_DAYS}} days</strong> after they were
+        sent (the deletion check runs every 6 hours, while the server is running).</li>
       <li>Your settings (language, consent): deleted {{RETENTION_DAYS}} days after your last message, or, if you donated
         voice notes, once none of them is left (they record your donation consent).</li>
       <li>Donated voice notes: up to {{VOICE_RETENTION}} (see above).</li>
       <li><strong>Scam examples:</strong> when a message is judged a likely scam or suspicious, a separate copy is kept
-        for up to <strong>{{PATTERN_RETENTION}}</strong> to protect others and improve KudiGuard: its wording and English
+        for up to <strong>{{PATTERN_RETENTION}}</strong> (examples are grouped by week, and a week's examples are all
+        deleted before its oldest one reaches that age) to protect others and improve KudiGuard: its wording and English
         translation (most numbers, emails and card numbers masked; most links reduced to the website name), the language,
         channel, our assessment and the week, without your number or any id of you or the conversation. While your own
         messages are still stored ({{RETENTION_DAYS}} days), DELETE also removes the examples taken from them; after that
@@ -144,7 +148,9 @@
     <ul>
       <li>On WhatsApp, send <strong>DELETE</strong> to erase everything linked to you, immediately, including donated
         voice notes. We keep a coded marker for up to {{DELETION_MARKER_DAYS}} days only so that an earlier sign-up form
-        cannot re-enrol you in voice donation; it holds no phone number and nothing you sent.</li>
+        cannot re-enrol you in voice donation; it holds no phone number and nothing you sent. If you used KudiGuard in
+        the last 30 days, a second coded marker keeps only the time of your last message, so that you still count
+        toward the AI model's licence limit on users until 30 days after it, and is then deleted.</li>
       <li>Send <strong>STOP DONATING</strong> (or untick the box on this website) to withdraw your voice-note donation
         and delete what you donated.</li>
       <li>Send <strong>STOP</strong> to stop receiving messages; it also deletes donated voice notes. Your other data is

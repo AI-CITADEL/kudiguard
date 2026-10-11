@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
 
 from kudiguard.domain import Interaction, LanguageCode, Outcome
@@ -18,10 +18,19 @@ from kudiguard.patterns import ScamPattern
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
 DELETION_MARKER_DAYS = 30  # DELETE markers (only for the sign-up import); stated on /privacy
+# A second, separate marker for the licence cap: dated with the erased user's last interaction, written only if that
+# interaction is inside the active-user window (a number that never used KudiGuard takes no slot). Same table as the
+# DELETE markers, but its own purge (``purge_cap_markers``) at exactly the window start.
+CAP_MARKER_PREFIX = "cap:"
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def cap_window_start() -> datetime:
+    """Start of the licence window now: a user active since then is an active end-user."""
+    return utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
 
 
 def aware(value: datetime) -> datetime:
@@ -113,7 +122,8 @@ class Store(Protocol):
     async def delete_user(self, user_hash: str) -> int:
         """Erase everything stored for a user, atomically (the DELETE command), including scam examples taken from
         their stored messages and their donated voice-sample rows (files: ``donation.VoiceVault.erase``). Leaves only
-        a coded DELETE marker (``deleted_at``). Returns rows removed (the marker is not counted)."""
+        a coded DELETE marker (``deleted_at``) and, if their last interaction is inside the active-user window, a
+        licence-cap marker dated with it. Returns rows removed (the markers are not counted)."""
         ...
 
     async def record_form_consent(self, state: UserState, expected: UserState | None) -> bool:
@@ -127,8 +137,18 @@ class Store(Protocol):
         Read only by the sign-up form import."""
         ...
 
+    async def count_deletions_since(self, since: datetime) -> int:
+        """Erased users whose last interaction was since ``since``: they keep their licence-cap slot for the rest of
+        the window (``admission``). Users who never had an interaction are not counted."""
+        ...
+
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
-        """Remove DELETE markers older than ``cutoff``. Returns markers removed."""
+        """Remove DELETE markers older than ``cutoff`` (not the licence-cap markers). Returns markers removed."""
+        ...
+
+    async def purge_cap_markers(self, cutoff: datetime) -> int:
+        """Remove licence-cap markers dated before ``cutoff`` (pass exactly the window start: an earlier purge would
+        free a slot that still counts). Returns markers removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:
@@ -141,7 +161,9 @@ class Store(Protocol):
         ...
 
     async def purge_patterns_before(self, cutoff: date) -> int:
-        """Delete scam examples from weeks before ``cutoff``'s week (their own, longer retention). Rows removed."""
+        """Delete scam examples whose week starts before ``cutoff`` (their own, longer retention): such a week may
+        hold an example dated before ``cutoff``, so none outlives it (a week's later examples go a few days early).
+        Rows removed."""
         ...
 
     async def export_patterns(self) -> list[dict[str, Any]]:

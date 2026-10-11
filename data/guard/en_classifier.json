@@ -1,0 +1,200 @@
+{
+  "dev_by_source": {
+    "d_probes": {
+      "false_positive_rate": 0.0,
+      "n": 39,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "natural": {
+      "false_positive_rate": 0.0,
+      "n": 124,
+      "precision": 1.0,
+      "recall": 0.7273
+    },
+    "packs": {
+      "false_positive_rate": 0.0,
+      "n": 47,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    "probes": {
+      "false_positive_rate": 0.0,
+      "n": 71,
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  },
+  "dev_classifier_units_alone": {
+    "false_positive_rate": 0.0,
+    "n": 281,
+    "precision": 1.0,
+    "recall": 0.7107
+  },
+  "dev_combined": {
+    "false_positive_rate": 0.0,
+    "n": 281,
+    "precision": 1.0,
+    "recall": 0.8512
+  },
+  "dev_leak_share": {
+    "bge_cosine_0.8": 0.7936,
+    "bge_cosine_0.9": 0.0,
+    "difflib_ratio_0.8": 0.0,
+    "trigram_jaccard_0.6": 0.0
+  },
+  "dev_model_whole_text_ungated": {
+    "false_positive_rate": 0.0187,
+    "n": 281,
+    "precision": 0.9643,
+    "recall": 0.6694
+  },
+  "dev_regex_alone": {
+    "false_positive_rate": 0.0,
+    "n": 281,
+    "precision": 1.0,
+    "recall": 0.562
+  },
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "lexical_features": [
+    "credential",
+    "payment",
+    "untrusted",
+    "access",
+    "endorsement",
+    "trusted",
+    "negation",
+    "reported",
+    "imperative"
+  ],
+  "max_dev_false_positive_rate": 0.02,
+  "operating_points": {
+    "shipped": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.8512
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0368,
+        "n": 1135,
+        "precision": 0.9536,
+        "recall": 0.8417
+      },
+      "threshold": 0.85
+    },
+    "strict": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.7521
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0184,
+        "n": 1135,
+        "precision": 0.9732,
+        "recall": 0.7449
+      },
+      "threshold": 0.945
+    }
+  },
+  "seed": 20261010,
+  "threshold": 0.85,
+  "threshold_curve": {
+    "0.6": {
+      "dev": {
+        "false_positive_rate": 0.0312,
+        "n": 281,
+        "precision": 0.9583,
+        "recall": 0.9504
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.1154,
+        "n": 1135,
+        "precision": 0.8802,
+        "recall": 0.9441
+      }
+    },
+    "0.7": {
+      "dev": {
+        "false_positive_rate": 0.0125,
+        "n": 281,
+        "precision": 0.9825,
+        "recall": 0.9256
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0786,
+        "n": 1135,
+        "precision": 0.9125,
+        "recall": 0.9125
+      }
+    },
+    "0.8": {
+      "dev": {
+        "false_positive_rate": 0.0063,
+        "n": 281,
+        "precision": 0.9907,
+        "recall": 0.876
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0452,
+        "n": 1135,
+        "precision": 0.9458,
+        "recall": 0.8771
+      }
+    },
+    "0.85": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.8512
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0368,
+        "n": 1135,
+        "precision": 0.9536,
+        "recall": 0.8417
+      }
+    },
+    "0.9": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.8182
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0268,
+        "n": 1135,
+        "precision": 0.964,
+        "recall": 0.797
+      }
+    },
+    "0.95": {
+      "dev": {
+        "false_positive_rate": 0.0,
+        "n": 281,
+        "precision": 1.0,
+        "recall": 0.7273
+      },
+      "out_of_fold": {
+        "false_positive_rate": 0.0151,
+        "n": 1135,
+        "precision": 0.9778,
+        "recall": 0.7374
+      }
+    }
+  },
+  "train": {
+    "n": 1875,
+    "positives": 917
+  },
+  "trained": "2026-10-10",
+  "training_set": "data/guard/train_set.jsonl",
+  "training_set_sha256": "a45779b466bc6d41aec44f2856988849b730a5f71f6abaa43ad935af60e0fefa",
+  "version": "2026-10-10-a45779b4",
+  "weights_sha256": "25f639cc763e7af63080af9626f8110b2608c6aee30bf059c51a8f828f373f36"
+}

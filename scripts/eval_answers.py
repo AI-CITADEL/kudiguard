@@ -3,6 +3,7 @@
     python scripts/eval_answers.py --runs 3 --temperature 0.1 --no-seed --label t01   # the old sampling
     python scripts/eval_answers.py --runs 3 --label t0seed                             # production sampling
     python scripts/eval_answers.py --label t0seed --only ha,en-otp-caller
+    python scripts/eval_answers.py --runs 3 --label direct --compose-strategy direct   # in-language compose
     python scripts/eval_answers.py --compare data/eval/results/answers-t01.jsonl data/eval/results/answers-t0seed.jsonl
 
 Each case runs through the production Engine (hybrid knowledge search with bge-small, the pipeline's turn deadline);
@@ -10,13 +11,16 @@ the reply is back-translated to English and scored (kudiguard.evaluation): verdi
 `must` points, `must_not`/pattern violations, claims unsupported by the facts the model saw. The sampling options
 apply to the engine only; back-translation always uses the plain backend so translator noise stays out of an A/B.
 Results: data/eval/results/answers-<label>.jsonl (a meta line, then one record per case and run, appended as they
-are produced). Once workstream B merges, build the engine with grounding on, as production does.
+are produced). The eval engine runs without B's grounding checker and classifier: in production they run in shadow
+mode, which never changes a reply, so the scored replies are the ones users get (the scorer grounds them separately).
+On Windows set PYTHONIOENCODING=utf-8: replies and logs contain Yoruba/Igbo/Hausa characters.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -42,6 +46,7 @@ from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.openai_compat import OpenAICompatLLM
 from kudiguard.llm.sampling import add_sampling_arguments, describe, with_sampling
+from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / "data" / "eval" / "answers.yaml"
@@ -50,6 +55,9 @@ RESULTS = ROOT / "data" / "eval" / "results"
 
 
 def git_commit() -> str:
+    """The checkout's commit; ``KUDIGUARD_EVAL_COMMIT`` names it when the code runs from a copy (no .git)."""
+    if named := os.environ.get("KUDIGUARD_EVAL_COMMIT"):
+        return named
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT
@@ -81,10 +89,14 @@ async def main(args: argparse.Namespace) -> None:
         if not await base.ready():
             sys.exit(f"N-ATLAS at {args.url} is not ready: start it (scripts/run_llm.ps1) and retry")
         knowledge = knowledge_base_from_packs(PACKS, client=client, embedder=embedder)
-        engine = Engine(registry=registry, llm=with_sampling(base, args), knowledge=knowledge)
+        policy = ComposePolicy.parse(args.compose_strategy)
+        engine = Engine(
+            registry=registry, llm=with_sampling(base, args), knowledge=knowledge, compose_policy=policy
+        )
         grounding = make_grounding(base, embedder, registry)  # unwrapped: the A/B varies the engine only
         meta = {
             "sampling": describe(args),
+            "compose_strategy": args.compose_strategy,
             "grounding": type(grounding).__name__,
             "cover_threshold": scorer.cover_threshold,
             "forbid_threshold": scorer.forbid_threshold,
@@ -138,6 +150,11 @@ if __name__ == "__main__":
     parser.add_argument("--model-cache", type=Path, default=ROOT / "models" / "fastembed")
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--only", default="", help="comma-separated languages and/or case ids")
+    parser.add_argument(
+        "--compose-strategy",
+        default=DEFAULT_COMPOSE_STRATEGY,
+        help='kudiguard.reply_translation: "english_first", "direct" or e.g. "english_first,ig=direct"',
+    )
     parser.add_argument("--label", default="latest", help="results file suffix, e.g. t01 / t0seed")
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("A", "B"), help="diff two results files")
     add_sampling_arguments(parser)

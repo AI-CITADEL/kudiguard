@@ -268,6 +268,23 @@ async def test_empty_error_body_uses_reason_phrase(client: httpx.AsyncClient) ->
         await OpenAICompatLLM(BASE, client=client, retries=0).complete(request())
 
 
+async def test_complete_within_caps_the_budget_to_the_deadline() -> None:
+    import time
+
+    from fakes import FakeLLM
+    from kudiguard.llm.base import DEFAULT_TIMEOUTS, complete_within
+
+    llm = FakeLLM(compose="ok")
+    await complete_within(llm, request(), None, 3.0)
+    await complete_within(llm, request(), time.monotonic() + 5, 3.0)
+    unbounded, capped = llm.requests
+    assert unbounded.timeout_s is None
+    assert capped.timeout_s is not None and capped.timeout_s <= 5 < DEFAULT_TIMEOUTS[Purpose.COMPOSE]
+    with pytest.raises(LLMError, match="skipped"):
+        await complete_within(llm, request(), time.monotonic() + 1, 3.0)
+    assert len(llm.requests) == 2
+
+
 @pytest.mark.parametrize("server", list(ServerKind))
 def test_no_seed_is_omitted_for_every_server(client: httpx.AsyncClient, server: ServerKind) -> None:
     llm = OpenAICompatLLM(BASE, client=client, server=server)
