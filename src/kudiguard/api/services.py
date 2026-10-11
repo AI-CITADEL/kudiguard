@@ -65,6 +65,8 @@ class Services:
     # abuse limits shared by every channel (safety.limits, docs/ABUSE.md)
     new_users: NewUserGate = field(default_factory=NewUserGate)
     learning: LearningGate = field(default_factory=LearningGate)
+    # per-user voice budget and queue cap, one for every channel
+    flood: FloodGuard = field(default_factory=FloodGuard)
     closers: list[Callable[[], Awaitable[None]]] = field(default_factory=list)
     background: list[asyncio.Task[None]] = field(default_factory=list)
     # The one licence-cap gate for every channel (WhatsApp, website, partner API); new-user gates plug in here.
@@ -214,8 +216,8 @@ def log_grounding(turn_id: str | None, report: GroundingReport | None, ms: int) 
     """Per-turn grounding result for the shadow review (>= 100 real replies before enforce): counts only, no text.
 
     ``turn_id`` is the hashed message key (``UserHasher.message_key``), never a raw provider id.
-    TODO(merge with E's pipeline): store grounded / unsupported_claims / grounding_ms on the turn's interaction row
-    (needs a store migration); until then the logs carry them, keyed by the hashed message key.
+    Not yet stored on the interaction row (grounded / unsupported_claims / grounding_ms would need a store
+    migration): the logs carry them, keyed by the hashed message key, which is what the shadow review reads.
     """
     if report is None:
         log.info("grounding turn=%s checked=no ms=%d", turn_id, ms)
@@ -341,8 +343,13 @@ def build_crisis_similarity(
 
 
 def build_limits(settings: Settings) -> dict[str, Any]:
-    """The new-user gate and the learning gate, shared by WhatsApp and the web page."""
+    """The new-user gate, the learning gate and the flood guard (per-user voice budget), shared by WhatsApp, the web
+    page and the partner API."""
     return {
+        "flood": FloodGuard(
+            max_queued=settings.max_queued_per_user, notice_interval_s=settings.rate_notice_interval_s,
+            voice_per_hour=settings.voice_notes_per_user_per_hour, mode=ScreenMode(settings.flood_mode),
+        ),
         "new_users": NewUserGate(
             per_hour=settings.new_users_per_hour, per_day=settings.new_users_per_day,
             mode=ScreenMode(settings.new_user_mode),
@@ -453,10 +460,7 @@ async def build_services(settings: Settings) -> Services:
                 accept_donations=settings.voice_donation,
                 storage=settings.storage_location,
                 admission=services.admission,
-                flood=FloodGuard(
-                    max_queued=settings.max_queued_per_user, notice_interval_s=settings.rate_notice_interval_s,
-                    voice_per_hour=settings.voice_notes_per_user_per_hour, mode=ScreenMode(settings.flood_mode),
-                ),
+                flood=services.flood,  # one voice budget per person across WhatsApp, the web page and the API
                 learning=services.learning,
             )  # fmt: skip
         services.background.append(

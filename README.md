@@ -24,7 +24,7 @@ Built on **N-ATLAS** (LLM) and the **NCAIR1** speech models for NAIC 2026. Why a
 | Speech (official NCAIR1 models, word error rate) | Hausa 28%, Yoruba 33%, Igbo 46% | 10-20 read FLEURS sentences per language, not voice notes |
 | Scam detection by the rules alone (model down) | 80% of scams flagged, 89% precision | 40 messages; set already used once for lexicon edits |
 | Answer covers the key points (0-1) | en 0.64 · ha 0.46 · yo 0.58 · ig 0.33 | 53-case dev set, ha/yo/ig AI-drafted |
-| Unsafe advice caught in English/Pidgin replies | 5% → 34% (rule guard) → ~70% with the learned layer, ~2% false alarms | held-out set partly used; learned layer logs only in the pilot |
+| Unsafe advice caught in English/Pidgin replies | 5% → 34% (rule guard) → ~70% with the learned layer at threshold 0.85, 2.3% false alarms (verifier's held-out en+pcm set; 3.7% out of fold on our 1,135 training items) | held-out set partly used; learned layer logs only in the pilot |
 | Speed (RTX 4070 laptop, text, shipped code) | p50 4.0 s, p95 8.2 s (English p50 2.8 s; Yoruba +1.6 s) | one request at a time; voice timed once (~7 s, English) |
 
 Not yet measured: the full engine on the scam set (to be re-run live), the frozen 366-case end-to-end set (to be

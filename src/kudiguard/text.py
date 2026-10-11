@@ -504,6 +504,31 @@ class RedactingFilter(logging.Filter):
         return True
 
 
+_REDACTING_FACTORY = "_kudiguard_redacting"
+
+
+def install_log_redaction() -> None:
+    """Redact every log record when it is created (a ``logging`` record factory), whichever handler writes it later:
+    root, uvicorn and uvicorn.access handlers, and handlers added after this call (e.g. by ``uvicorn --factory`` or a
+    library) are all covered. Also puts ``RedactingFilter`` on the root and uvicorn handlers present now, as a second
+    layer. Idempotent."""
+    factory = logging.getLogRecordFactory()
+    if not getattr(factory, _REDACTING_FACTORY, False):
+        redacting = RedactingFilter()
+
+        def make(*args: object, **kwargs: object) -> logging.LogRecord:
+            record = factory(*args, **kwargs)
+            redacting.filter(record)
+            return record
+
+        setattr(make, _REDACTING_FACTORY, True)
+        logging.setLogRecordFactory(make)
+    for name in ("", "uvicorn", "uvicorn.error", "uvicorn.access"):
+        for handler in logging.getLogger(name or None).handlers:
+            if not any(isinstance(f, RedactingFilter) for f in handler.filters):
+                handler.addFilter(RedactingFilter())
+
+
 def _redact_log(text: str) -> str:
     """``redact``, leaving hashed ids (``turn=3fa9…``) intact."""
     out, cursor = [], 0

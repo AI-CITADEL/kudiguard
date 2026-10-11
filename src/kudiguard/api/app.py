@@ -30,7 +30,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -55,11 +55,13 @@ from kudiguard.safety.abuse import CRISES
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
 from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
+from kudiguard.text import install_log_redaction
 
 log = logging.getLogger(__name__)
 
 STATIC = Path(__file__).with_name("static")
 API_DEADLINE_S = 45.0  # model work per check; the engine skips model steps that no longer fit
+PATTERN_WRITE_S = 2.0  # a slow pattern-library write is dropped, never turns a logged check into a 504
 REQUEST_TIMEOUT_S = 75.0  # whole check incl. speech: beyond this the caller gets 504
 QUEUE_TIMEOUT_S = 15.0  # waiting for a free check slot: beyond this the caller gets 503 (retry later)
 MAX_TEXT_CHARS = 4000
@@ -260,6 +262,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        install_log_redaction()  # also under `uvicorn --factory`, which configures logging without our filters
         services = await services_factory(config)
         app.state.services = services
         try:
@@ -327,20 +330,29 @@ def _services(request: Request) -> Services:
 ServicesDep = Annotated[Services, Depends(_services)]
 
 
-def _api_client(request: Request) -> str:
-    """The caller's name for a valid ``X-API-Key`` (constant-time compare), rate-limited per client."""
+def _api_key(request: Request) -> str:
+    """The caller's name for a valid ``X-API-Key`` (constant-time compare). Not rate-limited: the check endpoints
+    screen for a crisis first and apply the rate limit themselves (``_partner_gates``)."""
     key = request.headers.get("x-api-key", "")
     for known, name in request.app.state.api_keys.items():
         if hmac.compare_digest(key.encode(), known.encode()):
-            _too_many(request.app.state.api_limiter, name)
             return str(name)
     raise HTTPException(401, "missing or invalid X-API-Key", headers={"WWW-Authenticate": "ApiKey"})
+
+
+ApiKey = Annotated[str, Depends(_api_key)]
+
+
+def _api_client(request: Request, name: ApiKey) -> str:
+    """The caller's name for a valid ``X-API-Key``, rate-limited per client."""
+    _too_many(request.app.state.api_limiter, name)
+    return name
 
 
 Client = Annotated[str, Depends(_api_client)]
 
 
-def _end_user(request: Request, client: Client) -> str:
+def _end_user(request: Request, client: str) -> str:
     """The licence-cap identity of a partner call: ``api:<key name>:<end-user id>`` (hashed by ``UserHasher``).
 
     The partner must name its end user with a stable pseudonymous id (its own random or hashed id), so each person
@@ -366,9 +378,6 @@ def _end_user(request: Request, client: Client) -> str:
             "SHA-256 hex digest of your own customer id, or a UUID",
         )
     return f"api:{client}:{value}"
-
-
-EndUser = Annotated[str, Depends(_end_user)]
 
 
 def client_ip(request: Request, trust_proxy: bool) -> str:
@@ -476,8 +485,12 @@ async def _check_in_slot(
         log.exception("could not log %s check", channel)
         # served but not in the store: the user keeps their licence-cap slot for the window
         _RESERVATION.get(Reservation()).hold()
-    await record_pattern(services.store, channel, answer, text or "", created, gate=services.learning,
-                         user_key=services.hasher.user_id(user_key))  # fmt: skip
+    try:  # bounded: the answer is ready and logged; a slow write must not cost the caller a 504
+        async with asyncio.timeout(PATTERN_WRITE_S):
+            await record_pattern(services.store, channel, answer, text or "", created, gate=services.learning,
+                                 user_key=services.hasher.user_id(user_key))  # fmt: skip
+    except TimeoutError:
+        log.warning("scam pattern not recorded: the write took over %.0f s", PATTERN_WRITE_S)
     return answer, transcript, total_ms
 
 
@@ -557,19 +570,18 @@ def _v1_router() -> APIRouter:
 
     @router.post("/check", response_model=CheckResponse, summary="Check a message (JSON text)")
     async def check(
-        body: CheckRequest, request: Request, services: ServicesDep, user: EndUser
+        body: CheckRequest, request: Request, services: ServicesDep, client: ApiKey
     ) -> CheckResponse:
-        async with _admitted(request, services, user):
-            answer, transcript, ms = await _run_check(
-                request,
-                services,
-                channel="api",
-                user_key=user,
-                language=body.language,
-                text=body.text,
-                audio=None,
-            )
-        return _check_response(services, answer, transcript, ms)
+        async def gated() -> CheckResponse:
+            user = _partner_gates(request, client)
+            async with _admitted(request, services, user):
+                answer, transcript, ms = await _run_check(
+                    request, services, channel="api", user_key=user, language=body.language, text=body.text,
+                    audio=None,
+                )  # fmt: skip
+            return _check_response(services, answer, transcript, ms)
+
+        return await _crisis_or(_crisis_reply(services, body.text, body.language), gated())
 
     @router.post(
         "/check/audio",
@@ -577,29 +589,48 @@ def _v1_router() -> APIRouter:
         summary="Check a voice note (multipart upload)",
         openapi_extra=AUDIO_FORM,
     )
-    async def check_audio(request: Request, services: ServicesDep, user: EndUser) -> CheckResponse:
-        async with _admitted(request, services, user):
-            # only after the key, end user, rate limit and licence cap were checked
-            fields, audio = await _form(request)
-            if audio is None:
-                raise HTTPException(422, "missing 'audio' file")
-            answer, transcript, ms = await _run_check(
-                request, services, channel="api", user_key=user,
-                language=fields.get("language", "en"), text=None, audio=audio,
-            )  # fmt: skip
-        return _check_response(services, answer, transcript, ms)
+    async def check_audio(request: Request, services: ServicesDep, client: ApiKey) -> CheckResponse:
+        # Typed text in a small form (no file part) is screened for a crisis before the gates, as on the web page.
+        crisis = await _typed_crisis(request, services)
+
+        async def gated() -> CheckResponse:
+            user = _partner_gates(request, client)
+            _voice_allowed(request, services, user, None)  # before the upload is read
+            async with _admitted(request, services, user):
+                # only after the key, end user, rate limit, voice budget and licence cap were checked
+                fields, audio = await _form(request)
+                if audio is None:
+                    raise HTTPException(422, "missing 'audio' file")
+                answer, transcript, ms = await _run_check(
+                    request, services, channel="api", user_key=user,
+                    language=fields.get("language", "en"), text=None, audio=audio,
+                )  # fmt: skip
+            return _check_response(services, answer, transcript, ms)
+
+        return await _crisis_or(crisis, gated())
 
     @router.post("/ask", response_model=AskResponse, summary="Ask a money-safety question")
-    async def ask(body: AskRequest, request: Request, services: ServicesDep, user: EndUser) -> AskResponse:
-        async with _admitted(request, services, user):
-            answer, _, ms = await _run_check(
-                request, services, channel="api", user_key=user, language=body.language,
-                text=body.question, audio=None,
+    async def ask(body: AskRequest, request: Request, services: ServicesDep, client: ApiKey) -> AskResponse:
+        async def gated() -> AskResponse:
+            user = _partner_gates(request, client)
+            async with _admitted(request, services, user):
+                answer, _, ms = await _run_check(
+                    request, services, channel="api", user_key=user, language=body.language,
+                    text=body.question, audio=None,
+                )  # fmt: skip
+            result = _check_response(services, answer, None, ms)
+            return AskResponse(
+                answer=result.explanation, verdict=result.verdict, language=result.language,
+                sources=list(answer.sources), degraded=result.degraded, disclaimer=result.disclaimer,
+                latency_ms=ms,
             )  # fmt: skip
-        result = _check_response(services, answer, None, ms)
+
+        result = await _crisis_or(_crisis_reply(services, body.question, body.language), gated())
+        if isinstance(result, AskResponse):
+            return result
         return AskResponse(
-            answer=result.explanation, verdict=result.verdict, language=result.language,
-            sources=list(answer.sources), degraded=result.degraded, disclaimer=result.disclaimer, latency_ms=ms,
+            answer=result.explanation, verdict=result.verdict, language=result.language, sources=[], degraded=False,
+            disclaimer=result.disclaimer, latency_ms=0,
         )  # fmt: skip
 
     @router.get("/languages", summary="Supported languages")
@@ -678,6 +709,45 @@ async def _admitted(request: Request, services: Services, user_key: str) -> Asyn
         reservation.release()
 
 
+_T = TypeVar("_T")
+
+
+async def _crisis_or(crisis: CheckResponse | None, gated: Awaitable[_T]) -> _T | CheckResponse:
+    """Crisis-first (docs/ABUSE.md): a message already screened as a crisis (``crisis``) gets the crisis reply with 200
+    if any gate refuses it (consent, end-user id, rate limit, voice budget, licence cap, busy) or the check fails;
+    nothing is stored then. Without a crisis the refusal or failure propagates unchanged."""
+    try:
+        return await gated
+    except HTTPException as exc:
+        if crisis is None:
+            raise
+        log.info("crisis reply served; the check was refused (%d)", exc.status_code)
+        return crisis
+    except Exception:
+        if crisis is None:
+            raise
+        log.exception("crisis reply served; the check failed")  # records are redacted (install_log_redaction)
+        return crisis
+
+
+def _partner_gates(request: Request, client: str) -> str:
+    """The partner API's gates after the key: the end-user id (400), then the per-key rate limit (429)."""
+    user = _end_user(request, client)
+    _too_many(request.app.state.api_limiter, client)
+    return user
+
+
+def _voice_allowed(request: Request, services: Services, user_key: str, language: str | None) -> None:
+    """The per-user voice-note budget shared with WhatsApp (``Services.flood``): 429 with WhatsApp's message."""
+    if services.flood.voice_allowed(services.hasher.user_id(user_key)):
+        return
+    codes = {lang.code for lang in services.registry.enabled}
+    settings: Settings = request.app.state.settings
+    chosen = language if language in codes else settings.default_language
+    message = plain_text(services.engine.messages.text(chosen, Msg.VOICE_LIMIT))
+    raise HTTPException(429, {"problem": "voice_limit", "message": message}, headers={"Retry-After": "3600"})
+
+
 def _web_router() -> APIRouter:
     router = APIRouter(include_in_schema=False)
 
@@ -740,12 +810,7 @@ def _web_router() -> APIRouter:
         """A typed crisis message gets the crisis reply whatever happens next (docs/ABUSE.md): no consent header,
         rate limit, licence cap or busy server stands between the user and help, and nothing is stored then."""
         crisis = await _typed_crisis(request, services)
-        try:
-            return await _gated_web_check(request, services, background)
-        except HTTPException:
-            if crisis is None:
-                raise
-            return crisis
+        return await _crisis_or(crisis, _gated_web_check(request, services, background))
 
     async def _gated_web_check(
         request: Request, services: Services, background: BackgroundTasks
@@ -770,6 +835,10 @@ def _web_router() -> APIRouter:
             text = fields.get("text", "")[:MAX_TEXT_CHARS]
             if audio is None and not text.strip():
                 raise HTTPException(422, "send text or audio")
+            if audio is not None:
+                # The per-user voice budget shared with WhatsApp. The page sends text and voice in one multipart form,
+                # so the kind is known only once the form is parsed; the costly step (transcription) has not started.
+                _voice_allowed(request, services, f"web:{session}", fields.get("language"))
             answer, transcript, ms = await _run_check(
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
@@ -805,7 +874,12 @@ def _web_router() -> APIRouter:
 
 async def _typed_crisis(request: Request, services: Services) -> CheckResponse | None:
     """The crisis reply for a small typed web message, read before any gate (a voice note is only known to be a
-    crisis after transcription, behind the gates). None: not a crisis, or not a small text form."""
+    crisis after transcription, behind the gates). None: not a crisis, or not a small text form.
+
+    Only a body with a declared Content-Length up to ``SMALL_REQUEST_BYTES`` is read here: reading an undeclared
+    (chunked) body before the gates would let any client stream up to ``MAX_REQUEST_BYTES`` before consent or rate
+    limits. Browsers send FormData with a Content-Length, so the web page is always covered; a chunked client's
+    crisis message is still answered by the engine's crisis screen once it passes the gates (docs/ABUSE.md)."""
     declared = request.headers.get("content-length", "")
     kind = request.headers.get("content-type", "")
     if not declared.isdigit() or int(declared) > SMALL_REQUEST_BYTES or "form" not in kind:
@@ -817,12 +891,17 @@ async def _typed_crisis(request: Request, services: Services) -> CheckResponse |
     fields = {k: v for k, v in form.multi_items() if isinstance(v, str)}
     if len(fields) < len(form.multi_items()):
         return None  # a voice note: known to be a crisis only after transcription
-    text = fields.get("text", "")[:MAX_TEXT_CHARS]
+    return _crisis_reply(services, fields.get("text", ""), fields.get("language", ""))
+
+
+def _crisis_reply(services: Services, text: str, asked: str) -> CheckResponse | None:
+    """The fixed crisis reply for a typed message, or None (not a crisis). Shared by the web page and the partner
+    API; uses no model and stores nothing."""
+    text = text[:MAX_TEXT_CHARS]
     category = services.engine.screen.crisis(text)
     if category is None:
         return None
     codes = {lang.code for lang in services.registry.enabled}
-    asked = fields.get("language", "")
     language = asked if asked in codes else services.engine.screen.crisis_language(text) or "en"
     messages = services.engine.messages
     return CheckResponse(

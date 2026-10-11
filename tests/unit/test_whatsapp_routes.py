@@ -130,7 +130,12 @@ async def test_failed_delivery_status_is_logged(caplog: pytest.LogCaptureFixture
     body = json.dumps(payload).encode()
     async with client_for(Recorder()) as client:
         assert (await client.post(PATH, content=body, headers=signed(body))).status_code == 200
-    assert any("131047" in r.getMessage() for r in caplog.records)
+    # The title identifies the failure; the 6-digit code itself may be masked by log redaction (records are
+    # redacted at creation once any app has started, kudiguard.text.install_log_redaction).
+    assert any(
+        "could not deliver" in r.getMessage() and "Re-engagement message" in r.getMessage()
+        for r in caplog.records
+    )
     logged = caplog.text + " ".join(str(r.args) for r in caplog.records)
     for secret in (wamid, "HBgNMjM0ODAz", "2348031234567", "8031234567"):
         assert secret not in logged

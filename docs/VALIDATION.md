@@ -37,7 +37,7 @@ replies (rubric and process: [NATIVE_REVIEW.md](NATIVE_REVIEW.md)); the table is
 | Scam detection with N-ATLAS (full engine) | to be re-run live | the 8 Oct run predates greedy decoding, new lexicon terms and English-first replies |
 | Knowledge retrieval, 24 independent questions | right entry in top 3: 96% (top 1: 62%) | English questions only (assumes a perfect translation) |
 | Speech, FLEURS read sentences as WhatsApp audio (WER) | Hausa 28% (20 clips) · Yoruba 33% (10; 64% with tone marks) · Igbo 46% (10) | read speech, not voice notes; possible training overlap |
-| Frozen end-to-end set (366 cases, 49 scam types, 5 languages) | to be scored live | ha/yo/ig cases near-parallel and DRAFT |
+| Frozen end-to-end set (366 cases, 49 scam types, 5 languages) | live: pending (run at 8e15852); rules-only floor: 88/196 scams flagged, 11/96 genuine flagged, flag recall 22%, flag precision ≥95% (lower bound) | ha/yo/ig cases near-parallel and DRAFT |
 
 ## End-to-end test set T (frozen, v2.1)
 **Set.** `data/eval/e2e/cases.yaml`: 366 cases (en 147, pcm 63, ha/yo/ig 52 each; 196 scam, 96 genuine, 74 question),
@@ -87,7 +87,7 @@ judges.
 
 Deterministic safety floor (rules alone, no model; `--rules-only`, results in `data/eval/results/e2e-rules.jsonl`):
 88/196 scams flagged (45%), 11/96 genuine messages flagged (11%), 0/74 questions answered (no model, so only fixed
-text), flag recall 22%, precision 95%.
+text), flag recall 22%, flag precision ≥95% (a lower bound: the author's flag lists are not exhaustive).
 
 ## Speech on real voice notes (donated, opt-in)
 Users who opt in donate voice notes (adults, own voice; docs/DPIA_VOICE.md). The transcription loop:

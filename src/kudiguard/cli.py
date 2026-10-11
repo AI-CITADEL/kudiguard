@@ -36,6 +36,7 @@ from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
 from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
+from kudiguard.text import install_log_redaction
 
 
 async def _rows(settings: Settings) -> list[dict[str, object]]:
@@ -345,6 +346,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     voice_cli.add_commands(commands)
 
     args = parser.parse_args(argv)
+    # Every command (incl. the voice commands) logs through redaction: records are redacted when created, so a
+    # handler a library adds later is covered too (kudiguard.text.install_log_redaction).
+    logging.basicConfig(
+        level=str(getattr(args, "log_level", "info")).upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    install_log_redaction()
+    redact_every_handler()
     settings = Settings()
     if getattr(args, "days", 0) is None:
         args.days = settings.retention_days

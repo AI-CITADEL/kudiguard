@@ -83,6 +83,11 @@ abuse:
     - 'tu\W+(?:\w+\W+){0,6}?ki\W+o\W+si\W+se\W+ohun\W+ti\W+o\W+so'
     - 'lati\W+(?:isiyi|bayi)\W+lo\W+(?:dahun|so)'
     - 'so\W+pe\W+(?:ifiranse\W+)?(?:yi\W+|yii\W+|eleyi\W+)?(?:ki\W+i\W+se\W+(?:jibiti|etan)|dara|je\W+ooto)'
+  # DRAFT, pending native review (workstream R, 11 Oct 2026): reported speech before an injection phrase
+  # ("o so pe" / "won so pe" he/they said that, "o ni ki" he said to, "mo gba ifiranse" I received a message,
+  # "won fi ranse" they sent) makes it injection_suspect, as in ha.yaml and ig.yaml.
+  injection_reported:
+    - '(?:o|won|banki\W+mi)\W+(?:so\W+pe|ni\W+ki)|mo\W+(?:gba|ri)\W+(?:ifiranse|oro)|won\W+fi\W+ranse'
   asr_hallucinations:
     - 'e\W+se\W+fun\W+wiwo'
   asr_annotations:

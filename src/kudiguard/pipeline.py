@@ -191,6 +191,7 @@ class _Turn:
     received_at: datetime | None = None  # when the turn started (donation consent must stand at this time)
     screened: tuple[str, ...] = ()  # abuse-screen categories of the checked message (never donated)
     crisis_sent: bool = False  # the crisis reply already went out (before any gate), never twice
+    crisis_text: bool = False  # a typed crisis message is part of this turn: no words of the turn are stored
     # Own (not forwarded) voice notes of this turn with their transcripts, for donation after the reply.
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
     # A new user's licence-cap slot, held until this turn's interaction is logged (or the turn ends).
@@ -500,7 +501,7 @@ class Conversation:
         if user is None or not user.language:  # first contact: answer in the language the message is in
             turn.language = self._engine.screen.crisis_language(text) or turn.language
         await self._send(turn, self._messages.text(turn.language, crisis_message(category)))
-        turn.crisis_sent = True
+        turn.crisis_sent = turn.crisis_text = True
         # No reservation is taken here: the crisis reply is free, uses no model and is stored nowhere. The admission
         # that follows reserves once (and, if it refuses, sends nothing more: the help was the answer).
         if user is None or user.stopped or not _consented(user):
@@ -543,6 +544,9 @@ class Conversation:
         if pending and turn.message.kind is MessageKind.AUDIO:
             await self._messenger.send(turn.message.user_id, self._language_menu(turn.language))
             turn.replied = True
+            return None
+        if pending and turn.crisis_sent:
+            # A crisis message is not consent: the crisis reply was the answer; nothing is stored or logged for it.
             return None
         if pending and turn.message.kind is MessageKind.TEXT and not match.greeting_language:
             assert user is not None
@@ -679,6 +683,7 @@ class Conversation:
         else:
             turn.transcript = _inbound(message)
         follow_ons = self._take_follow_ons(turn)
+        await self._crisis_in_follow_ons(turn, follow_ons)
         if follow_ons:
             for merged in follow_ons:
                 await self._acknowledge(merged)
@@ -702,6 +707,9 @@ class Conversation:
             turn_id=self._hasher.message_key(turn.message.channel, turn.message.message_id),
         )
         turn.screened = answer.screened
+        if turn.crisis_text:  # a typed crisis message was merged in: its words are kept nowhere
+            turn.transcript = None
+            answer = dataclasses.replace(answer, english="")
         if answer.kind is AnswerKind.SCREENE***REMOVED***
             await self._screened(turn, user, answer)
             return
@@ -715,7 +723,7 @@ class Conversation:
 
         # A crisis message that is also a scam: the crisis reply first, then the check. Its words are kept nowhere
         # (not in the log, the English field, the "I heard" echo or the pattern library).
-        private = answer.screen_action in CRISES
+        private = answer.screen_action in CRISES or turn.crisis_text
         echo = turn.transcript if turn.voice and not private else None
         if private:
             turn.transcript = None
@@ -768,6 +776,20 @@ class Conversation:
             await self._send(turn, self._messages.text(turn.language, Msg.FEEDBACK_PROMPT), feedback)
         else:
             await self._send(turn, reply, feedback)
+
+    async def _crisis_in_follow_ons(self, turn: _Turn, follow_ons: list[InboundMessage]) -> None:
+        """Crisis-first for typed messages that queued behind this turn and are merged into its check: the crisis
+        reply goes out at once (not after the analysis), once per turn, and the turn keeps no words."""
+        for merged in follow_ons:
+            if merged.kind is not MessageKind.TEXT:
+                continue
+            category = self._engine.screen.crisis(_inbound(merged))
+            if category is None:
+                continue
+            turn.crisis_text = True
+            if not turn.crisis_sent:
+                await self._send(turn, self._messages.text(turn.language, crisis_message(category)))
+                turn.crisis_sent = True
 
     async def _screened(self, turn: _Turn, user: UserState, answer: Answer) -> None:
         """Crisis, abuse or a scam-tool request (docs/ABUSE.md): the fixed reply, no buttons, never a scam example or a
