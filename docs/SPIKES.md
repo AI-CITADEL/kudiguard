@@ -663,7 +663,7 @@ checks a traceback quoting 08031234567 and an access path. The filter formats th
 exception and stack text, and never raises (a record whose arguments do not fit is replaced by a fixed line).
 
 **Old-vs-new check (mandatory before a redaction change):** `tests/fixtures/redaction_corpus.yaml` holds every probe
-of the three reviews and of the unit tests (532 cases, `expect: masked|kept`, digits allowed to remain listed); a unit
+of the three reviews and of the unit tests (557 cases, `expect: masked|kept`, digits allowed to remain listed); a unit
 test asserts each. `python scripts/redaction_compare.py` compares b4f96f8's `redact` with the current one on the
 corpus (every digit the old one masked must stay masked, except 10 cases marked `changed:` with the reason: years, two
 dates, a date and a time, the minutes or hour of a time next to a masked number, a date after a masked number) and
@@ -689,7 +689,11 @@ runs of 9 digits or fewer ("0803 12 34 5"), a 13-digit number written as a comma
 split by letters or HTML tags ("a0803 b123 c4567", "<b>0803</b>123…"), digits split by emoji or bullets
 ("0803😊123😊4567", "0803 • 123 • 4567"), percent-encoded digits in access-log paths, "₦5,000.00 482913" (masked,
 but the amount's decimals go with the code), "Expires 10/2026" (masked as a card expiry even without card words),
-and `legacy._absorb` merging only digits joined by spaces or "-".
+and `legacy._absorb` merging only digits joined by spaces or "-", an address without a TLD ("ngozi@company"),
+and a PIN that reads as a year written before its name ("1999 is your pin": years are excluded so "2024 code of
+conduct" stays). Round 5: a code before its name may have up to two words between ("415-984 is your Opay login
+code"), needs "is"/"as"; "error/bank/zip/postal/dress/sort code N" is not a secret; "_" separates a code's
+digits; log ids need a hex letter or 32+ digits ("key=4111111111111111" is masked).
 
 **Equivalent or accepted survivors** (197 in the ten modules): *identity-equivalent* — `is`/`==` on enums, interned literals and small
 ints; comparisons that cannot differ for the values that occur (`Intent`/`Verdict`/`Outcome`/`StorageLocation`

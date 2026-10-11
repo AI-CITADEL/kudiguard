@@ -561,7 +561,9 @@ def test_inputs_found_by_mutation_testing(raw: str, expected: str) -> None:
     [
         ("turn=12345678ab ok", "turn=12345678ab ok"),  # 10 to 64 hex characters with a letter: an id
         ("turn=1234567ab ok", "turn=[number]ab ok"),
-        ("turn=1234567890123456 ok", "turn=1234567890123456 ok"),  # or 16+ characters
+        ("id=" + "1" * 32 + " ok", "id=" + "1" * 32 + " ok"),  # or 32+ digits
+        ("key=4111111111111111 ok", "key=[number] ok"),  # a card number is never an id
+        ("id=0803123456789012 ok", "id=[number] ok"),
         ("id=08031234567 ok", "id=[number] ok"),  # a number is never an id
         ("id=" + "1" * 64 + " ok", "id=" + "1" * 64 + " ok"),
         ("id=" + "1" * 65 + " ok", "id=[number] ok"),
@@ -602,6 +604,26 @@ def test_only_uvicorn_access_lines_are_redacted_argument_by_argument() -> None:
         ("N5,000 is your code", "N5,000 is your code"),
         ("pay 5000 using code", "pay 5000 using code"),
         ("10:30 is the code time", "10:30 is the code time"),
+        # round 5: words between "your" and the name; never a year or a code without "is"/"as"
+        ("234-858 is your verification code", "[number] is your verification code"),
+        ("415-984 is your Opay login code today", "[number] is your Opay login code today"),
+        ("4 7 8 5 3 4 is your Opay login code", "[number] is your Opay login code"),
+        ("123 456 is your verification code", "[number] is your verification code"),
+        ("482913 is your code now", "[number] is your code now"),
+        ("2024 code of conduct", "2024 code of conduct"),
+        ("The 2023 code review", "The 2023 code review"),
+        ("the 2026 pin", "the 2026 pin"),
+        ("Section 419 code", "Section 419 code"),
+        ("room 101 code", "room 101 code"),
+        ("about 500 code words", "about 500 code words"),
+        ("pay 2000 as code fee", "pay 2000 as code fee"),
+        ("1000 is the code limit", "[number] is the code limit"),  # could be the code: masked
+        ("error code 404", "error code 404"),
+        ("bank code 058", "bank code 058"),
+        ("zip code 23401", "zip code 23401"),
+        ("dress code 2025", "dress code 2025"),
+        ("area code 0803", "area code [number]"),  # may start a phone number
+        ("otp 482_913", "otp [number]"),
         # survivors the verifier showed are not equivalent (m119, m215, m101, m293)
         ("IP 192 168 100 200", "IP [number]"),  # an IP is written with dots
         ("IP address:      192.168.100.200", "IP address:      [number]"),  # "IP" within 16 characters only

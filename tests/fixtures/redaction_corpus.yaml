@@ -1005,7 +1005,9 @@
   expect: masked
 - text: turn=1234567ab ok
   expect: masked
-- text: turn=1234567890123456 ok
+- text: key=4111111111111111 ok
+  expect: masked
+- text: id=0803123456789012 ok
   expect: masked
 - text: id=08031234567 ok
   expect: masked
@@ -1047,6 +1049,54 @@
   expect: kept
 - text: 10:30 is the code time
   expect: kept
+- text: 234-858 is your verification code
+  expect: masked
+- text: 415-984 is your Opay login code today
+  expect: masked
+- text: 4 7 8 5 3 4 is your Opay login code
+  expect: masked
+- text: 123 456 is your verification code
+  expect: masked
+- text: 482913 is your code now
+  expect: masked
+- text: 2024 code of conduct
+  expect: kept
+- text: The 2023 code review
+  expect: kept
+- text: the 2026 pin
+  expect: kept
+- text: Section 419 code
+  expect: kept
+- text: room 101 code
+  expect: kept
+- text: about 500 code words
+  expect: kept
+- text: pay 2000 as code fee
+  expect: kept
+- text: 1000 is the code limit
+  expect: masked
+- text: error code 404
+  expect: kept
+- text: bank code 058
+  expect: kept
+- text: zip code 23401
+  expect: kept
+- text: dress code 2025
+  expect: kept
+- text: area code 0803
+  expect: masked
+- text: otp 482_913
+  expect: masked
+- text: IP 192 168 100 200
+  expect: masked
+- text: 'IP address:      192.168.100.200'
+  expect: masked
+- text: 'IP address: 192.168.100.200'
+  expect: kept
+- text: 10.30.5 08031234567
+  expect: masked
+- text: 10,20,30,40,50
+  expect: masked
 - text: call 8 031 234 567 now
   expect: masked
 - text: call +234 8 031 234 567 now

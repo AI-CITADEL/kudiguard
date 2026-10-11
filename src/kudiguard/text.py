@@ -80,15 +80,20 @@ _MIN_SPELLED_DIGITS = 7
 # Short secrets named as such: "cvv 123", "PIN: 1234", "pin na 1 2 3 4", "OTP is 482-913", "token 4829", "exp 09/28",
 # codes ("verification code 4829", "Ur code: 48 29 13", "Use 652-137 as your one-time password").
 _SECRET = re.compile(
-    r"(?<![a-z0-9\]])(?:cvv2?|cvc2?|pin|otp|password|passcode|pass code|security code|token|code"
+    r"(?<![a-z0-9\]])(?:cvv2?|cvc2?|pin|otp|password|passcode|pass code|security code|token"
+    # not a code that names no secret: "error code 404", "bank code 058", "zip code 23401", "dress code 2025"
+    r"|(?<!error )(?<!bank )(?<!zip )(?<!postal )(?<!dress )(?<!sort )code"
     r"|one[ -]time password)[\s:=#-]*"
-    r"(?:(?:is|was|na|be|dey|e)\s+)?(?P<value>\d(?:[ .\-]?\d){2,}|(?:"
+    r"(?:(?:is|was|na|be|dey|e)\s+)?(?P<value>\d(?:[ ._\-]?\d){2,}|(?:"
     + _WORD
     + r")(?:[ ,\-]+(?:"
     + _WORD
     + r")){2,})"
-    # the value before its name: "Use 652-137 as your one-time password", "482913 is your code"
-    r"|(?<![\w.,])(?P<before>\d(?:[ .\-]?+\d){2,11}+)\s+(?:(?:is|as)\s+)?(?:(?:your|the)\s+)?"
+    # the value before its name, joined by "is"/"as" (up to two words between): "482913 is your code",
+    # "Use 652-137 as your one-time password", "415-984 is your Opay login code"; never a year ("2024 code of
+    # conduct", "the 2026 pin") nor without "is"/"as" ("Section 419 code"). Bounded and possessive: linear.
+    r"|(?<![\w.,])(?!(?:19|20)\d\d\s)(?P<before>\d(?:[ ._\-]?+\d){2,11}+)\s+(?:is|as)\s+"
+    r"(?:(?:your|the)\s+)?(?:[a-z]{1,20}\s+){0,2}"  # bounded: constant backtracking
     r"(?:one[ -]time password|otp|code|pin|passcode|password|token)(?![a-z])"
     r"|(?<![a-z0-9\]])(?:exp|expiry|expires|expiry date)[\s:.-]*(?P<expiry>\d\d?\s?/\s?\d\d(?:\d\d)?)(?!\d)"
 )
@@ -127,10 +132,11 @@ _IP_BEFORE = re.compile(
 _TOKEN_BREAK = re.compile(r"[ ]*,[ ]+|[ ]+")
 _CLOCK_BEFORE = re.compile(r"\d:$")  # "10:|30 0803…"
 _CLOCK_AFTER = re.compile(r":\d\d")  # "…4567 10|:30"
-# A hashed id after a known key: hex with a letter, or 16+ characters; never a number ("id=08031234567").
+# A hashed id after a known key: hex with a letter, or 32+ digits; never a number ("id=08031234567",
+# "key=4111111111111111").
 _ID_FIELD = re.compile(
     r"\b(?:turn|user|msg|message|interaction|review|sample|id|key|hash)="
-    r"(?:(?=[0-9]*[a-f])[0-9a-f]{10,64}|[0-9a-f]{16,64})\b"
+    r"(?:(?=[0-9]*[a-f])[0-9a-f]{10,64}|[0-9]{32,64})\b"
 )
 
 
