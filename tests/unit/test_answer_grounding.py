@@ -38,6 +38,7 @@ from kudiguard.knowledge.service import KnowledgeBase, knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLMError, Purpose
 from kudiguard.pipeline import REPLY_RESERVE_S
+from kudiguard.reply_translation import ComposePolicy, ComposeStrategy
 
 PACKS = Path(__file__).resolve().parents[2] / "data" / "packs"
 
@@ -220,7 +221,9 @@ async def knowledge() -> Any:
 
 
 def engine(registry: LanguageRegistry, knowledge: KnowledgeBase, llm: FakeLLM) -> Engine:
-    return Engine(registry=registry, llm=llm, knowledge=knowledge)
+    """Direct compose: these tests script the reply in the user's language (english_first: test_reply_translation)."""
+    direct = ComposePolicy(ComposeStrategy.DIRECT)
+    return Engine(registry=registry, llm=llm, knowledge=knowledge, compose_policy=direct)
 
 
 def test_turn_deadline_mirrors_the_pipeline() -> None:

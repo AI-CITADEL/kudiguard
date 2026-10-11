@@ -134,6 +134,7 @@ the live server's `/v1/check/audio` used it (6.9 s incl. N-ATLAS). Every languag
 multilingual Whisper vocabulary with no Igbo token. NCAIR does not pin a language token, so at inference Whisper
 detects the language (+~1.2 s). Our config forces `ha`/`yo` (faster) and leaves Igbo on auto. **To decide with data:**
 A/B forced vs auto on the recorded clips (`eval_asr.py`, toggle `asr_whisper_language` to null) before submission.
+**Decided (H, 10 Oct):** the Igbo model itself detects `yo` on every clip, so Igbo now forces `yo` (section H).
 
 ## S6 — Official NCAIR1 ASR accuracy on public clips (8 Oct 2026, corrected after data review)
 
@@ -149,7 +150,8 @@ outputs in `data/eval/asr/results/int8.jsonl`. "WER" folds all diacritics (tone 
 | ig | 10 | 1 | 45.5% | 48.9% | 25.9% | 3.8 s |
 
 * Forced vs auto language (ha, yo; first run, mean-of-clips): WER unchanged on these clips (ha 29.8 vs 29.8, yo 32.0 vs
-  32.0), forced 1.6–2.1 s faster → keep forced. Small n: indicative, not proof. Igbo has no Whisper token (always auto).
+  32.0), forced 1.6–2.1 s faster → keep forced. Small n: indicative, not proof. Igbo has no Whisper token; it now forces `yo`
+  (same transcripts, ~3 s faster: section H).
 * Yoruba WER+d is inflated by noisy FLEURS references (e.g. "sih", "gbeh", missing tone marks), not only ASR errors.
 * The rejected Igbo clip is quiet real speech (loudest frame −56 dBFS vs the −55 dB floor). Backlog: gain-normalise
   before the silence check and re-measure (risk: Whisper hallucination on noise).
@@ -485,3 +487,172 @@ noisy; both runs saw the same load).
 * Per-language coverage (t=0): en 0.66, ha 0.52, yo 0.35, ig 0.25; 62% of Igbo replies copy the worked example →
   workstream H (Yoruba/Igbo parity; English-first then translate).
 * The grounding column of this run used the scorer's stand-in, not workstream B's checker: not reported.
+
+## H — Yoruba/Igbo answer quality and English-first replies (10 Oct 2026, workstream H)
+
+Goal: bring yo/ig replies up to Hausa's level with the loop Hausa got, then (user decisions, same day) write replies
+**English-first** where it helps: compose in English, run every English check, translate, check the translation.
+Measured for ha/yo/ig; shipped for Yoruba and Igbo only (Hausa and English stay direct; decision at the end).
+All numbers: `scripts/eval_answers.py` live on N-ATLAS (llama.cpp, temperature 0 + seed 42), stand-in grounding;
+per-item results in `data/eval/results/answers-h_{base,after_direct,after,final}.jsonl` and `answers-h2_final.jsonl`
+(the shipped code, re-measured by the verifier) (`h_base`: master code on the
+extended dev set; `h_final`: English-first for ha/yo/ig with the first negation check; the shipped default uses it for
+yo/ig and `h_after_direct` for ha). Other workstreams used the same server and CPU, so latency is noisy.
+`h_after_direct`, `h_after` and `h_final` ran back to back; `h_base` and master's `answers-t0seed` ran in earlier
+sessions (cross-session noise below).
+
+**Dev data parity.** `data/eval/answers.yaml` +8 cases (yo/ig 8 → 12 each: prize fee, fake alert, ajo/budget, stolen
+phone: the Hausa situations, so ha/yo/ig compare case for case); `data/eval/prompts.yaml` yo 3 → 7, ig 2 → 7 (BVN
+question, code-switched OTP threat, "why does my bank ask for my BVN", investment tripling, Igbo OTP caller). DRAFT
+wording, pending native review. The blind `scenarios.yaml` was never read or tuned on.
+
+**Baseline failure modes** (master, 24 yo/ig cases, run 0; replies read with their back-translations):
+
+| Mode | yo | ig | Example (gloss) |
+|---|---|---|---|
+| Copies the NIN question example, off-topic | 4/12 | 6/12 | ig-family-requests "Ị nwere ike ịlele NIN gị… Pịa *346#" (you can check your NIN… dial *346#) for "my relatives always ask me for money" |
+| Adapts the fee example whatever the facts | 3 | 1 | yo-bvn-link "Maṣe san ohunkohun… Ṣayẹwo ipese nikan nipasẹ awọn ikanni osise" (do not pay anything… check the offer only through official channels) for a phishing link |
+| Generic, or facts of another case | 2 | 1 | ig-fake-alert-goods: "check the person is really your friend" for a fake payment screenshot |
+| Wrong verdict | 1 | 1 | yo-otp-legit (genuine OTP) likely_scam; ig-investment-triple no flags (no Igbo rule fired) |
+| Analyse-step translation errors | seen | seen | "wọ́n ti dí àkọọ́lẹ̀" (they blocked my account) → "they hacked my account"; Igbo OTP caller → "called me from KudiGuard" (system-prompt echo); ajo/adashe → "a team" / "the stock market" |
+| Drift into English, wrong language | 0 | 0 | none (register: replies use singular "rẹ"/"gị", the fixed strings polite "yín": for native review) |
+| Good | 2 | 3 | yo-pos-pin, ig-school-fees, ig-otp-blocked |
+
+**Prompt variants for the direct (in-language) path**, deterministic A/B (`--no-cache-prompt`, 1 run, 53 cases):
+
+| Arm | en | ha | yo | ig | yo copied | ig copied |
+|---|---|---|---|---|---|---|
+| master | 0.64 | 0.48 | 0.35 | 0.50 | 33% | 33% |
+| (a) Yoruba/Igbo worked examples (reply in the user's language) | 0.64 | 0.48 | 0.43 | **0.22** | 8% | 42% |
+| (b) "write the whole reply in X, from its facts, not the earlier answer's wording" | **0.55** | **0.42** | 0.49 | 0.38 | 25% | 33% |
+| (a) + (b) | 0.55 | 0.42 | 0.49 | 0.36 | 8% | 25% |
+
+(b) regresses en and ha beyond noise (identical prompts give identical numbers in this mode): **rejected**. (a) helps
+Yoruba and hurts Igbo; in production sampling (cache on, 3 runs) Yoruba was flat (0.38 vs 0.36) and ~1–2 s slower
+(longer tone-marked replies); as a one-shot example for the reply translation it gave no fewer fidelity failures,
++0.3 s, and its wording leaked into translations. **Dropped** everywhere (kept in git history, commit 3373eff).
+Cross-session noise is large: the same master prompts gave ig 0.35 (cache on) vs 0.50 (cache off), and ha 0.52 vs
+0.62 in two cache-on sessions; only arms run back to back are compared.
+
+**Lexicon parity** (`data/languages/yo.yaml`, `ig.yaml`, lexicon sections only; DRAFT, pending native review): yo 7 →
+14 terms and ig 7 → 12 (Hausa 12), both 6 → 7 flags (prize_lottery added), plus guaranteed-return ("put in X, get Y within a
+week"), must-pay-first, registration-fee, urgency and Igbo "tell him the code" terms. Each new term is pinned by a
+firing message the English pivot alone misses, ordinary messages that must not fire, and a zero-hit check on the
+packs, the fixed strings and the worked examples (`tests/unit/test_scam_rules.py`). Rules-only on the dev set:
+ig-investment-triple and yo-prize-fee → likely_scam, yo-job-fee → caution (were missed); these dev gains are
+**in-sample** (the terms were written with the dev cases in view). After review, four terms were narrowed for false
+positives the reviewer found ("gwa m ihe OTP pụtara" / "agwaghị m ya PIN m" in Igbo; Yoruba bank interest "màá gba
+èlé ní oṣù kan", a denied "èrè tó dájú kò sí", "mo ti pa SIM mi tì" / "ó ti di àkáǹtì mi"). Held-out e2e set
+(`data/eval/e2e`, measure only, rules-only, 27 scams + 25 genuine per language): yo recall 5/27 (master) → 6/27
+(7/27 before the account-threat narrowing, which now misses "wọ́n ti dí àkáǹtì rẹ", "they have blocked your
+account"), ig 6/27 unchanged; false positives unchanged (yo 0/25, ig 1/25). Blind scenarios: rules-only
+and engine verdicts identical before/after (rules-only precision 89% / recall 80% / FPR 10%; engine 86% / 95% / 15%).
+A third engine run, overlapping another eval, flipped two legit yo/ig items to caution through model flags in the
+unchanged analyse step (run-to-run variance, not the lexicon).
+
+**Igbo ASR** (`scripts/ab_asr_language.py`, 10 FLEURS clips, interleaved, 3 rounds, CPU int8): left on auto, the
+NCAIR1 Igbo model detects **`yo` on every clip (p ≈ 1.0)**; forcing `yo` gives identical transcripts (10/10) and WER
+(45.5%, WER+d 48.9%, CER 25.9%, 1 rejected quiet clip) at **p50 3.5 s vs 6.5 s** (auto) under load (re-run with the
+committed script, lighter load: 2.5 s vs 4.4 s); forcing `ha` gives 46.4%, `en` 66.0%. `ig.yaml` now forces `yo`.
+
+**English-first replies** (`kudiguard/reply_translation.py`; `KUDIGUARD_COMPOSE_STRATEGY`, a default strategy plus
+per-language overrides; English is always direct; shipped default `english_first,ha=direct`, see the decision below).
+COMPOSE in English (same prompt,
+English worked examples) → clean + output guard (en; retry once) → REPLY_TRANSLATE (zero-shot, temperature 0 + seed)
+→ strip tags, clean, guard (user language) and fidelity check → fixed text in the language on failure. Fidelity
+(deterministic): same number of steps; no new numbers, links or `[number]` markers; length ratio 0.5–3; not an English
+echo, overall or of a whole sentence/step; **negation kept** (see the review fixes). Deadline: english_first starts
+only when ≥ 8 s are left (see below), else fixed text in the language (never an English reply to a user who chose a
+language, never a cut translation). The tables below were measured with the first version of these checks
+(`max_tokens` 0.75/char, cap 700; retry on any failure; negation by presence per block; 6-s threshold).
+
+Same session, final code: `h_after_direct` (direct), `h_after` (english_first, before the negation check), `h_final`
+(with it); 3 runs each; English is direct in every arm:
+
+| direct / english_first / + negation check | verdict | coverage | copied | violating | fallback | p50 | p95 |
+|---|---|---|---|---|---|---|---|
+| **en** | 90 / 89 / 90% | 0.63 / 0.63 / 0.62 | 33 / 33 / 38% | 10 / 10 / 10% | 0 | 2.9 / 2.9 / 3.1 s | 4.3 / 4.2 / 4.6 s |
+| **ha** | 100 / 100 / 100% | **0.54 / 0.38 / 0.34** | 0 | 0 / 0 / 8%* | 0 / 0 / 12% | 3.7 / 6.0 / 5.8 s | 5.1 / 8.7 / 8.6 s |
+| **yo** | 92 / 92 / 92% | 0.36 / **0.56 / 0.56** | 33 / 25 / 25% | 0 / 8% / 0 | 0 / 0 / 8% | 4.0 / 5.7 / 6.4 s | 6.5 / 10.2 / 13.9 s |
+| **ig** | 100 / 100 / 100% | 0.37 / **0.50 / 0.42** | 42 / 8 / 8% | 0 | 0 / 0 / 14% | 4.5 / 6.2 / 7.2 s | 6.8 / 9.6 / 15.7 s |
+
+\* ha-otp-blocked: the `must_not` matcher read "hang up if someone calls asking for your OTP" as "tell the caller the
+OTP" (scorer false positive; the reply is safe). The 8% yo violation without the negation check was a real one
+(yo-inflation-cash: "keep all your money at home", see below).
+
+Against the H baseline (`h_base`, master, same 53 cases, earlier session), for `h_final` (the shipped code's re-run
+`h2_final` gave yo 0.58, ig 0.33, see the decision below): yo 0.36 → 0.56, ig 0.35 → 0.42 (Igbo
+copied 50% → 8% vs `h_base`; 42% → 8% vs `h_after_direct`), ha 0.52 → 0.34, en 0.66 → 0.62 (en path unchanged:
+noise). Against master's `answers-t0seed` (the original 45 cases, earlier session): ig 0.25 → 0.39 (copied 62% → 0%),
+yo 0.35 → 0.52, ha 0.52 → 0.34, en 0.66 → 0.62; verdicts en 86 → 90%, ig 88 → 100%, yo 88%, ha 100%.
+
+What it shows:
+* **Copying is cured** for Igbo (the English compose never produced the NIN example for an Igbo case); Yoruba coverage
+  +0.2. The remaining yo/ig copies are English example phrases in scam replies, at the English rate.
+* **Hausa regresses** (−0.16 and −0.18 in two sessions; a third, `h_ef`, was −0.22 raw but +0.01 after excluding 9
+  records whose eval back-translation echoed the Hausa): the English drafts for Hausa cases are worse than
+  Hausa-direct replies ("adashe" translated as the stock market, a credit alert read as a debit). The analyse-step
+  translation is now the single bottleneck for every language. `english_first,ha=direct` restores Hausa's coverage but
+  gives up the English checks for Hausa.
+* **Translations flip negations.** Offline over 93 accepted translations, 10 (11%) lost or added a negation, all
+  confirmed by reading: Yoruba "You should not keep all your money at home" → "Ó yẹ kí o máa tọ́jú gbogbo owó rẹ nílé"
+  (keep all your money at home); Igbo "Do not pay anything" → "Nye ego ọ bụla" (give any money); Hausa "block your
+  SIM" → "Kada ku rufe katin SIM" (do not block your SIM), "Hang up" → "Kada ka gama kiran" (do not end the call). No
+  other check caught them. The negation check rejects them (in `h_final`: retry, then fixed text; since the review:
+  fixed text at once) — the 8–14% fallback above, all
+  on those cases: ha-budget, yo-inflation-cash, ig-fake-alert-goods, ig-loan-fee). Subtler meaning errors remain
+  undetected ("three months" → "ọ̀sẹ̀ mẹ́ta", three weeks).
+* **Latency**: the translation step alone takes p50 2.1 s (ha) / 3.1 s (yo, ig), max 9 s for long replies (replay of
+  32 English drafts). Shipped code (`h2_final` vs `h_after_direct`): **+1.7 s (yo) and +1.3 s (ig) p50**, p95
+  8.2 s (yo) / 9.4 s (ig) (target ≤ +1.5 s: missed for Yoruba). The first version (`h_final`, warm retries) was
+  +2.4 / +2.7 s p50, p95 14–16 s. **Capacity:** model time per yo/ig turn rises +42% (yo) / +35% (ig), so the single
+  GPU serves ≈26–30% fewer yo/ig turns per minute. English and Hausa replies are unchanged. The 60-s turn deadline is
+  not at risk.
+* `scripts/eval_prompts.py` still exercises the direct path (it builds the compose request itself); English-first is
+  measured by `eval_answers.py --compose-strategy`, whose records now keep the English draft (`reply_english`).
+
+**Decision (user, 10 Oct 2026): default `english_first,ha=direct`.** Yoruba and Igbo are English-first (every English
+check sees the reply); Hausa stays direct (0.54 vs 0.34 English-first in the same session); English is always direct.
+Measured on the shipped code (`h2_final`, commit 6da290d, 3 runs, verifier's re-run, vs `h_after_direct`): Yoruba
+coverage 0.36 → **0.58**, fallback 8%; Igbo 0.37 → **0.33** (0.36 excluding 3 failed back-translations): **the Igbo
+coverage gain is NOT reproduced**; Igbo's measured benefits are copying 42% → 8% and the English safety checks (17% of
+Igbo replies fall back to fixed text, all confirmed real negation flips). Hausa direct measured 0.46 in that session
+(cross-session noise, mostly ha-otp-blocked's analyse-step flag). Note: the direct path has **no translation-fidelity or negation check** (there is no English text to
+compare against), only the output guard; given the 11% negation-flip rate seen in translations, the same kind of error
+in a direct Hausa reply would go unnoticed, so native-speaker review of Hausa replies matters.
+
+**Review fixes (after merging workstream B; unit-tested; re-measured live as `h2_final` above,
+`data/eval/results/answers-h2_final.jsonl`, with B's `CheckerGrounding` in the eval):**
+* **B's checks on the English draft**: for yo/ig the shadow classifier and shadow grounding score the English draft
+  (`Answer.reply_english`), not the translation; grounding in enforce mode runs between the draft and the translation
+  (unsupported English steps are trimmed before translating; nothing left → fixed text); the classifier in enforce mode
+  blocks the English draft inside `_generate(…, PIVOT)`, so nothing unsafe is translated.
+* **No warm retry for content failures.** In review a warm (0.5) retry produced Igbo "Echefula izu ohi ego n'aka onye ị
+  maara naanị online" ("don't forget to steal money from someone you only know online"). Now a lost/added negation,
+  step-count, number or link failure, or a guard hit on the translation, goes straight to fixed text; only formatting
+  failures (untranslated echo, length, empty) get the warmer retry.
+* **Negation counting.** Per aligned sentence (per block when the sentence counts differ): native negators ≥ strict
+  English negations (not, no, never, n't, none, nobody, nothing, cannot); native prohibitives ≤ strict + soft ones
+  ("stop …", "instead", "avoid", "refuse", "without", "not even" are soft: may be rendered with or without a "do not").
+  "Don't forget/hesitate/fail/neglect/wait/delay" (the output guard's `_NEGATED_LEAD` exclusions) and their DRAFT
+  equivalents (yo "má gbàgbé/ṣiyèméjì/dúró/pẹ́", ig "echefula/egbula oge", ha "kada ka manta/jinkiri/jira") count on
+  neither side. Yoruba is matched on tone-stripped text that keeps under-dots, so kò (not) and kọ (write, refuse) stay
+  apart; toneless "ko"/"ma" still count as negators (a false match can only hide a loss, never cause a fallback), and
+  sentence-initial "Má" + verb is a prohibitive (not "máa", the future marker). Igbo no longer counts "mba" (also
+  "country") or "kwụsị" (stop; also used for "block"). Offline over 163 English/translation pairs (the eval runs plus
+  the reviewer's probes), 15 are flagged and all 15 read as real errors (11 lost negations, 2 added, 2 broken step
+  structures); `scripts/check_translations.py` reproduces the rate: 7 of 44 distinct accepted translations in `h_after`
+  (16%) fail the current checks, 0 of 44 in `h_final`.
+* **Follow-up buttons**: "What should I do?" translates the knowledge base's English steps and "Warn my family" writes
+  the warning in English (guarded), then translates; both get the same fidelity checks and fall back to their fixed
+  text. Hausa stays direct for both.
+* **Measurement**: `Answer.translation_rejections` (and eval records) list why translations were rejected, so pilot
+  logs separate negation fallbacks; eval meta records the commit (`KUDIGUARD_EVAL_COMMIT` for runs from a copy).
+* **Latency budget**: `MIN_TRANSLATE_S` 3 → 5 s (translation p50 2–3 s, p95 ~5 s, up to 9 s for long drafts), so
+  English-first starts only with ≥ 8 s left; below that the user gets fixed text in the language at once instead of a
+  translation likely to be cut off. `max_tokens` 1.0 per English character (cap 900): no long draft is truncated.
+* Inline tags are stripped; a whole sentence or step left in English is flagged; `ComposePolicy.parse` is
+  case-insensitive and rejects override codes that are not configured languages at startup.
+
+Status: yo/ig stay **beta** (Hausa `stable`): coverage is up but still below Hausa-direct, and no native speaker has
+reviewed a reply, a translation, a lexicon term or a negator list.

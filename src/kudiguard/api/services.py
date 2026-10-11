@@ -302,6 +302,7 @@ async def build_services(settings: Settings) -> Services:
                 if settings.guard_classifier_pidgin_mode
                 else None
             ),
+            compose_policy=settings.compose_policy([lang.code for lang in registry.enabled]),
         )
         closers.append(engine.aclose)  # closers run in reverse: shadow checks drain before the checker stops
 

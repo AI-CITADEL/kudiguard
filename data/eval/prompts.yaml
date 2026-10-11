@@ -29,3 +29,15 @@
 - {lang: en, expect: question, verdicts: [not_a_check, caution], text: "Do banks ever ask for OTP?"}
 - {lang: en, expect: question, verdicts: [not_a_check, caution], text: "When do banks ask for your PIN?"}
 - {lang: ha, expect: question, verdicts: [not_a_check, caution], text: "Me yasa banki ke tambayar BVN dina?"}
+# --- Yoruba and Igbo parity with the Hausa set (workstream H). DRAFT wording, pending native-speaker review.
+# English glosses: what is a BVN / code-switched OTP threat / why does my bank ask for my BVN / an investment that
+# triples in a week; Igbo adds the OTP caller and the prize fee already above.
+- {lang: yo, expect: question, text: "Kí ni BVN, kí ló sì fà á tí mo fi nílò rẹ̀?"}
+- {lang: yo, expect: scam_check, text: "Customer care kan pè mí, ó ní my account will be blocked if I no send the OTP ní kíákíá."}
+- {lang: yo, expect: question, verdicts: [not_a_check, caution], text: "Kí ló dé tí báǹkì mi fi ń béèrè BVN mi?"}
+- {lang: yo, expect: scam_check, text: "Ẹnìkan lórí Facebook sọ pé tí mo bá fi 50k sílẹ̀, màá rí 150k gbà láàrin ọ̀sẹ̀ kan. Ṣé kí n ṣe é?"}
+- {lang: ig, expect: scam_check, text: "Otu onye kpọrọ m sị na ọ si n'ụlọ akụ m, sị na a ga-emechi akaụntụ m ma ọ bụrụ na m ezitaghị ya OTP ha zitere m."}
+- {lang: ig, expect: question, text: "Gịnị bụ BVN, gịnị kpatara m ji chọọ ya?"}
+- {lang: ig, expect: scam_check, text: "Customer care kpọrọ m, sị na my account will be blocked if I no send the OTP ngwa ngwa."}
+- {lang: ig, expect: question, verdicts: [not_a_check, caution], text: "Gịnị mere ụlọ akụ m ji ajụ maka BVN m?"}
+- {lang: ig, expect: scam_check, text: "Mmadụ na Facebook sị na ọ bụrụ na m tinye 50k, m ga-enweta 150k n'ime otu izu. Ọ kwesịrị m ime ya?"}

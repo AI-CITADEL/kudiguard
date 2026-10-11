@@ -27,6 +27,7 @@ class Purpose(StrEnum):
     ANALYSE = "analyse"
     TRANSLATE = "translate"
     COMPOSE = "compose"
+    REPLY_TRANSLATE = "reply_translate"  # an English-composed reply into the user's language
     WARN = "warn"
     STEPS = "steps"
     GENERAL = "general"
@@ -37,6 +38,7 @@ DEFAULT_TIMEOUTS: Mapping[Purpose, float] = {
     Purpose.ANALYSE: 10.0,
     Purpose.TRANSLATE: 10.0,
     Purpose.COMPOSE: 20.0,
+    Purpose.REPLY_TRANSLATE: 15.0,
     Purpose.WARN: 10.0,
     Purpose.STEPS: 10.0,
     Purpose.GENERAL: 30.0,

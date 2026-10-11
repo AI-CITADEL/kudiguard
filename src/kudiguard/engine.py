@@ -44,6 +44,16 @@ from kudiguard.prompts import (
     warn_family_request,
 )
 from kudiguard.render import REPORT_VERDICTS
+from kudiguard.reply_translation import (
+    DEFAULT_COMPOSE_STRATEGY,
+    RETRYABLE_PROBLEMS,
+    ComposePolicy,
+    ComposeStrategy,
+    problem_kind,
+    reply_translate_request,
+    strip_reply_tags,
+    translation_problems,
+)
 from kudiguard.safety.decision import decide, is_content_free, resolve_analysis
 from kudiguard.safety.grounding import (
     GroundingChecker,
@@ -66,6 +76,10 @@ RETRY_TEMPERATURE = 0.5  # a retry at the base temperature (0, greedy) would rep
 MIN_ANALYSE_S = 2.0
 MIN_GENERATE_S = 3.0  # a short reply takes ~2-3 s on one GPU
 MIN_RETRY_S = 5.0  # a retry is optional: only when there is clearly time
+# english_first: a reply translation takes p50 2-3 s, p95 ~5 s, up to 9 s for long drafts (docs/SPIKES.md H). With
+# less than ~5 s left a translation would often be cut off by the deadline (and wasted GPU time), so english_first
+# starts only with MIN_GENERATE_S + MIN_TRANSLATE_S (8 s) left, else it sends fixed text in the language at once.
+MIN_TRANSLATE_S = 5.0
 SHADOW_DRAIN_S = 1.0  # shutdown wait for shadow checks when the checker has no budget
 MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never make a turn miss its deadline
 
@@ -94,6 +108,11 @@ class Answer:
     grounding_ms: int = 0  # wall time the grounding check added (0 = not run), separate from model time
     grounded: bool | None = None  # grounding verdict on the composed reply (None = not checked)
     unsupported_claims: int = 0
+    # english_first: the checked English reply that was translated (kept when the translation was rejected and
+    # ``body`` is fixed text); "" for direct replies
+    reply_english: str = ""
+    # english_first: why translations were rejected ("negation_lost", "steps", ...), in order; () = none rejected
+    translation_rejections: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +120,7 @@ class FollowUp:
     text: str
     outcome: Outcome
     llm_ms: int = 0
+    translation_rejections: tuple[str, ...] = ()  # english_first: as ``Answer.translation_rejections``
 
 
 @dataclass(slots=True)
@@ -109,6 +129,12 @@ class _Generation:
     ms: int = 0
     issues: tuple[OutputIssue, ...] = ()
     unavailable: bool = False  # the model could not be reached (skip further calls this turn)
+    english: str | None = None  # english_first: the checked English reply that was translated
+    rejections: tuple[str, ...] = ()  # english_first: why translations were rejected
+    report: GroundingReport | None = (
+        None  # enforce-mode grounding of the composed text (English when translated)
+    )
+    grounding_ms: int = 0
 
 
 class Engine:
@@ -128,7 +154,10 @@ class Engine:
         classifier: UnsafeAdviceClassifier | None = None,
         classifier_mode: ClassifierMode = ClassifierMode.SHADOW,
         classifier_pidgin_mode: ClassifierMode | None = None,
+        compose_policy: ComposePolicy | None = None,
     ) -> None:
+        """``compose_policy``: direct or English-first replies per language (default:
+        ``reply_translation.DEFAULT_COMPOSE_STRATEGY``, Yoruba/Igbo English-first, Hausa direct)."""
         self.registry = registry
         self.messages = Messages(registry)
         # One limit for every caller (WhatsApp, API, web): decoding + recognition are CPU-bound. A transcription
@@ -155,6 +184,7 @@ class Engine:
         self.classifier = classifier if modes != {ClassifierMode.OFF} else None
         self._shadow: set[asyncio.Task[None]] = set()
         self._matcher = CommandMatcher(registry)
+        self.compose_policy = compose_policy or ComposePolicy.parse(DEFAULT_COMPOSE_STRATEGY)
 
     @property
     def has_speech(self) -> bool:
@@ -216,33 +246,20 @@ class Engine:
         report: GroundingReport | None = None
         grounding_ms = 0
         if analysis.english and not model_down:
-            request = compose_request(
-                language_name=self.registry.get(language).name,
-                english=analysis.english,
-                verdict=verdict,
-                flags=assessment.flags,
-                knowledge=knowledge,
+            evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
+            generation = await self._compose(
+                language, analysis.english, verdict, assessment.flags, knowledge, deadline, evidence, turn_id
             )
-            generation = await self._generate(request, language, deadline)
+            report, grounding_ms = generation.report, generation.grounding_ms
             if generation.text is not None:
-                evidence = evidence_for(knowledge, verdict=verdict, flags=assessment.flags)
-                self._classify_in_background(generation.text, language, turn_id)
+                # Shadow checks see the English text when there is one (english_first: the draft that was
+                # translated), else the reply in its own language.
+                checked, checked_language = (
+                    (generation.english, PIVOT) if generation.english else (generation.text, language)
+                )
+                self._classify_in_background(checked, checked_language, turn_id)
                 if self.grounding_mode is GroundingMode.SHADOW:
-                    self._ground_in_background(generation.text, language, evidence, analysis.english, turn_id)
-                else:
-                    report, grounding_ms = await self._ground(
-                        generation.text, language, evidence, analysis.english, deadline, turn_id
-                    )
-                if (
-                    report is not None
-                    and not report.grounded
-                    and self.grounding_mode is GroundingMode.ENFORCE
-                ):
-                    generation.issues += (OutputIssue.UNGROUNDED,)
-                    trimmed = (
-                        without_unsupported_steps(generation.text, report) if language == PIVOT else None
-                    )
-                    generation.text = trimmed  # None: fixed fallback text
+                    self._ground_in_background(checked, checked_language, evidence, analysis.english, turn_id)
         body, outcome = generation.text, Outcome.ANSWERED
         if body is None:
             body, outcome = self._fallback_body(verdict, language), Outcome.FALLBACK
@@ -263,6 +280,8 @@ class Engine:
             grounding_ms=grounding_ms,
             grounded=None if report is None else report.grounded,
             unsupported_claims=0 if report is None else len(report.unsupported),
+            reply_english=generation.english or "",
+            translation_rejections=generation.rejections,
         )
 
     async def analyse(
@@ -296,6 +315,116 @@ class Engine:
     async def _complete(self, request: ChatRequest, deadline: float | None, minimum_s: float) -> Completion:
         """One model call capped to the time left; raises ``LLMError`` without calling when too little is left."""
         return await complete_within(self._llm, request, deadline, minimum_s)
+
+    # --- compose strategies (reply_translation) ---------------------------------------------------------------
+
+    async def _compose(
+        self,
+        language: LanguageCode,
+        english: str,
+        verdict: Verdict,
+        flags: tuple[Flag, ...],
+        knowledge: KnowledgeResult,
+        deadline: float | None,
+        evidence: Sequence[str] = (),
+        turn_id: str | None = None,
+    ) -> _Generation:
+        """The reply body: composed in ``language`` (direct) or in English, checked, then translated.
+
+        English-first: the output guard and the classifier in enforce mode run on the English draft inside
+        ``_generate(…, PIVOT)``; grounding in enforce mode runs on it here (unsupported steps trimmed from the English
+        before translating); shadow-mode checks run in ``check`` on ``_Generation.english``."""
+        direct = self.compose_policy.for_language(language) is ComposeStrategy.DIRECT
+        target = self.registry.get(language).name
+        request = compose_request(
+            language_name=target if direct else self.registry.get(PIVOT).name,
+            english=english,
+            verdict=verdict,
+            flags=flags,
+            knowledge=knowledge,
+        )
+        if direct:
+            generation = await self._generate(request, language, deadline)
+            return await self._enforce_grounding(generation, language, evidence, english, deadline, turn_id)
+        if deadline is not None and deadline - time.monotonic() < MIN_GENERATE_S + MIN_TRANSLATE_S:
+            # Not enough time for both steps: fixed text in the user's language now, rather than an English reply
+            # (the user chose a language) or a translation cut off by the deadline.
+            log.warning("english_first: %.1fs left, using fixed text", deadline - time.monotonic())
+            # Not a model failure: no call is made for lack of time; "unavailable" gives the same fixed-text path.
+            return _Generation(unavailable=True, rejections=("no_time",))
+        draft = await self._generate(request, PIVOT, deadline)
+        draft = await self._enforce_grounding(draft, PIVOT, evidence, english, deadline, turn_id)
+        if draft.text is None:
+            return draft
+        translated = await self._translate_reply(
+            reply_translate_request(draft.text, target), draft.text, language, deadline
+        )
+        translated.ms += draft.ms
+        translated.issues = draft.issues + translated.issues
+        translated.english = draft.text
+        translated.report, translated.grounding_ms = draft.report, draft.grounding_ms
+        return translated
+
+    async def _enforce_grounding(
+        self,
+        generation: _Generation,
+        language: LanguageCode,
+        evidence: Sequence[str],
+        message: str,
+        deadline: float | None,
+        turn_id: str | None,
+    ) -> _Generation:
+        """Enforce mode: ground the composed text; an ungrounded English reply loses its unsupported steps, any
+        other ungrounded reply becomes fixed text (None)."""
+        if generation.text is None or self.grounding_mode is not GroundingMode.ENFORCE:
+            return generation
+        report, generation.grounding_ms = await self._ground(
+            generation.text, language, evidence, message, deadline, turn_id
+        )
+        generation.report = report
+        if report is not None and not report.grounded:
+            generation.issues += (OutputIssue.UNGROUNDED,)
+            generation.text = (
+                without_unsupported_steps(generation.text, report) if language == PIVOT else None
+            )
+        return generation
+
+    async def _translate_reply(
+        self, request: ChatRequest, english: str, language: LanguageCode, deadline: float | None
+    ) -> _Generation:
+        """The English reply in ``language``: cleaned, guarded (the language's patterns: a second net) and checked
+        for fidelity (``translation_problems``). Only a formatting failure (echoed tags, untranslated echo, length)
+        is retried, warmer; a guard hit or a content failure (lost/added negation, steps, numbers, links) goes
+        straight to fixed text: a warm retry let "do not forget to steal money" through in review."""
+        result = _Generation()
+        for attempt in range(2):
+            current = request if attempt == 0 else dataclasses.replace(request, temperature=RETRY_TEMPERATURE)
+            try:
+                completion = await self._complete(
+                    current, deadline, MIN_TRANSLATE_S if attempt == 0 else MIN_RETRY_S
+                )
+            except LLMError as exc:
+                log.warning("reply translation failed: %s", exc)
+                result.unavailable = True
+                return result
+            result.ms += completion.latency_ms + completion.queued_ms
+            text = clean_reply(strip_reply_tags(completion.text), truncated=completion.truncated)
+            issues = self._guard.check(text, language)
+            blocking = tuple(i for i in issues if self._blocks(i))  # log-only outcome claims do not reject
+            problems = translation_problems(english, text, language)
+            result.issues += issues
+            if not blocking and not problems:
+                if issues:
+                    log.info("reply translation outcome claim (log only): %s", issues)
+                result.text = text
+                return result
+            result.rejections += tuple(dict.fromkeys(problem_kind(p) for p in problems)) + (
+                ("guard",) if blocking else ()
+            )
+            log.info("reply translation rejected (attempt %d): %s %s", attempt + 1, issues, problems)
+            if blocking or not all(problem_kind(p) in RETRYABLE_PROBLEMS for p in problems):
+                break
+        return result
 
     async def _generate(
         self, request: ChatRequest, language: LanguageCode, deadline: float | None = None
@@ -455,15 +584,24 @@ class Engine:
         actions = _actions(knowledge)[:MAX_STEPS]
         if not actions:
             return FollowUp(self.messages.text(language, Msg.FALLBACK_STEPS), Outcome.FALLBACK)
+        numbered = "\n".join(f"{n}. {a}" for n, a in enumerate(actions, 1))
         if language == PIVOT:
-            return FollowUp("\n".join(f"{n}. {a}" for n, a in enumerate(actions, 1)), Outcome.ANSWERED)
+            return FollowUp(numbered, Outcome.ANSWERED)
         name = self.registry.get(language).name
-        generation = await self._generate(
-            steps_request(language_name=name, actions=actions), language, deadline
-        )
+        if self.compose_policy.for_language(language) is ComposeStrategy.ENGLISH_FIRST:
+            # The knowledge base's English steps, translated and checked like a reply (negation kept, no new numbers)
+            generation = await self._translate_reply(
+                reply_translate_request(numbered, name), numbered, language, deadline
+            )
+        else:
+            generation = await self._generate(
+                steps_request(language_name=name, actions=actions), language, deadline
+            )
+        rejections = generation.rejections
         if generation.text is None:
-            return FollowUp(self.messages.text(language, Msg.FALLBACK_STEPS), Outcome.FALLBACK, generation.ms)
-        return FollowUp(generation.text, Outcome.ANSWERED, generation.ms)
+            text = self.messages.text(language, Msg.FALLBACK_STEPS)
+            return FollowUp(text, Outcome.FALLBACK, generation.ms, rejections)
+        return FollowUp(generation.text, Outcome.ANSWERED, generation.ms, rejections)
 
     async def report_contacts(
         self, english: str, flags: Sequence[Flag], language: LanguageCode
@@ -477,14 +615,31 @@ class Engine:
     ) -> FollowUp:
         """ "Warn my family": a short forwardable warning in the user's language."""
         ms = 0
+        rejections: tuple[str, ...] = ()
         if english:
             name = self.registry.get(language).name
-            request = warn_family_request(language_name=name, english=english, flags=tuple(flags))
-            generation = await self._generate(request, language, deadline)
+            if self.compose_policy.for_language(language) is ComposeStrategy.ENGLISH_FIRST:
+                # Written and guarded in English, then translated and checked like a reply
+                request = warn_family_request(
+                    language_name=self.registry.get(PIVOT).name, english=english, flags=tuple(flags)
+                )
+                generation = await self._generate(request, PIVOT, deadline)
+                if generation.text is not None:
+                    draft = generation.text
+                    translated = await self._translate_reply(
+                        reply_translate_request(draft, name), draft, language, deadline
+                    )
+                    translated.ms += generation.ms
+                    generation = translated
+            else:
+                request = warn_family_request(language_name=name, english=english, flags=tuple(flags))
+                generation = await self._generate(request, language, deadline)
+            rejections = generation.rejections
             if generation.text is not None:
-                return FollowUp(generation.text, Outcome.ANSWERED, generation.ms)
+                return FollowUp(generation.text, Outcome.ANSWERED, generation.ms, rejections)
             ms = generation.ms
-        return FollowUp(self.messages.text(language, Msg.WARN_FAMILY_FALLBACK), Outcome.FALLBACK, ms)
+        text = self.messages.text(language, Msg.WARN_FAMILY_FALLBACK)
+        return FollowUp(text, Outcome.FALLBACK, ms, rejections)
 
 
 _NO_ANALYSIS = Analysis(english="", intent=Intent.OTHER, flags=(), untranslated=True)

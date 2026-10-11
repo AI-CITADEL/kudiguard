@@ -6,6 +6,7 @@ misconfigured deployment fails fast instead of half-working.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -13,6 +14,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from kudiguard.hosting import StorageLocation
+from kudiguard.reply_translation import DEFAULT_COMPOSE_STRATEGY, ComposePolicy
 
 ROOT = Path(__file__).resolve().parents[2]  # source checkout; set KUDIGUARD_DATA_DIR etc. for other installs
 
@@ -66,6 +68,10 @@ class Settings(BaseSettings):
     speech: bool = True
     preload_languages: Annotated[tuple[str, ...], NoDecode] = ("ha", "en")  # warm speech models at startup
     ffmpeg: str | None = None
+    # How replies are written (kudiguard.reply_translation): english_first (compose in English, check, translate) or
+    # direct (compose in the user's language), with per-language overrides. Default "english_first,ha=direct":
+    # Yoruba/Igbo English-first, Hausa direct (docs/SPIKES.md H); English is always direct.
+    compose_strategy: str = DEFAULT_COMPOSE_STRATEGY
 
     # --- conversation limits ------------------------------------------------------------------------------
     per_user_per_hour: int = Field(default=20, ge=1)
@@ -106,6 +112,16 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return tuple(part.strip() for part in value.split(",") if part.strip())
         return value
+
+    @field_validator("compose_strategy")
+    @classmethod
+    def _valid_compose_strategy(cls, value: str) -> str:
+        ComposePolicy.parse(value)  # fail fast at startup on a typo
+        return value
+
+    def compose_policy(self, languages: Iterable[str] | None = None) -> ComposePolicy:
+        """``languages``: the configured codes (startup); an override for another code raises ``ValueError``."""
+        return ComposePolicy.parse(self.compose_strategy, languages)
 
     def voice_secret(self) -> bytes:
         """Input key for donated-audio encryption: ``voice_key`` if set, else the hash secret."""

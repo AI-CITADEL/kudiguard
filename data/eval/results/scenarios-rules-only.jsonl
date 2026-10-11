@@ -15,7 +15,7 @@
 {"id": "s15", "lang": "ha", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s16", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s17", "lang": "ha", "label": "scam", "verdict": "caution", "flags": ["upfront_fee"], "english": ""}
-{"id": "s18", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s18", "lang": "ha", "label": "scam", "verdict": "caution", "flags": ["secrecy"], "english": ""}
 {"id": "s19", "lang": "ha", "label": "scam", "verdict": "likely_scam", "flags": ["suspicious_link", "impersonation"], "english": ""}
 {"id": "s20", "lang": "ha", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s21", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
@@ -24,12 +24,12 @@
 {"id": "s24", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s25", "lang": "yo", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s26", "lang": "yo", "label": "scam", "verdict": "caution", "flags": ["suspicious_link"], "english": ""}
-{"id": "s27", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s27", "lang": "yo", "label": "scam", "verdict": "caution", "flags": ["secrecy"], "english": ""}
 {"id": "s28", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s29", "lang": "yo", "label": "scam", "verdict": "likely_scam", "flags": ["remote_access", "impersonation"], "english": ""}
 {"id": "s30", "lang": "yo", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s31", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
-{"id": "s32", "lang": "ig", "label": "legit", "verdict": "caution", "flags": ["urgency"], "english": ""}
+{"id": "s32", "lang": "ig", "label": "legit", "verdict": "likely_scam", "flags": ["asks_credentials", "urgency"], "english": ""}
 {"id": "s33", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s34", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
 {"id": "s35", "lang": "ig", "label": "legit", "verdict": "not_a_check", "flags": [], "english": ""}
@@ -37,4 +37,4 @@
 {"id": "s37", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["upfront_fee"], "english": ""}
 {"id": "s38", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["impersonation"], "english": ""}
 {"id": "s39", "lang": "ig", "label": "scam", "verdict": "caution", "flags": ["impersonation"], "english": ""}
-{"id": "s40", "lang": "ig", "label": "scam", "verdict": "not_a_check", "flags": [], "english": ""}
+{"id": "s40", "lang": "ig", "label": "scam", "verdict": "likely_scam", "flags": ["guaranteed_returns"], "english": ""}

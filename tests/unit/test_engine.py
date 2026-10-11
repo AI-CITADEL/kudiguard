@@ -100,13 +100,18 @@ async def test_hausa_uses_translation_fallback_when_analysis_echoes(
     registry: LanguageRegistry, knowledge: KnowledgeBase
 ) -> None:
     llm = FakeLLM(
-        analyse=analysis(HA_OTP, "scam_check"), translate=HA_OTP_EN, compose="Kada ka bayar da lambar."
+        analyse=analysis(HA_OTP, "scam_check"),
+        translate=HA_OTP_EN,
+        compose="Kada ka bayar da lambar.",
     )
     answer = await engine_with(registry, knowledge, llm).check(HA_OTP, "ha")
     assert len(llm.calls(Purpose.TRANSLATE)) == 1
     assert answer.english == HA_OTP_EN
     assert answer.verdict is Verdict.LIKELY_SCAM and answer.outcome is Outcome.ANSWERED
+    # Hausa is composed directly by default (docs/SPIKES.md H): no reply translation
     assert "Reply in Hausa" in llm.calls(Purpose.COMPOSE)[0].messages[-1]["content"]
+    assert llm.calls(Purpose.REPLY_TRANSLATE) == [] and answer.reply_english == ""
+    assert answer.body == "Kada ka bayar da lambar."
 
 
 async def test_hausa_without_any_translation_answers_with_fixed_text(
