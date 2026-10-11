@@ -28,6 +28,10 @@ yo-023, ig-001). n=6, so this is indicative only; ha/yo/ig cases are DRAFT near-
 **not the main cause** of missed scams; the larger failure on T is false alarms on genuine messages (36% flagged,
 all languages).
 
+The T v2 re-run (5503deb, `e2e-live2.jsonl`; not independent) gives the same picture: 6 yo/ig scam misses again
+(ig 4: 2 never translated, 2 with no rule cue in the translation; yo 2, no rule cue), and the same 35/96 genuine
+messages flagged. One Igbo miss, ig-001, got worse: it is now shown green (`no_flags`) instead of not checked.
+
 ## 2. The constraint
 
 The NAIC 2026 challenge is built on N-ATLAS, and judges score how deeply a project uses it (`docs/WHY_KUDIGUARD.md`).
