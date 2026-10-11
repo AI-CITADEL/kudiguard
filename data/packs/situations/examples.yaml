@@ -1,0 +1,163 @@
+# Model answers (<= 60 words), keyed by entry id in topics.yaml. Calm and specific; the most urgent step first.
+# Not read by the current loader (Entry forbids unknown fields); workstream E is adding an `example` field.
+sit-card-stolen: >-
+  Block the card now in your bank app, with your bank's USSD code, or by calling your bank. Then check your account
+  for any debit you did not make and report each one to your bank in writing. Keep the complaint number and ask for a
+  replacement card.
+sit-phone-stolen-banking: >-
+  From another phone, call your bank first and ask them to block mobile and USSD banking. Then call your network to
+  block the SIM, and visit their office with your ID for a new SIM. Change your email password, and report any
+  transfer you did not make.
+sit-sim-swap: >-
+  If your line suddenly has no service, someone may have swapped your SIM. From another phone, call your network and
+  ask them to block it. Then call your bank to block mobile and USSD banking. Visit your network's office with your ID
+  to get your line back.
+sit-whatsapp-hijacked: >-
+  Open WhatsApp and log in again with your number, using the 6-digit SMS code. This logs the other person out. If they
+  set a PIN, you may need to wait 7 days. Warn your contacts by SMS not to send money. Then turn on two-step
+  verification and never share the code.
+sit-email-facebook-hacked: >-
+  For Facebook, go to facebook.com/hacked and follow the steps. For Gmail, use Google's account recovery page from a
+  device you used before. Once back in, change your password, turn on two-step verification and remove unknown phones
+  or emails. Never pay anyone to recover it.
+sit-card-wrong-pin: >-
+  Cards lock after a few wrong PINs to protect you. Your bank can unlock or reset it through its app, a branch, or the
+  number on the back of your card. Nobody needs your PIN to unlock it, and do not take help from strangers at the ATM.
+sit-fake-buyer-paid: >-
+  Do not release the goods yet. Screenshots and SMS alerts are easy to fake. Open your own bank app and confirm the
+  money is in your available balance. If the buyer says the bank is "delayed", keep the goods until the money shows.
+sit-p2p-crypto-release: >-
+  Release the coins only when the money is in your own bank account, checked in your bank app. Reject payment from a
+  different name; it may be stolen money and get your account frozen. Keep the chat inside the exchange and open an
+  appeal if anything is wrong.
+sit-pos-reversal-trick: >-
+  Do not give cash back because someone says the POS payment failed. Check your own POS wallet or account. If the
+  customer was debited but you were not credited, their bank handles it; give them the receipt and reference.
+sit-wrong-transfer-send-back: >-
+  First check your bank app; the alert may be fake. If the money really came in, do not send it back yourself. Tell
+  the person to ask their bank to recall it, and inform your bank so it returns the money to the source account.
+sit-ponzi-double-money: >-
+  Fixed high returns, bonuses for bringing people, and pressure to reinvest are signs of a Ponzi scheme. CBEX promised
+  this and collapsed in 2025. Before paying, check the company on the SEC register at sec.gov.ng. Never pay a
+  "withdrawal fee" to get money out.
+sit-celebrity-deepfake-ad: >-
+  Videos of famous people promoting investments are often fake, made with AI. Famous people do not send private
+  investment links. Check the company with the SEC before paying. If you already joined, do not pay any "tax" to
+  withdraw; report to your bank and the EFCC.
+sit-fake-job-fee: >-
+  Real employers do not charge you for training, processing or uniforms before you start. "Task" jobs that later ask
+  you to deposit money are scams. Check the company on the CAC public search and call its office using its own
+  website. Do not pay.
+sit-advance-fee-loan: >-
+  Do not pay. Real lenders deduct fees from the loan; they do not ask for an "insurance" or "activation" fee first.
+  Check the lender is on the FCCPC approved list. If you already paid, stop; more fees will follow. Report it to the
+  FCCPC and your bank.
+sit-fake-delivery-fee: >-
+  Do not click the link or pay. Fake delivery messages steal card details. If you expect a parcel, type the tracking
+  number on the courier's own app or website. If you already entered card details, call your bank now to block the
+  card.
+sit-bank-blocked-link: >-
+  Banks do not unblock accounts through links. Do not click. Open your bank app yourself or call the number on your
+  card. If you already typed your login, PIN or OTP, call your bank now to block the account, then change your
+  password.
+sit-fake-nin-bvn-update: >-
+  Do not click. NIN updates happen at NIMC centres or official NIMC services, and BVN changes happen at your bank. Fake
+  update pages steal details to take loans in your name. If you entered details, tell your bank and watch your account.
+sit-fake-student-loan: >-
+  NELFUND says its only official portal is nelf.gov.ng, and other links are fake. Do not pay anyone to process or
+  fast-track a loan. Apply only on nelf.gov.ng, and report fake links to info@nelf.gov.ng.
+sit-fake-grant: >-
+  Grant, palliative or TraderMoni messages with WhatsApp links are usually fake. Real programmes do not ask for fees,
+  OTPs or forwarding. Check the agency's own website or your local government office. If you entered bank details,
+  tell your bank.
+sit-fake-cbn-message: >-
+  This is a scam. The CBN regulates banks; it does not keep money for individuals or call about payouts. Do not pay
+  any "release" or "clearance" fee. Ignore the message and report it to the EFCC.
+sit-romance-scam: >-
+  Please do not send money, gift cards or crypto to someone you have not met in person. Romance scammers build trust,
+  avoid video calls, then ask for emergency money. Do not send intimate photos. Keep the chats and report to the EFCC
+  and the app.
+sit-loan-app-shaming: >-
+  Lenders may not shame you or message your contacts. Screenshot every message and call, then report the lender to the
+  FCCPC; misuse of your contacts can also go to the NDPC. Report threats to your safety to the police. Pay what you
+  fairly owe only through the app.
+sit-sextortion: >-
+  Do not pay; paying brings more demands. Stop replying but keep the chat, and screenshot the threats and account
+  name. Report the account to the app and to the police cybercrime centre. You are the victim. Talk to someone you
+  trust.
+sit-fake-arrest-bail: >-
+  Police bail in Nigeria is free. Do not pay anyone on the phone for bail or "settlement". Hang up and call your
+  relative on the number you know. If you are unsure, go to the police station or EFCC office in person and ask.
+sit-voice-clone-relative: >-
+  Voices can be copied with AI. Hang up and call your relative back on the number you already have. Ask something only
+  they would know, or use a family code word. Be careful if they want payment to another person's account or secrecy.
+sit-religious-leader-impersonation: >-
+  Scammers copy pastors' and imams' names and photos. Call your leader or the church or mosque office on a number you
+  already know before paying anything. Give only through the official account announced in person.
+sit-fake-lottery-dv: >-
+  You cannot win a lottery you did not enter, and any fee to claim a prize is a scam. Natives of Nigeria were not
+  eligible for the DV-2026 US visa lottery, and the State Department does not call winners. Check rules only on
+  travel.state.gov.
+sit-fake-abroad-job-visa: >-
+  Visa fees go to the embassy or its official visa centre, not an agent's personal account. Be wary of "guaranteed"
+  visas or jobs with no interview. Check the employer on its own website, keep copies of your documents, and never
+  give up your passport.
+sit-fake-customer-care: >-
+  That account is likely fake. Real banks never ask for your PIN, OTP or card number in chats. Do not share details or
+  click their links. Contact your bank only through its app, official website, or the number on your card.
+sit-lost-money-now: >-
+  Call your bank now; speed matters. Give the amount, time and receiving account, and ask them to contact the
+  receiving bank to hold the money. Make a written complaint and keep the number. Then report to the EFCC or police.
+  Never pay "recovery agents".
+sit-dispute-debit: >-
+  Block your card or account first. Then write to your bank listing each debit you did not make, with date, amount and
+  reference, and get a complaint number. If the bank does not resolve it in time, escalate to the CBN at
+  cpd@cbn.gov.ng with that number.
+sit-debited-not-received: >-
+  Many failed transfers reverse on their own, so check again soon. If not, complain to your bank with the date, amount,
+  receiver and reference, and get a tracking number. If the bank does not acknowledge within 3 days or resolve it,
+  escalate to cpd@cbn.gov.ng.
+sit-evidence-to-keep: >-
+  Screenshot the chats, phone numbers, profiles and links before they disappear. Keep receipts, references and the
+  account numbers you paid into. Note dates and times of calls. Give all of this to your bank and the EFCC or police.
+sit-ndic-fintech-wallet: >-
+  Licensed mobile money operators keep your money in bank trust accounts. NDIC pass-through cover protects each
+  subscriber up to N5 million per operator if that bank fails. It does not cover scams or unlicensed apps. Check the
+  app is CBN-licensed and confirm limits on the NDIC website.
+sit-check-company: >-
+  Ask for the RC number and search it free on search.cac.gov.ng. CAC registration only shows the company exists. For
+  investments, also check the SEC register at sec.gov.ng; for loan apps, the FCCPC approved list.
+sit-ajo-collector-disappears: >-
+  Gather the other members and list what each person paid, with receipts and chats. Report together to the police
+  station near where the collector lived or worked; large losses can also go to the EFCC. Informal ajo money is not
+  insured.
+sit-fake-bank-staff-visit: >-
+  Banks do not send staff to collect your card or PIN. Do not hand over your card, even if they show an ID. Call your
+  bank on the number on your card. If you already gave it, call your bank now to block it.
+sit-fake-payment-link: >-
+  You never need your PIN, card details or OTP to receive money. A link or QR code asking for them takes money from
+  you. Give only your account number and name. If you entered details, call your bank now.
+sit-money-mule: >-
+  Please say no. Receiving and passing on money for others can make you part of a fraud, get your account frozen, or
+  get you arrested. If money has already come in, tell your bank before you move it.
+sit-online-vendor-no-delivery: >-
+  Ask the vendor in writing for delivery or a refund by a set date, and keep all messages. If they block you, report
+  them to the platform and tell your bank about the transfer. Report fraud to the EFCC or police.
+sit-fake-house-agent: >-
+  Do not pay for a house, shop or land you have not inspected. Ask to meet the landlord or see proof of ownership. Pay
+  into the landlord's or a registered company's account and get a written receipt and agreement.
+sit-installed-unknown-app: >-
+  Uninstall the app now. From another phone, call your bank and ask them to watch or block your account. Change your
+  bank app PIN and password after removing it. Install apps only from Google Play or the App Store.
+sit-pos-agent-overcharge: >-
+  Stay and ask the agent to check the terminal and print the receipt. Many failed withdrawals reverse on their own. If
+  not, complain to your bank with the receipt and reference, and note the agent's name, location and POS provider.
+sit-forex-crypto-signal: >-
+  Mentors who show big profits and choose your platform are often scammers. Fake platforms block withdrawals or demand
+  "tax". Do not deposit more. Check the platform with the SEC and report to your bank and the EFCC.
+sit-family-emergency-new-number: >-
+  Scammers often say "this is my new number" and ask for urgent money. Call the old number you have for the person, or
+  ask someone close to them, before you pay anything.
+sit-fake-network-call: >-
+  Hang up. Networks do not ask you to dial codes or share PINs or OTPs to keep your SIM. Some codes forward your calls
+  and texts to scammers. If you dialled one, call your network from another phone.

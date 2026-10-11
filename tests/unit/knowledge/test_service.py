@@ -211,6 +211,7 @@ async def test_build_sources_default_is_every_enabled_real_pack() -> None:
     assert [s.manifest.id for s in sources] == [
         "kudiguard-core",
         "money-skills",
+        "situations",
     ]  # fictional samples stay off
 
 

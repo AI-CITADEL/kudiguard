@@ -1,0 +1,17 @@
+# KudiGuard's own situation pack: one entry per specific scam situation or money problem, with ordered steps
+# (most urgent first). It complements kudiguard-core (red flags, basics) and never repeats it. Sources and the date
+# each fact was checked are in a YAML comment above every entry in topics.yaml. Model answers for each entry are in
+# examples.yaml (id -> text); the current loader ignores that file (Entry has no `example` field yet).
+id: situations
+name: KudiGuard Situations
+owner: KudiGuard
+kind: core
+priority: 10
+content_language: en
+cite: false  # our own content: not cited as a third-party source
+description: >
+  Specific scam situations and money problems (stolen card, SIM swap, hijacked WhatsApp, fake buyer alerts, Ponzi
+  schemes, fake grants, sextortion, fake arrests, money already lost, complaints and deposit insurance) with short,
+  ordered steps that N-ATLAS can restate in Hausa, Yoruba, Igbo, Pidgin or English.
+source:
+  type: files
