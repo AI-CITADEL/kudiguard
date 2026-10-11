@@ -245,7 +245,7 @@ lawyer confirms this.
   |---|---|
   | Activity | Voice-note donation for speech-recognition testing |
   | Data subjects | Adult users who opt in (chat, web, tester form) |
-  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source, withdrawal time); DELETE markers (keyed HMAC and time, 30 days) |
+  | Categories | Voice audio, pseudonymous id, language, channel, week, redacted transcript, consent record (version, time, source, withdrawal time); DELETE markers (keyed HMAC and time, 30 days; for erased users who were active in the last 30 days, a second keyed marker with the time of their last message, for the licence cap) |
   | Basis | Consent (s.25, s.30 explicit consent) |
   | Recipients | Named reviewers and transcribers under written confidentiality |
   | Transfers | Outside Nigeria during the pilot: our server, and Meta and Cloudflare in transit. Basis: informed consent (s.43) |

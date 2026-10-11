@@ -32,7 +32,7 @@ from kudiguard.donation import Sealer, VoiceVault
 from kudiguard.envfile import load_env_file
 from kudiguard.privacy import UserHasher
 from kudiguard.reporting import USER_CHANNELS, build_report, format_report
-from kudiguard.storage.base import DELETION_MARKER_DAYS, utcnow
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 
@@ -101,6 +101,12 @@ def cmd_patterns(settings: Settings, args: argparse.Namespace) -> int:
 
 def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
     from kudiguard.api.services import pattern_keep_from
+
+    if settings.active_user_cap is not None and args.days < ACTIVE_USER_WINDOW_DAYS:
+        raise ValueError(
+            f"--days must be at least {ACTIVE_USER_WINDOW_DAYS} while the licence cap is on: it counts active users "
+            "from the evidence log"
+        )
 
     async def run() -> tuple[int, int, int, int]:
         if not settings.db_path.is_file():  # never create an empty database (its vault would match no files)

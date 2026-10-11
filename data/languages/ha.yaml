@@ -118,6 +118,7 @@ strings:
   warn_family_fallback: "⚠️ Gargaɗi kan damfara: wani zai iya tuntuɓarku yana cewa daga banki ko hukumar gwamnati yake, ko yana alƙawarin kuɗi. Kada ku taɓa bayar da OTP, PIN ko BVN ɗinku, kuma kada ku biya kuɗi don karɓar kuɗi. Ku tabbatar da bankinku tukuna."
   at_capacity: "😔 KudiGuard ta cika yanzu. Don Allah ku sake gwadawa bayan 'yan kwanaki."
   busy: "⏳ Mutane da yawa suna tambaya yanzu. Don Allah ku sake gwadawa bayan minti ɗaya."
+  new_users_busy: "⏳ Sababbin mutane da yawa suna shiga KudiGuard yanzu. Don Allah ku sake gwadawa bayan kimanin awa ɗaya."
   privacy_link: "🔐 Sanarwar sirri: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-

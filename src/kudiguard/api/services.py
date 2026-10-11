@@ -32,7 +32,7 @@ from kudiguard.safety.grounding import GroundingChecker, GroundingMode, Groundin
 from kudiguard.safety.guard_classifier import ClassifierMode, ClassifierModel, UnsafeAdviceClassifier
 from kudiguard.safety.output_guard import OutputGuard
 from kudiguard.speech.audio import find_ffmpeg, sweep_stale_audio
-from kudiguard.storage.base import DELETION_MARKER_DAYS, Store, utcnow
+from kudiguard.storage.base import ACTIVE_USER_WINDOW_DAYS, DELETION_MARKER_DAYS, Store, utcnow
 from kudiguard.storage.sqlite import SQLiteStore
 
 log = logging.getLogger(__name__)
@@ -162,8 +162,12 @@ async def _purge_once(
     # DELETION_MARKER_DAYS (/privacy), while still outliving every importable form answer (29 days).
     marker_cutoff = now - timedelta(days=DELETION_MARKER_DAYS) + timedelta(seconds=interval_s) + PURGE_MARGIN
     pattern_cutoff = pattern_keep_from(now, pattern_retention_days, interval_s)
-    # Messages likewise: "up to N days" holds until the next pass, so purge one interval (plus margin) early.
-    evidence_cutoff = now - timedelta(days=retention_days) + timedelta(seconds=interval_s) + PURGE_MARGIN
+    # Messages likewise: "up to N days" holds until the next pass, so purge one interval (plus margin) early, but
+    # never inside the licence window: the cap counts active users from these rows (retention_days >= 31).
+    evidence_cutoff = min(
+        now - timedelta(days=retention_days) + timedelta(seconds=interval_s) + PURGE_MARGIN,
+        now - timedelta(days=ACTIVE_USER_WINDOW_DAYS),
+    )
     steps: list[tuple[str, Callable[[], Awaitable[int]]]] = [
         ("evidence", lambda: store.purge_before(evidence_cutoff)),
         (

@@ -1,13 +1,14 @@
 """The one licence-cap gate shared by WhatsApp, the website and the partner API (``kudiguard.admission``)."""
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from kudiguard.admission import Admission, AtCapacity
+from kudiguard.admission import Admission, AtCapacity, NewUsersBusy
 from kudiguard.domain import Interaction, MessageKind
+from kudiguard.i18n import Msg
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
 from kudiguard.storage.base import utcnow
 from kudiguard.storage.memory import MemoryStore
@@ -23,7 +24,7 @@ def row(user_hash: str, channel: str = "whatsapp", days_ago: float = 0) -> Inter
     )  # fmt: skip
 
 
-async def test_no_cap_and_no_checks_admits_everyone_without_a_slot() -> None:
+async def test_no_cap_and_no_gates_admits_everyone_without_a_slot() -> None:
     gate = Admission(MemoryStore(HASHER), None)
     reservation = await gate.reserve("u1", "web")
     assert not reservation.holds_slot and gate.in_flight == 0
@@ -36,7 +37,6 @@ async def test_new_users_hold_a_slot_until_released_and_returning_users_never_ne
     assert not (await gate.reserve("active", "whatsapp")).holds_slot  # active in the window: always served
     first = await gate.reserve("new-1", "api")
     assert first.holds_slot and gate.in_flight == 1
-    assert not (await gate.reserve("new-1", "api")).holds_slot  # its first turn already holds the slot
     with pytest.raises(AtCapacity, match="licence cap"):
         await gate.reserve("new-2", "web")  # 1 active + 1 in flight = cap 2
     first.release()
@@ -44,6 +44,36 @@ async def test_new_users_hold_a_slot_until_released_and_returning_users_never_ne
     assert gate.in_flight == 0
     async with gate.admitted("new-2", "web") as second:
         assert second.holds_slot and gate.in_flight == 1
+    assert gate.in_flight == 0
+
+
+async def test_concurrent_requests_of_one_new_user_each_hold_the_slot() -> None:
+    """The twin attack: a first request that ends without a log (a 422) must not free the slot its twin is using."""
+    store = MemoryStore(HASHER)
+    gate = Admission(store, 1)
+    first = await gate.reserve("twin", "web")
+    second = await gate.reserve("twin", "web")  # concurrent: counted, not free
+    assert first.holds_slot and second.holds_slot and gate.in_flight == 1
+    first.release()  # the slow, empty request 422s
+    with pytest.raises(AtCapacity):
+        await gate.reserve("other", "web")  # the twin is still being served
+    second.release()
+    assert gate.in_flight == 0
+    (await gate.reserve("other", "web")).release()
+
+
+async def test_a_failed_log_keeps_the_slot_for_a_window() -> None:
+    now = [datetime(2026, 10, 11, 12, tzinfo=utcnow().tzinfo)]
+    store = MemoryStore(HASHER)
+    gate = Admission(store, 1, clock=lambda: now[0])
+    served = await gate.reserve("served", "api")
+    served.hold()  # its interaction could not be written: served, but invisible to the store
+    served.hold()  # idempotent once released
+    assert gate.in_flight == 1
+    with pytest.raises(AtCapacity):
+        await gate.reserve("next", "api")
+    now[0] += timedelta(days=30)
+    (await gate.reserve("next", "api")).release()  # the hold expired with the window
     assert gate.in_flight == 0
 
 
@@ -66,37 +96,68 @@ async def test_a_channel_share_limits_only_that_channel() -> None:
     held.release()
 
 
-async def test_a_delete_keeps_its_slot_for_the_rest_of_the_window() -> None:
-    store = MemoryStore(HASHER)
-    gate = Admission(store, 1)
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+async def test_a_delete_keeps_its_slot_only_for_users_who_were_active(kind: str, tmp_path: Path) -> None:
+    store = (
+        MemoryStore(HASHER) if kind == "memory" else await SQLiteStore.open(tmp_path / "kg.db", hasher=HASHER)
+    )
+    gate = Admission(store, 2)
+    since = utcnow() - timedelta(days=30)
+    for stranger in range(5):  # numbers that never used KudiGuard: no slot taken (and no way to block others)
+        await store.delete_user(f"stranger-{stranger}")
+    await store.add_interaction(row("old", days_ago=40))
+    await store.delete_user("old")  # active only before the window
+    assert await store.count_deletions_since(since) == 0
     await store.add_interaction(row("leaver"))
     await store.delete_user("leaver")
-    assert await store.count_active_users_since(utcnow() - timedelta(days=30)) == 0
+    assert await store.count_active_users_since(since) == 0 and await store.count_deletions_since(since) == 1
+    assert await store.deleted_at("stranger-0") is not None  # the sign-up import marker is unchanged
+    (await gate.reserve("newcomer", "whatsapp")).release()  # 1 erased-but-active + 0 in flight < 2
+    await store.add_interaction(row("active"))
     with pytest.raises(AtCapacity):
-        await gate.reserve("newcomer", "whatsapp")
+        await gate.reserve("another", "whatsapp")  # 1 active + 1 erased = cap
+    if kind == "sqlite":
+        await store.close()  # type: ignore[attr-defined]
 
 
-async def test_new_user_checks_plug_in_and_run_only_for_new_users() -> None:
-    """Where a new-user rate gate (workstream F) plugs in: under the same lock, before the cap."""
+async def test_pure_checks_and_on_admit_hooks_for_a_new_user_gate() -> None:
+    """Where a new-user rate gate (workstream F) plugs in: a pure check, and a hook that takes its token only once
+    the cap has passed, so a user refused at the cap never uses one."""
     store = MemoryStore(HASHER)
     await store.add_interaction(row("known"))
-    seen: list[tuple[str, str]] = []
+    checked: list[str] = []
+    taken: list[tuple[str, str]] = []
 
-    class TooManyNewUsers(AtCapacity):
-        pass
-
-    async def gate_check(user_hash: str, channel: str) -> None:
-        seen.append((user_hash, channel))
+    async def allows(user_hash: str, channel: str) -> None:
+        checked.append(user_hash)
         if user_hash == "blocked":
-            raise TooManyNewUsers("new-user rate")
+            raise NewUsersBusy("new-user rate")
 
-    gate = Admission(store, None)
-    gate.add_check(gate_check)
+    async def take_token(user_hash: str, channel: str) -> None:
+        taken.append((user_hash, channel))
+
+    gate = Admission(store, 2)
+    gate.add_check(allows)
+    gate.add_on_admit(take_token)
     assert not (await gate.reserve("known", "web")).holds_slot
-    assert (await gate.reserve("fresh", "api")).holds_slot
-    with pytest.raises(TooManyNewUsers):
+    assert (await gate.reserve("fresh", "api")).holds_slot  # 1 known + 1 in flight: the cap is now full
+    with pytest.raises(NewUsersBusy):
         await gate.reserve("blocked", "whatsapp")
-    assert seen == [("fresh", "api"), ("blocked", "whatsapp")] and gate.in_flight == 1
+    with pytest.raises(AtCapacity):
+        await gate.reserve("late", "whatsapp")  # refused at the cap: no token taken
+    assert checked == ["fresh", "blocked", "late"] and taken == [("fresh", "api")]
+    hooks_only = Admission(store, None, on_admit=(take_token,))
+    assert (await hooks_only.reserve("solo", "web")).holds_slot and taken[-1] == ("solo", "web")
+
+
+def test_refusals_say_what_to_tell_the_user() -> None:
+    assert (AtCapacity.message, AtCapacity.problem, AtCapacity.retry_after_s) == (
+        Msg.AT_CAPACITY,
+        "at_capacity",
+        None,
+    )
+    busy = NewUsersBusy("x")
+    assert (busy.message, busy.problem, busy.retry_after_s) == (Msg.NEW_USERS_BUSY, "busy_new_users", 3600)
 
 
 async def test_concurrent_new_users_on_sqlite_never_overshoot(tmp_path: Path) -> None:
@@ -113,13 +174,10 @@ async def test_concurrent_new_users_on_sqlite_never_overshoot(tmp_path: Path) ->
             return False
         return True
 
-    admitted = await asyncio.gather(*(arrive(n) for n in range(30)))
+    admitted = await asyncio.gather(
+        *(arrive(n) for n in range(30))
+    )  # all arrive before any logs: deterministic
     since = utcnow() - timedelta(days=30)
-    # never more than the cap; a slot seen twice for an instant (logged, not yet released) may refuse one more
-    assert 3 <= sum(admitted) <= 5 and await store.count_active_users_since(since) == sum(admitted)
-    assert await store.count_active_users_since(since, channels={"web"}) <= 2
-    assert await store.count_deletions_since(since) == 0
-    await store.delete_user("user-0")
-    assert await store.count_deletions_since(since) == 1
-    assert await store.count_deletions_since(utcnow() + timedelta(seconds=1)) == 0
+    assert sum(admitted) == 5 and await store.count_active_users_since(since) == 5
+    assert await store.count_active_users_since(since, channels={"web"}) == 2
     await store.close()

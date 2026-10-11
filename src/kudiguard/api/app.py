@@ -28,6 +28,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -38,7 +39,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from kudiguard.admission import AtCapacity
+from kudiguard.admission import AtCapacity, Reservation
 from kudiguard.api.ratelimit import RateLimiter
 from kudiguard.api.services import Services, build_services
 from kudiguard.config import ROOT, Settings
@@ -68,14 +69,16 @@ SMALL_REQUEST_BYTES = 64 * 1024  # JSON endpoints: a 4000-char message is ~16 KB
 LARGE_BODY_PATHS = {"/v1/check/audio": MAX_REQUEST_BYTES, "/web/check": MAX_REQUEST_BYTES,
                     "/webhooks/whatsapp": 2 * 1024 * 1024}  # fmt: skip
 SESSION_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
+# The licence-cap reservation of the request being served (set by ``_admitted``): kept if its log cannot be written.
+_RESERVATION: ContextVar[Reservation] = ContextVar("kudiguard_reservation")
 END_USER_HEADER = "X-KudiGuard-End-User"
 _END_USER = re.compile(r"[A-Za-z0-9._:-]{8,128}")
 # A guardrail against mistakes, not proof of pseudonymity: ids that look like a phone number or an email address are
-# refused. Hex digests (32/40/64 hex characters) and UUIDs, optionally behind a short letter tag ("c-<sha256>"), are
+# refused. Hex digests (32/40/64/128 hex characters) and UUIDs, optionally behind a short letter tag ("c-<sha256>"), are
 # accepted as they are: what partners should send. Anything else may not hold a run of 10+ digits once the separators
 # are removed (catches "user-0803-123-4567", "x8031234567", "cust-447911123456"), nor be digits only.
 _HASHED_ID = re.compile(
-    r"(?i)(?:[a-z]{1,8}[._:-]?)?(?:[0-9a-f]{64}|[0-9a-f]{40}|[0-9a-f]{32}"
+    r"(?i)(?:[a-z]{1,8}[._:-]?)?(?:[0-9a-f]{128}|[0-9a-f]{64}|[0-9a-f]{40}|[0-9a-f]{32}"
     r"|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
 )
 _ONLY_DIGITS = re.compile(r"[\d._:-]+")
@@ -469,6 +472,8 @@ async def _check_in_slot(
         )
     except Exception:
         log.exception("could not log %s check", channel)
+        # served but not in the store: the user keeps their licence-cap slot for the window
+        _RESERVATION.get(Reservation()).hold()
     await record_pattern(services.store, channel, answer, text or "", created)
     return answer, transcript, total_ms
 
@@ -656,12 +661,18 @@ async def _admitted(request: Request, services: Services, user_key: str) -> Asyn
     held for the check, which logs the interaction before it ends."""
     channel = user_key.partition(":")[0]
     try:
-        async with services.admission.admitted(services.hasher.user_id(user_key), channel):
-            yield
-    except AtCapacity as exc:
+        reservation = await services.admission.reserve(services.hasher.user_id(user_key), channel)
+    except AtCapacity as exc:  # the cap, the web share, or a new-user gate (e.g. NewUsersBusy)
         settings: Settings = request.app.state.settings
-        message = plain_text(services.engine.messages.text(settings.default_language, Msg.AT_CAPACITY))
-        raise HTTPException(503, {"problem": "at_capacity", "message": message}) from exc
+        message = plain_text(services.engine.messages.text(settings.default_language, exc.message))
+        headers = {"Retry-After": str(exc.retry_after_s)} if exc.retry_after_s else None
+        raise HTTPException(503, {"problem": exc.problem, "message": message}, headers=headers) from exc
+    token = _RESERVATION.set(reservation)
+    try:
+        yield
+    finally:
+        _RESERVATION.reset(token)
+        reservation.release()
 
 
 def _web_router() -> APIRouter:

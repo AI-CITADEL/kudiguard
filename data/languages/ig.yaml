@@ -122,6 +122,7 @@ strings:
   warn_family_fallback: "⚠️ Ịdọ aka ná ntị maka aghụghọ: mmadụ nwere ike ịkpọtụrụ unu na-ekwu na o si n'ụlọ akụ ma ọ bụ ụlọ ọrụ gọọmentị, ma ọ bụ na-ekwe nkwa ego. Unu enyela onye ọ bụla OTP, PIN ma ọ bụ BVN unu, unu akwụkwala ego ka unu nata ego. Buru ụzọ jụọ ụlọ akụ unu."
   at_capacity: "😔 KudiGuard juputara ugbu a. Biko nwaa ọzọ mgbe ụbọchị ole na ole gachara."
   busy: "⏳ Ọtụtụ mmadụ na-ajụ ajụjụ ugbu a. Biko nwaa ọzọ mgbe otu nkeji gachara."
+  new_users_busy: "⏳ Ọtụtụ mmadụ ọhụrụ na-abata na KudiGuard ugbu a. Biko nwaa ọzọ mgbe ihe dị ka otu awa gachara."
   privacy_link: "🔐 Ọkwa nzuzo: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-

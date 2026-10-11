@@ -21,7 +21,7 @@ from typing import Any, TypeVar
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
+from kudiguard.storage.base import CAP_MARKER_PREFIX, StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -349,6 +349,16 @@ class SQLiteStore:
                         "DELETE FROM scam_patterns WHERE week = ? AND text = ?",
                         (week, deidentify(row["transcript"])),
                     ).rowcount
+                last = db.execute(
+                    "SELECT MAX(created_at) FROM interactions WHERE user_hash = ?", (user_hash,)
+                )
+                last_active = last.fetchone()[0]
+                if last_active is not None:  # the licence-cap slot outlives the erasure (admission)
+                    db.execute(
+                        "INSERT INTO deletion_markers VALUES (?, ?) ON CONFLICT (marker) DO UPDATE SET deleted_at = "
+                        "excluded.deleted_at",
+                        (CAP_MARKER_PREFIX + marker, last_active),
+                    )
                 feedback = db.execute(
                     "DELETE FROM feedback WHERE interaction_id IN (SELECT id FROM interactions WHERE user_hash = ?)",
                     (user_hash,),
@@ -411,7 +421,8 @@ class SQLiteStore:
     async def count_deletions_since(self, since: datetime) -> int:
         row = await self._run(
             lambda db: db.execute(
-                "SELECT COUNT(*) FROM deletion_markers WHERE deleted_at >= ?", (_ts(since),)
+                "SELECT COUNT(*) FROM deletion_markers WHERE marker LIKE ? AND deleted_at >= ?",
+                (CAP_MARKER_PREFIX + "%", _ts(since)),
             ).fetchone()
         )
         return int(row[0])

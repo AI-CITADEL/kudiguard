@@ -275,6 +275,7 @@ strings:
   warn_family_fallback: "⚠️ Scam alert: someone may contact you pretending to be from a bank or a government agency, or promising money. Never share your OTP, PIN or BVN, and never pay a fee to receive money. Check with your bank first."
   at_capacity: "😔 KudiGuard is full right now. Please try again in a few days."
   busy: "⏳ Many people are asking right now. Please try again in a minute."
+  new_users_busy: "⏳ Many new people are joining KudiGuard right now. Please try again in about an hour."
   privacy_link: "🔐 Privacy notice: {url}"
   # Voice-note donation (kudiguard.donation): separate opt-in consent; keep in step with DONATION_VERSION.
   donation_offer: |-

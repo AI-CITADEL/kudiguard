@@ -18,6 +18,9 @@ from kudiguard.patterns import ScamPattern
 RETENTION_DAYS = 90  # stated in the consent text
 ACTIVE_USER_WINDOW_DAYS = 30  # N-ATLAS licence: 1,000 active end-users per rolling 30 days
 DELETION_MARKER_DAYS = 30  # DELETE markers (only for the sign-up import); stated on /privacy
+# A second, separate marker for the licence cap: dated with the erased user's last interaction, kept only if they had
+# one (a number that never used KudiGuard takes no slot). Same table and purge as the DELETE markers.
+CAP_MARKER_PREFIX = "cap:"
 
 
 def utcnow() -> datetime:
@@ -128,8 +131,8 @@ class Store(Protocol):
         ...
 
     async def count_deletions_since(self, since: datetime) -> int:
-        """DELETE markers dated since ``since``: a user who erased their data keeps their licence-cap slot for the
-        rest of the window (``admission``)."""
+        """Erased users whose last interaction was since ``since``: they keep their licence-cap slot for the rest of
+        the window (``admission``). Users who never had an interaction are not counted."""
         ...
 
     async def purge_deletion_markers(self, cutoff: datetime) -> int:

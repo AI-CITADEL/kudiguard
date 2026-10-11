@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     db_path: Path = ROOT / "var" / "kudiguard.db"
     hash_secret: SecretStr = SecretStr("")  # >= 32 bytes; pseudonymous user ids (privacy.UserHasher)
     # Upper bounds = the pilot's published promises ("up to 90 days", "up to 2 years"): the user-facing texts render
-    # the configured values, and a longer period would need a new consent text (docs/DEPLOY.md). Lower bound 30: the
-    # licence cap counts active users from the evidence log over 30 days, so it must be kept at least that long.
-    retention_days: int = Field(default=90, ge=30, le=90)
+    # the configured values, and a longer period would need a new consent text (docs/DEPLOY.md). Lower bound 31: the
+    # licence cap counts active users from the evidence log over 30 days, and the purge runs up to ~7 h early.
+    retention_days: int = Field(default=90, ge=31, le=90)
     # de-identified scam examples (kudiguard.patterns)
     pattern_retention_days: int = Field(default=730, ge=30, le=730)
     # Voice-note donation (kudiguard.donation; docs/DPIA_VOICE.md). Off until the DPIA is signed off.

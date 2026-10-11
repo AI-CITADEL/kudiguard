@@ -127,6 +127,7 @@ strings:
   warn_family_fallback: "⚠️ Ìkìlọ̀ nípa jìbìtì: ẹnìkan lè kàn sí yín pé òun wá láti báǹkì tàbí ilé-iṣẹ́ ìjọba, tàbí kí ó ṣèlérí owó fún yín. Ẹ má ṣe fún ẹnikẹ́ni ní OTP, PIN tàbí BVN yín, ẹ má sì san owó kankan kí ẹ tó gba owó. Ẹ kọ́kọ́ bá báǹkì yín sọ̀rọ̀."
   at_capacity: "😔 KudiGuard ti kún báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ọjọ́ díẹ̀."
   busy: "⏳ Ọ̀pọ̀ ènìyàn ló ń béèrè báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn ìṣẹ́jú kan."
+  new_users_busy: "⏳ Ọ̀pọ̀ ènìyàn tuntun ló ń dara pọ̀ mọ́ KudiGuard báyìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn nǹkan bí wákàtí kan."
   privacy_link: "🔐 Ìkéde àṣírí: {url}"
   # Voice-note donation: DRAFT, pending native-speaker review (keep in step with DONATION_VERSION).
   donation_offer: |-

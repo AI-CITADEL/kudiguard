@@ -188,6 +188,7 @@ class _Turn:
     voice_notes: list[tuple[bytes, SpeechResult]] = dataclasses.field(default_factory=list)
     # A new user's licence-cap slot, held until this turn's interaction is logged (or the turn ends).
     reservation: Reservation = dataclasses.field(default_factory=Reservation)
+    admitted: bool = False  # passed the licence-cap gate: only such turns are logged (a row means "admitted")
 
 
 class _KeyedLocks:
@@ -369,6 +370,8 @@ class Conversation:
                     await self._send(turn, self._messages.text(turn.language, Msg.ERROR_RETRY))
         except Exception:
             log.exception("could not tell the user about the failure")
+        if not turn.admitted:
+            return  # never logged: a row would make this user "returning" and let them past the licence cap
         if turn.logged:
             if turn.interaction_id is not None and not delivered:  # logged as answered, never delivered
                 try:
@@ -440,9 +443,10 @@ class Conversation:
             return
         try:
             turn.reservation = await self._admission.reserve(turn.user_hash, message.channel)
-        except AtCapacity:
-            await self._send(turn, self._messages.text(turn.language, Msg.AT_CAPACITY))
+        except AtCapacity as exc:  # the cap, or a new-user gate (e.g. NewUsersBusy)
+            await self._send(turn, self._messages.text(turn.language, exc.message))
             return
+        turn.admitted = True
 
         chosen = match.language or self._chosen_language(message)
         if user is None or user.stopped or not _consented(user):
@@ -948,7 +952,33 @@ class Conversation:
         reply_to: int | None = None,
     ) -> int:
         logged_at = self._clock()
-        interaction_id = await self._store.add_interaction(
+        try:
+            interaction_id = await self._add_interaction(turn, outcome=outcome, answer=answer, reply=reply,
+                                                         error=error, intent=intent, llm_ms=llm_ms,
+                                                         reply_to=reply_to, logged_at=logged_at)  # fmt: skip
+        except Exception:
+            turn.reservation.hold()  # served but not in the store: the user keeps their cap slot for the window
+            raise
+        turn.logged = True
+        turn.logged_at = logged_at
+        turn.interaction_id = interaction_id
+        turn.reservation.release()  # the store counts this user now
+        return interaction_id
+
+    async def _add_interaction(
+        self,
+        turn: _Turn,
+        *,
+        outcome: Outcome,
+        answer: Answer | None,
+        reply: str | None,
+        error: str | None,
+        intent: str | None,
+        llm_ms: int | None,
+        reply_to: int | None,
+        logged_at: datetime,
+    ) -> int:
+        return await self._store.add_interaction(
             Interaction(
                 channel=turn.message.channel,
                 message_id=turn.message.message_id,
@@ -971,11 +1001,6 @@ class Conversation:
                 reply_to=reply_to,
             )
         )
-        turn.logged = True
-        turn.logged_at = logged_at
-        turn.interaction_id = interaction_id
-        turn.reservation.release()  # the store counts this user now
-        return interaction_id
 
 
 AUDIO = MessageKind.AUDIO

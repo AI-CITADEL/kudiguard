@@ -545,10 +545,10 @@ async def test_privacy_page_without_contact(api: Api) -> None:
 
 
 async def test_privacy_page_reflects_configured_retention(registry: LanguageRegistry) -> None:
-    async for api in _start(registry, settings(retention_days=30, pattern_retention_days=400,
+    async for api in _start(registry, settings(retention_days=45, pattern_retention_days=400,
                                                operator_name="{{CONTACT}} Ltd")):  # fmt: skip
         page = (await api.client.get("/privacy")).text
-        assert "30 days" in page and "400 days" in page and "{{CONTACT}} Ltd" in page  # one-pass substitution
+        assert "45 days" in page and "400 days" in page and "{{CONTACT}} Ltd" in page  # one-pass substitution
 
 
 async def test_web_scam_checks_feed_the_library_but_api_checks_do_not(api: Api) -> None:
@@ -803,7 +803,13 @@ async def test_every_partner_call_names_a_pseudonymous_end_user(
 
 
 @pytest.mark.parametrize(
-    "value", ["550e8400-e29b-41d4-a716-446655440000", "a3f9c2d17be04c55a1e2f3b4c5d6e7f8", "cust.000123:web"]
+    "value",
+    [
+        "550e8400-e29b-41d4-a716-446655440000",
+        "a3f9c2d17be04c55a1e2f3b4c5d6e7f8",
+        "cust.000123:web",
+        "ab12" * 32,
+    ],
 )
 async def test_pseudonymous_ids_are_accepted(api: Api, value: str) -> None:
     assert (await api.check(user=value)).status_code == 200
@@ -901,16 +907,22 @@ async def test_privacy_page_says_whether_the_partner_api_and_live_packs_are_on(
 
 
 async def test_web_page_renders_the_configured_retention(registry: LanguageRegistry) -> None:
-    async for api in _start(registry, settings(retention_days=30, pattern_retention_days=400)):
+    async for api in _start(registry, settings(retention_days=45, pattern_retention_days=400)):
         page = (await api.client.get("/")).text
-        assert "for up to 30 days" in page and "for up to 400 days" in page  # the no-JavaScript fallback
-        assert '"retentionDays": 30, "patternRetentionDays": 400' in page and "{{" not in page
+        assert "for up to 45 days" in page and "for up to 400 days" in page  # the no-JavaScript fallback
+        assert '"retentionDays": 45, "patternRetentionDays": 400' in page and "{{" not in page
         assert "90 days" not in page and "2 years" not in page
         assert page.count("{days}") == page.count("{patternDays}") == 5  # 4 languages + the renderer
 
 
 @pytest.mark.parametrize(
-    ("field", "value"), [("retention_days", 91), ("pattern_retention_days", 731), ("retention_days", 0)]
+    ("field", "value"),
+    [
+        ("retention_days", 91),
+        ("pattern_retention_days", 731),
+        ("retention_days", 30),
+        ("pattern_retention_days", 29),
+    ],
 )
 def test_retention_cannot_exceed_the_published_promise(field: str, value: int) -> None:
     from pydantic import ValidationError
@@ -955,3 +967,84 @@ def test_day_counts_read_naturally() -> None:
         "400 days",
     )
     assert _days(365) == "365 days (1 year)"
+
+
+@pytest.mark.parametrize("channel", ["web", "api"])
+async def test_a_twin_request_cannot_ride_on_a_slot_its_failing_sibling_frees(
+    registry: LanguageRegistry, channel: str
+) -> None:
+    """The review's twin attack: per user, a request whose (empty) body trickles in holds the slot, its valid twin
+    arrives 20 ms later; the slow one then fails (422) and must not free the slot the twin is still using."""
+    import asyncio
+
+    async for api in _start(registry, settings(active_user_cap=20, web_session_cap=3, web_rate_per_minute=10_000,
+                                               api_rate_per_minute=10_000)):  # fmt: skip
+        api.llm.delay_s = 0.3
+
+        async def slow_empty(headers: dict[str, str], path: str, content_type: str, api: Api = api) -> int:
+            async def trickle():  # type: ignore[no-untyped-def]
+                yield b"text=" if content_type.endswith("urlencoded") else b"--x\r\n"
+                await asyncio.sleep(0.15)
+                yield b"+" if content_type.endswith("urlencoded") else b"--x--\r\n"
+
+            response = await api.client.post(
+                path, content=trickle(), headers={**headers, "content-type": content_type}
+            )
+            return response.status_code
+
+        async def pair(k: int, api: Api = api) -> tuple[int, int]:
+            await asyncio.sleep(k * 0.03)
+            if channel == "web":
+                headers = {**WEB, "x-kudiguard-session": f"twin-{k:04d}-xxxxxxxxxx"}
+                bad = asyncio.create_task(
+                    slow_empty(headers, "/web/check", "application/x-www-form-urlencoded")
+                )
+                await asyncio.sleep(0.02)
+                good = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=headers)
+            else:
+                headers = {**API, "x-kudiguard-end-user": f"twin-user-{k:04d}"}
+                bad = asyncio.create_task(
+                    slow_empty(headers, "/v1/check/audio", "multipart/form-data; boundary=x")
+                )
+                await asyncio.sleep(0.02)
+                good = await api.client.post("/v1/check", json={"text": OTP_SCAM}, headers=headers)
+            return await bad, good.status_code
+
+        results = await asyncio.gather(*(pair(k) for k in range(30)))
+        rows = list(api.store._interactions.values())  # type: ignore[attr-defined]
+        users = {r.user_hash for r in rows}
+        limit = 3 if channel == "web" else 20
+        assert len(users) <= limit and {bad for bad, _ in results} <= {422, 503}  # 503: cap reached
+        assert api.app.state.services.admission.in_flight == 0
+
+
+async def test_a_new_user_gate_refusal_is_its_own_problem(api: Api) -> None:
+    from kudiguard.admission import NewUsersBusy
+
+    async def busy(user_hash: str, channel: str) -> None:
+        raise NewUsersBusy("too many new users")
+
+    api.app.state.services.admission.add_check(busy)
+    response = await api.check()
+    assert response.status_code == 503 and response.headers["retry-after"] == "3600"
+    assert (
+        response.json()["detail"]["problem"] == "busy_new_users"
+        and "hour" in response.json()["detail"]["message"]
+    )
+    web = await api.client.post("/web/check", data={"text": OTP_SCAM}, headers=WEB)
+    assert web.status_code == 503 and web.json()["detail"]["problem"] == "busy_new_users"
+
+
+async def test_a_failed_evidence_write_keeps_the_partner_users_slot(
+    registry: LanguageRegistry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async for api in _start(registry, settings(active_user_cap=1)):
+
+        async def broken(*args: object) -> int:
+            raise RuntimeError("disk full")
+
+        monkeypatch.setattr(api.store, "add_interaction", broken)
+        assert (await api.check(user="customer-aaaa")).status_code == 200  # served, but not in the store
+        monkeypatch.undo()
+        assert api.app.state.services.admission.in_flight == 1
+        assert (await api.check(user="customer-bbbb")).status_code == 503

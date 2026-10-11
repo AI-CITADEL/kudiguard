@@ -377,6 +377,60 @@ async def test_a_new_users_slot_is_released_once_the_turn_is_logged(h: Harness) 
     assert h.conversation._admission.in_flight == 0  # type: ignore[attr-defined]
 
 
+async def test_a_viral_burst_of_timed_out_turns_cannot_make_users_returning(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Turns that time out waiting for a slot never passed admission, so they leave no row (a row would make the user
+    "returning" and let them past the cap next time). Cap 2, one slot, a check that hangs."""
+    phones = [f"+2348055{k:06d}" for k in range(6)]
+    for phone in phones:
+        await h.onboard("en", user=phone)
+    real = h.engine.check
+
+    async def hang(*args: object, **kwargs: object) -> object:
+        await asyncio.sleep(5)
+        return await real(*args, **kwargs)  # type: ignore[arg-type]  # pragma: no cover - cancelled by the deadline
+
+    monkeypatch.setattr(h.engine, "check", hang)
+    h.configure(active_user_cap=2, max_concurrent_turns=1, turn_deadline_s=1.0)
+    for n, phone in enumerate(phones):
+        h.conversation.submit(h.msg(OTP_SCAM, user=phone, message_id=f"wamid.viral.{n}"))
+    await h.conversation.wait_idle()
+    rows = await interactions(h)
+    assert len(rows) <= 1 and all(r["outcome"] == "error" for r in rows)  # only the turn that got a slot
+    monkeypatch.setattr(h.engine, "check", real)
+    h.configure(active_user_cap=2)
+    served = 0
+    for phone in phones:
+        texts = await h.say(OTP_SCAM, user=phone)
+        served += texts != [h.t(Msg.AT_CAPACITY)]
+    assert served == 2
+
+
+async def test_new_user_gate_refusals_are_told_their_own_message(h: Harness) -> None:
+    from kudiguard.admission import NewUsersBusy
+
+    async def busy(user_hash: str, channel: str) -> None:
+        raise NewUsersBusy("too many new users")
+
+    h.conversation._admission.add_check(busy)  # type: ignore[attr-defined]
+    assert await h.say("hello", user="+2348066666666") == [h.t(Msg.NEW_USERS_BUSY)]
+
+
+async def test_a_failed_log_keeps_the_users_cap_slot(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    h.configure(active_user_cap=1)
+    await h.onboard("en")
+
+    async def broken(*args: object) -> int:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(h.store, "add_interaction", broken)
+    await h.say(OTP_SCAM)  # answered, but the evidence row (and the failure row) cannot be written
+    assert h.conversation._admission.in_flight == 1  # type: ignore[attr-defined]
+    monkeypatch.undo()
+    assert await h.say("hello", user="+2348099999999") == [h.t(Msg.AT_CAPACITY)]
+
+
 async def test_consent_text_change_asks_again(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
     await h.onboard("ha")
     monkeypatch.setattr("kudiguard.pipeline.CONSENT_VERSION", "2099-01-01")

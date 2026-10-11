@@ -11,7 +11,7 @@ from typing import Any
 from kudiguard.domain import Interaction, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import StoreClosedError, UserState, VoiceSample, aware, utcnow
+from kudiguard.storage.base import CAP_MARKER_PREFIX, StoreClosedError, UserState, VoiceSample, aware, utcnow
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -104,7 +104,11 @@ class MemoryStore:
 
     async def delete_user(self, user_hash: str) -> int:
         self._ensure_open()
-        self._deleted[self._hasher.deletion_marker(user_hash)] = utcnow()
+        marker = self._hasher.deletion_marker(user_hash)
+        self._deleted[marker] = utcnow()
+        times = [i.created_at for i in self._interactions.values() if i.user_hash == user_hash]
+        if times:  # the licence-cap slot outlives the erasure (admission); dated with the last interaction
+            self._deleted[CAP_MARKER_PREFIX + marker] = max(times)
         removed = int(self._users.pop(user_hash, None) is not None)
         for item in self._interactions.values():  # examples taken from this user's stored messages
             if (
@@ -154,7 +158,7 @@ class MemoryStore:
 
     async def count_deletions_since(self, since: datetime) -> int:
         self._ensure_open()
-        return sum(at >= aware(since) for at in self._deleted.values())
+        return sum(m.startswith(CAP_MARKER_PREFIX) and at >= aware(since) for m, at in self._deleted.items())
 
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
         self._ensure_open()
