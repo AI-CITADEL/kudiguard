@@ -534,3 +534,46 @@ def test_f4_helpline_requests_get_the_crisis_reply(registry: LanguageRegistry, t
 )
 def test_ai_questions(registry: LanguageRegistry, text: str, lang: str, asks: bool) -> None:
     assert InputScreen(registry).asks_if_ai(text, lang) is asks
+
+
+# --- last-round probes (tests/fixtures/abuse_review_probes_f5.yaml) ----------------------------------------------
+
+F5: dict[str, list[dict[str, str]]] = yaml.safe_load(
+    (ROOT / "tests" / "fixtures" / "abuse_review_probes_f5.yaml").read_text(encoding="utf-8")
+)
+F5_THREAT = {"g01", "g02", "g03", "g04", "g05", "g22", "a04", "a10", "a12", "a13"}
+F5_CRISIS = {"g19": "crisis", "g20": "crisis_other", "g21": "crisis"}
+F5_AI = {"g14", "g15", "g18"}
+F5_INJECTION = {"a06", "a07", "a08"}
+
+
+@pytest.mark.parametrize("case", F5["genuine"] + F5["attacks"], ids=lambda c: c["id"])
+def test_f5_threat_flag(registry: LanguageRegistry, case: dict[str, str]) -> None:
+    """Arrest threats with an account number, bail money or "for his release"; exposure of a third person."""
+    assert ("threat" in assess([case["text"]], registry.lexicon_for("en")).flags) is (case["id"] in F5_THREAT)
+
+
+@pytest.mark.parametrize("case", F5["genuine"], ids=lambda c: c["id"])
+def test_f5_genuine_users_are_answered(registry: LanguageRegistry, case: dict[str, str]) -> None:
+    assert enforced(registry, case["text"], "en") == F5_CRISIS.get(case["id"], "none")
+    assert InputScreen(registry).asks_if_ai(case["text"], "en") is (case["id"] in F5_AI)
+
+
+@pytest.mark.parametrize("case", F5["attacks"], ids=lambda c: c["id"])
+def test_f5_attacks_are_refused(registry: LanguageRegistry, case: dict[str, str]) -> None:
+    """Including requests to write threat, blackmail and sextortion messages (a09-a13, a15)."""
+    expected = "injection" if case["id"] in F5_INJECTION else "scam_tool"
+    assert enforced(registry, case["text"], "en") == expected
+    assert not InputScreen(registry).asks_if_ai(case["text"], "en")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Write a warning for my WhatsApp group: loan apps say they will post your photos unless you pay.",
+        "How do scammers threaten people with nude pictures?",
+        "Help me write a reply to a loan app that threatened to post my picture.",
+    ],
+)
+def test_writing_about_threats_is_allowed(registry: LanguageRegistry, text: str) -> None:
+    assert enforced(registry, text, "en") == "none"

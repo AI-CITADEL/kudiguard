@@ -36,7 +36,9 @@ _SCAFFOLD = re.compile(
 
 # what someone else says ("the scammer will say: I am not a bot", "tell them: I'm a person who ...")
 _REPORTED = re.compile(
-    r"\b(?:say|says|said|saying|claim\w*|pretend\w*|tell\w*|told|ya\W+ce|sun\W+ce|so\W+pe|kwuru)\b"
+    r"\b(?:(?:scammers?|fraudsters?|they|he|she|caller|callers|agent|someone|somebody|people|dem|him|her|them)\W+"
+    r"(?:\w+\W+){0,3}?(?:say|says|said|saying|claim\w*|pretend\w*|tell\w*|told)"
+    r"|tell\W+(?:them|him|her|the\W+caller|dem|am)|ya\W+ce|sun\W+ce|o\W+so\W+pe|won\W+so\W+pe|kwuru)\b"
 )
 _QUOTE = re.compile("\"[^\"\n]*\"|(?:(?<=[\\s:])|^)'[^'\n]*'")
 

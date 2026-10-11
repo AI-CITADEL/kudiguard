@@ -179,3 +179,15 @@ def test_reported_or_quoted_denials_are_not_the_reply_s_own(
     screen: ReplyScreen, text: str, lang: str
 ) -> None:
     assert OutputIssue.AI_DENIAL not in screen.check(text, lang)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I can tell you honestly that I am not a bot.",
+        "Let me say this clearly: I am a human, not an AI.",
+        "As I said, I am a real human agent.",
+    ],
+)
+def test_first_person_reporting_words_do_not_hide_a_denial(screen: ReplyScreen, text: str) -> None:
+    assert OutputIssue.AI_DENIAL in screen.check(text, "en")

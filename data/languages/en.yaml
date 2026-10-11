@@ -202,10 +202,14 @@ abuse:
   # Requests to create, translate, polish or obtain scam content: a fixed refusal with an offer to check a
   # message instead (strings: scam_tool_reply).
   scam_tool:
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\W+(?:\w+\W+){0,3}?(?:threaten\w*|to\W+(?:scare|intimidate|blackmail|threaten|frighten))\W+(?:a|an|the|my|him|her|them|someone|somebody|person|borrower|debtor|customer)\b'
+    - '(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)\W+(?:\w+\W+){0,2}?(?:to|wey\W+go|that\W+will|for)\W+(?:blackmail\w*|scare|threaten|intimidate|frighten|sextort)\b'
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\b.{0,160}?\b(?:arrest|post|release|send|leak|expose|publish|share)\W+(?:\w+\W+){0,3}?(?:him|her|them|am|his|their|she|he)\b.{0,160}?\b(?:unless|if\W+(?:she|he|they|him|dem|e)\W+(?:no|doesn''t|does\W+not|don''t|fail\w*)|or\W+else)\b'
+    - '(?:write|draft|compose|create|craft|generate|make|prepare|give\W+me)\W+(?:\w+\W+){0,4}?(?:message|sms|text|letter|email|template|note|dm|script|voice\W+note)s?\b.{0,160}?\bif\W+(?:she|he|they|him|dem|e)\W+(?:no|doesn''t|does\W+not|don''t|fail\w*)\W+pay\b.{0,80}?\b(?:arrest|post|release|send|leak|expose|publish|share)\W+(?:\w+\W+){0,3}?(?:him|her|them|am|his|their)\b'
     - '(?:write|draft|compose|create)\W+(?:me\W+)?(?:a\W+|an\W+)?(?:message|sms|text|letter|email)\W+(?:\w+\W+){0,3}?(?:telling|asking|to\W+tell|to\W+ask)\W+(?:people|customers|users|someone|everyone|victims)\W+(?:\w+\W+){0,12}?(?:otp|pin|bvn|password|passcode|card\W+details|verification\W+fee|processing\W+fee|activation\W+fee)\b'
     - 'write\W+(?:\w+\W+){0,4}?message\W+(?:\w+\W+){0,4}?(?:scam|trick|fool|dupe)\W+(?:person|people|dem|them)'
     - '(?:write|draft|generate|create|compose|make|design|produce|prepare)\W+(?:me\W+)?(?:\w+\W+){0,3}?(?:fake|scam|phishing|threat\w*|sextortion|romance\W+scam|fraud\w*|bogus)\W+(?:\w+\W+){0,3}?(?:message|sms|text|letter|alert|script|email|notice|page|template)s?'
-    - '(?:convince|persuade|trick|deceive|lure)\W+(?:\w+\W+){0,4}?(?:to\W+)?(?:give|send|tell|share|read)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:pin|otp|bvn|password|passcode|card\W+details)'
+    - '(?:convince|persuade|trick|deceive|lure)\W+(?:(?!not\b|never\b)\w+\W+){0,4}?(?:to\W+)?(?:give|send|tell|share|read)\W+(?:me\W+)?(?:\w+\W+){0,2}?(?:pin|otp|bvn|password|passcode|card\W+details)'
     - '(?:use|try)\W+(?:it|them|this|these)\W+on\W+(?:my\W+)?(?:target|victim|mugu|maga|client)s?'
     - 'translate\b.{0,300}?\b(?:otp|pin|bvn|password|unblock|verify\W+your|processing\W+fee|claim\W+your|account\W+(?:is|has\W+been|will\W+be)\W+(?:blocked|suspended|restricted))\b.{0,300}?\bso\W+(?:that\W+)?i\W+(?:can|could|fit)\W+(?:send|forward|share|post)'
     - 'translate\b.{0,80}?\bso\W+(?:that\W+)?i\W+(?:can|could|fit)\W+(?:send|forward|share|post)\b.{0,300}?\b(?:otp|pin|bvn|password|unblock|processing\W+fee|claim\W+your|account\W+(?:is|has\W+been|will\W+be)\W+(?:blocked|suspended|restricted))\b'
@@ -231,6 +235,8 @@ abuse:
   # here when the text before it reports someone else's words (injection_reported) or it sits inside quotes; it is
   # then injection_suspect. Chat-template tokens and role markup are matched in code (safety/abuse.py).
   injection:
+    - 'ask\w*\W+(?:\w+\W+){0,2}?(?:if|whether|say)\W+(?:you|u)\W+(?:are|be|is|re)\W+(?:an?\W+)?(?:ai|bot|robot|machine)\W+(?:\w+\W+){0,3}?(?:say\W+no|deny|lie)\b'
+    - '(?:deny|never\W+admit|don''t\W+admit|do\W+not\W+admit|never\W+say)\W+(?:\w+\W+){0,3}?(?:ai|bot|robot|machine|chatbot)\b'
     - '(?:ignore|disregard|forget|override|bypass)\W+(?:all\W+)?(?:of\W+)?(?:your\W+|the\W+|these\W+|those\W+|my\W+)?(?:previous|prior|above|earlier|system|original|initial|old)\W+(?:instructions?|prompts?|rules|guidelines|programming|directions)'
     - '(?:ignore|disregard|forget|override|bypass|comot|drop)\W+(?:all\W+)?(?:of\W+)?your\W+(?:\w+\W+)?(?:instructions?|rules|programming|guidelines|policy|policies|restrictions|training|guardrails|filters|prompt)'
     - '(?:disregard|ignore|forget)\W+(?:the\W+|all\W+the\W+|all\W+)?(?:rules|instructions)\W+above'
@@ -339,6 +345,7 @@ abuse:
     - '(?:are|r)\W+(?:you|u)\W+(?:an?\W+)?(?:real\W+)?(?:ai|bot|robot|human|human\W+being|person|machine|chatbot|computer|program)\b'
     - '(?:talking|chatting|speaking)\W+(?:to|with)\W+(?:an?\W+)?(?:real\W+)?(?:ai|bot|robot|human|person|machine)\b'
     - 'who\W+(?:built|made|created|programmed)\W+(?:you|u)\b'
+    - 'is\W+(?:this|it)\W+(?:chat\W+|service\W+|number\W+)?(?:an?\W+)?(?:ai|bot|robot|real\W+person|human)\b'
     - '(?:you|u)\W+be\W+(?:an?\W+)?(?:ai|robot|human|human\W+being|person|machine|real\W+person)\b|na\W+real\W+person'
   # A reply that denies being an AI (KudiGuard is one): retried, then the honest fixed line (strings: ai_honest).
   ai_denials:
@@ -360,13 +367,14 @@ lexicon:
     threat:
       - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise)\W+(?:\w+\W+){0,4}?(?:kill\w*|hurt|harm\w*|burn\w*|kidnap\w*|deal\W+with\W+(?:you|u)|come\W+(?:to\W+)?your\W+(?:house|home|office|shop))\b'
       - 'if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|no|fail\W+to|refuse\W+to)\W+(?:pay|send|repay|transfer)\W+(?:\w+\W+){0,8}?(?:kill\w*|burn\w*|kidnap\w*|harm|hurt|deal\W+with\W+(?:you|u)|come\W+(?:to\W+)?your\W+(?:house|home|office|shop))'
-      - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise|unless)\W+(?:\w+\W+){0,4}?(?:post|release|leak|send|share|expose|publish|show)\W+(?:\w+\W+){0,2}?(?:your|ya)\W+(?:\w+\W+){0,1}?(?:photos?|pictures?|pics|fotos?|videos?|nudes?|chats?)\b'
+      - '(?:pay|send|transfer|repay|remit)\W+(?:\w+\W+){0,8}?(?:or|else|otherwise|unless)\W+(?:\w+\W+){0,4}?(?:post|release|leak|send|share|expose|publish|show)\W+(?:\w+\W+){0,2}?(?:your|ya|her|his|their|him|my)\W+(?:\w+\W+){0,1}?(?:photos?|pictures?|pics|fotos?|videos?|nudes?|chats?)\b'
       - '(?:or|else|otherwise)\W+(?:we|i)\W+(?:will|go|shall)\W+expose\W+(?:you|u)\b'
       - '(?:photos?|pictures?|pics|fotos?|videos?|nudes?|chats?)\W+(?:\w+\W+){0,3}?will\W+be\W+(?:sent|posted|shared|released|leaked|published)\W+(?:\w+\W+){0,6}?(?:unless|if\W+(?:you|u)\W+(?:don''t|dont|do\W+not|fail\W+to|no))'
       - '(?:i|we)\W+have\W+your\W+(?:video|videos|photos?|pictures?|nudes?)\b'
+      - '(?:post|send|share|release|leak|publish)\W+(?:\w+\W+){0,2}?(?:pictures?|photos?|pics|videos?|nudes?)\W+(?:\w+\W+){0,6}?(?:say|that|as|call\W+(?:me|him|her|am|you))\W+(?:\w+\W+){0,3}?(?:thief|debtor|fraud\w*|criminal|scammer|owing)\b'
       - '(?:tell|inform|message|send\W+(?:\w+\W+){0,3}?to)\W+(?:all\W+)?your\W+(?:contacts|family|employer|boss|church|friends|phone\W+book)\W+(?:\w+\W+){0,5}?(?:thief|debtor|fraud\w*|dead|criminal|scammer|owing)\b'
-      - '(?:arrest\w*|warrant|prosecut\w*|jail\w*|detain\w*|pick\W+you)\W+(?:\w+\W+){0,12}?(?:(?:bail|release|clearance)\W+(?:fee|charge)|to\W+(?:this|the\W+following|my|our)\W+(?:account|number)|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))\b'
-      - '(?:(?:bail|release|clearance)\W+(?:fee|charge)|clearance|to\W+(?:this|the\W+following|my|our)\W+(?:account|number)|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))\W+(?:\w+\W+){0,12}?(?:arrest\w*|prosecut\w*|jail\w*|detain\w*|pick\W+you)\b'
+      - '(?:arrest\w*|warrant|prosecut\w*|jail\w*|detain\w*|pick\W+you)\W+(?:\w+\W+){0,12}?(?:(?:bail|release|clearance)\W+(?:fee|charge|money)|bail\W+money|for\W+(?:his|her|your|my|their)\W+release|(?:to|into)\W+(?:this|the\W+following|my|our)\W+(?:account|number)|(?:account|acct|a/c)\W+(?:(?:no|number)\W+)?\d{10}\b|(?:to|into)\W+\d{10}\b|(?:through|via|click|on)\W+(?:a|the|this)\W+link|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))\b'
+      - '(?:(?:bail|release|clearance)\W+(?:fee|charge)|clearance|(?:bail|release|clearance)\W+(?:fee|charge|money)|bail\W+money|for\W+(?:his|her|your|my|their)\W+release|(?:to|into)\W+(?:this|the\W+following|my|our)\W+(?:account|number)|(?:account|acct|a/c)\W+(?:(?:no|number)\W+)?\d{10}\b|(?:to|into)\W+\d{10}\b|(?:through|via|click|on)\W+(?:a|the|this)\W+link|gift\W*cards?|bitcoin|crypto|usdt|within\W+\d+\W*(?:hours?|hrs?|minutes?|mins?))\W+(?:\w+\W+){0,12}?(?:arrest\w*|prosecut\w*|jail\w*|detain\w*|pick\W+you)\b'
       - '(?:or|else|otherwise)\W+(?:you|u)\W+(?:will|go|shall)\W+die\b|(?:pay|send)\W+or\W+die\b'
       - '(?:you|u)\W+will\W+(?:die\W+(?:a\W+debtor|in\W+prison)|be\W+killed)'
       - '(?:they|we|dem)\W+(?:will|go|would|said\W+they\W+(?:will|would))\W+(?:\w+\W+){0,1}?(?:kill|end)\W+(?:me|my\W+life|you|your\W+life)\b'
