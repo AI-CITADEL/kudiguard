@@ -131,7 +131,7 @@ async def test_blind_set_pipeline_hybrid() -> None:
 
 
 def test_production_pack_set() -> None:
-    assert PRODUCTION == ("kudiguard-core", "money-skills")
+    assert PRODUCTION == ("genuine-notices", "kudiguard-core", "money-skills", "situations")
 
 
 async def test_money_skills_reachable_bm25() -> None:
@@ -205,3 +205,57 @@ async def test_extra_packs_never_displace_core_red_flag_guidance() -> None:
     first, second = result.entries[:2]
     assert (first.entry.id, second.entry.id) == ("flag-guaranteed-returns", "flag-upfront-fee")
     assert {first.source_id, second.source_id} == {"kudiguard-core"}
+
+
+# --- probes for the situations and genuine-notices packs (production pack set, rules flags as in production) --------
+
+
+async def _top(query: str, embedder: Embedder | None) -> list[str]:
+    from kudiguard.knowledge.service import KnowledgeBase
+    from kudiguard.languages import LanguageRegistry
+    from kudiguard.safety.scam_rules import assess
+
+    lexicon = LanguageRegistry.load(ROOT / "data" / "languages").lexicon_for("en")
+    kb = KnowledgeBase(
+        [FilePackSource.load(ROOT / "data" / "packs" / pack, embedder=embedder) for pack in PRODUCTION],
+        embedder=embedder,
+    )
+    result = await kb.search(Query(text=query, flags=assess([query], lexicon).flags))
+    return [item.entry.id for item in result.entries if item.relevance is not None]  # search hits, best first
+
+
+PROBES_FOUND = [
+    ("my card was stolen", "sit-card-stolen"),
+    (
+        "I just made a transfer in my app and got an OTP SMS for it, is it normal?",
+        "notice-otp-own-transaction",
+    ),
+]
+CUSTOMER_CARE = "what is my bank's customer care number?"
+CUSTOMER_CARE_XFAIL = pytest.mark.xfail(
+    strict=True,
+    reason="content: sit-fake-customer-care's title is 'A \"customer care\" account...' and wins the literal query in "
+    "BM25 and dense search (measured 2026-10-11); for the situations pack owners",
+)
+
+
+@pytest.mark.parametrize(("query", "entry"), PROBES_FOUND)
+async def test_situation_and_notice_probes_bm25(query: str, entry: str) -> None:
+    assert entry in await _top(query, None)
+
+
+@pytest.mark.live
+@pytest.mark.parametrize(("query", "entry"), PROBES_FOUND)
+async def test_situation_and_notice_probes_hybrid(query: str, entry: str) -> None:
+    assert entry in await _top(query, local_fast_embedder())
+
+
+@CUSTOMER_CARE_XFAIL
+async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_bm25() -> None:
+    assert (await _top(CUSTOMER_CARE, None))[0] != "sit-fake-customer-care"
+
+
+@pytest.mark.live
+@CUSTOMER_CARE_XFAIL
+async def test_customer_care_number_is_not_answered_with_the_fake_care_scam_hybrid() -> None:
+    assert (await _top(CUSTOMER_CARE, local_fast_embedder()))[0] != "sit-fake-customer-care"

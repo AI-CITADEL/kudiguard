@@ -107,11 +107,11 @@ MIN_GROUNDING_S = 0.5  # the English check takes tens of ms (CPU); it must never
 
 
 # Genuine notices (pack entries "notice-*": the user's own OTP, a login alert, a reversal): measured on the dev
-# retrieval sets (docs/ARCHITECTURE.md, "Advice quality"), a top hit at or above this is wrong <= 3% of the time.
-NOTICE_MIN = Relevance(dense=0.75, bm25=0.80)
-# An entry's model answer is used only when that entry is the top hit at this level (conservative: above the 0.60 /
-# 0.58 cut-off; on the dev sets it keeps 82% / 79% of correct top-3 hits and 39% / 30% of wrong ones).
-EXAMPLE_MIN = Relevance(dense=0.68, bm25=0.68)
+# retrieval sets with all packs (docs/ARCHITECTURE.md, "Advice quality"), 7% / 5% of wrong hits reach this level.
+NOTICE_MIN = Relevance(dense=0.80, bm25=0.84)
+# An entry's model answer is used only when that entry is the top hit at this level (conservative: above the 0.62 /
+# 0.60 cut-off; on the dev sets, all packs, it keeps 85% / 81% of correct top-3 hits and 51% / 55% of wrong ones).
+EXAMPLE_MIN = Relevance(dense=0.70, bm25=0.70)
 # The only model flags a genuine notice may carry and still be lowered: a bank alert reads as urgent, official and
 # private. Any other flag (a code, money or details to send, a link, a fee, a threat) keeps the model's verdict.
 NOTICE_SOFT_FLAGS = frozenset({Flag.URGENCY, Flag.IMPERSONATION, Flag.SECRECY})

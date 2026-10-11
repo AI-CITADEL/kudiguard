@@ -249,12 +249,12 @@ def test_analysis_reads_user_initiated() -> None:
 async def test_cut_off_drops_weak_hits_and_keeps_red_flag_entries() -> None:
     async with httpx.AsyncClient() as client:
         kb = knowledge_base_from_packs(
-            PACKS, client=client, include=["kudiguard-core"], min_relevance=Relevance(dense=0.6, bm25=0.58)
+            PACKS, client=client, include=["kudiguard-core"], min_relevance=Relevance(dense=0.62, bm25=0.60)
         )
         weak = await kb.search(Query(text="my card was stolen at the football match"))
         strong = await kb.search(Query(text="How do I check my NIN?"))
         flagged = await kb.search(Query(text="unrelated words", flags=(Flag.ASKS_CREDENTIALS,)))
-    assert all(item.relevance is not None and item.relevance >= 0.58 for item in weak.entries)
+    assert all(item.relevance is not None and item.relevance >= 0.60 for item in weak.entries)
     assert "nin-basics" not in [item.entry.id for item in weak.entries]
     assert strong.entries[0].entry.id == "nin-basics" and not strong.dense
     assert flagged.entries and flagged.entries[0].entry.flags
@@ -268,7 +268,7 @@ def test_relevance_levels() -> None:
 
 def test_settings_build_the_policy_and_cut_off() -> None:
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert min_relevance(settings) == Relevance(dense=0.60, bm25=0.58)
+    assert min_relevance(settings) == Relevance(dense=0.62, bm25=0.60)
     assert advice_policy(settings) == AdvicePolicy()
     off = Settings(_env_file=None, knowledge_min_relevance_dense=0, knowledge_min_relevance_bm25=0)  # type: ignore[call-arg]
     assert min_relevance(off) is None
