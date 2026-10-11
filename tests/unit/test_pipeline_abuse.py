@@ -401,3 +401,13 @@ async def test_are_you_an_ai_is_not_swallowed_by_the_greeting_matcher(h: Harness
     await h.onboard("en")
     assert await h.say("Hello, are you a real person?") == [h.t(Msg.AI_HONEST)]
     assert await h.say("hello") == [h.t(Msg.GREETING_REPLY)]
+
+
+async def test_the_crisis_screen_reads_the_same_capped_text_as_the_check(h: Harness) -> None:
+    """Past MAX_INBOUND_CHARS nothing is read: not by the check, and not by the crisis screen either."""
+    from kudiguard.pipeline import MAX_INBOUND_CHARS
+
+    await h.onboard("en")
+    texts = await h.say("a" * MAX_INBOUND_CHARS + " I want to kill myself.")
+    assert h.t(Msg.CRISIS_REPLY) not in texts
+    assert await h.say("   " + CRISIS) == [h.t(Msg.CRISIS_REPLY)]  # stripped first, as everywhere else

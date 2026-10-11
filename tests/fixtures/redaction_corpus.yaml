@@ -1,0 +1,1282 @@
+- text: call 08031234567
+  expect: masked
+- text: call 0803 123 4567
+  expect: masked
+- text: call 0803-123-4567
+  expect: masked
+- text: call +2348031234567
+  expect: masked
+- text: call 2348031234567
+  expect: masked
+- text: call +234 803 123 4567
+  expect: masked
+- text: call +234 (0) 803 123 4567
+  expect: masked
+- text: call 0803/123/4567
+  expect: masked
+- text: call 0803_123_4567
+  expect: masked
+- text: call 0803–123–4567
+  expect: masked
+- text: call 0803—123—4567
+  expect: masked
+- text: call 0803 123 4567
+  expect: masked
+- text: call 0803 123 4567
+  expect: masked
+- text: call 0803 123 4567
+  expect: masked
+- text: call ０８０３１２３４５６７
+  expect: masked
+- text: call ٠٨٠٣١٢٣٤٥٦٧
+  expect: masked
+- text: call ۰۸۰۳۱۲۳۴۵۶۷
+  expect: masked
+- text: call o8o31234567
+  expect: masked
+- text: call O8O3 123 4567
+  expect: masked
+- text: call 0803 l23 4567
+  expect: masked
+- text: call zero eight zero three one two three four five six seven
+  expect: masked
+- text: call 080 3 1 2 3 4 5 6 7
+  expect: masked
+- text: call 0803.123.4567
+  expect: masked
+- text: call 0803, 123, 4567
+  expect: masked
+- text: call 0803,123,4567
+  expect: masked
+- text: call 0803 123 4567.
+  expect: masked
+- text: call 0 8 0 3 1 2 3 4 5 6 7
+  expect: masked
+- text: call 08031234567,08051234567
+  expect: masked
+- text: call 08031234567/08051234567
+  expect: masked
+- text: 'WhatsApp: 08031234567'
+  expect: masked
+- text: 'call: 0803 123 45 67'
+  expect: masked
+- text: phone 080-3123-4567
+  expect: masked
+- text: phone 0803  123  4567
+  expect: masked
+- text: "phone 0803\t123\t4567"
+  expect: masked
+- text: 'phone 0803
+
+    123
+
+    4567'
+  expect: masked
+- text: phone 0803 123 4567x
+  expect: masked
+- text: call me on 08031234567pls
+  expect: masked
+- text: 08031234567abc
+  expect: masked
+- text: abc08031234567
+  expect: masked
+- text: tel:+2348031234567
+  expect: masked
+- text: wa.me/2348031234567
+  expect: masked
+- text: https://wa.me/2348031234567?text=hi
+  expect: masked
+- text: call 0803*123*4567
+  expect: masked
+- text: call 0803~123~4567
+  expect: masked
+- text: call 0803·123·4567
+  expect: masked
+- text: call 0803 - 123 - 4567
+  expect: masked
+- text: call (0803)1234567
+  expect: masked
+- text: call 0803 123 456 7
+  expect: masked
+- text: call +234-803-123-4567
+  expect: masked
+- text: call +234.803.123.4567
+  expect: masked
+- text: call 803 123 4567
+  expect: masked
+- text: call 8031234567
+  expect: masked
+- text: call 234 803 123 4567
+  expect: masked
+- text: 'phone #08031234567'
+  expect: masked
+- text: phone *08031234567#
+  expect: masked
+- text: ₦08031234567
+  expect: masked
+- text: N 0803 123 4567
+  expect: masked
+- text: ₦ 0803 123 4567
+  expect: masked
+- text: N08031234567
+  expect: masked
+- text: 0803 123 4567 naira
+  expect: masked
+- text: 08031234567k
+  expect: masked
+- text: send to 0803 123 4567 naira
+  expect: masked
+- text: pay N 803 123 4567
+  expect: masked
+- text: acct 0123456789
+  expect: masked
+- text: acct 0123 456 789
+  expect: masked
+- text: acct 012-345-6789
+  expect: masked
+- text: 'acct: 0123456789 GTB'
+  expect: masked
+- text: acc no 1234567890
+  expect: masked
+- text: acct 1234 567 890
+  expect: masked
+- text: acct ０１２３４５６７８９
+  expect: masked
+- text: acct 012345678９
+  expect: masked
+- text: acct 123.456.7890
+  expect: masked
+- text: acct 1,234,567,890
+  expect: kept
+- text: acct 1234567890.
+  expect: masked
+- text: acct 01234-56789
+  expect: masked
+- text: bvn 22312345678
+  expect: masked
+- text: nin 12345678901
+  expect: masked
+- text: BVN:22312345678
+  expect: masked
+- text: bvn 223 1234 5678
+  expect: masked
+- text: bvn 2231-234-5678
+  expect: masked
+- text: card 5399831234567890
+  expect: masked
+- text: card 5399 8312 3456 7890
+  expect: masked
+- text: card 5399-8312-3456-7890
+  expect: masked
+- text: card 5399 8312 3456 7890 123
+  expect: masked
+- text: card 5399831234567890 cvv 123 exp 12/27
+  expect: masked
+- text: cvv 123
+  expect: masked
+- text: exp 12/27
+  expect: masked
+- text: card 4111 1111 1111 1111 exp 09/28 cvv 456
+  expect: masked
+- text: pin 1234
+  expect: masked
+- text: otp 123456
+  expect: masked
+- text: 'OTP: 482913'
+  expect: masked
+- text: mail john.doe@gmail.com
+  expect: masked
+- text: mail john doe at gmail dot com
+  expect: masked
+- text: mail john(at)gmail.com
+  expect: masked
+- text: mail "j d"@x.com
+  expect: masked
+- text: mail j@[1.2.3.4]
+  expect: masked
+- text: mail JOHN@GMAIL.COM
+  expect: masked
+- text: mail j@localhost
+  expect: kept
+- text: mail jöhn@gmäil.com
+  expect: masked
+- text: mail j@x.com.ng
+  expect: masked
+- text: mail j+tag@x.co
+  expect: masked
+- text: mail j @ x.com
+  expect: masked
+- text: 'Ref: 000013241008123456789012345'
+  expect: masked
+- text: Ref 100004241008091234567890
+  expect: masked
+- text: Trans ID 2410081234567
+  expect: masked
+- text: Session ID 090405241008123456789012345678
+  expect: masked
+- text: ref FT24282ABC123
+  expect: kept
+- text: 'Txn ref: 1234 5678 9012 3456 7890'
+  expect: masked
+- text: N5k
+  expect: kept
+- text: ₦50,000
+  expect: kept
+- text: 5,000 naira
+  expect: kept
+- text: N 5,000,000
+  expect: kept
+- text: ₦5000000
+  expect: kept
+- text: ₦ 5 000 000
+  expect: kept
+- text: ₦ 1 237 648 798
+  expect: kept
+- text: N 12 500 000 000
+  expect: kept
+- text: ₦12500000000
+  expect: kept
+- text: 1 237 648 798 naira
+  expect: masked
+- text: '2026-10-08'
+  expect: kept
+- text: 08/10/2026
+  expect: kept
+- text: 8/10/2026
+  expect: kept
+- text: '10:30'
+  expect: kept
+- text: 10.30am
+  expect: kept
+- text: 12-05-2024 10.30
+  expect: kept
+- text: '*737*1*5000#'
+  expect: kept
+- text: '*565*0#'
+  expect: kept
+- text: '*894*0803123456 7#'
+  expect: masked
+  keep:
+  - '*894*'
+- text: '622'
+  expect: kept
+- text: '55019'
+  expect: kept
+- text: '2026'
+  expect: kept
+- text: 15%
+  expect: kept
+- text: 3 steps
+  expect: kept
+- text: in 2026 2027 2028
+  expect: kept
+  changed: years, not a number (the old patterns masked runs of years)
+- text: between 10 and 20
+  expect: kept
+- text: 50 000 naira
+  expect: kept
+- text: N10,000,000,000
+  expect: kept
+- text: ₦1,000,000.50
+  expect: kept
+- text: valid till 2026-10-08 2026-10-09
+  expect: kept
+  changed: two dates (the old phone pattern masked the second)
+- text: call 622 or 55019
+  expect: kept
+- text: dial *737*2*08031234567#
+  expect: masked
+  keep:
+  - '*737*2*'
+- text: dial *737*08031234567#
+  expect: masked
+  keep:
+  - '*737*'
+- text: +234 is Nigeria
+  expect: kept
+- text: 1 2 3
+  expect: kept
+- text: v1.2.3
+  expect: kept
+- text: IP 192.168.1.1
+  expect: kept
+- text: version 10.0.26200
+  expect: kept
+- text: ₦ 803 123 4567
+  expect: masked
+- text: N803 123 4567
+  expect: masked
+- text: N 8031234567
+  expect: kept
+- text: 8031234567 naira
+  expect: masked
+- text: 803 123 4567 naira
+  expect: masked
+- text: ₦ 8 031 234 567
+  expect: kept
+- text: send 8 031 234 567
+  expect: masked
+- text: 8 031 234 567 naira
+  expect: masked
+- text: 803 123 4567k
+  expect: masked
+- text: send ₦5000 to 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5000
+- text: N5000 08031234567
+  expect: masked
+  keep:
+  - N5000
+- text: ₦5,000 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: ₦ 0 803 123 4567
+  expect: masked
+- text: N 803 123 456 7
+  expect: masked
+- text: call 08031234567, 08051234567
+  expect: masked
+- text: call 0803 123 4567,0805 123 4567
+  expect: masked
+- text: 0803 123 4567, 0805 123 4567
+  expect: masked
+- text: '08031234567.08051234567'
+  expect: masked
+- text: acct 0123456789,bvn 22312345678
+  expect: masked
+- text: acct 0123456789.
+  expect: masked
+- text: my acct is 0123456789,pls send
+  expect: masked
+- text: my number is 08031234567,call me
+  expect: masked
+- text: 08031234567,call
+  expect: masked
+- text: 0803 123 4567,call me
+  expect: masked
+- text: send to 0123456789,GTB
+  expect: masked
+- text: send ₦5,000 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: 5,000 0803 123 4567
+  expect: masked
+  keep:
+  - 5,
+- text: at 10:30 0803 123 4567
+  expect: masked
+  keep:
+  - '10:30'
+- text: at 10:30 08031234567
+  expect: masked
+  keep:
+  - '10:30'
+- text: 1-0803 123 4567
+  expect: masked
+- text: N5,000 to 0123 456 789
+  expect: masked
+  keep:
+  - N5,000
+- text: 5000, 0803 123 4567
+  expect: masked
+- text: 2. 0803 123 4567
+  expect: masked
+- text: 2.0803 123 4567
+  expect: masked
+- text: 1, 0803 123 4567
+  expect: masked
+- text: pay 2,000 08031234567
+  expect: masked
+  keep:
+  - 2,
+- text: ₦5,000 0123456789
+  expect: masked
+  keep:
+  - ₦5,
+- text: ₦5,000 0123 456 789
+  expect: masked
+  keep:
+  - ₦5,
+- text: ₦5,000 0803-123-4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: N2,500 0803.123.4567
+  expect: masked
+  keep:
+  - N2,
+- text: 10-08 0803 123 4567
+  expect: masked
+- text: 'Date: 10-10-2026 0803 123 4567'
+  expect: masked
+  keep:
+  - 10-10-2026
+- text: 12:00 0123 456 7890
+  expect: masked
+  keep:
+  - '12:00'
+  changed: the minutes of a time (12:00); the number after it is masked
+- text: 1.5 0803 123 4567
+  expect: masked
+- text: acct 0123456789,0123456788
+  expect: masked
+- text: 08031234567;08051234567
+  expect: masked
+- text: 08031234567|08051234567
+  expect: masked
+- text: 08031234567&08051234567
+  expect: masked
+- text: 0803123456,7
+  expect: masked
+- text: 0803 123 4567.5
+  expect: masked
+- text: '08031234567.5'
+  expect: masked
+- text: 0803123 4567
+  expect: masked
+- text: +2348031234567,+2348051234567
+  expect: masked
+- text: N 8 031 234 567
+  expect: kept
+- text: pay n 8 031 234 567
+  expect: kept
+- text: 8 031 234 567k
+  expect: masked
+- text: 8 031 234 567 kobo
+  expect: masked
+- text: n 0 803 123 456
+  expect: masked
+- text: 2026 2027 2028
+  expect: kept
+  changed: years, not a number
+- text: in 2025 and 2026 2027
+  expect: kept
+- text: 10:30 11:45 12:15 13:00
+  expect: kept
+- text: 'phone: 0803 123 4567 at 10.30'
+  expect: masked
+  keep:
+  - '10.30'
+- text: 'Ref: 000013241008123456789012345 Amt: NGN5,000.00'
+  expect: masked
+  keep:
+  - NGN5,000.00
+- text: NGN 5,000,000.00
+  expect: kept
+- text: NGN5000000000
+  expect: kept
+- text: NGN 08031234567
+  expect: masked
+- text: ₦50,000.00
+  expect: kept
+- text: N50k
+  expect: kept
+- text: 5 000 000 naira
+  expect: kept
+- text: 10 000 000 000 naira
+  expect: masked
+- text: 1.5m naira
+  expect: kept
+- text: 50 percent
+  expect: kept
+- text: 0.5%
+  expect: kept
+- text: 'Acct: 01******89'
+  expect: kept
+- text: Acct:0123456789 Amt:NGN5,000.00 Desc:TRF
+  expect: masked
+  keep:
+  - Amt:NGN5,000.00
+- text: Bal:NGN12,345.67
+  expect: kept
+- text: 'Desc: TRF/08031234567/John'
+  expect: masked
+- text: TRF FROM 0123456789 TO 9876543210
+  expect: masked
+- text: OTP is 1234
+  expect: masked
+- text: 08-10-2026 0803
+  expect: masked
+- text: phone (+234) 803-123-4567
+  expect: masked
+- text: 0803 123 4567​
+  expect: masked
+- text: 0803​123​4567
+  expect: masked
+- text: 0​8​0​3​1​2​3​4​5​6​7
+  expect: masked
+- text: my account 0123456789 was debited
+  expect: masked
+- text: call +234 803 123 4567 now
+  expect: masked
+- text: call 0803-123-4567 now
+  expect: masked
+- text: email me at ada.obi+x@mail.example.com
+  expect: masked
+- text: BVN 22212345678 and card 5399 8312 3456 7890
+  expect: masked
+- text: I paid N5,000 for 2 items in 2024
+  expect: kept
+- text: dial *565*0# to check
+  expect: kept
+- text: my account is 0123456789.
+  expect: masked
+- text: pay into 0123456789, then call
+  expect: masked
+- text: on 12-05-2024 and 01-05-2024
+  expect: kept
+- text: amounts N5000000 and ₦5000000 and 1 500 000
+  expect: kept
+- text: rate 2.5000000 or 1,500000
+  expect: kept
+- text: call 0700-CALL-CBN
+  expect: kept
+- text: call 803 123 4567 now
+  expect: masked
+- text: my number is 123-456-7890
+  expect: masked
+- text: on 2026 10 08 at noon
+  expect: kept
+- text: pay 5 000 000 naira
+  expect: kept
+- text: dial *737*1*500 000#
+  expect: kept
+- text: meet 10:30 12 45 2026
+  expect: masked
+  keep:
+  - '10:'
+- text: pay N 50 000 000 000 now
+  expect: kept
+- text: BVN is 2 2 3 1 5 6 7 8 9 0 1
+  expect: masked
+- text: the 1 2 3 steps
+  expect: kept
+- text: Card:5399 8312 3456 7890
+  expect: masked
+- text: ref:5399 8312 3456
+  expect: masked
+- text: ref:5399 8312
+  expect: kept
+- text: call 80 312 345 67 now
+  expect: masked
+- text: call 8031 2345 67 now
+  expect: masked
+- text: my number is 803 12345 67
+  expect: masked
+- text: pairs 12 34 56 78 90
+  expect: masked
+- text: code 1 23 45 67 89 01
+  expect: masked
+- text: in 12 345 678 90
+  expect: masked
+- text: ₦ 12 345 678 900 and $ 1 234 567 890
+  expect: kept
+- text: ₦ 12 345 678 90
+  expect: masked
+- text: balance ₦1 234 567 890.50
+  expect: kept
+- text: balance 12 345 678 90.50
+  expect: masked
+- text: BVN 2 2 3 1 5 6 7 8 9 0
+  expect: masked
+- text: PIN 2 2 3 1 5 6 7 8 9
+  expect: masked
+- text: acct 123456 ok
+  expect: masked
+- text: code 12345 ok
+  expect: masked
+- text: acct 1234567890 kindly
+  expect: masked
+- text: N 0803123456
+  expect: masked
+- text: on 31-12-2024 23.59
+  expect: kept
+- text: on 01-01-2024 00.00
+  expect: kept
+  changed: a date and a time (the old phone pattern read 01-01-2024 00 as a number)
+- text: on 32-12-2024 23.59
+  expect: masked
+- text: on 00-12-2024 23.59
+  expect: masked
+- text: on 31-13-2024 23.59
+  expect: masked
+- text: on 31-00-2024 23.59
+  expect: masked
+- text: on 31-12-2024 24.00
+  expect: masked
+- text: on 31-12-2024 23.60
+  expect: masked
+- text: on 31-12-2024 25.00
+  expect: masked
+- text: on 31-12-2024 23.61
+  expect: masked
+- text: in 1 234 567 890
+  expect: masked
+- text: acct 1 234 567 890 kg
+  expect: masked
+- text: on 31-12-2724 23.59
+  expect: masked
+- text: pay ₦ 1234 567 890
+  expect: masked
+- text: pay ₦1 234 567 890.5
+  expect: kept
+- text: pay ₦1 234 567 890.505
+  expect: masked
+  keep:
+  - ₦1
+- text: pay N12345678901.5
+  expect: kept
+- text: pay N12345678901.505
+  expect: masked
+- text: pay x₦ 12 345 678 90
+  expect: masked
+- text: call (080) 312 3456
+  expect: masked
+- text: call 0700 12345
+  expect: kept
+- text: login 123456
+  expect: masked
+- text: code 123456 kindly
+  expect: masked
+- text: acct 1234567890 kg
+  expect: masked
+- text: call (08031234567) now
+  expect: masked
+- text: call zero 0803 123 4567 now
+  expect: masked
+- text: call zero nine zero nine zero nine zero now
+  expect: masked
+- text: call zero nine zero nine zero nine now
+  expect: kept
+- text: kira sifili tara sifili tara sifili tara sifili yanzu
+  expect: masked
+- text: pe odo esan odo esan odo esan odo bayi
+  expect: masked
+- text: kpọọ efu itoolu efu itoolu efu itoolu efu ugbu a
+  expect: masked
+- text: call zero , nine - zero . nine  zero nine zero now
+  expect: masked
+- text: call zero 0803 123 4567 nine now
+  expect: masked
+- text: call 0803 123 4567 and zero 0805 123 4567 now
+  expect: masked
+- text: hello8031234567
+  expect: masked
+- text: call 08031234567olx
+  expect: masked
+- text: call 0803 123 456 o7 now
+  expect: masked
+- text: i 803 123 456 now
+  expect: kept
+- text: 12-05-2024 9:30 ok
+  expect: kept
+- text: on 12-05-2024 100:30 ok
+  expect: masked
+  keep:
+  - :30
+- text: at 1:5 08031234567
+  expect: masked
+  keep:
+  - '1:'
+- text: at 10:300 0803 123 4567
+  expect: masked
+  keep:
+  - '10:'
+- text: 10:30,0803 123 4567
+  expect: masked
+  keep:
+  - 10:30,
+- text: ₦1,234,567,890.00 0803 123 4567
+  expect: masked
+  keep:
+  - ₦1,
+- text: ₦5,000,000 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: N5000.5 08031234567
+  expect: masked
+  keep:
+  - N5000.5
+- text: N5000.50 08031234567
+  expect: masked
+  keep:
+  - N5000.50
+- text: N5000.505 08031234567
+  expect: masked
+- text: acct 1,234,567,890.5
+  expect: kept
+- text: acct 1,234,567,890.505
+  expect: masked
+- text: acct 1234,567,890
+  expect: masked
+- text: call 0803    123    4567 now
+  expect: masked
+- text: call 0803 ... 123 ... 4567 now
+  expect: masked
+- text: call 0803...123...4567 now
+  expect: masked
+- text: call 0803 -- 123 -- 4567 now
+  expect: masked
+- text: call 0803....123....4567 now
+  expect: kept
+- text: "call 0803\x01123\x014567 now"
+  expect: masked
+- text: call 0803∞123∞4567 now
+  expect: kept
+- text: acct 1234567 ok
+  expect: masked
+- text: 1:30 0803 123 4567
+  expect: masked
+  keep:
+  - '1:30'
+- text: valid 2026-10-08 2026-10-09 9:30
+  expect: kept
+  changed: two dates and a time
+- text: 1,2345 0803 123 4567
+  expect: masked
+- text: N5000/50 08031234567
+  expect: masked
+- text: call 0803 123 4567 and zero 0805 123 4567 nine now
+  expect: masked
+- text: codexp 09/28 ok
+  expect: kept
+- text: exp 09/281 ok
+  expect: kept
+- text: write to john at gmail dot community
+  expect: kept
+- text: callzero nine zero nine zero nine zero
+  expect: kept
+- text: zero nine zero nine zero nine zerox
+  expect: kept
+- text: call 0803 .... 123 .... 4567 now
+  expect: kept
+- text: dial *737*2*08031234567# now
+  expect: masked
+  keep:
+  - '*737*2*'
+- text: dial *737*0123456789#
+  expect: masked
+  keep:
+  - '*737*'
+- text: dial *737*1*500000# then call 0803 123 4567 now
+  expect: masked
+  keep:
+  - '*737*1*500000#'
+- text: +2348031234567 is mine
+  expect: masked
+- text: 08031234567 call me (
+  expect: masked
+- text: call 08031234567) now
+  expect: masked
+- text: call (08031234567x
+  expect: masked
+- text: call (08031234567 now
+  expect: masked
+- text: call 0803)123)4567) now
+  expect: masked
+- text: call (0803)1234567) now
+  expect: masked
+- text: my pin 1234 ok
+  expect: masked
+- text: my pin1234 ok
+  expect: masked
+- text: spin 1234 ok
+  expect: kept
+- text: pin 12 ok
+  expect: kept
+- text: 'otp::  482913'
+  expect: masked
+- text: card exp 9/28 ok
+  expect: masked
+- text: 'card expiry: 09 / 2028 ok'
+  expect: masked
+- text: mail john(at)gmail.com now
+  expect: masked
+- text: Your code 482913. 10 minutes
+  expect: masked
+  keep:
+  - '10'
+- text: Use 482913, 5 mins
+  expect: masked
+  keep:
+  - '5'
+- text: verification code 482913 - 10 mins
+  expect: masked
+  keep:
+  - '10'
+- text: 482913-1
+  expect: masked
+  keep:
+  - '-1'
+- text: code 482913/2
+  expect: masked
+  keep:
+  - /2
+- text: ref 12345678 (2)
+  expect: masked
+  keep:
+  - (2)
+- text: acct 1234567 89
+  expect: masked
+  keep:
+  - '89'
+- text: send to 5012345 3 times
+  expect: masked
+  keep:
+  - '3'
+- text: pay 1234567 2x
+  expect: masked
+  keep:
+  - 2x
+- text: 482913 (1)
+  expect: masked
+  keep:
+  - (1)
+- text: 482913 482914
+  expect: masked
+- text: '1234567.5'
+  expect: kept
+- text: 1234567,8
+  expect: kept
+- text: 10/10/2026 - 12/10/2026
+  expect: kept
+- text: 2026-10-10 - 2026-12-31
+  expect: kept
+- text: 10.10.2026-12.10.2026
+  expect: kept
+- text: 10, 20, 30, 40, 50
+  expect: kept
+- text: 1 2 3 4 5 6 7 8 9 10
+  expect: kept
+- text: 10 9 8 7 6 5
+  expect: kept
+- text: 0 1 2 3 4 5 6 7 8 9
+  expect: masked
+- text: IP 192.168.100.200
+  expect: kept
+- text: 192.168.100.200
+  expect: masked
+- text: IP 192.168.100.256
+  expect: masked
+- text: IP 192.168.010.200
+  expect: masked
+- text: 5,000 10,000 20,000
+  expect: kept
+- text: 1.5 0.5 2.5
+  expect: kept
+- text: 2.5, 3.5, 4.5, 5.5, 6.5
+  expect: kept
+- text: 1.5 0.25 2.5
+  expect: kept
+- text: 1.5 0.5
+  expect: kept
+- text: 10.30 0803 123 4567
+  expect: masked
+  keep:
+  - '10.30'
+- text: v2.1 08031234567
+  expect: masked
+  keep:
+  - v2.1
+- text: v12.345.678 08031234567
+  expect: masked
+- text: 6.57 05.674-3719-06
+  expect: masked
+- text: 10.30 0803 123 4567 10:30
+  expect: masked
+  keep:
+  - '10:30'
+  changed: the hour of a time (10:30) after a whole number; the number is masked
+- text: 08031234567 *737#
+  expect: masked
+  keep:
+  - '*737#'
+- text: ngn6.78287,16,4178 0055
+  expect: masked
+- text: 706.7 2.1 112.3
+  expect: masked
+- text: 250.122.208.23
+  expect: masked
+- text: +23.47 07-065-4443 04:19
+  expect: masked
+  keep:
+  - 04:19
+  changed: the hour of a time (04:19) after a whole number; the number is masked
+- text: 07-065-4443 04:19
+  expect: masked
+  keep:
+  - :19
+- text: 54 2075.06.06
+  expect: masked
+- text: 080-2061.07.24
+  expect: masked
+- text: 07-06-2026 301
+  expect: masked
+- text: 24/01/1990, 389792 07-0-05-09-1929
+  expect: masked
+  keep:
+  - 24/01/1990,
+- text: 28.97 34 296 083.4160-0.22-13-11-1913
+  expect: masked
+- text: 3.32 7-09-1998 and 01:48
+  expect: masked
+  keep:
+  - 01:48
+- text: 2001.03.05 02 3 53958365
+  expect: masked
+- text: 20-04-1998 09.0.31-622.973
+  expect: masked
+  keep:
+  - 20-04-1998
+- text: 20-04-1998, 53.8-40 2069.05
+  expect: masked
+  keep:
+  - 20-04-1998,
+- text: 08031234567-10/10/2026
+  expect: masked
+  keep:
+  - -10/10/2026
+  changed: a date written after the number with another separator; the number is masked
+- text: on 16/08/2026 18:33 please
+  expect: kept
+- text: 10:30 8031234567
+  expect: masked
+  keep:
+  - '10:30'
+- text: 10:30 803123456
+  expect: masked
+  keep:
+  - '10:'
+- text: call 0803:123:4567
+  expect: masked
+- text: call 0803\123\4567
+  expect: masked
+- text: call 0803|123|4567
+  expect: masked
+- text: call 0803;123;4567
+  expect: masked
+- text: call 0803'123'4567
+  expect: masked
+- text: call 0803+123+4567
+  expect: masked
+- text: call O8O3 l23 4S67
+  expect: masked
+- text: call 08B3 123 4567
+  expect: masked
+- text: call 0803 123 4Z67
+  expect: masked
+- text: '[0803] 123-4567'
+  expect: masked
+- text: meet at 10:30
+  expect: kept
+- text: '*737*0803*1234567#'
+  expect: masked
+  keep:
+  - '*737*'
+- text: '*894*500*0123456789#'
+  expect: masked
+  keep:
+  - '*894*500*'
+- text: pin na 1234
+  expect: masked
+- text: pin 1 2 3 4
+  expect: masked
+- text: pin one two three four
+  expect: masked
+- text: otp is 4 8 2 9 1 3
+  expect: masked
+- text: OTP - 482-913
+  expect: masked
+- text: token 4829
+  expect: masked
+- text: spinach 1234
+  expect: kept
+- text: ade@gmail,com
+  expect: masked
+- text: ade at gmail.com
+  expect: masked
+- text: ade@gmail
+  expect: masked
+- text: turn=12345678ab ok
+  expect: masked
+- text: turn=1234567ab ok
+  expect: masked
+- text: key=4111111111111111 ok
+  expect: masked
+- text: id=0803123456789012 ok
+  expect: masked
+- text: id=08031234567 ok
+  expect: masked
+- text: xid=1234567890ab ok
+  expect: masked
+- text: id=1234567890abx ok
+  expect: masked
+- text: Login at gtbank-verify.com to unlock
+  expect: kept
+- text: register at cbn-grant.ng
+  expect: kept
+- text: Apply at bit.ly/fg-grant
+  expect: kept
+- text: mail ade at gmail.com
+  expect: masked
+- text: mail john at company dot com
+  expect: masked
+- text: Use 652-137 as your one-time password
+  expect: masked
+- text: Your verification code is 5 8 7 2 8 4
+  expect: masked
+- text: 'Ur code: 48 29 13'
+  expect: masked
+- text: Code 4829-13 expires in 10 minutes
+  expect: masked
+  keep:
+  - '10'
+- text: verification code 4829
+  expect: masked
+- text: your code is 48291
+  expect: masked
+- text: 482913 is your code
+  expect: masked
+- text: code expires at 10:30
+  expect: kept
+- text: N5,000 is your code
+  expect: kept
+- text: pay 5000 using code
+  expect: kept
+- text: 10:30 is the code time
+  expect: kept
+- text: 234-858 is your verification code
+  expect: masked
+- text: 415-984 is your Opay login code today
+  expect: masked
+- text: 4 7 8 5 3 4 is your Opay login code
+  expect: masked
+- text: 123 456 is your verification code
+  expect: masked
+- text: 482913 is your code now
+  expect: masked
+- text: 2024 code of conduct
+  expect: kept
+- text: The 2023 code review
+  expect: kept
+- text: the 2026 pin
+  expect: kept
+- text: Section 419 code
+  expect: kept
+- text: room 101 code
+  expect: kept
+- text: about 500 code words
+  expect: kept
+- text: pay 2000 as code fee
+  expect: kept
+- text: 1000 is the code limit
+  expect: masked
+- text: error code 404
+  expect: kept
+- text: bank code 058
+  expect: kept
+- text: zip code 23401
+  expect: kept
+- text: dress code 2025
+  expect: kept
+- text: area code 0803
+  expect: masked
+- text: otp 482_913
+  expect: masked
+- text: IP 192 168 100 200
+  expect: masked
+- text: 'IP address:      192.168.100.200'
+  expect: masked
+- text: 'IP address: 192.168.100.200'
+  expect: kept
+- text: 10.30.5 08031234567
+  expect: masked
+- text: 10,20,30,40,50
+  expect: masked
+- text: call 8 031 234 567 now
+  expect: masked
+- text: call +234 8 031 234 567 now
+  expect: masked
+- text: call 0 803 123 4567 now
+  expect: masked
+- text: call 0803.123.4567 now
+  expect: masked
+- text: call +234.803.123.4567 now
+  expect: masked
+- text: call 0 8 0 3 123 45 67 now
+  expect: masked
+- text: call 0803 123-45.67 now
+  expect: masked
+- text: pay to 2 2 3 1 5 6 7 8 9 0 now
+  expect: masked
+- text: card 5399 8312 3456 7890 1234 now
+  expect: masked
+- text: card 5399-8312-3456-7890-123 now
+  expect: masked
+- text: card 3782 822463 10005 now
+  expect: masked
+- text: card 53998312345678901234 now
+  expect: masked
+- text: Card:5399 8312 3456 7890 1234 now
+  expect: masked
+- text: card no.5399 8312 3456 7890 now
+  expect: masked
+- text: call 0803 123 4567, then 0803 765 4321 now
+  expect: masked
+- text: call (0803) 123 4567 now
+  expect: masked
+- text: N5,000
+  expect: kept
+- text: ₦1,250,000.50
+  expect: kept
+- text: pay ₦ 5 000 000 000 now
+  expect: kept
+- text: pay N12500000000.50 now
+  expect: kept
+- text: pay $ 1 234 567 890 now
+  expect: kept
+- text: 5,000,000,000 naira
+  expect: kept
+- text: on 12-05-2024 10.30 and 2026-10-08 14:30
+  expect: kept
+- text: from 01-05-2024 10:30 to 2026-10-08 2026-10-09
+  expect: kept
+  changed: dates and a time
+- text: times 10.30 12.45 14.00 16.15
+  expect: kept
+- text: meet 08.10.2026 10.30
+  expect: kept
+- text: '10/10/2026 '
+  expect: kept
+- text: 10-10-2026-
+  expect: kept
+- text: '2026-10-10 '
+  expect: kept
+- text: '10:30 '
+  expect: kept
+- text: '2026 '
+  expect: kept
+- text: 'N5,000 '
+  expect: kept
+- text: '1, '
+  expect: kept
+- text: '1.5 '
+  expect: kept
+- text: '0803 123 4567 '
+  expect: masked
+- text: X=1
+  expect: kept
+- text: " \t\r\n-1"
+  expect: kept
+- text: card [number] 1234
+  expect: masked
+  keep:
+  - '1234'
+- text: card [number] 1234.
+  expect: masked
+  keep:
+  - '1234.'
+- text: call 0803 [number] now
+  expect: masked
+  keep:
+  - 0803
+- text: a [number] 12 34 [number] b
+  expect: masked
+  keep:
+  - '12'
+  - '34'
+- text: '[number] 10:30 and N5,000 [number]'
+  expect: masked
+  keep:
+  - '10:30'
+  - N5,000
+- text: '[number] 1.5 kg'
+  expect: masked
+  keep:
+  - '1.5'
+- text: call 8 031 234 567
+  expect: masked
+- text: 12 apples and [number]
+  expect: masked
+  keep:
+  - '12'
+- text: '[number] now and 1234'
+  expect: masked
+  keep:
+  - '1234'
+- text: 1234 [number]
+  expect: masked
+  keep:
+  - '1234'
+- text: '[number] 1234'
+  expect: masked
+  keep:
+  - '1234'
+- text: kira sifili takwas sifili uku daya biyu uku hudu biyar shida bakwai
+  expect: masked
+- text: pe òdo ẹ̀jọ òdo ẹ̀ta ọ̀kan èjì ẹ̀ta ẹ̀rin àrún ẹ̀fà èje
+  expect: masked
+- text: pe odo ejo odo eta okan eji eta erin arun efa eje
+  expect: masked
+- text: kpọọ efu asatọ efu atọ otu abụọ atọ anọ ise isii asaa
+  expect: masked
+- text: call zero eight 0 3 one 2 3 4 5 6 7
+  expect: masked
+- text: call ZERO EIGHT ZERO THREE 1 2 3 4 5 6 7
+  expect: masked
+- text: I have one or two questions about three things
+  expect: kept
+- text: one two three four five six
+  expect: kept
+- text: call 0803 I23 4567
+  expect: masked
+- text: Ola 08031234567
+  expect: masked
+- text: 'cvv: 123'
+  expect: masked
+- text: my pin is 1234
+  expect: masked
+- text: OTP was 482913.
+  expect: masked
+- text: password 12345678
+  expect: masked
+- text: exp 09/2028
+  expect: masked
+- text: 'expiry: 09 / 28'
+  expect: masked
+- text: john [at] gmail [dot] com
+  expect: masked
+- text: john {at} gmail.com
+  expect: masked
+- text: mail me at john dot doe at gmail dot com
+  expect: masked
+- text: meet at the hotel
+  expect: kept
+- text: ₦5,000.00 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: ₦5,000, 0803 123 4567
+  expect: masked
+  keep:
+  - ₦5,
+- text: 10:30, 0803 123 4567
+  expect: masked
+  keep:
+  - 10:30,
+- text: 0803 123 4567 at 10:30
+  expect: masked
+  keep:
+  - '10:30'
+- text: 0803 123 4567, ₦5,000
+  expect: masked
+  keep:
+  - ₦5,000
+- text: call (+234)8031234567
+  expect: masked
+- text: dial *737*1*500000#
+  expect: kept

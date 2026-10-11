@@ -63,6 +63,9 @@ DONATION_DEADLINE_S = 60.0  # the background donation step (write or offer) afte
 # nobody reads the notice faster, and it protects against this server's clock running up to this much *behind*
 # the provider's (a clock ahead only delays when a reply counts). Keep the clock synced (docs/DEPLOY.md).
 WELCOME_READ_S = 5.0
+# Inbound text is cut to this before it is matched, checked, redacted or stored: the engine reads only the first
+# MAX_INPUT_CHARS (2000) anyway, WhatsApp sends at most 4096, and redaction time and stored size stay bounded.
+MAX_INBOUND_CHARS = 8000
 MAX_COALESCED = 5  # quick successive notes/texts merged into one check (people split one story over messages)
 
 
@@ -316,7 +319,7 @@ class Conversation:
             # a flood: this user already has a full queue (logged by the guard; no reply, they get one soon), but a
             # crisis message is never dropped silently: the crisis reply goes out at once, nothing is stored
             category = (
-                self._engine.screen.crisis(message.text or "") if message.kind is MessageKind.TEXT else None
+                self._engine.screen.crisis(_inbound(message)) if message.kind is MessageKind.TEXT else None
             )
             if category is not None:
                 await self._best_effort_reply(message.user_id, await self._language_of(user_hash),
@@ -436,7 +439,7 @@ class Conversation:
             utcnow()
         )  # real time, compared with withdrawal tombstones (not the injectable clock)
         message = turn.message
-        match = self._matcher.match(message.text) if message.kind is MessageKind.TEXT else Match()
+        match = self._matcher.match(_inbound(message)) if message.kind is MessageKind.TEXT else Match()
         user = await self._store.get_user(turn.user_hash)
         if user is not None and user.language:
             turn.language = user.language
@@ -490,7 +493,7 @@ class Conversation:
         and the rate limit (docs/ABUSE.md). Returns True when the turn ends here (a rate-limited user: nothing about
         the message is stored); a refusal by the admission that follows also ends it without another message. Otherwise the check follows (its crisis reply is not sent
         twice); a voice note is only known to be a crisis after transcription, inside the check."""
-        text = turn.message.text or ""
+        text = _inbound(turn.message)
         category = self._engine.screen.crisis(text)
         if category is None:
             return False
@@ -639,10 +642,10 @@ class Conversation:
             await self._store.save_user(user)
             await self._follow_up(turn, parsed)
         elif match.greeting_language and not self._engine.screen.asks_if_ai(
-            turn.message.text or "", turn.language
+            _inbound(turn.message), turn.language
         ):
             await self._store.save_user(user)
-            await self._fixed(turn, Msg.GREETING_REPLY, transcript=turn.message.text)
+            await self._fixed(turn, Msg.GREETING_REPLY, transcript=_inbound(turn.message))
         else:
             await self._check(turn, user)
             self._after_voice(turn, user)
@@ -674,7 +677,7 @@ class Conversation:
             turn.transcript = speech.transcript.text.strip()
             turn.decode_ms, turn.asr_ms = speech.decode_ms, speech.asr_ms
         else:
-            turn.transcript = (message.text or "").strip()
+            turn.transcript = _inbound(message)
         follow_ons = self._take_follow_ons(turn)
         if follow_ons:
             for merged in follow_ons:
@@ -950,7 +953,7 @@ class Conversation:
     async def _content_of(self, turn: _Turn, message: InboundMessage) -> str:
         """Text of a merged follow-on message; an unusable voice note among several is skipped, not fatal."""
         if message.kind is not MessageKind.AUDIO:
-            return (message.text or "").strip()
+            return _inbound(message)
         turn.voice = True
         if not self._flood.voice_allowed(turn.user_hash):
             log.info("merged voice note skipped: voice budget")
@@ -1106,6 +1109,11 @@ class Conversation:
 
 
 AUDIO = MessageKind.AUDIO
+
+
+def _inbound(message: InboundMessage) -> str:
+    """The text of an inbound message, stripped and cut to MAX_INBOUND_CHARS."""
+    return (message.text or "").strip()[:MAX_INBOUND_CHARS]
 
 
 async def record_pattern(

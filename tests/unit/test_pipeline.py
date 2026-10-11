@@ -16,6 +16,7 @@ from kudiguard.llm.base import Purpose
 from kudiguard.pipeline import (
     CONSENT_VERSION,
     MAX_COALESCED,
+    MAX_INBOUND_CHARS,
     Action,
     Conversation,
     Limits,
@@ -160,6 +161,13 @@ async def test_real_message_after_welcome_is_consent_and_is_answered(h: Harness)
     assert texts[0].startswith(h.t(Msg.VERDICT_LIKELY_SCAM))
     user = await h.store.get_user(h.user_hash)
     assert user is not None and user.consented_at is not None and user.language == "en"
+
+
+async def test_long_inbound_text_is_cut_before_it_is_checked_or_stored(h: Harness) -> None:
+    await h.onboard("en")
+    await h.say(OTP_SCAM + " 10/10/2026" * 20_000)
+    stored = str((await interactions(h))[-1]["transcript"])
+    assert stored.startswith(OTP_SCAM) and len(stored) <= MAX_INBOUND_CHARS
 
 
 async def test_invalid_language_button_is_ignored(h: Harness) -> None:

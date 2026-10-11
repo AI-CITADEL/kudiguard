@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from kudiguard.knowledge.file_pack import KnowledgeConfigError
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
 from kudiguard.reporting import build_report, format_report, percentile
 from kudiguard.storage.sqlite import SQLiteStore
+from kudiguard.text import RedactingFilter
 
 ROOT = Path(__file__).resolve().parents[2]
 SECRET = "s" * MIN_SECRET_BYTES
@@ -342,8 +344,64 @@ def test_cli_serve_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KUDIGUARD_HASH_SECRET", SECRET)
     monkeypatch.setenv("KUDIGUARD_WHATSAPP_ENABLED", "false")
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: called.update(kwargs))
-    assert cli.main(["serve", "--port", "9000"]) == 0
-    assert called["port"] == 9000 and called["host"] == "127.0.0.1"
+    handlers = logging.getLogger().handlers
+    before = {id(h): list(h.filters) for h in handlers}
+    own = logging.getLogger("kudiguard.test_serve")
+    own_handler = logging.NullHandler()
+    own.addHandler(own_handler)
+    try:
+        assert cli.main(["serve", "--port", "9000"]) == 0
+        assert called["port"] == 9000 and called["host"] == "127.0.0.1"
+        assert called["log_config"] == cli.serve_log_config()
+        assert all(any(isinstance(f, RedactingFilter) for f in h.filters) for h in [*handlers, own_handler])
+        cli.redact_every_handler()  # idempotent: one filter per handler
+        assert sum(isinstance(f, RedactingFilter) for f in own_handler.filters) == 1
+    finally:
+        own.removeHandler(own_handler)
+        for handler in handlers:
+            handler.filters = before.get(id(handler), [])
+
+
+@pytest.fixture
+def uvicorn_logging() -> object:
+    """uvicorn's loggers as uvicorn configures them, restored afterwards."""
+    names = ("uvicorn", "uvicorn.error", "uvicorn.access")
+    saved = {n: (logging.getLogger(n).handlers[:], logging.getLogger(n).propagate, logging.getLogger(n).level)
+             for n in names}  # fmt: skip
+    yield
+    for name, (handlers, propagate, level) in saved.items():
+        logger = logging.getLogger(name)
+        logger.handlers, logger.propagate, logger.level = handlers, propagate, level
+
+
+@pytest.mark.usefixtures("uvicorn_logging")
+def test_uvicorn_own_handlers_redact_tracebacks_and_access_lines(capsys: pytest.CaptureFixture[str]) -> None:
+    """uvicorn's loggers do not propagate to the root: the redaction must sit on uvicorn's own handlers, as uvicorn
+    configures them from ``serve_log_config``."""
+    import uvicorn
+
+    async def app(scope: object, receive: object, send: object) -> None:  # pragma: no cover - never called
+        raise AssertionError
+
+    uvicorn.Config(
+        app, log_config=cli.serve_log_config(), log_level="info"
+    )  # configures logging, as uvicorn.run
+    try:
+        raise ValueError("bad request from 08031234567")
+    except ValueError:
+        logging.getLogger("uvicorn.error").exception("Exception in ASGI application")
+    logging.getLogger("uvicorn.access").info(
+        '%s - "%s %s HTTP/%s" %d',
+        "127.0.0.1:5000",
+        "GET",
+        "/check/0803-123-4567?hub.verify_token=SECRET",
+        "1.1",
+        200,
+    )
+    out = capsys.readouterr()
+    assert "Exception in ASGI application" in out.err and "ValueError: bad request from [number]" in out.err
+    assert "Traceback" in out.err and '"GET /check/[number] HTTP/1.1" 200' in out.out
+    assert "0803" not in out.err + out.out and "SECRET" not in out.out
 
 
 def test_rows_without_latency_are_still_counted() -> None:
