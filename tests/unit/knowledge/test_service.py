@@ -212,6 +212,7 @@ async def test_build_sources_default_is_every_enabled_real_pack() -> None:
         "genuine-notices",
         "kudiguard-core",
         "money-skills",
+        "situations",
     ]  # fictional samples stay off
 
 

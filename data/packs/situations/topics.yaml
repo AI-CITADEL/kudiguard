@@ -1,0 +1,609 @@
+# Situation entries. Rules for authors (same as kudiguard-core):
+#  * facts are short plain sentences, specific steps in order, the most urgent first
+#  * never promise an outcome; never invent phone numbers, shortcodes or URLs (contacts live in kudiguard-core)
+#  * every entry has a "# Sources:" comment (URL + date checked). "General practice" marks steps that are standard
+#    bank/telecom security advice already used in kudiguard-core, not a new factual claim.
+#  * model answers are in examples.yaml (id -> text)
+
+# =====================================================================================================
+# Account or phone compromise
+# =====================================================================================================
+
+# Sources: general bank practice (block card via bank app, USSD or the number on the card); CBN complaints route
+#   https://www.cbn.gov.ng/supervision/cpdcomgt.html (checked 2026-10-11)
+- id: sit-card-stolen
+  title: Your ATM card was stolen or lost just now
+  facts:
+    - Block the card first. Use your bank's app, your bank's USSD code or your bank's customer care line.
+    - If you cannot block it yourself, call your bank from any phone and ask them to block the card and report it.
+    - Check your account for any debit you did not make and write down the date, amount and reference.
+    - Report every debit you did not make to your bank in writing and keep the complaint number.
+    - Ask your bank for a replacement card. Do not write your new PIN anywhere near the card.
+  actions:
+    - Block the card now in your bank app or by calling your bank.
+    - Report any unknown debit to your bank and keep the complaint number.
+  keywords: [card stolen, stolen card, lost card, block my card, dem steal my card, my card don lost]
+
+# Sources: general bank/telecom practice, as in kudiguard-core lost-phone (not separately web-verified)
+- id: sit-phone-stolen-banking
+  title: Your phone was stolen and it has your bank apps
+  facts:
+    - From another phone, call your bank first and ask them to block mobile app and USSD banking on your account.
+    - Then call your network provider and ask them to block the SIM. Go to their office with your ID for a new SIM with the same number.
+    - Change your email password from another device, because email can reset many apps.
+    - When you get a new phone, reinstall your bank app from the official store and change your PIN and password.
+    - Check your account for transfers you did not make and report them to your bank at once.
+  actions:
+    - Call your bank first, then your network provider.
+  keywords: [phone stolen, phone snatched, dem snatch my phone, stolen phone with bank app]
+
+# Sources: general bank/telecom practice (block SIM, then mobile/USSD banking), as in kudiguard-core lost-phone and
+#   report-fraud; NCC complaint escalation 622 verified 2026-10-07 in kudiguard-core contacts
+- id: sit-sim-swap
+  title: Your phone suddenly has no signal (possible SIM swap)
+  facts:
+    - If your SIM suddenly shows "No service" or "SIM not registered" while others nearby have signal, someone may have swapped your SIM.
+    - Call your network provider at once from another phone and ask if your SIM was replaced. Ask them to block it.
+    - Then call your bank and ask them to block mobile and USSD banking until you have your SIM back.
+    - Go to your network provider's office with your ID to get your SIM back.
+    - Check your accounts for transfers you did not make and report them to your bank.
+  actions:
+    - Call your network provider, then your bank, from another phone.
+  keywords: [sim swap, sim stopped working suddenly, no signal and bank alert, sim not registered suddenly, my line no dey work, my sim stop working]
+
+# Sources: WhatsApp Help Center "How to recover a compromised account" https://faq.whatsapp.com/1131652977717250 and
+#   two-step verification (Settings > Account > Two-step verification) (checked 2026-10-11);
+#   https://www.businesstoday.in/technology/news/story/whatsapp-hacked-heres-how-to-recover-your-account-and-log-out-the-attacker-558841-2026-10-03 (2026-10-03)
+- id: sit-whatsapp-hijacked
+  title: Someone took over your WhatsApp account
+  facts:
+    - The usual trick is a message asking you to forward a 6-digit code "sent by mistake". That code lets them register your WhatsApp on their phone.
+    - Open WhatsApp on your phone and log in again with your number. Enter the 6-digit SMS code. This logs the other person out.
+    - If they set a two-step PIN, you may have to wait 7 days before you can log in again without it.
+    - Tell your family and friends by another channel that your WhatsApp was taken, so they do not send money to anyone using it.
+    - Once you are back in, turn on two-step verification in Settings, Account, Two-step verification, and add an email.
+  actions:
+    - Never share a WhatsApp code with anyone, even a friend.
+    - Warn your contacts by SMS or call that your account was hijacked.
+  keywords: [whatsapp hacked, whatsapp hijacked, whatsapp code, 6 digit code, six digit code, sent code by mistake, dem hack my whatsapp, my whatsapp don hack, logged out of whatsapp, two-step verification]
+
+# Sources: Meta Help "Report a compromised account" https://www.facebook.com/hacked (checked 2026-10-11);
+#   Google account recovery https://accounts.google.com/signin/recovery (checked 2026-10-11)
+- id: sit-email-facebook-hacked
+  title: Your email or Facebook account was hacked
+  facts:
+    - For Facebook, go to facebook.com/hacked from a browser and follow the steps to secure the account.
+    - For Gmail, use Google's account recovery page and answer the questions from a device you have used before.
+    - When you are back in, change the password and turn on two-step verification.
+    - Remove any phone number, email or device you do not recognise.
+    - Warn friends that messages asking for money from that account are not from you.
+  actions:
+    - Never pay anyone who offers to "recover" an account. Use only the official recovery pages.
+  keywords: [facebook hacked, fb hacked, email hacked, gmail hacked, instagram hacked, account hacked, dem hack my facebook, cannot log in facebook, hacked account recovery]
+
+# Sources: general bank practice (cards lock after repeated wrong PIN; bank resets PIN or replaces card)
+- id: sit-card-wrong-pin
+  title: Your card was blocked after a wrong PIN
+  facts:
+    - Most cards lock after a few wrong PIN attempts. This protects you from thieves.
+    - Your bank can unlock or reset it. Use your bank's app, visit a branch, or call the number on the back of your card.
+    - If the ATM kept your card, report it to your bank. Do not accept help from strangers at the ATM.
+    - Nobody from the bank needs your old or new PIN to unlock a card.
+  actions:
+    - Contact your bank through its app, a branch or the number on your card.
+  keywords: [card blocked wrong pin, wrong pin, pin tries exceeded, atm swallowed card, atm seize my card]
+
+# =====================================================================================================
+# Buyer and payment tricks
+# =====================================================================================================
+
+# Sources: general bank practice (credit alerts can be faked; confirm in app/USSD); kudiguard-core flag-fake-payment
+- id: sit-fake-buyer-paid
+  title: A buyer says "I have paid" but you are not sure
+  facts:
+    - Do not release goods because of a screenshot, SMS alert or receipt. These are easy to fake.
+    - Open your bank app, or check your balance by USSD, and confirm the money is in your available balance.
+    - If the buyer rushes you or says the bank is "delayed", keep the goods until the money shows.
+    - For big sales, wait until the transfer is final before handing over anything.
+  actions:
+    - Release goods only when the money is in your own account.
+  keywords: [i have paid, fake alert, fake credit alert, payment screenshot, customer said he paid, alert never land, fake receipt]
+
+# Sources: general P2P exchange practice (release only after funds arrive; appeal inside the exchange)
+- id: sit-p2p-crypto-release
+  title: P2P crypto sale - the buyer wants you to release coins
+  facts:
+    - Release your crypto only after the money is in your own bank account. Check your bank app, not the buyer's proof.
+    - Do not accept payment from a name different from the buyer's verified name. It may be stolen money and your account can be frozen.
+    - Keep all trades and chats inside the exchange app. Do not move to WhatsApp or Telegram.
+    - If something is wrong, open an appeal or dispute in the exchange app before releasing.
+  actions:
+    - Never release coins because of a screenshot or a call.
+  keywords: [p2p, binance p2p, release usdt, release coin, crypto buyer, third party payment, usdt sale, bybit p2p, account frozen p2p]
+
+# Sources: general POS/card practice; CBN complaints route https://www.cbn.gov.ng/supervision/cpdcomgt.html (checked 2026-10-11)
+- id: sit-pos-reversal-trick
+  title: Someone says a POS payment "failed" and asks for cash back
+  facts:
+    - Do not give cash back because a customer says a POS payment failed or reversed.
+    - Check your own account or POS wallet. A real reversal shows there, not on the customer's phone.
+    - If the customer was debited but you were not credited, the customer's bank handles it. Give them the receipt and reference.
+    - If someone pays you, then "disputes" it with their bank, report to your POS provider with the receipt.
+  actions:
+    - Give out goods or cash only when the payment shows in your POS wallet or account.
+  keywords: [pos reversal, pos failed, pos debit no credit, customer say pos fail, chargeback, pos dispute, terminal failed, give me my money back pos]
+
+# Sources: kudiguard-core flag-wrong-transfer; general bank practice (bank-to-bank recall)
+- id: sit-wrong-transfer-send-back
+  title: Someone says they sent money to you by mistake and wants it back
+  facts:
+    - First check your bank app. The money may not be there at all, and the alert may be fake.
+    - If the money is there, do not send it back yourself to any number they give you.
+    - Tell the person to ask their own bank to recall it. Inform your bank, which can return it to the source account.
+    - If they threaten you or call you a thief, keep the messages and tell your bank.
+  actions:
+    - Let your bank return the money. Do not transfer it yourself.
+  keywords: [sent by mistake, send am back, wrong transfer to me, mistake transfer, i sent you money mistakenly]
+
+# =====================================================================================================
+# Investment and job fraud
+# =====================================================================================================
+
+# Sources: SEC Nigeria warning on CBEX (unregistered) and register search https://www.sec.gov.ng/cmos
+#   via https://nairametrics.com/2025/06/11/sec-issues-fresh-warning-as-cbex-resumes-operations-in-nigeria-two-months-after-crash/ (2025-06-11, checked 2026-10-11);
+#   https://techcabal.com/2025/04/15/cbex-ponzi-collapse-nigeria/ (2025-04-15)
+- id: sit-ponzi-double-money
+  title: A scheme promises to double your money
+  facts:
+    - Signs of a Ponzi scheme are fixed high returns, bonuses for bringing new members, and pressure to reinvest.
+    - Before you pay, check if the company is registered with the SEC on its register of capital market operators.
+    - CBEX collapsed in April 2025 after promising high returns. The SEC said it was never registered.
+    - If a scheme asks you to pay a "withdrawal fee" to get your money out, it is collapsing. Do not pay more.
+  actions:
+    - Check the SEC register before you invest. Report Ponzi schemes to the SEC and the EFCC.
+  keywords: [double your money, ponzi, cbex, mmm, invest and earn, daily returns, refer and earn, withdrawal fee, investment platform, crypto investment, guaranteed profit, money doubling]
+
+# Sources: SEC register https://www.sec.gov.ng/cmos (via nairametrics 2025-06-11, checked 2026-10-11); general advice on deepfake ads
+- id: sit-celebrity-deepfake-ad
+  title: An ad with a famous person says to invest
+  facts:
+    - Scammers use fake videos and photos of famous people, such as politicians and rich business people, to sell investments.
+    - Famous people do not send you personal links to invest or ask you to pay into a private account.
+    - Check if the company is registered with the SEC. If it is not, do not pay.
+    - If you already signed up, do not pay any "tax" or "release fee" to withdraw. Report to your bank and the EFCC.
+  actions:
+    - Report the ad to the platform where you saw it.
+  keywords: [deepfake, celebrity investment, dangote investment, video ad invest, famous person ad, facebook investment ad, ai video investment, quantum ai, trading platform ad]
+
+# Sources: kudiguard-core flag-upfront-fee; CAC public search https://techpoint.africa/general/cac-public-search/ (checked 2026-10-11)
+- id: sit-fake-job-fee
+  title: A job offer asks you to pay for training or processing
+  facts:
+    - Real employers do not ask you to pay before you start. Fees for "training", "processing", "uniform" or "medicals" are a warning sign.
+    - Online "task" jobs that pay you small amounts first, then ask you to deposit money to unlock bigger tasks, are scams.
+    - Check the company on the CAC public search and call its office using contacts from its own website.
+    - Government recruitment is announced on the agency's own website and is free.
+  actions:
+    - Do not pay. Do not send your BVN, NIN or bank login to an employer you have not verified.
+  keywords: [job offer fee, training fee, processing fee job, task job, like and earn, recruitment fee, telegram job, job scam]
+
+# =====================================================================================================
+# Fee and grant scams
+# =====================================================================================================
+
+# Sources: kudiguard-core loan-apps (FCCPC approval of digital lenders); FCCPC complaints https://complaints.fccpc.gov.ng (verified 2026-10-07)
+- id: sit-advance-fee-loan
+  title: A lender asks for a fee before giving you a loan
+  facts:
+    - Real lenders take fees from the loan or add them to repayment. They do not ask you to pay first.
+    - Words like "insurance fee", "activation" or "account verification fee" before a loan are a warning sign.
+    - Digital lenders must be approved by the FCCPC. Check its list before you apply.
+    - If you already paid, stop paying. More fees will follow. Report to your bank and the FCCPC.
+  actions:
+    - Do not pay any fee to receive a loan.
+  keywords: [pay before loan, loan processing fee, loan insurance fee, loan activation fee, upfront loan fee]
+
+# Sources: general courier/phishing practice (track on the courier's own site); kudiguard-core flag-suspicious-link
+- id: sit-fake-delivery-fee
+  title: A message says your parcel is held and you must pay a fee
+  facts:
+    - Scammers send fake delivery or customs messages with a link to pay a small fee. The link steals your card details.
+    - If you are not expecting a parcel, ignore it.
+    - If you are expecting one, go to the courier's official app or website yourself and type your tracking number.
+    - Customs duties are paid through official government payment channels, not into a person's account.
+    - Romance or "gift" parcels that need "clearance fees" are almost always scams.
+  actions:
+    - Do not click the link or pay. If you entered card details, call your bank to block the card.
+  keywords: [parcel fee, customs clearance fee, package held, your parcel is waiting, redelivery fee, gift package]
+
+# Sources: kudiguard-core flag-account-threat and flag-suspicious-link; general bank practice
+- id: sit-bank-blocked-link
+  title: A message says your bank account is blocked and you must click to verify
+  facts:
+    - Banks do not ask you to click a link in an SMS or WhatsApp to unblock your account.
+    - Do not click. Open your bank's app yourself or call the number on the back of your card.
+    - If you clicked and typed your login, PIN or OTP, call your bank now to block your account, then change your password.
+    - Fake messages often use your bank's name and logo. Look at what they ask, not how they look.
+  actions:
+    - Check your account status only in your bank's own app or by calling your bank.
+  keywords: [account blocked link, click to unblock, account restricted sms, bank sms link, account suspended verify]
+
+# Sources: kudiguard-core nin-basics (NIMC does not update NIN through SMS/WhatsApp links) and bvn-basics
+- id: sit-fake-nin-bvn-update
+  title: A link says you must update your NIN or BVN
+  facts:
+    - NIN changes are done at NIMC enrolment centres or through NIMC's official services, not through links on WhatsApp or SMS.
+    - BVN changes are done at your bank. No one needs your BVN, PIN or OTP through a link.
+    - Fake update pages collect your details to open loans or accounts in your name.
+    - If you entered details on such a page, tell your bank and watch your account closely.
+  actions:
+    - Do not click. Visit a NIMC centre or your bank in person if you think something needs updating.
+  keywords: [nin update link, bvn update link, nimc link, nin verification link, bvn will be blocked, nin portal fake]
+
+# Sources: NELFUND warnings on fake portals; only official portal is nelf.gov.ng
+#   https://www.channelstv.com/2025/03/08/nelfund-warns-against-fake-student-loan-application-websites/ (2025-03-08)
+#   https://nannews.ng/2025/06/30/beware-of-fake-loan-portal-nelfund-alerts-students (2025-06-30), checked 2026-10-11
+- id: sit-fake-student-loan
+  title: A message offers a NELFUND student loan through a link
+  facts:
+    - NELFUND says its only official portal is nelf.gov.ng. Other links are fake.
+    - NELFUND has warned about fake portals that collect students' personal and bank details.
+    - Do not pay anyone to "process" or "fast-track" a student loan.
+    - Check news about NELFUND only on its official website and verified social media accounts.
+  actions:
+    - Apply only on nelf.gov.ng. Report fake links to NELFUND by email at info@nelf.gov.ng.
+  keywords: [nelfund, nelfund portal, nelfund link, fake student loan portal, students loan fee, nelf]
+
+# Sources: kudiguard-core flag-upfront-fee and flag-suspicious-link; same pattern as NELFUND fake-portal warnings
+#   https://nannews.ng/2025/06/30/beware-of-fake-loan-portal-nelfund-alerts-students (2025-06-30)
+- id: sit-fake-grant
+  title: A message offers a government grant, palliative or TraderMoni
+  facts:
+    - Messages offering a "CBN grant", "FG palliative", "TraderMoni" or "N50,000 grant" through a WhatsApp link are usually fake.
+    - Real government programmes do not ask you to pay a fee, share an OTP, or forward a message to many people.
+    - Check the programme on the ministry or agency's own website, or with your local government office.
+    - If you entered your bank details or BVN, tell your bank and watch your account.
+  actions:
+    - Do not click, pay or forward the message.
+  keywords: [palliative, tradermoni, cbn grant, fg grant, fake grant, government grant link, n50000 grant, survival fund]
+
+# Sources: CBN role (regulator; complaints page https://www.cbn.gov.ng/supervision/cpdcomgt.html, checked 2026-10-11);
+#   kudiguard-core flag-prize-lottery and flag-impersonation
+- id: sit-fake-cbn-message
+  title: Someone claims to be from the CBN and says money is waiting for you
+  facts:
+    - The CBN regulates banks. It does not keep money for individuals or call people about payouts.
+    - Any "CBN" message saying you have funds, an "inheritance" or a "compensation" waiting is a scam.
+    - Do not pay any "release", "clearance" or "anti-money laundering" fee.
+  actions:
+    - Ignore the message and report it to the EFCC.
+  keywords: [cbn payment, cbn approved fund, cbn compensation, inheritance fund, atm card delivery fund, unclaimed fund, contract payment, cbn governor message]
+
+# =====================================================================================================
+# Pressure and impersonation
+# =====================================================================================================
+
+# Sources: general romance-scam guidance; EFCC reporting https://www.efcc.gov.ng (verified 2026-10-07 in kudiguard-core contacts)
+- id: sit-romance-scam
+  title: Someone you met online asks for money
+  facts:
+    - Romance scammers build trust for weeks, then ask for money for an emergency, a ticket, customs or a business.
+    - They often say they are abroad, in the army, on an oil rig or a doctor, and they avoid video calls.
+    - Do not send money, gift cards or crypto to someone you have not met in person.
+    - Do not send intimate photos. They can be used to threaten you.
+  actions:
+    - Stop sending money. Keep the chats and report to the EFCC and the platform.
+  keywords: [romance scam, online lover, boyfriend abroad, girlfriend asks money, love scam, met online, dating scam, oyinbo lover, my love needs money, army officer abroad]
+
+# Sources: FCCPC Digital, Electronic, Online or Non-Traditional Consumer Lending Regulations 2025 (bans shaming and
+#   contacting third parties) https://fccpc.gov.ng ; complaints https://complaints.fccpc.gov.ng (checked 2026-10-07);
+#   NDPC loan-app privacy probes https://technologytimes.ng/ndpc-probes-privacy-breaches-linked-to-loan-apps/ (2024, checked 2026-10-11)
+- id: sit-loan-app-shaming
+  title: A loan app is shaming you or messaging your contacts
+  facts:
+    - Lenders are not allowed to shame you, insult you, or message your family and contacts about your debt.
+    - Take screenshots of every message, call log and post. Write down the app name and dates.
+    - Report the lender to the FCCPC. Misuse of your contacts and photos can also be reported to the NDPC (Nigeria Data Protection Commission).
+    - If they threaten your life or safety, report to the police.
+    - You still owe what you fairly borrowed. Pay through the app's official channel and keep receipts.
+  actions:
+    - Remove the app's permission to your contacts and photos in your phone settings.
+  keywords: [loan app shaming, loan app calling my contacts, loan app defamation, loan app threat, fraudster broadcast, debt shaming, loan app insult, dem send message to my contacts, loan app harassment]
+
+# Sources: NPF-NCCC e-report https://nccc.npf.gov.ng/ereport (verified 2026-10-08 in kudiguard-core contacts);
+#   general sextortion guidance (do not pay; keep evidence; report)
+- id: sit-sextortion
+  title: Someone threatens to share your intimate photos or videos
+  facts:
+    - Do not pay. Paying usually leads to more demands, not deletion.
+    - Stop replying, but do not delete the chat. Take screenshots of the threats, the account name and any payment details.
+    - Report the account to the app where it happened. Most apps remove intimate images shared without consent.
+    - Report to the police cybercrime centre. You are the victim, not the criminal.
+    - Talk to someone you trust. You do not have to handle this alone.
+  actions:
+    - Report to the NPF cybercrime centre and the platform. Keep all evidence.
+  keywords: [sextortion, nude photos threat, video call blackmail, intimate video, blackmail, they will post my nudes, leak my pictures, naked video threat, private pictures]
+
+# Sources: NPF "Bail is free" https://guardian.ng/news/bail-remains-free-police/ and
+#   https://www.legit.ng/nigeria/1725544-bail-free-prominent-lawyer-counters-police-pro-tells-legal-practitioners-what-do/ (checked 2026-10-11)
+- id: sit-fake-arrest-bail
+  title: A caller says a relative was arrested and you must pay bail
+  facts:
+    - Police bail in Nigeria is free. The police have said no one should pay for bail.
+    - Scammers pretend to be EFCC, police or DSS and ask for "bail" or "settlement" into a personal account.
+    - Hang up and call your relative directly on the number you know.
+    - If you are not sure, go to the police station or EFCC office in person and ask.
+  actions:
+    - Do not pay anyone on the phone for bail or to stop an arrest.
+  keywords: [bail fee, police bail, efcc arrest call, your son arrested, pay for bail, settlement money, dss arrest, warrant of arrest]
+
+# Sources: general voice-clone/impersonation advice; kudiguard-core flag-impersonation and flag-urgency
+- id: sit-voice-clone-relative
+  title: A relative's voice on the phone asks for urgent money
+  facts:
+    - Voices can be copied with AI from short videos or voice notes.
+    - Hang up and call the person back on the number you already have for them.
+    - Ask a question only the real person would know, or use a family code word agreed in advance.
+    - Be careful if they ask you to pay into someone else's account or to keep it secret.
+  actions:
+    - Agree a family code word for emergencies.
+  keywords: [voice clone, ai voice, my brother called new number, mummy please send money, relative emergency call, deepfake voice, voice note asking money]
+
+# Sources: general impersonation advice; kudiguard-core flag-impersonation
+- id: sit-religious-leader-impersonation
+  title: A message from your pastor or imam asks for money
+  facts:
+    - Scammers copy the names and photos of pastors, imams and church or mosque leaders on WhatsApp and Facebook.
+    - Real leaders rarely ask members privately for money or for "special prayer" fees.
+    - Call your leader or the church or mosque office on a number you already know.
+    - Give offerings and donations only through the official account announced in person.
+  actions:
+    - Do not pay into a personal account from a message. Warn the church or mosque office.
+  keywords: [pastor asking money, imam asking money, fake pastor, prophet whatsapp, seed offering, prayer fee, church account, man of god message, fake bishop]
+
+# Sources: U.S. State Department DV-2026 instructions (Nigeria among ineligible countries)
+#   https://travel.state.gov/content/travel/en/us-visas/immigrate/diversity-visa-program-entry.html (checked 2026-10-11);
+#   https://www.legit.ng/business-economy/industry/1729359-why-nigerians-apply-visa-lottery-16-west-african-countries-selected/
+- id: sit-fake-lottery-dv
+  title: You are told you won a lottery or the US visa lottery
+  facts:
+    - You cannot win a lottery you did not enter. Any fee to "claim" a prize is a scam.
+    - Natives of Nigeria were not eligible for the DV-2026 US visa lottery.
+    - The US State Department does not email or call winners. Entrants check results themselves on its official site.
+    - Do not pay any agent who says they can guarantee a US visa or green card.
+  actions:
+    - Check DV rules only on the US State Department website (travel.state.gov).
+  keywords: [visa lottery, dv lottery, green card lottery, you have won, lottery winner, promo winner, american lottery, dv-2026, dv-2027, raffle win]
+
+# Sources: general visa-fraud guidance (fees go to the embassy or its official visa centre); not separately web-verified
+- id: sit-fake-abroad-job-visa
+  title: An agent promises a job abroad or a fast visa for money
+  facts:
+    - Visa fees are paid to the embassy or its official visa centre, not to an agent's personal account.
+    - Be careful of agents who promise "guaranteed" visas or jobs abroad with no interview.
+    - Never hand your passport to an agent. Give it only to the embassy or its official visa centre.
+    - Check the job and the employer yourself on the employer's own website.
+    - Some fake job abroad offers lead to trafficking. Tell family where you are going and keep copies of your documents.
+  actions:
+    - Do not pay an agent before you check the employer and the embassy's rules yourself.
+  keywords: [visa agent, job abroad, japa, travel agent, canada job, uk care job, work visa fee, sponsorship fee, guaranteed visa, dubai job, japa agent]
+
+# Sources: general impersonation advice; kudiguard-core flag-impersonation
+- id: sit-fake-customer-care
+  title: A "customer care" account on social media asks for your details
+  facts:
+    - Scammers reply to your complaint on X, Facebook or Instagram with a fake "customer care" account.
+    - Real banks do not ask for your PIN, OTP or full card number in chats.
+    - Contact your bank only through its app, its official website, or the number on the back of your card.
+  actions:
+    - Do not share your details or click links from customer care accounts that message you first.
+  keywords: [fake customer care, fake bank support twitter, customer care dm, they replied my complaint, fake support whatsapp]
+
+# =====================================================================================================
+# After money is lost
+# =====================================================================================================
+
+# Sources: CBN complaint route https://www.cbn.gov.ng/supervision/cpdcomgt.html ; EFCC https://www.efcc.gov.ng ;
+#   NPF-NCCC https://nccc.npf.gov.ng/ereport (checked 2026-10-07/08 in kudiguard-core contacts)
+- id: sit-lost-money-now
+  title: You just sent money to a scammer - what to do now
+  facts:
+    - Call your bank now. Speed matters, because scammers move money fast.
+    - Give the bank the amount, time, the receiving account number and bank. Ask them to contact the receiving bank to place a hold on the money.
+    - Make a written fraud complaint with your bank and keep the complaint number.
+    - Report to the EFCC or the police cybercrime centre. Keep all chats, receipts and phone numbers.
+    - Do not pay anyone who promises to recover the money for a fee.
+  actions:
+    - Call your bank first, then report to the EFCC or police.
+  keywords: [i have been scammed, scammed, i sent money to scammer, dem scam me, fraudster collected my money, what to do after scam, place lien]
+
+# Sources: CBN complaint route https://www.cbn.gov.ng/supervision/cpdcomgt.html and
+#   https://www.cbn.gov.ng/FinInc/FinLit/How_Lodge_Complaints.pdf (checked 2026-10-11)
+- id: sit-dispute-debit
+  title: How to dispute a debit you did not make
+  facts:
+    - Block your card or account first, so no more money leaves.
+    - Write to your bank or visit a branch. State each wrong debit with date, amount and reference, and that you did not authorise it.
+    - Ask for a complaint or tracking number. The bank should acknowledge your complaint.
+    - If the bank does not acknowledge or resolve it in time, escalate to the CBN Consumer Protection Department with your complaint number.
+  actions:
+    - Email the CBN at cpd@cbn.gov.ng if your bank does not resolve the complaint.
+  keywords: [dispute debit, dispute transaction, chargeback, unauthorised transaction complaint, bank refund complaint, i did not do this transaction, complaint letter bank]
+
+# Sources: CBN "How to lodge complaints" https://www.cbn.gov.ng/FinInc/FinLit/How_Lodge_Complaints.pdf and
+#   https://www.cbn.gov.ng/supervision/cpdcomgt.html (checked 2026-10-11)
+- id: sit-debited-not-received
+  title: You were debited but the receiver did not get the money
+  facts:
+    - Wait a short time and check again. Many failed transfers reverse on their own.
+    - If not, complain to your bank with the date, amount, receiver's account and the transaction reference.
+    - Get a complaint or tracking number. If the bank does not acknowledge it within 3 days or resolve it in time, you can escalate.
+    - Escalate to the CBN Consumer Protection Department by email or letter, with your complaint number and receipts.
+  actions:
+    - Email cpd@cbn.gov.ng only after your bank has had the chance to resolve it.
+  keywords: [debited not received, transfer not received, receiver did not get money, transfer stuck, debit no credit, failed transfer complaint]
+
+# Sources: EFCC https://www.efcc.gov.ng ; Eagle Eye app (verified 2026-10-07 in kudiguard-core contacts)
+- id: sit-evidence-to-keep
+  title: What evidence to keep after a scam
+  facts:
+    - Take screenshots of chats, phone numbers, profile pages and links before the scammer deletes them.
+    - Keep bank receipts, transaction references and the account numbers you paid into.
+    - Write down dates and times of calls and what was said.
+    - Give this to your bank and to the EFCC or police when you report.
+  keywords: [proof of scam, scam evidence, what to keep after scam, report scam evidence, records for police]
+
+# =====================================================================================================
+# Rights and protections
+# =====================================================================================================
+
+# Sources: NDIC coverage raised May 2024 (DMB N5m; MFB and PSB N2m; MMO pass-through N5m per subscriber per MMO)
+#   https://nairametrics.com/2024/05/02/ndic-raises-deposit-insurance-coverage-for-bank-customers-in-nigeria-to-n5-million/ (2024-05-02)
+#   https://guardian.ng/business-services/ndic-raises-maximum-bank-deposit-insurance-coverage-to-n5m/ (checked 2026-10-11)
+#   NDIC pass-through guidelines (MMO funds in trust accounts at banks) https://businessday.ng/companies/article/ndic-releases-deposit-insurance-guidelines-on-mobile-payments-system/
+- id: sit-ndic-fintech-wallet
+  title: Is my money in a fintech or mobile money wallet insured?
+  facts:
+    - NDIC insurance covers licensed banks. Since May 2024 the limit is N5 million per depositor at a commercial bank, and N2 million at a microfinance bank, primary mortgage bank or payment service bank.
+    - Licensed mobile money operators keep customers' money in trust accounts at banks. NDIC "pass-through" cover protects each subscriber up to N5 million per operator if the bank holding it fails.
+    - Pass-through cover is for bank failure. It does not cover money lost to scams or to an unlicensed app.
+    - Check that the app is licensed by the CBN before you keep money in it. Confirm current limits on the NDIC website.
+  keywords: [ndic, is opay insured, is palmpay insured, moniepoint insured, wallet insurance, fintech insurance, pass-through insurance, deposit insurance limit, if fintech collapse]
+
+# Sources: CAC public search https://icrp.cac.gov.ng/public-search (verified live by fact-check 2026-10-11; https://www.cac.gov.ng);
+#   SEC register of capital market operators https://www.sec.gov.ng/cmos (checked 2026-10-11)
+- id: sit-check-company
+  title: How to check if a company is real and registered
+  facts:
+    - Ask the company for its RC number. A real Nigerian company will give it.
+    - Search the name or RC number on the public search on the CAC website (cac.gov.ng). A basic search is free.
+    - CAC registration only shows the company exists. It does not mean it may take investments.
+    - For investments, the company must also be registered with the SEC. Check the SEC register of capital market operators.
+    - For loans, check the FCCPC list of approved digital lenders. For banks and wallets, check the CBN list.
+  actions:
+    - Use the public search on the CAC website (icrp.cac.gov.ng/public-search) and sec.gov.ng for SEC checks.
+  keywords: [check company, is company registered, cac search, rc number, verify business, cac registration, sec registered, is this company legit, is this company real]
+
+# Sources: kudiguard-core / money-skills savings-groups and deposit-insurance (unlicensed collectors are not insured);
+#   NPF-NCCC/EFCC reporting (checked 2026-10-07)
+- id: sit-ajo-collector-disappears
+  title: Your ajo, esusu or adashe collector disappeared with the money
+  facts:
+    - Contact the other members and write down how much each person paid and when.
+    - Gather proof, such as receipts, transfer records, chat messages and the collector's details.
+    - Report to the police station near where the collector lives or worked. Large group losses can also go to the EFCC.
+    - Money given to an informal collector is not insured. In future, use a group with written rules or a licensed savings product.
+  actions:
+    - Report together as a group, with all your evidence.
+  keywords: [ajo collector ran away, esusu, adashe, isusu, thrift collector, contribution money, daily contribution, ajo don run, alajo disappeared, cooperative collector]
+
+# Sources: general bank practice (verify charges and accounts in the official app)
+- id: sit-fake-bank-staff-visit
+  title: Someone says they are from your bank and wants to collect your card
+  facts:
+    - Banks do not send staff to collect your card, PIN or token at home or on the street.
+    - Do not hand over your card or tell anyone your PIN, even if they show an ID or know your name.
+    - Call your bank on the number on your card to check.
+  actions:
+    - If you already gave your card or PIN, call your bank to block the card now.
+  keywords: [bank staff collect card, card collection, bank officer visit, courier collect card, replace card at home, bank staff at my door]
+
+# Sources: general practice (receiving money needs only account number and name); kudiguard-core flag-asks-credentials
+- id: sit-fake-payment-link
+  title: Someone sends a link or QR code for you to receive payment
+  facts:
+    - You never need to enter your PIN, card details or OTP to receive money.
+    - Payment links or QR codes that ask for those details are taking money from you, not paying you.
+    - To receive money, give only your account number and name.
+  actions:
+    - Close the link. If you entered details, call your bank now.
+  keywords: [receive payment link, qr code payment, scan to receive, enter pin to receive, buyer sent link, jiji payment link]
+
+# Sources: general bank practice; kudiguard-core flag-money-request
+- id: sit-money-mule
+  title: Someone asks to use your account to receive money
+  facts:
+    - People who receive and pass on money for others can be treated as part of the fraud.
+    - Your account can be frozen and you can be arrested, even if you were only "helping".
+    - Do not lend your account, BVN, card or bank app to anyone, for any payment.
+  actions:
+    - Say no. If money already came in, tell your bank before you move it.
+  keywords: [use my account, receive money for me, borrow your account, money mule, help me receive transfer, rent account, sell account]
+
+# Sources: FCCPC complaint process (contact the business first) https://complaints.fccpc.gov.ng (checked 2026-10-07)
+- id: sit-online-vendor-no-delivery
+  title: You paid an online vendor and they did not deliver
+  facts:
+    - Contact the vendor in writing and ask for delivery or a refund by a clear date. Keep all messages.
+    - If they block you, report the account to the platform where you found them.
+    - Tell your bank about the transfer and the receiving account. A quick report helps if it was fraud.
+    - For a registered business that refuses to refund, you can complain to the FCCPC after contacting the business first.
+    - In future, pay on delivery or use a platform that holds payment until you receive the item.
+  actions:
+    - Report fraud to your bank and the EFCC or police. Report unfair business treatment to the FCCPC.
+  keywords: [vendor did not deliver, instagram vendor, online seller scam, paid no delivery, vendor blocked me, fake vendor, jiji scam, i paid for goods not delivered, order not delivered]
+
+# Sources: general rental practice (inspect, pay after documents); not separately web-verified
+- id: sit-fake-house-agent
+  title: An agent asks for payment before you see a house or shop
+  facts:
+    - Do not pay for a house, shop or land you have not inspected in person.
+    - Ask to meet the landlord or see proof of ownership before you pay rent.
+    - Pay into an account in the name of the landlord or a registered company, and get a written receipt and agreement.
+    - Be careful of "inspection fees" for many houses that never happen.
+  actions:
+    - Report fake agents to the police with your receipts.
+  keywords: [house agent, fake landlord, rent scam, inspection fee, apartment deposit, land scam, shop rent scam, agent fee, caution fee]
+
+# Sources: general device security advice; kudiguard-core flag-remote-access
+- id: sit-installed-unknown-app
+  title: You installed an app a stranger sent you
+  facts:
+    - Uninstall the app now. Apps from links outside the official store can read your messages and codes.
+    - From another phone, call your bank and ask them to watch or block your account.
+    - Change your bank app PIN and password after the app is removed.
+    - Install apps only from Google Play or the App Store.
+  keywords: [installed apk, unknown app, anydesk installed, they told me to download app, apk file, screen share app]
+
+# Sources: general POS practice; kudiguard-core pos-safety
+- id: sit-pos-agent-overcharge
+  title: A POS agent debited you but did not give you cash
+  facts:
+    - Do not leave. Ask the agent to check the terminal and print the receipt.
+    - If the terminal shows failed and you were debited, take the receipt or reference and complain to your bank.
+    - Many failed card withdrawals reverse on their own. If not, follow your bank's complaint process.
+    - Write down the agent's name, location and POS provider.
+  actions:
+    - Complain to your bank with the receipt and reference.
+  keywords: [pos agent no cash, pos debited no cash, agent did not pay me, pos withdraw failed, pos no money, agent cheat me, pos dispense error]
+
+# Sources: general practice; kudiguard-core flag-secrecy and flag-guaranteed-returns
+- id: sit-forex-crypto-signal
+  title: A trading "mentor" or signal group asks you to deposit money
+  facts:
+    - Mentors who show big profits and ask you to deposit on a platform they choose are often running a scam.
+    - Fake platforms show growing profits but block withdrawals or ask for "tax" to withdraw.
+    - Check the platform is registered with the SEC before you deposit.
+  actions:
+    - Do not deposit more. Report to your bank, the SEC and the EFCC.
+  keywords: [forex mentor, signal group, trading account manager, trading mentor, crypto mentor, telegram trading, withdraw tax, withdrawal blocked, binary options]
+
+# Sources: general practice; kudiguard-core flag-urgency
+- id: sit-family-emergency-new-number
+  title: A message from a "new number" says a friend or relative needs money
+  facts:
+    - Scammers often say "this is my new number" and then ask for urgent money.
+    - Call the old number you have for the person, or ask someone close to them.
+    - Do not pay into an account in another person's name without speaking to your relative first.
+  keywords: [this is my new number, emergency money, hospital bill urgent, i am stranded, send money urgent, mum new number]
+
+# Sources: kudiguard-core flag-account-threat and flag-asks-credentials; general call-forwarding scam pattern
+- id: sit-fake-network-call
+  title: A caller says they are from your network and your SIM will be blocked
+  facts:
+    - Network providers do not ask you to dial codes, share PINs or OTPs to keep your SIM.
+    - Some callers ask you to dial a code that forwards your calls, including calls that read out bank codes, to them. Do not dial codes a stranger gives you.
+    - Check your SIM and NIN link status yourself through your network's official channels.
+  actions:
+    - Hang up. If you dialled a code they gave you, call your network from another phone.
+  keywords: [mtn staff call, airtel staff call, sim will be blocked, dial this code, call forwarding scam, network staff call, sim upgrade call, 4g upgrade]
