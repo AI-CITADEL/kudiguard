@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
 
 from kudiguard.domain import Interaction, LanguageCode, Outcome
@@ -25,6 +25,11 @@ CAP_MARKER_PREFIX = "cap:"
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def cap_window_start() -> datetime:
+    """Start of the licence window now: a user active since then is an active end-user."""
+    return utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS)
 
 
 def aware(value: datetime) -> datetime:
@@ -136,7 +141,12 @@ class Store(Protocol):
         ...
 
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
-        """Remove DELETE markers older than ``cutoff``. Returns markers removed."""
+        """Remove DELETE markers older than ``cutoff`` (not the licence-cap markers). Returns markers removed."""
+        ...
+
+    async def purge_cap_markers(self, cutoff: datetime) -> int:
+        """Remove licence-cap markers dated before ``cutoff`` (pass exactly the window start: an earlier purge would
+        free a slot that still counts). Returns markers removed."""
         ...
 
     async def purge_before(self, cutoff: datetime) -> int:

@@ -44,20 +44,22 @@ welcome, the web page and /privacy show the configured values. Longer periods ar
 need a new consent text and `CONSENT_VERSION`. Messages are kept at least 31 days because the licence cap counts
 active users from them over a rolling 30 days: the purge runs one pass (~7 h) early, so "up to N days" holds while
 the server runs, but it never cuts inside the last 30 days. `kudiguard purge --days` refuses less than 30 while the
-cap is on.
+cap is on. A DELETE by a user active in the last 30 days leaves a licence-cap marker (the time of their last
+message), so their slot stays counted until 30 days after it; DELETEs made before this version left none, so on an
+existing pilot database those users stop counting at once.
 
 **Partner API (off in the pilot).** `/v1/check`, `/v1/check/audio` and `/v1/ask` are not mounted unless
 `KUDIGUARD_PARTNER_API=true` (with `KUDIGUARD_API_KEYS`). The N-ATLaS licence caps *active end-users*, not API keys,
 so when it is on every call must send `X-KudiGuard-End-User`: a stable pseudonymous id for the partner's customer
-(8-128 characters: letters, digits, `. _ : -`). Send a SHA-256 (or SHA-512) hex digest of your own customer id,
-or a UUID, optionally behind a short letter tag (`c-<sha256>`): these are always accepted. A guardrail refuses (400)
-ids that look like a phone number or an email address (digits only, a run of 10+ digits once separators are removed,
-a mail provider or a domain ending); it catches mistakes, not deliberate abuse, and other formats (short hex tokens,
-date-based order numbers such as `order-2024-10-11-1234`) may be refused too. The id is hashed as `api:<key name>:<id>`, logged as channel `api`, and
-counts toward `KUDIGUARD_ACTIVE_USER_CAP` with WhatsApp and web users through the same admission gate; a new end user
-gets 503 `at_capacity` when the cap is full (or 503 `busy_new_users` with `Retry-After: 3600` from a new-user rate
-gate, when one is installed). Renaming a key (`name:key`) re-counts its users as new for 30 days. A
-partner who needs more than our share of the cap needs its own N-ATLaS licence cover (its own deployment) or a
+(8-137 characters: letters, digits, `. _ : -`). Send a SHA-256 (or SHA-512) hex digest of your own customer id,
+or a UUID, optionally behind a short letter tag of up to 8 letters (`c-<sha256>`): these are always accepted. A
+guardrail refuses (400) ids that look like a phone number or an email address (digits only, a run of 10+ digits once
+separators are removed, a mail provider or a domain ending); it catches mistakes, not deliberate abuse, and other
+formats (short hex tokens, date-based order numbers such as `order-2024-10-11-1234`) may be refused too. The id is
+hashed as `api:<key name>:<id>`, logged as channel `api`, and counts toward `KUDIGUARD_ACTIVE_USER_CAP` with WhatsApp
+and web users through the same admission gate; a new end user gets 503 `at_capacity` when the cap is full (or 503
+`busy_new_users` with `Retry-After: 3600` from a new-user rate gate, when one is installed). Renaming a key
+(`name:key`) re-counts its users as new for 30 days. A partner who needs more than our share of the cap needs its own N-ATLaS licence cover (its own deployment) or a
 commercial licence. **The partner must tell its own customers and get their agreement** (they never see our
 welcome); /privacy then describes what is kept for them. Their messages never feed the scam-pattern library.
 

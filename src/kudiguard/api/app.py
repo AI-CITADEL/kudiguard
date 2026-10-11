@@ -72,7 +72,7 @@ SESSION_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
 # The licence-cap reservation of the request being served (set by ``_admitted``): kept if its log cannot be written.
 _RESERVATION: ContextVar[Reservation] = ContextVar("kudiguard_reservation")
 END_USER_HEADER = "X-KudiGuard-End-User"
-_END_USER = re.compile(r"[A-Za-z0-9._:-]{8,128}")
+_END_USER = re.compile(r"[A-Za-z0-9._:-]{8,137}")  # 137 = a short tag + a SHA-512 hex digest
 # A guardrail against mistakes, not proof of pseudonymity: ids that look like a phone number or an email address are
 # refused. Hex digests (32/40/64/128 hex characters) and UUIDs, optionally behind a short letter tag ("c-<sha256>"), are
 # accepted as they are: what partners should send. Anything else may not hold a run of 10+ digits once the separators
@@ -351,12 +351,12 @@ def _end_user(request: Request, client: Client) -> str:
     if not value:
         raise HTTPException(
             400,
-            f"missing {END_USER_HEADER}: send a stable pseudonymous id for the end user (8-128 characters), "
+            f"missing {END_USER_HEADER}: send a stable pseudonymous id for the end user (8-137 characters), "
             "never a phone number; each end user counts toward the N-ATLaS licence cap",
         )
     if not _END_USER.fullmatch(value):
         raise HTTPException(
-            400, f"{END_USER_HEADER} must be 8-128 characters: letters, digits, '.', '_', ':', '-'"
+            400, f"{END_USER_HEADER} must be 8-137 characters: letters, digits, '.', '_', ':', '-'"
         )
     if contact_shaped(value):
         raise HTTPException(

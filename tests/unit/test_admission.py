@@ -181,3 +181,32 @@ async def test_concurrent_new_users_on_sqlite_never_overshoot(tmp_path: Path) ->
     assert sum(admitted) == 5 and await store.count_active_users_since(since) == 5
     assert await store.count_active_users_since(since, channels={"web"}) == 2
     await store.close()
+
+
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+async def test_licence_cap_markers_are_purged_at_the_window_start_not_earlier(
+    kind: str, tmp_path: Path
+) -> None:
+    """The review's capmarker probe: a retention pass must not free the slot of a user erased 29 days 20 hours after
+    their last message (the DELETE markers for the sign-up import go ~7 h early; the cap markers must not)."""
+    from kudiguard.api.services import PURGE_INTERVAL_S, _purge_once
+
+    store = (
+        MemoryStore(HASHER) if kind == "memory" else await SQLiteStore.open(tmp_path / "kg.db", hasher=HASHER)
+    )
+    now = utcnow()
+    for n, hours in enumerate((30 * 24 - 4, 10)):  # active 29 d 20 h ago (then erased), and 10 h ago
+        await store.add_interaction(row(f"u{n}", days_ago=hours / 24))
+    await store.delete_user("u0")  # its cap marker is dated with the last message: 29 d 20 h ago
+    await store.add_interaction(row("u2"))
+    since = now - timedelta(days=30)
+    await _purge_once(store, now, 90, 730, PURGE_INTERVAL_S, None, 365)
+    assert await store.count_active_users_since(since) + await store.count_deletions_since(since) == 3
+    with pytest.raises(AtCapacity):
+        await Admission(store, 3).reserve("newcomer", "whatsapp")
+    assert (
+        await store.purge_cap_markers(now - timedelta(days=29)) == 1
+    )  # due once its message leaves the window
+    assert await store.deleted_at("u0") is not None  # the import marker is separate
+    if kind == "sqlite":
+        await store.close()  # type: ignore[attr-defined]

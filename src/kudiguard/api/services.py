@@ -175,6 +175,11 @@ async def _purge_once(
             lambda: store.purge_patterns_before(pattern_cutoff),
         ),
         ("deletion markers", lambda: store.purge_deletion_markers(marker_cutoff)),
+        # Licence-cap markers at exactly the window start, never early: one dropped early would free a counted slot.
+        (
+            "licence-cap markers",
+            lambda: store.purge_cap_markers(now - timedelta(days=ACTIVE_USER_WINDOW_DAYS)),
+        ),
     ]
     if donations is not None:
         vault = donations

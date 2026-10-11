@@ -3,12 +3,16 @@
 The licence allows ``cap`` active end-users per rolling 30 days, project-wide. A user with an interaction logged in
 the window is "returning" and always served. A user new to the window is admitted only while
 
-    users with an interaction in the window + DELETEs by such users in the window + new users in flight  <  cap
+    users with an interaction in the window
+    + erased users whose last interaction is in the window (licence-cap markers, purged exactly at the window start)
+    + new users in flight (or held after a failed log)                                                    <  cap
 
 and, for a channel with its own share (the anonymous website), the same inside that share.
 
 What is guaranteed, and under which assumptions:
-* **One server process.** The lock and the in-flight set live in memory; several instances need a shared gate.
+* **One server process.** The lock and the in-flight set live in memory; several instances need a shared gate, and
+  a restart forgets in-flight and held slots (a held slot is a served user whose log write failed). With
+  ``cap=None`` and a gate installed, held slots are not bounded by any cap (they still expire after the window).
 * **Every served request holds a reservation until its interaction is written.** Check and reservation happen under
   one lock. Reservations are counted per arrival (a user's concurrent requests each hold one), so the slot stays
   taken until the last of them ends, whatever order they end in. A turn that ends without a log (a 422, a welcome)
@@ -17,7 +21,9 @@ What is guaranteed, and under which assumptions:
   always means "admitted"; the evidence log is kept for at least the window (``config``: retention >= 31 days, and the
   purge never cuts inside the window).
 * In-flight users are read before the store, so a user who is logged-then-released during the check is counted once
-  or twice, never zero times: a burst can be refused early by one slot, never admitted past the cap.
+  or twice, never zero times. Double counting is the safe direction and also happens in steadier states: a logged
+  user whose twin request is still running, and a held user who later logs successfully (counted twice until the
+  hold expires, 30 days). So a burst can be refused early, never admitted past the cap.
 
 Pluggable for new users only, under the same lock: ``checks`` are pure tests (raise ``AtCapacity`` or a subclass such
 as ``NewUsersBusy`` to refuse; they must not consume anything), and ``on_admit`` hooks run only once the cap has

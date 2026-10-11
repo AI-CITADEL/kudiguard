@@ -47,7 +47,7 @@ copy .env.example .env               # fill in; KUDIGUARD_HASH_SECRET is require
 Then set the tunnel URL + `/webhooks/whatsapp` as the webhook in Meta. Details: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Develop
-`.venv\Scripts\python -m pytest` (2,959 tests, 100% line + branch coverage; `-m live` for real models) · `ruff check` · `mypy`.
+`.venv\Scripts\python -m pytest` (2,963 tests, 100% line + branch coverage; `-m live` for real models) · `ruff check` · `mypy`.
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Validation: [docs/VALIDATION.md](docs/VALIDATION.md) ·
 Sustainability: [docs/SUSTAINABILITY.md](docs/SUSTAINABILITY.md) · Demo: [docs/DEMO.md](docs/DEMO.md).
 

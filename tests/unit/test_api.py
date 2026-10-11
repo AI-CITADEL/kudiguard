@@ -768,10 +768,10 @@ def test_partner_api_on_without_keys_warns(caplog: pytest.LogCaptureFixture) -> 
     [
         (None, "missing"),
         ("", "missing"),
-        ("short", "8-128"),
-        ("x" * 129, "8-128"),
-        ("has space inside", "8-128"),
-        ("+2348031234567", "8-128"),  # '+' is not allowed at all
+        ("short", "8-137"),
+        ("x" * 138, "8-137"),
+        ("has space inside", "8-137"),
+        ("+2348031234567", "8-137"),  # '+' is not allowed at all
         ("08031234567", "phone"),
         ("2348031234567", "phone"),
         ("0803-123-4567", "phone"),
@@ -808,7 +808,9 @@ async def test_every_partner_call_names_a_pseudonymous_end_user(
         "550e8400-e29b-41d4-a716-446655440000",
         "a3f9c2d17be04c55a1e2f3b4c5d6e7f8",
         "cust.000123:web",
-        "ab12" * 32,
+        "ab12" * 32,  # SHA-512 hex
+        "c-" + "ab12" * 32,  # tagged SHA-512 (130 characters)
+        "cust-" + "0f" * 64,  # the longest tag: 137 characters
     ],
 )
 async def test_pseudonymous_ids_are_accepted(api: Api, value: str) -> None:

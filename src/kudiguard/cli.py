@@ -116,6 +116,7 @@ def cmd_purge(settings: Settings, args: argparse.Namespace) -> int:
             vault = VoiceVault(settings.voice_dir, store, Sealer(settings.voice_secret()))
             voice = await vault.purge((utcnow() - timedelta(days=settings.voice_retention_days)).date())
             markers = await store.purge_deletion_markers(utcnow() - timedelta(days=DELETION_MARKER_DAYS))
+            markers += await store.purge_cap_markers(utcnow() - timedelta(days=ACTIVE_USER_WINDOW_DAYS))
             patterns = await store.purge_patterns_before(
                 pattern_keep_from(utcnow(), settings.pattern_retention_days, interval_s=0)
             )

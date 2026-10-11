@@ -21,7 +21,15 @@ from typing import Any, TypeVar
 from kudiguard.domain import Flag, Interaction, MessageKind, Outcome, Verdict
 from kudiguard.patterns import ScamPattern, deidentify, week_of
 from kudiguard.privacy import UserHasher
-from kudiguard.storage.base import CAP_MARKER_PREFIX, StoreClosedError, UserState, VoiceSample, aware, utcnow
+from kudiguard.storage.base import (
+    CAP_MARKER_PREFIX,
+    StoreClosedError,
+    UserState,
+    VoiceSample,
+    aware,
+    cap_window_start,
+    utcnow,
+)
 from kudiguard.storage.export import export_row, protect
 from kudiguard.text import redact
 
@@ -334,6 +342,7 @@ class SQLiteStore:
 
     async def delete_user(self, user_hash: str) -> int:
         marker = self._hasher.deletion_marker(user_hash)
+        window_start = _ts(cap_window_start())
 
         def work(db: sqlite3.Connection) -> int:
             with _transaction(db):
@@ -353,7 +362,7 @@ class SQLiteStore:
                     "SELECT MAX(created_at) FROM interactions WHERE user_hash = ?", (user_hash,)
                 )
                 last_active = last.fetchone()[0]
-                if last_active is not None:  # the licence-cap slot outlives the erasure (admission)
+                if last_active is not None and last_active >= window_start:  # the slot outlives the erasure
                     db.execute(
                         "INSERT INTO deletion_markers VALUES (?, ?) ON CONFLICT (marker) DO UPDATE SET deleted_at = "
                         "excluded.deleted_at",
@@ -429,7 +438,19 @@ class SQLiteStore:
 
     async def purge_deletion_markers(self, cutoff: datetime) -> int:
         cursor = await self._run(
-            lambda db: db.execute("DELETE FROM deletion_markers WHERE deleted_at < ?", (_ts(cutoff),))
+            lambda db: db.execute(
+                "DELETE FROM deletion_markers WHERE marker NOT LIKE ? AND deleted_at < ?",
+                (CAP_MARKER_PREFIX + "%", _ts(cutoff)),
+            )
+        )
+        return int(cursor.rowcount)
+
+    async def purge_cap_markers(self, cutoff: datetime) -> int:
+        cursor = await self._run(
+            lambda db: db.execute(
+                "DELETE FROM deletion_markers WHERE marker LIKE ? AND deleted_at < ?",
+                (CAP_MARKER_PREFIX + "%", _ts(cutoff)),
+            )
         )
         return int(cursor.rowcount)
 
