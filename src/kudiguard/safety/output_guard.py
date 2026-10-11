@@ -156,7 +156,11 @@ def _split_told(text: str) -> str:
     chars = list(text)
     speech = set(_speech_spans(text))
     for start, end in _quoted_spans(text):
-        if (start, end) not in speech and len(_words(text[start:end])) >= 3:
+        clause = _CLAUSE_START.split(text[: start - 1])[-1]
+        if _NEGATED_LEAD.search(clause):  # 'Never tell him "my PIN is 1234"': a warning
+            continue
+        told = _TOLD_TO_SAY.match(clause) is not None  # told to say it: checked even when it opens with "no"
+        if ((start, end) not in speech or told) and len(_words(text[start:end])) >= 3:
             chars[start - 1], chars[end] = ";", " "
     return _mask_speech("".join(chars))
 
@@ -167,7 +171,15 @@ def _unify_quotes(text: str) -> str:
     return _SINGLE_QUOTED.sub(lambda m: '"' + m.group(1) + '"', text)
 
 
-_SINGLE_QUOTED = re.compile(r"(?<![\w'])'(?=\w)([^\n]*?[\w.!?,])'(?![\w'])")
+# "never tell him", "do not text anyone", "you should never tell anyone"
+_NEGATED_LEAD = re.compile(
+    r"\b(?:not|never|no|don't|dont)\s+(?:[\w']+\s+){0,2}?"
+    r"(?:tell|say|reply|answer|text|write|message|type|send|respond|read)\b"
+)
+# an elided opener ("'cause", "'em", "'til") is an apostrophe, not a quotation mark
+_SINGLE_QUOTED = re.compile(
+    r"(?<![\w'])'(?!(?:cause|cos|coz|em|til|tis|twas|n|bout|round)\b)(?=\w)([^\n]*?[\w.!?,])'(?![\w'])"
+)
 _REFUSAL_SCRIPT = re.compile(
     r"\W*(?:[\w']+\W+){0,3}?(?:no|not|never|don't|dont|won't|wont|can't|cannot|refuse)\b"
 )

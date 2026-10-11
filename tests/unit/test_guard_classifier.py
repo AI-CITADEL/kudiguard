@@ -174,6 +174,9 @@ def test_units_gate_quotes_and_reported_speech_but_not_instructions_before_a_col
     # the user is told to say it, or the quote is adopted: not someone else's speech, so scored
     assert not told['"here is my otp'] and not told['say "here is my pin"']
     assert not told['"send the otp to the agent now," is what you should do']
+    # a negated told-to-say is a warning; a told-to-say quote opening with "no" is still the user's words
+    assert not OutputGuard(registry).check('Never tell the caller "my OTP is 553201".', "en")
+    assert OutputGuard(registry).check('Tell him "No problem, here is my OTP 553201."', "en")
     quoted_tail = {u.text: u.gated for u in guard.units('Tell him "here is my OTP" and hang up.', "en")}
     assert not quoted_tail['tell him "here is my otp"']  # starts outside the quotes: scored
 

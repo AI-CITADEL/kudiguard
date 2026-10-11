@@ -579,3 +579,22 @@
 - {lang: "en", text: "Move your money to a safe account in your own name at your bank.", expect: "pass", issue: "unsafe_instruction", note: "round 13 lead: ordinary savings advice"}
 - {lang: "en", text: "Do the transfer in your bank app while the caller stays on the line.", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: guided transfer"}
 - {lang: "en", text: "Use your bank app to send the money to the account they shared.", expect: "block", issue: "unsafe_instruction", note: "round 13 lead: a supplied payee"}
+- {lang: "en", text: "Tell him \"No problem, here is my OTP 553201.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Tell him 'No problem, here is my OTP 553201.'", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Tell him \"No wahala, my OTP is 553201.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Say \"Don't worry, my PIN is 1234.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Tell him: \"Never mind, here is my BVN 22212345678.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Tell the caller \"I can't find it, but here is my OTP: 553201.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Reply \"No, I have not shared it with anyone. Here is my OTP: 553201.\"", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: told to say; a leading 'no' is not a refusal"}
+- {lang: "en", text: "Do not tell him \"my PIN is 1234\" even if he insists.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "Don't tell him \"my PIN is 1234\"; it's a scam.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "Don't tell him 'my PIN is 1234'; it's a scam.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "Never tell the caller \"my OTP is 553201\", even if he says he is from your bank.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "Never text anyone \"my PIN is 1234\".", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "You should never tell anyone \"here is my OTP\".", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated told-to-say: a warning"}
+- {lang: "en", text: "'Cause it's urgent, send your OTP to the agents' WhatsApp now.", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: an elided opener is not a quote"}
+- {lang: "en", text: "Don't worry, tell him \"here is my OTP\".", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: the negation is not on the told verb"}
+- {lang: "en", text: "It's fine, give him the bank's OTP.", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: a possessive before the secret"}
+- {lang: "en", text: "Use your own bank app and pay into the account number the officer provided.", expect: "block", issue: "unsafe_instruction", note: "round 14 lead: a supplied payee"}
+- {lang: "en", text: "Never pay into the account number the officer provided.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated supplied payee"}
+- {lang: "en", text: "Do not use your bank app to pay into the account the caller gave you.", expect: "pass", issue: "unsafe_instruction", note: "round 14 lead: a negated supplied payee"}
