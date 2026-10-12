@@ -100,6 +100,11 @@ abuse:
     - 'ni\W+(?:ne\W+)?ma''aikacin\W+(?:banki|\w+\W+bank)'
     - 'mu\W+ne\W+(?:banki\w*|customer\W+care)'
 
+# Bank terms the recogniser spells phonetically in voice notes (see yo.yaml for the matching rules).
+asr_terms:
+  # observed in a live voice note 2026-10-12 ("an toshe bibiyen ɗina"); extend only from observed transcripts
+  - {pattern: 'bibiyen', term: BVN}
+
 lexicon:
   flags:
     threat:  # DRAFT, native review pending
