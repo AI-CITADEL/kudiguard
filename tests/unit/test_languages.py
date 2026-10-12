@@ -166,3 +166,55 @@ def test_positional_or_attribute_placeholders_rejected(tmp_path: Path, template:
 def test_named_placeholders_accepted(tmp_path: Path) -> None:
     _write(tmp_path, "en.yaml", MINIMAL_EN + "strings: {greet: 'Hi {name}, {{literal}} braces ok'}\n")
     assert LanguageRegistry.load(tmp_path).get("en").strings["greet"].startswith("Hi {name}")
+
+
+# --- spoken-term corrections for voice-note transcripts (asr_terms) -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("terms", "message"),
+    [
+        ("[{pattern: 'bifi[eni', term: BVN}]", "invalid regex"),
+        ("[{pattern: 'bifi eni', term: '  '}]", "term"),
+        ("[{pattern: 'bifi ẹni', term: BVN}]", "without accents"),
+        ("[{pattern: 'x?', term: BVN}]", "empty string"),
+        ("[{pattern: 'bifi eni'}]", "term"),
+    ],
+)
+def test_invalid_asr_terms_fail_loudly(tmp_path: Path, terms: str, message: str) -> None:
+    _write(tmp_path, "en.yaml", MINIMAL_EN + f"asr_terms: {terms}\n")
+    with pytest.raises(LanguageConfigError, match=message):
+        LanguageRegistry.load(tmp_path)
+
+
+def test_asr_terms_are_per_language_without_pivot_merge(tmp_path: Path, registry: LanguageRegistry) -> None:
+    assert [t.term for t in registry.asr_terms("yo")] == ["BVN"]
+    assert registry.asr_terms("en") == () and registry.asr_terms("ha") == ()
+    _write(tmp_path, "en.yaml", MINIMAL_EN)
+    assert LanguageRegistry.load(tmp_path).asr_terms("en") == ()
+
+
+@pytest.mark.parametrize(
+    ("heard", "fixed"),
+    [
+        ("Wọ́n ní kí n fún wọn ní bifi eni mi", "Wọ́n ní kí n fún wọn ní BVN mi"),
+        ("Wọ́n ní kí n fún wọn ní bifi ẹni mi", "Wọ́n ní kí n fún wọn ní BVN mi"),
+        ("Wọ́n béèrè bifi ẹ́ni", "Wọ́n béèrè BVN"),  # tone mark on the last letter is swallowed with it
+        ("BIFI-ENI mi", "BVN mi"),
+        ("bifieni, OTP", "BVN, OTP"),
+        ("bifi  eni àti bifi ẹni", "BVN àti BVN"),
+        ("bifi ẹ̣ni", "BVN"),  # decomposed (NFD) under-dot
+        ("bifiẹnikan ni", "bifiẹnikan ni"),  # a longer word: not the term
+        ("abifi ẹni", "abifi ẹni"),
+        ("bifi", "bifi"),
+    ],
+)
+def test_asr_terms_replace_whole_words_ignoring_accents(
+    registry: LanguageRegistry, heard: str, fixed: str
+) -> None:
+    from kudiguard.languages import apply_asr_terms
+
+    text, replaced = apply_asr_terms(heard, registry.asr_terms("yo"))
+    assert text == fixed
+    assert replaced == heard.lower().count("bifi") - fixed.count("bifi")
+    assert apply_asr_terms(heard, ()) == (heard, 0)

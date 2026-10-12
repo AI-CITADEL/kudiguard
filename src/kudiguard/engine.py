@@ -29,7 +29,7 @@ from kudiguard.domain import Flag, LanguageCode, Outcome, ScamAssessment, Verdic
 from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.models import EXAMPLE_MIN, NOTICE_MIN, Contact, KnowledgeResult, Query, Relevance
 from kudiguard.knowledge.service import KnowledgeBase
-from kudiguard.languages import PIVOT, LanguageRegistry
+from kudiguard.languages import PIVOT, LanguageRegistry, apply_asr_terms
 from kudiguard.llm.base import LLM, ChatRequest, Completion, LLMError, complete_within
 from kudiguard.prompts import (
     MAX_ENTRIES,
@@ -296,12 +296,17 @@ class Engine:
             )
         # Whisper-style text invented on music or noise ("thanks for watching") is not a message (docs/ABUSE.md)
         filtered = self.transcripts.filter(speech.transcript.text, language)
-        if not filtered.removed:
+        if filtered.removed:
+            if filtered.empty:
+                raise AudioError(AudioProblem.NO_SPEECH, "only recogniser hallucinations")
+            transcript = dataclasses.replace(speech.transcript, text=filtered.text)
+            speech = dataclasses.replace(speech, transcript=transcript, filtered=True)
+        # bank terms spelled phonetically inside Hausa/Yoruba/Igbo speech ("bifi eni" = "BVN"); counts only logged
+        text, replaced = apply_asr_terms(speech.transcript.text, self.registry.asr_terms(language))
+        if not replaced:
             return speech
-        if filtered.empty:
-            raise AudioError(AudioProblem.NO_SPEECH, "only recogniser hallucinations")
-        transcript = dataclasses.replace(speech.transcript, text=filtered.text)
-        return dataclasses.replace(speech, transcript=transcript, filtered=True)
+        log.info("asr_terms language=%s replaced=%d", language, replaced)
+        return dataclasses.replace(speech, transcript=dataclasses.replace(speech.transcript, text=text))
 
     # --- check --------------------------------------------------------------------------------------------
 

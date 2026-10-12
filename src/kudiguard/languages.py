@@ -7,6 +7,7 @@ translated into, so its lexicon is always merged with the user's language lexico
 from __future__ import annotations
 
 import dataclasses
+import re
 import string
 import unicodedata
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 
 from kudiguard.domain import LanguageCode
 from kudiguard.safety.scam_rules import Lexicon, Patterns, compile_term
+from kudiguard.text import fold
 
 PIVOT: LanguageCode = "en"
 BUTTON_PREFIX = "btn_"
@@ -135,6 +137,47 @@ class _CommandsSpec(BaseModel):
     greetings: list[str] = Field(default_factory=list)  # greetings and thanks: fixed reply, no model call
 
 
+class _AsrTermSpec(BaseModel):
+    """A bank term speech recognition spells phonetically inside this language ("bifi eni" for "BVN")."""
+
+    model_config = ConfigDict(extra="forbid")
+    pattern: str  # regex on the accent-folded transcript, written without accents; whole words only
+    term: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]  # canonical text, e.g. "BVN"
+
+
+@dataclass(frozen=True, slots=True)
+class AsrTerm:
+    pattern: re.Pattern[str]
+    term: str
+
+
+def apply_asr_terms(text: str, terms: tuple[AsrTerm, ...]) -> tuple[str, int]:
+    """``text`` with each phonetic spelling replaced by its canonical term, and the number of replacements.
+
+    Patterns match an accent-folded, lower-cased copy (``fold`` applied per character, so Yoruba under-dots and
+    tone marks never block a match); each matched span is mapped back to the original text, combining marks
+    trailing the last matched letter included, and replaced there. The rest of the text keeps its accents.
+    """
+    replaced = 0
+    for asr_term in terms:
+        folded: list[str] = []
+        origin: list[int] = []  # folded index -> original index
+        for i, ch in enumerate(text):
+            part = fold(ch)
+            folded.append(part)
+            origin.extend([i] * len(part))
+        origin.append(len(text))
+        pieces: list[str] = []
+        last = 0
+        for match in asr_term.pattern.finditer("".join(folded)):
+            start, end = origin[match.start()], origin[match.end()]
+            pieces += [text[last:start], asr_term.term]
+            last = end
+            replaced += 1
+        text = "".join(pieces) + text[last:]
+    return text, replaced
+
+
 @dataclass(frozen=True, slots=True)
 class GuardPatterns:
     safety_claims: Patterns
@@ -195,6 +238,7 @@ class LanguageConfig(BaseModel):
     output_guard: _OutputGuardSpec = Field(default_factory=_OutputGuardSpec)
     commands: _CommandsSpec = Field(default_factory=_CommandsSpec)
     abuse: _AbuseSpec = Field(default_factory=_AbuseSpec)
+    asr_terms: list[_AsrTermSpec] = Field(default_factory=list)  # voice-note transcripts only
     strings: dict[str, str] = Field(default_factory=dict)  # fixed UI text; keys must match the pivot's
 
 
@@ -205,11 +249,13 @@ class LanguageRegistry:
         lexicons: dict[LanguageCode, Lexicon],
         guards: dict[LanguageCode, GuardPatterns] | None = None,
         abuse: dict[LanguageCode, AbusePatterns] | None = None,
+        asr_terms: dict[LanguageCode, tuple[AsrTerm, ...]] | None = None,
     ) -> None:
         self._by_code = {lang.code: lang for lang in languages}
         self._own_lexicons = lexicons
         self._own_guards = guards or {}
         self._own_abuse = abuse or {}
+        self._asr_terms = asr_terms or {}
         self._merged: dict[LanguageCode, Lexicon] = {}
         self.enabled: tuple[LanguageConfig, ...] = tuple(
             sorted(
@@ -224,6 +270,7 @@ class LanguageRegistry:
         lexicons: dict[LanguageCode, Lexicon] = {}
         guards: dict[LanguageCode, GuardPatterns] = {}
         abuse: dict[LanguageCode, AbusePatterns] = {}
+        asr_terms: dict[LanguageCode, tuple[AsrTerm, ...]] = {}
         for path in sorted(directory.glob("*.yaml")):
             try:
                 lang = LanguageConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
@@ -239,6 +286,10 @@ class LanguageRegistry:
                         f.name: tuple(compile_term(t) for t in getattr(lang.abuse, f.name))
                         for f in dataclasses.fields(AbusePatterns)
                     }
+                )
+                asr_terms[lang.code] = tuple(
+                    AsrTerm(re.compile(compile_term(t.pattern).pattern, re.IGNORECASE), t.term)
+                    for t in lang.asr_terms
                 )
             except (ValidationError, ValueError, yaml.YAMLError) as exc:
                 raise LanguageConfigError(f"{path.name}: {exc}") from exc
@@ -269,7 +320,7 @@ class LanguageRegistry:
         orders = [lang.order for lang in languages]
         if len(orders) != len(set(orders)):
             raise LanguageConfigError(f"duplicate 'order' values in {directory}")
-        return cls(languages, lexicons, guards, abuse)
+        return cls(languages, lexicons, guards, abuse, asr_terms)
 
     def __contains__(self, code: object) -> bool:
         return code in self._by_code
@@ -327,6 +378,10 @@ class LanguageRegistry:
                 }
             )
         return merged
+
+    def asr_terms(self, code: LanguageCode) -> tuple[AsrTerm, ...]:
+        """Spoken-term corrections for ``code``'s voice-note transcripts (own language only, no pivot merge)."""
+        return self._asr_terms.get(code, ())
 
     def asr_models(self) -> dict[LanguageCode, str]:
         """Language code -> speech model repo, for enabled languages."""
