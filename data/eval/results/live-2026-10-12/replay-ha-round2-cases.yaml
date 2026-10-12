@@ -1,0 +1,8 @@
+cases:
+- {id: r2-1, lang: ha, channel: whatsapp, label: scam, scam_type: bvn_block, text: "wani ya kirani ya ce an toshe bibiyen ɗina."}
+- {id: r2-2, lang: ha, channel: whatsapp, label: scam, scam_type: bvn_block, text: "Wani yakirani yace an toshe bvn dina"}
+- {id: r2-3, lang: ha, channel: whatsapp, label: scam, scam_type: otp, text: "wani ya ƙira ni ya ce na tura mai otp na."}
+- {id: r2-4, lang: ha, channel: whatsapp, label: scam, scam_type: pin, text: "wani ya kirani ya ce na tura mai fim ɗina."}
+- {id: r2-5, lang: ha, channel: whatsapp, label: scam, scam_type: account_number, text: "wani ya ƙira ne ya ce na tura mai akawun nan ba na."}
+- {id: r2-6, lang: ha, channel: whatsapp, label: scam, scam_type: otp, text: "wani ya kirani yake ce mun na duba wani sako an turo min wasu lambobi in tura mu shi."}
+- {id: r2-7, lang: ha, channel: whatsapp, label: scam, scam_type: otp, text: "wani ya kira ne yake ce an tura mu wani sako masu wasu lambobi guda shida, to yace in tura masu lambobi."}

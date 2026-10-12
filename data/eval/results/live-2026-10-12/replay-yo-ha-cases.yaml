@@ -1,0 +1,25 @@
+cases:
+- id: live-ha-2
+  lang: ha
+  channel: whatsapp
+  label: scam
+  scam_type: phone_money_request
+  text: "mun ya kirani ya ce ma tura mai kudi."
+- id: live-ha-3
+  lang: ha
+  channel: whatsapp
+  label: scam
+  scam_type: phone_money_request
+  text: "wani ya kirani ya ce na tura mai kuɗi."
+- id: live-yo-2
+  lang: yo
+  channel: whatsapp
+  label: scam
+  scam_type: bvn_request
+  text: "wọ́n ní BVN mi ti díná kí n fi ránṣẹ́ sí wọn."
+- id: live-yo-3
+  lang: yo
+  channel: whatsapp
+  label: scam
+  scam_type: bvn_request
+  text: "ẹnikọ́pẹ́ mi, o ni ki n fun ohun ni BVN mi, wọ́n ni BVN mi ti dina kí n fi ránṣẹ sí wọn."
