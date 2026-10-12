@@ -15,7 +15,7 @@ register with commands to reproduce is `docs/CLAIMS.md`.
 | Frozen end-to-end benchmark **T v1** (366 cases, 5 languages, run once) | pass **85%**; scams flagged **178/196 (91%)**; genuine messages wrongly flagged **35/96 (36%)**; questions answered 72/74; p50 3.5 s, p95 8.3 s; 0 errors | `docs/CLAIMS.md` C10, `data/eval/results/e2e-live.jsonl` |
 | Advice fixes on dev set dev2 (130 cases) | judged good 10 -> 26; advice points 32% -> 46%; scams flagged 48/50 -> 48/50 | `docs/CLAIMS.md` C14 |
 | NCAIR1 speech, word error rate | Hausa 28%, Yoruba 33%, Igbo 46% (read speech) | `docs/CLAIMS.md` C3 |
-| **Live pilot, 12 Oct 2026** | 14 real interactions (13 voice notes) from 3 testers on the web voice page; 8 issues found, 7 fixed and 1 experiment rejected the same day; 11 live messages replayed as text after the fixes: 10 flagged | `var/kudiguard.db`, `kudiguard stats`, git log |
+| **Live pilot, 12 Oct 2026** | 25 real interactions (20 voice notes) from 5 people (4 external testers + the team lead), Hausa and Yoruba, on the web voice page; team judgement: 11 of 25 handled right (44%), 9 of 16 scam descriptions flagged; 12 issues found, 11 fixed and 1 experiment rejected the same day | `var/kudiguard.db`, `kudiguard stats`, git log |
 
 The live sample is **small** (section 5). We state it plainly rather than extrapolate from it.
 
@@ -88,45 +88,74 @@ Google FLEURS read sentences re-encoded as WhatsApp audio; not real voice notes;
 ## 5. Live pilot, 12 Oct 2026
 
 **Setup.** Live server on the team's PC (RTX 4070 Laptop GPU), N-ATLAS Q4_K_M via llama.cpp, NCAIR1 speech models,
-public HTTPS via a Cloudflare tunnel, **web voice page** (`/`). Testers recorded voice notes in their own language
-about scam situations. WhatsApp was not used by testers on this day (0 WhatsApp users, `kudiguard stats`).
+public HTTPS via a Cloudflare tunnel, **web voice page** (`/`). Testers recorded voice notes or typed in their own
+language about scam situations. WhatsApp was not used by testers on this day (0 WhatsApp users, `kudiguard stats`).
 
-**Database totals** (`.venv\Scripts\python -m kudiguard.cli stats`, run 12 Oct 2026 15:27 EDT, read-only):
+**Database totals** (`.venv\Scripts\python -m kudiguard.cli stats`, re-run 12 Oct 2026 evening, read-only):
 
 ```
-Interactions: 15   unique users: 4 (whatsapp users: 0, web sessions: 4)
-Languages: {'ha': 10, 'yo': 4, 'en': 1}
-Verdicts: {'caution': 6, 'no_flags': 4, 'not_a_check': 3, 'likely_scam': 2}
-Outcomes: {'answered': 14, 'fallback': 1}
+Interactions: 27   unique users: 7 (whatsapp users: 0, web sessions: 7)
+Languages: {'yo': 15, 'ha': 10, 'en': 1, 'ig': 1}
+Verdicts: {'caution': 8, 'no_flags': 8, 'not_a_check': 6, 'likely_scam': 5}
+Outcomes: {'answered': 20, 'fallback': 7}
 Helpful: 0/0 (n/a)
-Latency audio: n=13 p50=7475 ms p95=17686 ms
-Latency text: n=2 p50=3793 ms p95=4103 ms
-Per day: {'2026-10-08': 1, '2026-10-12': 14}
+Latency audio: n=20 p50=7631 ms p95=17686 ms
+Latency text: n=7 p50=6136 ms p95=7304 ms
+Per day: {'2026-10-08': 1, '2026-10-12': 26}
 ```
 
-The 2026-10-08 row is the team's internal pre-pilot text test. **12 Oct only** (`var/kudiguard.db`,
-`interactions`, opened read-only):
+Two of these 27 rows are internal and are excluded below: the team's pre-pilot text test (8 Oct, English) and one
+team end-to-end smoke test on 12 Oct (Igbo, typed; flagged likely_scam). **Pilot rows, 12 Oct, testers only**
+(`var/kudiguard.db`, `interactions`, opened read-only; labels from `var/testers.csv`, no names or hashes):
 
-| Language | Voice notes | Typed | Total |
+| Tester | Language | Voice notes | Typed | Messages |
+|---|---|---|---|---|
+| Team lead | Yoruba | 4 | 0 | 4 |
+| Tester 2 (remote) | Hausa | 6 | 0 | 6 |
+| Tester 3 (remote) | Hausa | 3 | 1 | 4 |
+| Tester 4 | Yoruba | 4 | 0 | 4 |
+| Tester 5 | Yoruba | 3 | 4 | 7 |
+| **Total** | Hausa 10, Yoruba 15 | **20** | **5** | **25** |
+
+Verdicts as recorded live (before the same-day fixes): caution 8, no_flags 8, not_a_check 6, likely_scam 3.
+Outcomes: 18 answered, 7 fixed-text fallbacks. Voice-note latency end to end: n=20, p50 7,631 ms, p95 17,686 ms
+(`kudiguard stats`; every voice note is a pilot row); speech recognition alone p50 2,364 ms; typed messages median
+6,136 ms (n=5). No helpful/unhelpful ratings were given.
+
+### How the live system did (team judgement)
+
+There is no official answer key for live messages. The tables below are **the team's judgement of each message**
+(was the reply right for what the tester meant?).
+
+| Tester | Messages | Right | Wrong |
 |---|---|---|---|
-| Hausa | 9 | 1 | 10 |
-| Yoruba | 4 | 0 | 4 |
-| **Total** | **13** | **1** | **14** |
+| Team lead (yo) | 4 | 2 | 2 |
+| Tester 2 (ha) | 6 | 1 | 5 |
+| Tester 3 (ha) | 4 | 3 | 1 |
+| Tester 4 (yo) | 4 | 3 | 1 |
+| Tester 5 (yo) | 7 | 2 | 5 |
+| **Total** | **25** | **11 (44%)** | **14** |
 
-Verdicts on 12 Oct (as recorded at the time, before the same-day fixes): caution 6, no_flags 4, not_a_check 3,
-likely_scam 1. Outcomes: 13 answered, 1 fallback. Voice-note latency end to end: p50 7,475 ms, p95 17,686 ms
-(n=13; Hausa p50 6,417 ms, Yoruba p50 13,667 ms); speech recognition alone p50 2,343 ms. Testers (pseudonymous labels
-from `var/testers.csv`): **Tester 1** (team member, Yoruba, collecting ASR terms), **Tester 2** and **Tester 3**
-(remote Hausa testers outside the team). No helpful/unhelpful ratings were given.
+| Message type | Count | Outcome |
+|---|---|---|
+| Scam descriptions | 16 | 9 flagged (56%), 7 missed |
+| Off-topic questions | 2 | 2 right (not a check) |
+| Greeting | 1 | wrong: Yoruba "akúàṣálẹ̀ o" (good evening) translated "I'm in trouble" |
+| Bare numbers | 4 | shown green: probably the testers' own BVN, prompted by the old text-box example "Someone called and said my BVN is blocked…"; numbers are masked in storage (`[number]`) |
+| Recording glitches | 2 | wrong: a 0.46 s accidental tap; a speech-model loop ("ìdáná-ìdáná-…" ×60) after which N-ATLAS invented a lottery story |
+
+One Tester 4 reply shows the translation risk: from garbled Yoruba, N-ATLAS's English translation invented "the last
+four digits of my Social Security number" (interaction 19); the rules still gave caution (impersonation of the bank).
+**Open gap:** a bare number or link gets a generic green answer; KudiGuard cannot verify numbers.
 
 ### 5.1 The real messages (12 Oct 2026, times UTC; transcripts as heard by the NCAIR1 model)
 
 | # | Time | Tester | Lang | Input | Transcript (ASR output) | N-ATLAS English | Verdict then |
 |---|---|---|---|---|---|---|---|
-| 2 | 16:42 | Tester 1 | yo | voice | ẹnikan pẹrin o so wipe ki mu bifi ẹni mi wa, bo irun bami lati fun ni bifi ẹni mi naa, ṣe skamu lele yii aabi bẹkọ? | — (timed out: model loading) | not_a_check (fallback) |
-| 3 | 16:46 | Tester 1 | yo | voice | ẹnikan te mi, oni ki mu bifi eni mi wa kinsẹndẹ sa wọn, ... ki tun fi account-number mi sinu bifi eni mi naa ki wa fẹransẹ si oun | Someone is threatening me ... | likely_scam |
-| 4 | 17:00 | Tester 1 | yo | voice | ẹnikọ́pẹ́ mi, o ni ki n fun ohun ni bífi ẹni mi, wọ́n ni bífi ẹni mi ti dina kí n fi ránṣẹ sí wọn. | My friend, I have to give something up as a favor ... | not_a_check |
-| 5 | 17:01 | Tester 1 | yo | voice | wọ́n ní bífí ẹ̀nì mi ti díná kí n fi ránṣẹ́ sí wọn. | They have blocked my debit card ... | caution |
+| 2 | 16:42 | Team lead | yo | voice | ẹnikan pẹrin o so wipe ki mu bifi ẹni mi wa, bo irun bami lati fun ni bifi ẹni mi naa, ṣe skamu lele yii aabi bẹkọ? | — (timed out: model loading) | not_a_check (fallback) |
+| 3 | 16:46 | Team lead | yo | voice | ẹnikan te mi, oni ki mu bifi eni mi wa kinsẹndẹ sa wọn, ... ki tun fi account-number mi sinu bifi eni mi naa ki wa fẹransẹ si oun | Someone is threatening me ... | likely_scam |
+| 4 | 17:00 | Team lead | yo | voice | ẹnikọ́pẹ́ mi, o ni ki n fun ohun ni bífi ẹni mi, wọ́n ni bífi ẹni mi ti dina kí n fi ránṣẹ sí wọn. | My friend, I have to give something up as a favor ... | not_a_check |
+| 5 | 17:01 | Team lead | yo | voice | wọ́n ní bífí ẹ̀nì mi ti díná kí n fi ránṣẹ́ sí wọn. | They have blocked my debit card ... | caution |
 | 6 | 17:12 | Tester 2 | ha | voice | shugaban ƙarar ƙarar ƙarar ƙanar | (garbled input) | caution |
 | 7 | 17:13 | Tester 2 | ha | voice | mun ya kirani ya ce ma tura mai kudi. | they called me and said that they are sending money. | no_flags |
 | 8 | 17:14 | Tester 2 | ha | voice | wani ya kirani ya ce na tura mai kuɗi. | Someone called me and said they were sending money. | no_flags |
@@ -137,6 +166,14 @@ from `var/testers.csv`): **Tester 1** (team member, Yoruba, collecting ASR terms
 | 13 | 18:51 | Tester 2 | ha | voice | wani ya ƙira ne ya ce na tura mai akawun nan ba na. | Someone created a character who said that I sent this accountant here ... | not_a_check |
 | 14 | 18:53 | Tester 3 | ha | voice | wani ya kirani yake ce mun na duba wani sako an turo min wasu lambobi in tura mu shi. | Someone called and said they were checking a message and sent me some numbers to forward to them. | caution |
 | 15 | 18:54 | Tester 3 | ha | voice | wani ya kira ne yake ce an tura mu wani sako masu wasu lambobi guda shida, to yace in tura masu lambobi. | Someone called and said that there were some numbers with six digits, so he said to send those numbers. | no_flags |
+| 16 | 19:54 | Tester 4 | yo | voice | bàbá ọ̀rọ̀-ìdáná-ìdáná-ìdáná-… (loop, ~60 repeats) | (invented) "... I have won a big prize of N10 million from the National Lottery" | likely_scam (fallback) |
+| 17 | 19:57 | Tester 4 | yo | voice | ah, maaamn, roimọt, mo ni kii n ṣọ́fẹ̀ ... kí n ṣẹ̀ndì bbm, ìtì kódì ... there they will get in to my account. | Ah, mom, I'm not lying ... | likely_scam |
+| 18 | 19:59 | Tester 4 | yo | voice | elórò̩ imọ́, èyàn kó̩ pé mi ń sín, ó ní kí ń se̩ndì kó̩dì mi ... wón fẹ́ búlọ̀kà káàntì mi ... | They want me to send them my code first ... they will block my bank account | caution |
+| 19 | 20:08 | Tester 4 | yo | voice | ẹni kan pe mi ni si ounilati ile ifowopamọ mi loun ti n pe pe wọn fẹ bẹẹmi ... | Someone called me from my bank's customer service ... asked for the last four digits of my Social Security number. | caution |
+| 20–23 | 20:15–20:18 | Tester 5 | yo | text | [number] (masked in storage; 4 messages) | — | no_flags (fallback) |
+| 24 | 20:19 | Tester 5 | yo | voice | kí ni àwọn ọmọdé yóò kó yóò bí ní ọjọ́ àwọn ọmọdé? | What will children do on the day of children? | not_a_check (fallback) |
+| 25 | 20:19 | Tester 5 | yo | voice | akúàṣálẹ̀ o | I'm in trouble | not_a_check |
+| 26 | 20:23 | Tester 5 | yo | voice | ìgbà wo ni àwọn ọmọ ẹ̀kọ́ tí ó wà? | What time are the students coming? | not_a_check |
 
 (# = interaction id. English glosses shortened. "Verdict then" is the verdict recorded live, before the fixes in 5.2.)
 
@@ -157,6 +194,10 @@ no_flags or not_a_check live. These are exactly the cases fixed below.
 | f | Hausa requests for OTP, PIN ("fim"), account number ("akawun nan ba") and a six-digit code not flagged | Hausa rules for those requests from an unknown caller | 451629c, 07a1ec6 |
 | g | An uncertain non-English voice note with no flags got a green "no warning signs" reply | `KUDIGUARD_VOICE_NO_REASSURANCE` (default true): the reply says some words may have been mis-heard and asks the user to type; stored verdict unchanged | a66a94d, 8d1f551 |
 | h | Experiment: a "focused risk check" (an extra N-ATLAS call on the original ha/yo/ig text) | Measured on dev2 (ha/yo/ig/pcm, 70 cases), off -> enforce: scams flagged 25/27 -> 25/27 (no recall gain); genuine flagged 14/25 -> 15/25; Hausa genuine flagged 2/6 (33%) -> 3/6 (50%), n=6; p50/p95 5.5/11.2 s -> 6.5/12.0 s; model calls 187 -> 231. **Rejected** by the pre-set rule (ship only if recall rises and genuine false positives do not): stays off (`KUDIGUARD_FOCUSED_RISK_CHECK=off`), not merged | f961e32 (experiment branch); `data/eval/results/live-2026-10-12/focused-risk-dev2-off.jsonl`, `-enforce.jsonl` (`scripts/eval_e2e.py --summary`) |
+| i | A Yoruba voice note came back as a hyphen-joined loop ("ìdáná-ìdáná-…") and N-ATLAS invented a lottery story from it | Loop guard: hyphen-joined repetitions collapsed; a transcript that is mostly one loop is treated as "couldn't hear clearly" | 0038af0 |
+| j | Yoruba "ki n sendi kodi" (send my code, English loanwords) not flagged | Yoruba rule added; forwarded "ma fi koodu ranse" (do not send the code) warnings no longer flagged | 546c669 |
+| k | Testers read the text-box example ("Someone called and said my BVN is blocked…") as a request and typed bare numbers; a Yoruba "good evening" was translated "I'm in trouble" | The text box now asks for the message and says never to type BVN/PIN/OTP; Yoruba evening greetings recognised | 17a4e13 |
+| l | A real phone number was found in a test file | Replaced by a fictitious number and scrubbed from the published history | b6cfd4e |
 
 **Tester feedback, acted on.** A remote Hausa tester wrote: *"It can't decipher a Hausa pronunciation of words like
 account. Most Hausa people don't use the Hausa word for account."* The team followed up: the tester meant the English
@@ -169,8 +210,8 @@ cases: **67 Hausa** (52 in T + 15 in dev2) and **67 Yoruba** (52 + 15). Commit m
 rules "No change on any Yoruba e2e/dev2 case" (256b0dc, eaade33, e3f816d); Hausa `money_request` "0 new hits on
 Hausa genuine/question cases" and, after narrowing, "no genuine/question case changes" (one scam case, ha-003, moved
 from not_a_check to no_flags through the new "someone called me" intent term; 5cca936). All rules remain DRAFT
-pending native review. The latest full test run, on master 273c7f6: **5,517 passed**, 1 skipped, 12 xfailed, **100% line and branch
-coverage** (9,447 statements, 2,256 branches), mypy clean on 73 source files, ruff format clean.
+pending native review. The latest full test run, on master 17a4e13/b6cfd4e: **5,533 passed**, 1 skipped, 12 xfailed, **100% line and
+branch coverage** (9,455 statements, 2,258 branches), mypy clean, ruff clean.
 
 ### 5.3 Replay after the fixes
 
@@ -208,8 +249,12 @@ false-positive check is the 67 + 67 frozen cases above.
 
 ## 6. Known limitations (stated plainly)
 
-* **Small live sample**: 4 users and 15 interactions in the database, of which 14 on 12 Oct from 3 testers (one a
-  team member) on the web page; no WhatsApp users and no ratings yet. It shows real failure modes, not accuracy.
+* **Small live sample**: 25 pilot messages on 12 Oct from 5 people (4 external testers and the team lead) on the web
+  page; no WhatsApp users and no ratings yet; the right/wrong split is the team's own judgement. It shows real
+  failure modes, not accuracy.
+* **No Igbo or Pidgin real-user messages**: an Igbo tester opened the page but no message arrived (cause unknown,
+  probably on the client side).
+* **KudiGuard cannot verify numbers or links**: a bare number or link gets a generic green answer.
 * **Hausa ASR ~28% WER** on read speech (Yoruba 33%, Igbo 46%); real voice notes are harder, and bank words come out
   phonetically. `asr_terms` cover only the terms observed so far.
 * **Translation can flip meaning** (live interactions 7–8; 11% of measured translations reversed a negation,
@@ -219,3 +264,8 @@ false-positive check is the 67 + 67 frozen cases above.
 * **Hausa, Yoruba and Igbo rules, texts and test cases are DRAFT**, pending native-speaker review (none done yet,
   `docs/VALIDATION.md`).
 * Benchmarks use LLM judges, not people; T's ha/yo/ig cases are near-parallel templates.
+
+## 7. Next (roadmap)
+
+* **Spoken replies in Hausa, Yoruba and Igbo**, requested by testers. Candidates: MMS-TTS (non-commercial licence),
+  YarnGPT (Apache-2.0, 366M parameters), Spitch API.

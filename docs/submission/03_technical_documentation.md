@@ -135,9 +135,9 @@ Phone- or email-shaped ids are refused (400). Each end user counts toward the sh
 
 | Check | Command | Latest result |
 |---|---|---|
-| Unit + integration tests, coverage | `.venv\Scripts\python -m pytest --cov=kudiguard --cov-branch` | 5,517 passed, 1 skipped, 12 xfailed; **100% line + branch** (9,447 statements, 2,256 branches) (latest full run, master 273c7f6, 12 Oct 2026) |
-| Lint / format | `ruff check`, `ruff format --check` | ruff format clean (same run) |
-| Types | `mypy` | "no issues found in 73 source files" (same log) |
+| Unit + integration tests, coverage | `.venv\Scripts\python -m pytest --cov=kudiguard --cov-branch` | 5,533 passed, 1 skipped, 12 xfailed; **100% line + branch** (9,455 statements, 2,258 branches) (latest full run, master 17a4e13/b6cfd4e, 12 Oct 2026) |
+| Lint / format | `ruff check`, `ruff format --check` | ruff clean (same run) |
+| Types | `mypy` | clean (same run) |
 | Live model tests | `python -m pytest -m live` | need N-ATLAS and the speech models; not counted above |
 | Frozen benchmark | `PYTHONIOENCODING=utf-8 python scripts/eval_e2e.py --summary data/eval/results/e2e-live.jsonl` | T v1, document 3 |
 | Mutation testing | `python scripts/mutation.py text legacy` | ten safety-critical modules 93.1% (round 3), `docs/CLAIMS.md` C9 |
