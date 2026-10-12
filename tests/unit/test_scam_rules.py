@@ -439,11 +439,13 @@ def native(registry: LanguageRegistry, code: str) -> Lexicon:
         ("yo", Flag.PRIZE_LOTTERY, "Wọ́n ní mo ti jẹ ẹ̀bùn ẹgbẹ̀rún lọ́nà ọgọ́rùn-ún náírà."),
         # V terms (live voice notes, 12 Oct 2026): he said I should give him my BVN
         ("yo", Flag.ASKS_CREDENTIALS, "Ọkùnrin kan pè mí, ó ní kí n fún òun ní BVN mi."),
-        ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní kí n sọ NIN mi fún wọn."),  # tell them my NIN
-        ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní kí n fi nọ́mbà káàdì mi ránṣẹ́."),  # send my card number
-        ("yo", Flag.ASKS_CREDENTIALS, "Fi BVN rẹ ránṣẹ́ sí wa lónìí."),  # send your BVN to us today
-        # he said my SIM will be blocked
-        ("yo", Flag.ACCOUNT_THREAT, "Ó ní SIM mi máa di pípa tí mi ò bá ṣe verify."),
+        # someone called me, they said I should tell them my NIN
+        ("yo", Flag.ASKS_CREDENTIALS, "Ẹnìkan pè mí, wọ́n ní kí n sọ NIN mi fún wọn."),
+        # a woman called me, she said I should send my card number
+        ("yo", Flag.ASKS_CREDENTIALS, "Obìnrin kan pè mí, ó ní kí n fi nọ́mbà káàdì mi ránṣẹ́."),
+        # they said my NIN is blocked, I should send it to them
+        ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní NIN mi ti dínà, kí n fi ránṣẹ́ sí wọn."),
+        ("yo", Flag.ACCOUNT_THREAT, "Wọ́n ní SIM mi ti dínà."),  # they said my SIM has been blocked
         ("ig", Flag.URGENCY, "Ha sị m zitere ya ozugbo ozugbo."),  # send it immediately immediately
         # he wants me to tell him the OTP
         ("ig", Flag.ASKS_CREDENTIALS, "Ọ chọrọ ka m gwa ya OTP ha zitere m."),
@@ -496,6 +498,31 @@ def test_native_parity_terms_fire(registry: LanguageRegistry, lang: str, flag: F
         ("yo", "Mo ti fi NIN mi ránṣẹ́ sí NIMC nípasẹ̀ *346#."),  # I sent my NIN to NIMC via *346#
         ("yo", "Kí ni BVN, ṣé mo nílò rẹ̀ láti ṣí àkáǹtì?"),  # what is BVN, do I need it to open an account
         ("yo", "BVN mi ti wà lórí àkáǹtì mi tuntun."),  # my BVN is now on my new account
+        # review (12 Oct 2026): a known asker (bank, NIMC, JAMB, family) or a form, not an unknown caller
+        ("yo", "won ni ki n mu NIN mi wa lati so mo SIM mi"),  # bring my NIN to link it to my SIM
+        ("yo", "won ni ki n mu NIN mi wa si NIMC"),  # bring my NIN to NIMC
+        ("yo", "won ni ki n mu BVN mi wa ni ojo aje"),  # bring my BVN on Monday
+        ("yo", "won ni ki n mu BVN mi wa fun account opening"),  # bring my BVN for account opening
+        ("yo", "won ni ki n mu NIN slip mi wa"),  # bring my NIN slip
+        ("yo", "won ni ki n fi BVN mi si fomu"),  # put my BVN on the form
+        ("yo", "won so pe ki n fi BVN mi kun fomu"),  # fill the form with my BVN
+        ("yo", "won ni ki n fi NIN mi si portal JAMB"),  # enter my NIN on the JAMB portal
+        ("yo", "won ni ki n mu nomba kaadi mi wa"),  # bring my card number
+        ("yo", "won ni ki n so NIN mi fun osise NIMC"),  # tell my NIN to the NIMC officer
+        # he said I should give him my NIN so he helps me link it to my SIM
+        ("yo", "o ni ki n fun oun ni NIN mi ki o ba mi so mo SIM"),
+        # Mama called me, she said I should give her my card number
+        ("yo", "Mama pe mi, o ni ki n fun oun ni nomba kaadi mi"),
+        # warnings: don't send your BVN to us/them; the bank will not ask you to send it
+        ("yo", "mase fi BVN re ranse si wa"),
+        ("yo", "e ma se fi BVN ranse si won"),
+        ("yo", "banki ko ni beere ki e fi BVN yin ranse si won"),
+        ("yo", "won ko ni so pe ki e fi BVN yin ranse si won"),
+        # my NIN has been linked / my line is active / NCC: SIM barred unless NIN is linked
+        ("yo", "won ni NIN mi ti di linked"),
+        ("yo", "won ni line mi ti di active"),
+        ("yo", "won ni SIM mi maa dina ti nko ba so NIN mo"),
+        ("yo", "won ni line mi yoo pa ti n ko ba so NIN"),
         # please tell me what OTP means / I did not tell him my PIN
         ("ig", "Biko gwa m ihe OTP pụtara."),
         ("ig", "Agwaghị m ya PIN m."),
@@ -514,7 +541,7 @@ def test_native_parity_terms_spare_ordinary_messages(
     [
         "ẹnikọ́pẹ́ mi, o ni ki n fun ohun ni BVN mi, wọ́n ni BVN mi ti dina kí n fi ránṣẹ sí wọn.",
         "wọ́n ní BVN mi ti díná kí n fi ránṣẹ́ sí wọn.",
-        "ẹnikan te mi, oni ki mu BVN mi wa",
+        "ẹnikan te mi, oni ki mu BVN mi wa kinsẹndẹ sa wọn",
         "ẹnikan pẹrin o so wipe ki mu BVN mi wa",
     ],
 )
