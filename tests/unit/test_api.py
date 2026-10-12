@@ -1014,7 +1014,8 @@ async def test_web_page_renders_the_configured_retention(registry: LanguageRegis
         assert "for up to 45 days" in page and "for up to 400 days" in page  # the no-JavaScript fallback
         assert '"retentionDays": 45, "patternRetentionDays": 400' in page and "{{" not in page
         assert "90 days" not in page and "2 years" not in page
-        assert page.count("{days}") == page.count("{patternDays}") == 5  # 4 languages + the renderer
+        assert page.count("{days}") == 9  # 4 languages x (full terms + short consent line) + the renderer
+        assert page.count("{patternDays}") == 5  # 4 languages (full terms) + the renderer
 
 
 @pytest.mark.parametrize(
