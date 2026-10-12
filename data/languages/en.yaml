@@ -625,3 +625,6 @@ strings:
   # An injected message that is not a scam check (instead of the greeting, which would look like it ignored them).
   screen_neutral: "ℹ️ I check messages you are unsure about and answer money questions; I cannot change how I work. Send me the message you want checked."
   voice_limit: "🎧 You have sent many voice notes in a short time. Please wait a little, or type your message."
+  # A voice note in a language other than English with no flags found: shown instead of the no-flags line
+  # (the recogniser may have dropped words: no reassurance). Not shown for English voice notes.
+  voice_unsure: "🎧 I may not have heard every word. If this is not what you said, please type your message."

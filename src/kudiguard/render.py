@@ -4,6 +4,7 @@ Layout (sections joined by a blank line, empty sections skipped):
 
     🔴 *headline*                      fixed text for scam checks only
     🗣️ I heard: “transcript”           voice notes only
+    🎧 I may not have heard every word  instead of the no-flags headline: a non-English voice note (doubts_voice)
     body                               model text, already cleaned (prompts.clean_reply)
     *Where to report:*                 likely-scam / caution only, verified contacts only
     • label: value                     numbers and links inserted verbatim, never by the model
@@ -17,6 +18,7 @@ from collections.abc import Sequence
 from kudiguard.domain import LanguageCode, Verdict
 from kudiguard.i18n import VERDICT_HEADLINE, Messages, Msg
 from kudiguard.knowledge.models import Contact
+from kudiguard.languages import PIVOT
 
 WHATSAPP_MAX_CHARS = 4096
 MAX_TRANSCRIPT_CHARS = 280
@@ -44,6 +46,19 @@ def contact_line(contact: Contact, language: LanguageCode) -> str:
     return f"• {contact.label_for(language)}: {contact.value_for(language)}"
 
 
+def doubts_voice(verdict: Verdict, language: LanguageCode, *, voice: bool) -> bool:
+    """True when a "no flags" verdict must not be shown as reassurance: the message was a voice note in a language
+    the recogniser often mis-hears (dropped or mangled words), so "no flags" may describe words the user never said.
+    Presentation only: the stored verdict is unchanged. ``voice``: a voice note and the option is on
+    (``Settings.voice_no_reassurance``)."""
+    return voice and verdict is Verdict.NO_FLAGS and language != PIVOT
+
+
+def headline_for(verdict: Verdict, *, unsure: bool) -> Msg | None:
+    """The fixed headline key for a verdict, or None (``unsure``: ``doubts_voice``, no reassuring headline)."""
+    return None if unsure else VERDICT_HEADLINE.get(verdict)
+
+
 def render_check_reply(
     messages: Messages,
     language: LanguageCode,
@@ -52,14 +67,19 @@ def render_check_reply(
     body: str,
     transcript: str | None = None,
     contacts: Sequence[Contact] = (),
+    voice: bool = False,
 ) -> str:
+    """``voice``: a voice note with ``Settings.voice_no_reassurance`` on (see ``doubts_voice``)."""
+    unsure = doubts_voice(verdict, language, voice=voice)
     header = []
-    if headline := VERDICT_HEADLINE.get(verdict):
+    if headline := headline_for(verdict, unsure=unsure):
         header.append(messages.text(language, headline))
     if transcript and transcript.strip():
         header.append(
             messages.text(language, Msg.I_HEARD, transcript=_shorten(transcript, MAX_TRANSCRIPT_CHARS))
         )
+    if unsure:
+        header.append(messages.text(language, Msg.VOICE_UNSURE))
 
     shown = [c for c in contacts if c.verified] if verdict in REPORT_VERDICTS else []
     report = (

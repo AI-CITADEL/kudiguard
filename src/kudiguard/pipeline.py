@@ -240,12 +240,14 @@ class Conversation:
         new_users: NewUserGate | None = None,
         flood: FloodGuard | None = None,
         learning: LearningGate | None = None,
+        voice_no_reassurance: bool = True,
     ) -> None:
         """``admission``: the licence-cap gate shared with the website and the partner API (``Services``); without
         one, a private gate for ``limits.active_user_cap`` (tests, single-channel hosts).
         ``new_users``: a new-user rate gate to attach to that admission (``Services`` attaches its own; None here =
         none added). ``flood``, ``learning``: abuse limits (``safety.limits``, docs/ABUSE.md); None = each at its
-        default limits and mode (as in production with no settings changed)."""
+        default limits and mode (as in production with no settings changed).
+        ``voice_no_reassurance``: no "no red flags" line for a non-English voice note (``render.doubts_voice``)."""
         self._engine = engine
         self._registry = engine.registry
         self._messages: Messages = engine.messages
@@ -258,6 +260,7 @@ class Conversation:
         self._donations = donations  # also used to erase when collection is off
         self._collecting = donations is not None and accept_donations  # KUDIGUARD_VOICE_DONATION
         self._storage = storage
+        self._voice_no_reassurance = voice_no_reassurance  # KUDIGUARD_VOICE_NO_REASSURANCE
         self._admission = admission or Admission(store, limits.active_user_cap, clock=clock)
         if new_users is not None:
             new_users.attach(self._admission)
@@ -738,6 +741,7 @@ class Conversation:
             body=answer.body,
             transcript=echo,
             contacts=answer.contacts,
+            voice=turn.voice and self._voice_no_reassurance,
         )
         intent = f"screen:{answer.screen_action}" if answer.screen_action else None
         # the stored reply never quotes the crisis words (a composed reply may echo them)

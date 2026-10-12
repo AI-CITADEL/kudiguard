@@ -78,6 +78,7 @@ class Msg(StrEnum):
     AI_HONEST = "ai_honest"  # the honest fixed line when a reply denied being an AI
     SCREEN_NEUTRAL = "screen_neutral"
     VOICE_LIMIT = "voice_limit"
+    VOICE_UNSURE = "voice_unsure"  # non-English voice note, no flags: no reassurance (render.doubts_voice)
 
 
 VERDICT_HEADLINE: dict[Verdict, Msg] = {

@@ -1,7 +1,7 @@
 import pytest
 
 from kudiguard.domain import Verdict
-from kudiguard.i18n import Messages, Msg
+from kudiguard.i18n import VERDICT_HEADLINE, Messages, Msg
 from kudiguard.knowledge.models import Contact, ContactKind
 from kudiguard.languages import LanguageRegistry
 from kudiguard.render import (
@@ -52,6 +52,32 @@ def test_scam_reply_layout(messages: Messages) -> None:
         "\n"
         "_Guidance only, not financial advice._"
     )
+
+
+def test_non_english_voice_note_with_no_flags_is_not_reassured(messages: Messages) -> None:
+    text = render_check_reply(
+        messages, "ha", verdict=Verdict.NO_FLAGS, body="Shawara.", transcript="abokina ya kira", voice=True
+    )
+    assert "🟢" not in text and messages.text("ha", Msg.VERDICT_NO_FLAGS) not in text
+    heard = messages.text("ha", Msg.I_HEARD, transcript="abokina ya kira")
+    assert text.startswith(f"{heard}\n{messages.text('ha', Msg.VOICE_UNSURE)}\n\nShawara.")
+
+
+@pytest.mark.parametrize(
+    ("language", "verdict", "voice"),
+    [
+        ("en", Verdict.NO_FLAGS, True),  # English voice: unchanged
+        ("ha", Verdict.NO_FLAGS, False),  # typed, or the option off
+        ("ha", Verdict.CAUTION, True),
+        ("ha", Verdict.LIKELY_SCAM, True),
+    ],
+)
+def test_other_replies_keep_their_headline(
+    messages: Messages, language: str, verdict: Verdict, voice: bool
+) -> None:
+    text = render_check_reply(messages, language, verdict=verdict, body="x", transcript="words", voice=voice)
+    headline = messages.text(language, VERDICT_HEADLINE[verdict])
+    assert text.startswith(headline) and messages.text(language, Msg.VOICE_UNSURE) not in text
 
 
 def test_general_question_has_no_headline_or_contacts(messages: Messages) -> None:

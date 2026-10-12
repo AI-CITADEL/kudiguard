@@ -51,6 +51,7 @@
   .caution { background: var(--warn-bg); color: var(--warn); }
   .no_flags { background: var(--ok-bg); color: var(--ok); }
   .heard { color: var(--muted); font-style: italic; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .unsure { font-weight: 600; margin-bottom: 10px; }
   .explanation { white-space: pre-wrap; overflow-wrap: anywhere; }
   .channels { margin: 12px 0 0; padding-left: 18px; }
   .channels li { overflow-wrap: anywhere; }
@@ -121,6 +122,7 @@
   <div class="card result" id="result" aria-live="polite">
     <div class="verdict" id="verdict"></div>
     <div class="heard" id="heard"></div>
+    <div class="unsure" id="unsure"></div>
     <div class="explanation" id="explanation"></div>
     <ul class="channels" id="channels"></ul>
     <p class="small" id="disclaimer"></p>
@@ -289,6 +291,7 @@
     verdict.textContent = data.headline || "";
     verdict.style.display = data.headline ? "block" : "none";
     $("heard").textContent = data.transcript ? `🗣️ ${t("heard")}: “${data.transcript}”` : "";
+    $("unsure").textContent = data.voice_unsure || "";
     $("explanation").textContent = data.explanation || "";
     const list = $("channels"); list.replaceChildren();
     for (const channel of data.report_channels || []) {

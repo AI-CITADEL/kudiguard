@@ -483,6 +483,7 @@ async def build_services(settings: Settings) -> Services:
                 privacy_url=f"{settings.public_url.rstrip('/')}/privacy" if settings.public_url else "",
                 donations=services.donations,
                 accept_donations=settings.voice_donation,
+                voice_no_reassurance=settings.voice_no_reassurance,
                 storage=settings.storage_location,
                 admission=services.admission,
                 flood=services.flood,  # one voice budget per person across WhatsApp, the web page and the API

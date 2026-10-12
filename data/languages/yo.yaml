@@ -259,3 +259,4 @@ strings:
   new_users_busy_today: "⏳ KudiGuard ti gba ọ̀pọ̀ olùmúlò tuntun lónìí. Ẹ jọ̀ọ́ ẹ gbìyànjú lẹ́ẹ̀kan sí i nígbà míì."
   screen_neutral: "ℹ️ Mo máa ń ṣàyẹ̀wò ọ̀rọ̀ tí ẹ kò dá lójú, mo sì ń dáhùn ìbéèrè nípa owó; mi ò lè yí bí mo ṣe ń ṣiṣẹ́ padà. Ẹ fi ọ̀rọ̀ tí ẹ fẹ́ kí n ṣàyẹ̀wò ránṣẹ́."
   voice_limit: "🎧 O ti fi ọ̀pọ̀ ohùn ránṣẹ́ láàárín àkókò kúkúrú. Jọ̀wọ́ dúró díẹ̀, tàbí kọ ọ̀rọ̀ rẹ."
+  voice_unsure: "🎧 Ó ṣeé ṣe kí n má gbọ́ gbogbo ọ̀rọ̀. Bí kì í bá ṣe ohun tí ẹ sọ nìyí, ẹ jọ̀ọ́ ẹ kọ ọ̀rọ̀ yín."  # DRAFT, pending native review

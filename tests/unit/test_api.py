@@ -272,6 +272,51 @@ async def test_web_check_voice(api: Api) -> None:
     assert body["transcript"] == OTP_SCAM
 
 
+BENIGN_HA = "Abokina ya tambaye ni lokacin taron gobe."
+BENIGN_EN = "My friend asked me the time of tomorrow's meeting."
+
+
+async def _web_voice(api: Api, language: str) -> dict[str, object]:
+    api.asr.text = BENIGN_HA if language == "ha" else BENIGN_EN
+    api.llm.script[Purpose.ANALYSE] = [analysis(BENIGN_EN)]
+    files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+    response = await api.client.post("/web/check", data={"language": language}, files=files, headers=WEB)
+    body: dict[str, object] = response.json()
+    return body
+
+
+async def test_web_hausa_voice_with_no_flags_is_not_reassured(api: Api) -> None:
+    body = await _web_voice(api, "ha")
+    assert body["verdict"] == "no_flags" and body["headline"] is None and body["transcript"] == BENIGN_HA
+    assert body["voice_unsure"] and "🎧" in str(body["voice_unsure"])
+    assert (await api.store.export_interactions())[-1]["verdict"] == "no_flags"
+
+
+async def test_web_english_voice_and_typed_hausa_keep_the_headline(api: Api) -> None:
+    body = await _web_voice(api, "en")
+    assert body["verdict"] == "no_flags" and body["headline"] and body["voice_unsure"] is None
+    api.llm.script[Purpose.ANALYSE] = [analysis(BENIGN_EN)]
+    typed = (
+        await api.client.post("/web/check", data={"language": "ha", "text": BENIGN_HA}, headers=WEB)
+    ).json()
+    assert typed["verdict"] == "no_flags" and typed["headline"] and typed["voice_unsure"] is None
+
+
+async def test_web_voice_reassurance_option_off(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(voice_no_reassurance=False)):
+        body = await _web_voice(api, "ha")
+        assert body["verdict"] == "no_flags" and body["headline"] and body["voice_unsure"] is None
+
+
+async def test_api_hausa_voice_with_no_flags_is_not_reassured(api: Api) -> None:
+    api.asr.text = BENIGN_HA
+    api.llm.script[Purpose.ANALYSE] = [analysis(BENIGN_EN)]
+    files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+    response = await api.client.post("/v1/check/audio", files=files, data={"language": "ha"}, headers=API)
+    body = response.json()
+    assert body["verdict"] == "no_flags" and body["headline"] is None and body["voice_unsure"]
+
+
 @pytest.mark.parametrize(
     ("headers", "data", "status"),
     [

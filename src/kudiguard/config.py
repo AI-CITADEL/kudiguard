@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     pattern_retention_days: int = Field(default=730, ge=30, le=730)
     # Voice-note donation (kudiguard.donation; docs/DPIA_VOICE.md). Off until the DPIA is signed off.
     voice_donation: bool = False
+    # A voice note in a language other than English with no flags found: never the reassuring "no red flags" line
+    # (the recogniser may have dropped words); "I may not have heard every word ... please type" instead. Display only.
+    voice_no_reassurance: bool = True
     voice_dir: Path = ROOT / "var" / "voice"  # encrypted audio; must belong to db_path (marker file)
     voice_retention_days: int = Field(default=365, ge=1, le=365)  # the offer promises at most 12 months
     voice_key: SecretStr | None = None  # >= 32 bytes; default: derived from hash_secret

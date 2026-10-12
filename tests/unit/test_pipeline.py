@@ -316,6 +316,45 @@ async def test_voice_note_listening_then_answer_with_echo(h: Harness) -> None:
     assert row["kind"] == "audio" and row["asr_ms"] == 50 and row["decode_ms"] is not None
 
 
+BENIGN_HA = "Abokina ya tambaye ni lokacin taron gobe."
+
+
+def _no_flags(h: Harness) -> None:
+    h.llm.script[Purpose.ANALYSE] = [
+        analysis("My friend asked me the time of tomorrow's meeting.", "scam_check")
+    ]
+    h.llm.script[Purpose.COMPOSE] = ["Ku tabbatar da bankinku."]
+    h.asr.text = BENIGN_HA
+
+
+async def test_hausa_voice_note_with_no_flags_is_not_reassured(h: Harness) -> None:
+    await h.onboard("ha")
+    _no_flags(h)
+    reply = (await h.say(audio=VOICE_NOTE.read_bytes()))[1]
+    assert "🟢" not in reply and h.t(Msg.VERDICT_NO_FLAGS, "ha") not in reply
+    heard = h.t(Msg.I_HEARD, "ha", transcript=BENIGN_HA)
+    assert reply.startswith(f"{heard}\n{h.t(Msg.VOICE_UNSURE, 'ha')}")
+    row = (await interactions(h))[-1]
+    assert row["verdict"] == Verdict.NO_FLAGS.value and row["kind"] == "audio"  # evidence unchanged
+
+
+async def test_typed_hausa_no_flags_keeps_its_headline(h: Harness) -> None:
+    await h.onboard("ha")
+    _no_flags(h)
+    reply = (await h.say(BENIGN_HA))[-1]
+    assert reply.startswith(h.t(Msg.VERDICT_NO_FLAGS, "ha")) and h.t(Msg.VOICE_UNSURE, "ha") not in reply
+
+
+async def test_voice_reassurance_option_off_keeps_the_old_reply(h: Harness) -> None:
+    h.conversation = Conversation(
+        engine=h.engine, store=h.store, messenger=h.messenger, hasher=h.hasher, voice_no_reassurance=False
+    )
+    await h.onboard("ha")
+    _no_flags(h)
+    reply = (await h.say(audio=VOICE_NOTE.read_bytes()))[1]
+    assert reply.startswith(h.t(Msg.VERDICT_NO_FLAGS, "ha")) and h.t(Msg.VOICE_UNSURE, "ha") not in reply
+
+
 @pytest.mark.parametrize(
     ("problem", "expected"),
     [(AudioProblem.TOO_LONG, Msg.AUDIO_TOO_LONG), (AudioProblem.NO_SPEECH, Msg.NOT_UNDERSTOOD)],

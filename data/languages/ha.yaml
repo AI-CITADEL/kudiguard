@@ -234,3 +234,4 @@ strings:
   new_users_busy_today: "⏳ KudiGuard ta karɓi sababbin masu amfani da yawa yau. Don Allah ku sake gwadawa daga baya."
   screen_neutral: "ℹ️ Ina duba saƙonnin da kuke shakka a kansu kuma ina amsa tambayoyi game da kuɗi; ba zan iya canja yadda nake aiki ba. Ku turo min saƙon da kuke so in duba."
   voice_limit: "🎧 Ka turo saƙonnin murya da yawa cikin ɗan lokaci. Don Allah ka ɗan jira, ko ka rubuta saƙonka."
+  voice_unsure: "🎧 Wataƙila ban ji kowace kalma ba. Idan ba haka kuka faɗa ba, don Allah ku rubuta saƙonku."  # DRAFT, pending native review

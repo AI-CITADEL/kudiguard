@@ -221,3 +221,4 @@ strings:
   new_users_busy_today: "⏳ KudiGuard nabatara ọtụtụ ndị ọrụ ọhụrụ taa. Biko nwaa ọzọ ma emechaa."
   screen_neutral: "ℹ️ Ana m enyocha ozi ị na-enweghị obi ike na ya ma na-aza ajụjụ gbasara ego; enweghị m ike ịgbanwe otú m si arụ ọrụ. Ziga m ozi ị chọrọ ka m nyochaa."
   voice_limit: "🎧 Ị zitela ọtụtụ ozi olu n'obere oge. Biko chere ntakịrị, ma ọ bụ dee ozi gị."
+  voice_unsure: "🎧 O nwere ike ịbụ na anụghị m okwu niile. Ọ bụrụ na nke a abụghị ihe ị kwuru, biko dee ozi gị."  # DRAFT, pending native review

@@ -48,9 +48,9 @@ from kudiguard.donation import DONATION_VERSION, Donation
 from kudiguard.engine import Answer, AnswerKind, crisis_message
 from kudiguard.envfile import load_env_file
 from kudiguard.hosting import StorageLocation
-from kudiguard.i18n import VERDICT_HEADLINE, Msg
+from kudiguard.i18n import Msg
 from kudiguard.pipeline import CONSENT_VERSION, record_pattern
-from kudiguard.render import plain_text
+from kudiguard.render import doubts_voice, headline_for, plain_text
 from kudiguard.safety.abuse import CRISES
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
@@ -131,6 +131,11 @@ class CheckResponse(BaseModel):
     actions: list[str] = Field(description="Next steps from the knowledge base (English source text)")
     report_channels: list[ReportChannel]
     transcript: str | None = None
+    voice_unsure: str | None = Field(
+        default=None,
+        description="A voice note not in English with no flags found: shown instead of the headline (some words may "
+        "have been mis-heard; type the message). The verdict is unchanged.",
+    )
     english: str | None = None
     language: str
     degraded: bool = Field(description="True when the model was unavailable and fixed text was used")
@@ -498,8 +503,9 @@ async def _check_in_slot(
 
 
 def _check_response(
-    services: Services, answer: Answer, transcript: str | None, total_ms: int
+    services: Services, answer: Answer, transcript: str | None, total_ms: int, *, voice: bool = False
 ) -> CheckResponse:
+    """``voice``: a voice note with ``Settings.voice_no_reassurance`` on (``render.doubts_voice``)."""
     messages = services.engine.messages
     language = answer.language
     if answer.kind is AnswerKind.GREETING:
@@ -508,7 +514,9 @@ def _check_response(
         explanation = messages.text(language, Msg.NOT_UNDERSTOOD)
     else:  # a crisis message that is also a scam: the crisis reply first (docs/ABUSE.md)
         explanation = "\n\n".join(p for p in (answer.preface, answer.body) if p)
-    headline_key = VERDICT_HEADLINE.get(answer.verdict) if answer.kind is AnswerKind.CHECK else None
+    check = answer.kind is AnswerKind.CHECK
+    unsure = check and doubts_voice(answer.verdict, language, voice=voice)
+    headline_key = headline_for(answer.verdict, unsure=unsure) if check else None
     return CheckResponse(
         verdict=answer.verdict.value if answer.kind is AnswerKind.CHECK else "not_a_check",
         headline=plain_text(messages.text(language, headline_key)) if headline_key else None,
@@ -520,6 +528,7 @@ def _check_response(
             for c in answer.contacts
         ],
         transcript=transcript,
+        voice_unsure=plain_text(messages.text(language, Msg.VOICE_UNSURE)) if unsure else None,
         english=answer.english or None,
         language=language,
         degraded=answer.outcome is Outcome.FALLBACK,
@@ -609,7 +618,8 @@ def _v1_router() -> APIRouter:
                     request, services, channel="api", user_key=user,
                     language=fields.get("language", "en"), text=None, audio=audio,
                 )  # fmt: skip
-            return _check_response(services, answer, transcript, ms)
+            voice = request.app.state.settings.voice_no_reassurance
+            return _check_response(services, answer, transcript, ms, voice=voice)
 
         return await _crisis_or(crisis, gated())
 
@@ -859,7 +869,8 @@ def _web_router() -> APIRouter:
                         consented_at=consented_at,
                     ),
                 )  # fmt: skip
-            return _check_response(services, answer, transcript, ms)
+            voice = audio is not None and settings.voice_no_reassurance
+            return _check_response(services, answer, transcript, ms, voice=voice)
 
     @router.post("/web/donation/withdraw")
     async def withdraw_donation(request: Request, services: ServicesDep) -> dict[str, int]:
