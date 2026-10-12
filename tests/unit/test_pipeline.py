@@ -12,7 +12,7 @@ from kudiguard.engine import Engine
 from kudiguard.i18n import Messages, Msg
 from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
-from kudiguard.llm.base import Purpose
+from kudiguard.llm.base import LLMError, Purpose
 from kudiguard.pipeline import (
     CONSENT_VERSION,
     MAX_COALESCED,
@@ -24,6 +24,7 @@ from kudiguard.pipeline import (
     parse_button,
 )
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
+from kudiguard.prompts import UNSURE_VOICE_TASK, VERDICT_TASK
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
 from kudiguard.storage.memory import MemoryStore
@@ -353,6 +354,42 @@ async def test_voice_reassurance_option_off_keeps_the_old_reply(h: Harness) -> N
     _no_flags(h)
     reply = (await h.say(audio=VOICE_NOTE.read_bytes()))[1]
     assert reply.startswith(h.t(Msg.VERDICT_NO_FLAGS, "ha")) and h.t(Msg.VOICE_UNSURE, "ha") not in reply
+    assert UNSURE_VOICE_TASK not in _compose_task(h)
+
+
+REASSURING = "Babu alamun damfara, wannan saƙo lafiya ne."
+
+
+def _compose_task(h: Harness) -> str:
+    return str(h.llm.calls(Purpose.COMPOSE)[-1].messages[-1]["content"])
+
+
+async def test_unsure_voice_note_asks_compose_for_a_neutral_reply(h: Harness) -> None:
+    await h.onboard("ha")
+    _no_flags(h)
+    h.llm.script[Purpose.COMPOSE] = [
+        REASSURING
+    ]  # what the model sends back is not the point: what it was asked
+    await h.say(audio=VOICE_NOTE.read_bytes())
+    task = _compose_task(h)
+    assert UNSURE_VOICE_TASK in task and VERDICT_TASK[Verdict.NO_FLAGS] not in task
+
+
+async def test_typed_no_flags_keeps_the_usual_compose_task(h: Harness) -> None:
+    await h.onboard("ha")
+    _no_flags(h)
+    await h.say(BENIGN_HA)
+    task = _compose_task(h)
+    assert VERDICT_TASK[Verdict.NO_FLAGS] in task and UNSURE_VOICE_TASK not in task
+
+
+async def test_unsure_voice_note_with_the_model_down_still_points_to_the_bank(h: Harness) -> None:
+    await h.onboard("ha")
+    _no_flags(h)
+    h.llm.script[Purpose.COMPOSE] = [LLMError("down")]  # analysed (no flags), then the model went down
+    reply = (await h.say(audio=VOICE_NOTE.read_bytes()))[1]
+    assert h.t(Msg.VOICE_UNSURE, "ha") in reply and h.t(Msg.FALLBACK_ANSWER, "ha") in reply
+    assert "🟢" not in reply
 
 
 @pytest.mark.parametrize(

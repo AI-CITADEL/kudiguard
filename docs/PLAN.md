@@ -33,7 +33,9 @@ N-ATLAS integration check (15–17 Oct). Revision 2 — incorporates independent
 Same core, exposed as a documented REST API so banks, fintechs, apps, USSD/IVR providers and NGOs can embed it:
 
 * `POST /v1/check` — JSON `{text, language?}` or multipart `audio` → `{verdict, flags[], headline, explanation,
-  actions[], report_channels[], transcript?, english?, language}`; stateless, no phone number needed.
+  actions[], report_channels[], transcript?, voice_unsure?, english?, language}`; stateless, no phone number needed.
+  A voice note not in English with no flags found returns `headline: null` and `voice_unsure` ("I may not have
+  heard every word ... please type"; `KUDIGUARD_VOICE_NO_REASSURANCE`); the verdict stays `no_flags`.
 * `POST /v1/ask` — general money-literacy question → grounded answer in the requested language.
 * `GET /v1/languages`, `GET /v1/topics`, `GET /healthz`.
 * API keys (header `X-API-Key`), per-key rate limits, OpenAPI docs at `/docs`, copy-paste examples (curl, Python, JS).

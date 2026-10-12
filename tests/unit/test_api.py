@@ -13,12 +13,14 @@ from kudiguard.api import app as app_module
 from kudiguard.api.app import create_app
 from kudiguard.api.services import Services
 from kudiguard.config import Settings
+from kudiguard.domain import Verdict
 from kudiguard.engine import Engine
 from kudiguard.knowledge.service import knowledge_base_from_packs
 from kudiguard.languages import LanguageRegistry
 from kudiguard.llm.base import LLMError, Purpose
 from kudiguard.pipeline import CONSENT_VERSION
 from kudiguard.privacy import MIN_SECRET_BYTES, UserHasher
+from kudiguard.prompts import UNSURE_VOICE_TASK, VERDICT_TASK
 from kudiguard.speech.audio import find_ffmpeg
 from kudiguard.speech.base import ASRError
 from kudiguard.storage.memory import MemoryStore
@@ -315,6 +317,58 @@ async def test_api_hausa_voice_with_no_flags_is_not_reassured(api: Api) -> None:
     response = await api.client.post("/v1/check/audio", files=files, data={"language": "ha"}, headers=API)
     body = response.json()
     assert body["verdict"] == "no_flags" and body["headline"] is None and body["voice_unsure"]
+
+
+async def test_web_unsure_voice_asks_compose_for_a_neutral_reply(api: Api) -> None:
+    api.llm.script[Purpose.COMPOSE] = ["Babu alamun damfara, wannan saƙo lafiya ne."]
+    await _web_voice(api, "ha")
+    task = str(api.llm.calls(Purpose.COMPOSE)[-1].messages[-1]["content"])
+    assert UNSURE_VOICE_TASK in task and VERDICT_TASK[Verdict.NO_FLAGS] not in task
+
+
+async def test_web_english_voice_keeps_the_usual_compose_task(api: Api) -> None:
+    await _web_voice(api, "en")
+    task = str(api.llm.calls(Purpose.COMPOSE)[-1].messages[-1]["content"])
+    assert VERDICT_TASK[Verdict.NO_FLAGS] in task and UNSURE_VOICE_TASK not in task
+
+
+async def test_web_unsure_voice_with_the_model_down_still_points_to_the_bank(api: Api) -> None:
+    api.asr.text = BENIGN_HA
+    api.llm.script[Purpose.ANALYSE] = [analysis(BENIGN_EN)]
+    api.llm.script[Purpose.COMPOSE] = [LLMError("down")]  # analysed (no flags), then the model went down
+    files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+    body = (await api.client.post("/web/check", data={"language": "ha"}, files=files, headers=WEB)).json()
+    assert body["verdict"] == "no_flags" and body["degraded"] and body["voice_unsure"]
+    assert "banki" in body["explanation"]
+
+
+@pytest.mark.parametrize(
+    ("transcript", "verdict"),
+    [
+        ("Wani ya kira ni ya ce in tura masa lambar OTP.", "likely_scam"),  # a scam: its headline stays
+        ("sannu", "not_a_check"),  # a greeting
+    ],
+)
+async def test_web_hausa_voice_other_answers_have_no_unsure_line(
+    api: Api, transcript: str, verdict: str
+) -> None:
+    api.asr.text = transcript
+    api.llm.script[Purpose.ANALYSE] = [analysis("Someone called me and said to send them the OTP.", "scam_check",
+                                                ["asks_credentials"])]  # fmt: skip
+    files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+    body = (await api.client.post("/web/check", data={"language": "ha"}, files=files, headers=WEB)).json()
+    assert body["verdict"] == verdict and body["voice_unsure"] is None
+    assert (body["headline"] is not None) is (verdict != "not_a_check")
+
+
+async def test_api_voice_reassurance_option_off(registry: LanguageRegistry) -> None:
+    async for api in _start(registry, settings(voice_no_reassurance=False)):
+        api.asr.text = BENIGN_HA
+        api.llm.script[Purpose.ANALYSE] = [analysis(BENIGN_EN)]
+        files = {"audio": ("voice-note", VOICE_NOTE.read_bytes(), "audio/ogg")}
+        response = await api.client.post("/v1/check/audio", files=files, data={"language": "ha"}, headers=API)
+        body = response.json()
+        assert body["verdict"] == "no_flags" and body["headline"] and body["voice_unsure"] is None
 
 
 @pytest.mark.parametrize(

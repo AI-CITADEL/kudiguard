@@ -708,6 +708,7 @@ class Conversation:
             deadline=turn.deadline,
             # hashed: a provider message id may embed the sender's number (privacy.UserHasher.message_key)
             turn_id=self._hasher.message_key(turn.message.channel, turn.message.message_id),
+            voice=turn.voice and self._voice_no_reassurance,
         )
         turn.screened = answer.screened
         if turn.crisis_text:  # a typed crisis message was merged in: its words are kept nowhere

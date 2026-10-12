@@ -59,6 +59,12 @@ def headline_for(verdict: Verdict, *, unsure: bool) -> Msg | None:
     return None if unsure else VERDICT_HEADLINE.get(verdict)
 
 
+def unsure_fallback(messages: Messages, language: LanguageCode) -> str:
+    """The body when ``doubts_voice`` hid the headline and the model gave none (down, or out of time): the hidden
+    headline carried "confirm with your bank", so the fixed "ask your bank directly" answer stands in."""
+    return messages.text(language, Msg.FALLBACK_ANSWER)
+
+
 def render_check_reply(
     messages: Messages,
     language: LanguageCode,
@@ -80,6 +86,7 @@ def render_check_reply(
         )
     if unsure:
         header.append(messages.text(language, Msg.VOICE_UNSURE))
+        body = body if body.strip() else unsure_fallback(messages, language)
 
     shown = [c for c in contacts if c.verified] if verdict in REPORT_VERDICTS else []
     report = (

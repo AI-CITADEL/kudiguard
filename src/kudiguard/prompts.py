@@ -74,6 +74,11 @@ VERDICT_TASK: Mapping[Verdict, str] = {
     Verdict.NO_FLAGS: "Tell the user no warning signs were found, and to still confirm with their bank before acting.",
     Verdict.NOT_A_CHECK: "Answer the user's money question.",
 }
+# A non-English voice note with no flags (render.doubts_voice): the transcript may miss words, so no reassurance.
+UNSURE_VOICE_TASK = (
+    "Do not say the message is safe or that no warning signs were found; say you could not be sure what was said "
+    "and tell them to confirm with their bank before acting."
+)
 # A question with no relevant knowledge (``KnowledgeBase`` relevance cut-off): honest general guidance and one
 # clarifying question, never an unrelated entry's facts.
 NO_FACTS_TASK = (
@@ -404,10 +409,13 @@ def _compose_user(
     facts: Sequence[str],
     actions: Sequence[str],
     example: str | None = None,
+    unsure: bool = False,
 ) -> str:
     numbered = "\n".join(f"{n}. {fact}" for n, fact in enumerate(facts, start=1)) or "(no facts available)"
     bullets = "\n".join(f"- {a}" for a in actions) or "(none)"
     task = VERDICT_TASK[verdict] if facts or verdict is not Verdict.NOT_A_CHECK else NO_FACTS_TASK
+    if unsure and verdict is Verdict.NO_FLAGS:
+        task = UNSURE_VOICE_TASK
     model_answer = (
         f"\nThis is {EXAMPLE_LABEL}:\n<model_answer>\n{_data(example)}\n</model_answer>" if example else ""
     )
@@ -458,10 +466,12 @@ def compose_request(
     knowledge: KnowledgeResult,
     example: str | None = None,
     worked_example: bool = True,
+    unsure: bool = False,
 ) -> ChatRequest:
     """``example``: the top entry's model answer (``entry_example``), shown labelled in the request; it then
     replaces the fixed worked example (one example per request: two made Hausa copy both). ``worked_example``:
-    False = no fixed worked example either (the retry after a copied example)."""
+    False = no fixed worked example either (the retry after a copied example). ``unsure``: a non-English voice note
+    (``render.doubts_voice``): a "no flags" verdict gets ``UNSURE_VOICE_TASK``, not reassurance."""
     facts, actions = facts_block(knowledge)
     worked: tuple[dict[str, str], ...] = ()
     if not example and worked_example:
@@ -481,7 +491,9 @@ def compose_request(
             *worked,
             {
                 "role": "user",
-                "content": _compose_user(language_name, verdict, flags, english, facts, actions, example),
+                "content": _compose_user(
+                    language_name, verdict, flags, english, facts, actions, example, unsure=unsure
+                ),
             },
         ),
         max_tokens=COMPOSE_MAX_TOKENS,

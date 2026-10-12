@@ -53,7 +53,7 @@ from kudiguard.prompts import (
     warn_family_request,
     worked_example_reply,
 )
-from kudiguard.render import REPORT_VERDICTS
+from kudiguard.render import REPORT_VERDICTS, doubts_voice
 from kudiguard.reply_translation import (
     DEFAULT_COMPOSE_STRATEGY,
     RETRYABLE_PROBLEMS,
@@ -312,10 +312,17 @@ class Engine:
     # --- check --------------------------------------------------------------------------------------------
 
     async def check(
-        self, text: str, language: LanguageCode, *, deadline: float | None = None, turn_id: str | None = None
+        self,
+        text: str,
+        language: LanguageCode,
+        *,
+        deadline: float | None = None,
+        turn_id: str | None = None,
+        voice: bool = False,
     ) -> Answer:
         """``deadline`` (``time.monotonic()`` seconds): model steps that no longer fit are skipped, so the
-        deterministic verdict with fixed text is always delivered in time."""
+        deterministic verdict with fixed text is always delivered in time. ``voice``: a voice note with
+        ``Settings.voice_no_reassurance`` on: a non-English "no flags" reply is not reassuring (``render.doubts_voice``)."""
         lexicon = self.registry.lexicon_for(language)
         if is_content_free(text):
             return Answer(language, AnswerKind.CONTENT_FREE, Outcome.FIXED_REPLY)
@@ -381,6 +388,7 @@ class Engine:
                 language, analysis.english, verdict, assessment.flags, knowledge, deadline, evidence, turn_id,
                 sources=(text, analysis.english),
                 pidgin=self.advice.pidgin_replies and language == PIVOT and is_pidgin(text),
+                unsure=doubts_voice(verdict, language, voice=voice),
             )  # fmt: skip
             report, grounding_ms = generation.report, generation.grounding_ms
             if generation.text is not None:
@@ -567,6 +575,7 @@ class Engine:
         *,
         sources: Sequence[str] = (),
         pidgin: bool = False,
+        unsure: bool = False,
     ) -> _Generation:
         """The reply body: composed in ``language`` (direct) or in English, checked, then translated.
 
@@ -597,6 +606,7 @@ class Engine:
                 knowledge=knowledge,
                 example=model_answer,
                 worked_example=worked_example,
+                unsure=unsure,
             )
 
         request = build(example)

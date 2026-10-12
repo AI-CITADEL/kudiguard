@@ -52,6 +52,7 @@
   .no_flags { background: var(--ok-bg); color: var(--ok); }
   .heard { color: var(--muted); font-style: italic; margin-bottom: 10px; overflow-wrap: anywhere; }
   .unsure { font-weight: 600; margin-bottom: 10px; }
+  .unsure:empty { display: none; }  /* no stray margin when there is no line */
   .explanation { white-space: pre-wrap; overflow-wrap: anywhere; }
   .channels { margin: 12px 0 0; padding-left: 18px; }
   .channels li { overflow-wrap: anywhere; }

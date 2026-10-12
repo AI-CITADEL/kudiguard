@@ -50,7 +50,7 @@ from kudiguard.envfile import load_env_file
 from kudiguard.hosting import StorageLocation
 from kudiguard.i18n import Msg
 from kudiguard.pipeline import CONSENT_VERSION, record_pattern
-from kudiguard.render import doubts_voice, headline_for, plain_text
+from kudiguard.render import doubts_voice, headline_for, plain_text, unsure_fallback
 from kudiguard.safety.abuse import CRISES
 from kudiguard.speech.audio import MAX_AUDIO_BYTES, MAX_SECONDS
 from kudiguard.speech.base import ASRError, AudioError, AudioProblem
@@ -125,7 +125,10 @@ class ReportChannel(BaseModel):
 
 class CheckResponse(BaseModel):
     verdict: Literal["likely_scam", "caution", "no_flags", "not_a_check"]
-    headline: str | None = Field(description="Fixed, reviewed verdict text in the requested language")
+    headline: str | None = Field(
+        description="Fixed, reviewed verdict text in the requested language; null for a voice note not in English "
+        "with no flags found (see voice_unsure)"
+    )
     explanation: str = Field(description="Grounded explanation and next steps in the requested language")
     flags: list[str]
     actions: list[str] = Field(description="Next steps from the knowledge base (English source text)")
@@ -463,7 +466,10 @@ async def _check_in_slot(
         text = transcript
     message_id = uuid.uuid4().hex
     turn_id = services.hasher.message_key(channel, message_id)  # same key scheme as WhatsApp turns
-    answer = await services.engine.check(text or "", language, deadline=deadline, turn_id=turn_id)
+    voice = audio is not None and services.settings.voice_no_reassurance
+    answer = await services.engine.check(
+        text or "", language, deadline=deadline, turn_id=turn_id, voice=voice
+    )
     created = utcnow()
     total_ms = int((time.perf_counter() - started) * 1000)
     private = answer.screen_action in CRISES
@@ -508,14 +514,15 @@ def _check_response(
     """``voice``: a voice note with ``Settings.voice_no_reassurance`` on (``render.doubts_voice``)."""
     messages = services.engine.messages
     language = answer.language
+    check = answer.kind is AnswerKind.CHECK
+    unsure = check and doubts_voice(answer.verdict, language, voice=voice)
     if answer.kind is AnswerKind.GREETING:
         explanation = messages.text(language, Msg.GREETING_REPLY)
     elif answer.kind is AnswerKind.CONTENT_FREE:
         explanation = messages.text(language, Msg.NOT_UNDERSTOOD)
     else:  # a crisis message that is also a scam: the crisis reply first (docs/ABUSE.md)
-        explanation = "\n\n".join(p for p in (answer.preface, answer.body) if p)
-    check = answer.kind is AnswerKind.CHECK
-    unsure = check and doubts_voice(answer.verdict, language, voice=voice)
+        body = answer.body if answer.body.strip() or not unsure else unsure_fallback(messages, language)
+        explanation = "\n\n".join(p for p in (answer.preface, body) if p)
     headline_key = headline_for(answer.verdict, unsure=unsure) if check else None
     return CheckResponse(
         verdict=answer.verdict.value if answer.kind is AnswerKind.CHECK else "not_a_check",
