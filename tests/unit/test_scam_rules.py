@@ -355,6 +355,37 @@ def test_hausa_legitimate_money_sending_is_not_a_money_request(registry: Languag
     assert Flag.MONEY_REQUEST not in assess([text], registry.lexicon_for("ha")).flags
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # live Hausa voice notes 2026-10-12: "mai" = the recogniser's "masa"; "fim" = PIN; "akawun nan ba" = account number
+        "wani ya ƙira ni ya ce na tura mai otp na.",
+        "wani ya kirani ya ce na tura mai fim ɗina.",
+        "wani ya ƙira ne ya ce na tura mai akawun nan ba na.",
+        "ya ce in ba mai pin dina",
+    ],
+)
+def test_hausa_live_code_requests_caught(registry: LanguageRegistry, text: str) -> None:
+    result = assess([text], registry.lexicon_for("ha"))
+    assert Flag.ASKS_CREDENTIALS in result.flags
+    assert result.verdict is Verdict.LIKELY_SCAM
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "na ba mai shago lambar waya ta",  # "mai" = owner: I gave the shop owner my phone number
+        "na tura mai gidan kudin haya",
+        "mai otp ne?",
+        "na kalli fim din jiya",
+        "na tura masa account number dina don ya biya ni",  # own account number to get paid: no caller
+        "Mai gida ya ce na tura masa account number dina",
+    ],
+)
+def test_hausa_mai_and_account_number_spare_ordinary_messages(registry: LanguageRegistry, text: str) -> None:
+    assert Flag.ASKS_CREDENTIALS not in assess([text], registry.lexicon_for("ha")).flags
+
+
 def test_hausa_someone_called_me_is_a_check(registry: LanguageRegistry) -> None:
     ha = registry.lexicon_for("ha")
     assert has_check_intent(["Wani ya kira ni jiya"], ha)

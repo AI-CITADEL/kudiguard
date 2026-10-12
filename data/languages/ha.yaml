@@ -114,6 +114,13 @@ lexicon:
     asks_credentials:
       - 'lambar sirri'
       - '(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masa|mata|musu|mana|shi|ita|su)\W+(?:\w+\W+){0,2}?(?:lamba\w*|code|kod|otp|pin)'
+      # "mai" = the recogniser's "masa" (live voice notes 2026-10-12: "ya ce na tura mai otp na", "... tura mai fim
+      # dina" for PIN). Code words only, right after it: "mai" also means "owner" ("na ba mai shago lambar waya ta": I
+      # gave the shop owner my number). "fim" (film) only in this send-to-him frame.
+      - '(?:turo|tura|aika|aiko|ba|bayar)\W+mai\W+(?:code|kod|otp|pin|fim)\b'
+      # an unknown caller wants "my account number", as heard: "wani ya ƙira ne ya ce na tura mai akawun nan ba na"
+      # (live voice note 2026-10-12). Caller required: people send their own account number to get paid every day.
+      - '(?:wani|wata|wasu|mun)\W+(?:ya|ta|sun|suka)\W+(?:\w+\W+){0,2}?kira\w*\W+(?:\w+\W+){0,4}?(?:turo|tura|aika|aiko|ba|bayar)\W+(?:mai|masa|mata|musu)\W+(?:akawun|akant|akaunt|account)\w*\W+(?:nan\W+ba|nanba|namba|number)\b'
     prize_lottery:
       - '(?:kun|ka|kin|na|an|ya|ta|sun) ci (?:kyauta\w*|gasa\w*|lambar yabo)'
     upfront_fee:
