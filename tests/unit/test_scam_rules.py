@@ -437,6 +437,13 @@ def native(registry: LanguageRegistry, code: str) -> Lexicon:
         ("yo", Flag.UPFRONT_FEE, "Wọ́n ní kí n san owó ìforúkọsílẹ̀ lónìí."),
         # I won a N100,000 prize
         ("yo", Flag.PRIZE_LOTTERY, "Wọ́n ní mo ti jẹ ẹ̀bùn ẹgbẹ̀rún lọ́nà ọgọ́rùn-ún náírà."),
+        # V terms (live voice notes, 12 Oct 2026): he said I should give him my BVN
+        ("yo", Flag.ASKS_CREDENTIALS, "Ọkùnrin kan pè mí, ó ní kí n fún òun ní BVN mi."),
+        ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní kí n sọ NIN mi fún wọn."),  # tell them my NIN
+        ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní kí n fi nọ́mbà káàdì mi ránṣẹ́."),  # send my card number
+        ("yo", Flag.ASKS_CREDENTIALS, "Fi BVN rẹ ránṣẹ́ sí wa lónìí."),  # send your BVN to us today
+        # he said my SIM will be blocked
+        ("yo", Flag.ACCOUNT_THREAT, "Ó ní SIM mi máa di pípa tí mi ò bá ṣe verify."),
         ("ig", Flag.URGENCY, "Ha sị m zitere ya ozugbo ozugbo."),  # send it immediately immediately
         # he wants me to tell him the OTP
         ("ig", Flag.ASKS_CREDENTIALS, "Ọ chọrọ ka m gwa ya OTP ha zitere m."),
@@ -474,6 +481,21 @@ def test_native_parity_terms_fire(registry: LanguageRegistry, lang: str, flag: F
         # I switched my SIM off / it has become my account
         ("yo", "Mo ti pa SIM mi tì."),
         ("yo", "Ó ti di àkáǹtì mi báyìí."),
+        # genuine BVN/NIN talk (V terms, 12 Oct 2026)
+        ("yo", "Mo fi BVN mi sí app báǹkì mi."),  # I entered my BVN in my bank app
+        ("yo", "Báwo ni mo ṣe lè rí BVN mi?"),  # how do I find my BVN
+        ("yo", "Ṣé BVN mi ti dínà? Báwo ni mo ṣe lè mọ̀?"),  # is my BVN blocked? how can I know
+        ("yo", "Mo tẹ *565*0# láti rí BVN mi."),  # I dialled *565*0# to find my BVN
+        # they said link my NIN to my SIM or it is barred
+        ("yo", "Wọ́n ní kí n so NIN mi mọ́ SIM mi kí wọ́n má baà pa á."),
+        ("yo", "Báwo ni mo ṣe lè so NIN mọ́ SIM mi?"),  # how do I link NIN to my SIM
+        # at the bank, staff said bring my BVN to the branch
+        ("yo", "Ní báǹkì, òṣìṣẹ́ ní kí n mú BVN mi wá sí branch."),
+        ("yo", "Wọ́n ní kí n fi BVN mi sínú app báǹkì."),  # they said enter my BVN in the bank app
+        ("yo", "Ẹ má fi BVN yín ránṣẹ́ sí wọn."),  # don't send them your BVN
+        ("yo", "Mo ti fi NIN mi ránṣẹ́ sí NIMC nípasẹ̀ *346#."),  # I sent my NIN to NIMC via *346#
+        ("yo", "Kí ni BVN, ṣé mo nílò rẹ̀ láti ṣí àkáǹtì?"),  # what is BVN, do I need it to open an account
+        ("yo", "BVN mi ti wà lórí àkáǹtì mi tuntun."),  # my BVN is now on my new account
         # please tell me what OTP means / I did not tell him my PIN
         ("ig", "Biko gwa m ihe OTP pụtara."),
         ("ig", "Agwaghị m ya PIN m."),
@@ -483,6 +505,21 @@ def test_native_parity_terms_spare_ordinary_messages(
     registry: LanguageRegistry, lang: str, text: str
 ) -> None:
     assert assess([text], native(registry, lang)).flags == ()
+
+
+# Live Yoruba voice-note transcripts (12 Oct 2026, after the "bifi eni" -> BVN asr_terms fix): someone called and
+# asked for the BVN / said the BVN is blocked. The rules alone must reach at least caution.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "ẹnikọ́pẹ́ mi, o ni ki n fun ohun ni BVN mi, wọ́n ni BVN mi ti dina kí n fi ránṣẹ sí wọn.",
+        "wọ́n ní BVN mi ti díná kí n fi ránṣẹ́ sí wọn.",
+        "ẹnikan te mi, oni ki mu BVN mi wa",
+        "ẹnikan pẹrin o so wipe ki mu BVN mi wa",
+    ],
+)
+def test_yoruba_bvn_voice_notes_flagged_by_rules(registry: LanguageRegistry, text: str) -> None:
+    assert assess([text], registry.lexicon_for("yo")).verdict in {Verdict.CAUTION, Verdict.LIKELY_SCAM}
 
 
 # Pre-H term, known: warn_family_fallback paraphrases the scam ("never pay money before you receive money").

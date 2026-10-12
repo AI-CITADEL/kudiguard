@@ -124,11 +124,23 @@ lexicon:
     asks_credentials:
       - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
       - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
+      # V: "(he/they) said I should give him / bring / send / tell them my BVN/NIN/card number". Reported request
+      # ("o ni ki n", "won ni ki", "o so wipe ki") only: "mo fi BVN mi si app banki mi" (I entered my BVN in my bank
+      # app) and "bawo ni mo se le ri BVN mi" (how do I find my BVN) are ordinary. "bring/enter it at the bank,
+      # branch or app" ("won ni ki n mu BVN mi wa si banki") is the bank's own request, so it is spared. "so/ka" needs
+      # "fun" (tell/read it to): "won ni ki n so NIN mi mo SIM mi" (link my NIN to my SIM) is ordinary.
+      - '(?:(?:o|oun|ohun|un|won|wan) ?ni|so (?:pe|wipe))\W+(?:pe\W+|wipe\W+)?ki\W+(?:n\W+|mi\W+)?(?:fun\W+(?:ohun|oun|un|won|wan|awon|wa|mi)\W+(?:\w+\W+){0,1}?ni\W+(?:bvn|nin|nomba kaadi|card number|card details)|(?:fi|mu)\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)(?!\W+(?:\w+\W+){0,2}?(?:si|sinu|ni) (?:banki|bank|branch|ofiisi|app))|(?:so|ka)\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,1}?fun)'
+      # V: imperative "send your BVN/NIN to me/us/them", not a warning ("e ma fi BVN yin ranse si won": don't send)
+      # nor a report of one's own act ("mo fi BVN mi ranse si won").
+      - '(?<!ma )(?<!mo )(?<!ti )fi\W+(?:\w+\W+){0,1}?(?:bvn|nin)\W+(?:\w+\W+){0,2}?ranse (?:si|fun) (?:mi|wa|won|wan|un|oun|ohun|awon)'
     account_threat:
       - '(?:akaunti|account)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo|o) (?:di|dina|pa)'
       # H: "(they) will block the account". Future/threat markers only: "ti pa SIM mi ti" (I switched my SIM off) and
       # "o ti di akanti mi" (it became my account) are ordinary.
       - '(?:maa|yoo) (?:di|dina|pa)\W+(?:\w+\W+){0,1}?(?:akaunti|akanti|account|bvn|sim)'
+      # V: "they/he said my BVN/NIN/SIM is (or will be) blocked". Reported by someone only: the user's own question
+      # "se BVN mi ti dina?" (is my BVN blocked?) may be a genuine CBN restriction, so it is spared.
+      - '(?:o|oun|ohun|un|won|wan) ?ni\W+(?:pe\W+|wipe\W+)?(?:bvn|nin|sim|line)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo) (?:di|dina|pa)(?!\w)'
     guaranteed_returns:
       - 'ilopo (?:meji|meta)'
       # H: "sure/guaranteed profit", not when denied ("ere to daju ko si", "ko si ere to daju": there is none)
