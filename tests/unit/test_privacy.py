@@ -12,7 +12,7 @@ SECRET = b"k" * MIN_SECRET_BYTES
         ("2348031234567", "2348031234567"),
         ("+234 803 123 4567", "2348031234567"),
         ("08031234567", "2348031234567"),  # local Nigerian format -> E.164 digits
-        ("+1 (202) 555-0147", "19175550147"),
+        ("+1 (202) 555-0147", "12025550147"),
         ("whatsapp:+2348031234567", "2348031234567"),
     ],
 )
@@ -118,7 +118,7 @@ def test_secret_must_be_at_least_32_bytes(monkeypatch: pytest.MonkeyPatch) -> No
         ("whatsapp:+2348031234567", "+2348031234567"),  # channel prefix ignored
         ("tel:08031234567", "2348031234567"),
         ("803-123-4567", "8031234567"),  # ten digits, ten characters: a phone number
-        ("1-202-555-0147-12345", "+191755501471234 5"),  # twenty characters: still a phone number
+        ("1-202-555-0147-12345", "+120255501471234 5"),  # twenty characters: still a phone number
     ],
 )
 def test_phone_formats_merge(a: str, b: str) -> None:
@@ -133,7 +133,7 @@ def test_phone_formats_merge(a: str, b: str) -> None:
         ("----------", "((((()))))"),  # no digits at all
         ("08031234567abc", "08031234567"),  # trailing letters: an id
         ("234tel:8031234567", "2348031234567"),  # "tel:" only counts as a prefix
-        ("1-202-555-0147-123456", "+1917555014712345 6"),  # over twenty characters
+        ("1-202-555-0147-123456", "+1202555014712345 6"),  # over twenty characters
     ],
 )
 def test_non_phones_never_merge_with_phones(a: str, b: str) -> None:
