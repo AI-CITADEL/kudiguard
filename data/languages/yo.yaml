@@ -125,15 +125,18 @@ lexicon:
       - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
       - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
       # V (live voice notes, 12 Oct 2026): "someone called me, he said I should give him / bring / send / tell (him)
-      # my BVN/NIN/card number". An unknown caller (someone, a man, a woman, some people) is required before the reported request (mirrors the Hausa
-      # money_request rule): a bank, NIMC, JAMB or family member asking for them ("Mama pe mi, o ni ki n fun oun ni
-      # nomba kaadi mi", "won ni ki n mu NIN mi wa si NIMC") and warnings ("e ma se fi BVN ranse si won") are
-      # ordinary. "enikope mi" (for "enikan pe mi") and "perin" (for "pe mi") are the recogniser's renderings,
-      # observed in live transcripts.
-      - '(?:enikan(?: kan)?|awon kan|okunrin kan|obinrin kan)\W+(?:pe|te|perin)(?:\W+mi)?\W+(?:\w+\W+){0,4}?(?:(?:o|oun|ohun|un|won) ?ni|so (?:pe|wipe))\W+(?:pe\W+|wipe\W+)?ki\W+(?:n\W+|mi\W+)?(?:fun\W+(?:\w+\W+){0,1}?ni\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)|(?:mu|fi|so|ka)\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,2}?(?:wa|ranse|fun))'
-      - 'enikope\W+mi\W+(?:\w+\W+){0,4}?(?:(?:o|oun|ohun|un|won) ?ni|so (?:pe|wipe))\W+(?:pe\W+|wipe\W+)?ki\W+(?:n\W+|mi\W+)?(?:fun\W+(?:\w+\W+){0,1}?ni\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)|(?:mu|fi|so|ka)\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,2}?(?:wa|ranse|fun))'
+      # my BVN/NIN/card number" or "asked for my BVN". An unknown caller (someone, a man, a woman, a person, some
+      # people) is required before the request (mirrors the Hausa money_request rule): a bank, NIMC, JAMB or family
+      # member asking for them ("Mama pe mi, o ni ki n fun oun ni nomba kaadi mi", "won ni ki n mu NIN mi wa si
+      # NIMC") and warnings ("e ma se fi BVN ranse si won") are ordinary. "mu ... wa" (bring) not followed by
+      # "si/ni/fun" (bring it to the branch / for registration). "enikope mi" (for "enikan pe mi") and "perin" (for
+      # "pe mi") are the recogniser's renderings, observed in live transcripts.
+      - '(?:(?:enikan(?: kan)?|awon kan|okunrin kan|obinrin kan|eniyan kan|eeyan kan)\W+(?:pe|te|perin)(?:\W+mi)?|enikope\W+mi)\W+(?:\w+\W+){0,4}?(?:(?:(?:o|oun|ohun|un|won) ?ni|so (?:pe|wipe))\W+(?:pe\W+|wipe\W+)?ki\W+(?:n\W+|mi\W+)?(?:fun\W+(?:\w+\W+){0,1}?ni\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)|mu\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,1}?wa(?!\W+(?:si|ni|fun)(?!\w))|fi\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,2}?ranse|(?:so|ka)\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,2}?fun)|beere\W+(?:fun\W+)?(?:bvn|nin|nomba kaadi|card number|card details))'
+      # V: "they called me ... said I should send my BVN/NIN to them": a bare "won pe mi" caller only with the
+      # send-to-them form; warnings ("e ma se fi BVN ranse si won") have no "pe mi".
+      - 'won\W+pe\W+mi\W+(?:\w+\W+){0,4}?(?:(?:o|oun|ohun|un|won) ?ni|so (?:pe|wipe))\W+(?:pe\W+|wipe\W+)?ki\W+(?:n\W+|mi\W+)?fi\W+(?:\w+\W+){0,1}?(?:bvn|nin|nomba kaadi|card number|card details)\W+(?:\w+\W+){0,2}?ranse (?:si|fun) (?:won|wan|awon|wa|oun|ohun|un|mi)'
       # V: "they said my BVN/NIN is blocked, that I should send it to them": the block claim and the request together.
-      - '(?:o|oun|ohun|un|won|wan) ?ni\W+(?:pe\W+|wipe\W+)?(?:bvn|nin)\W+(?:mi\W+)?ti dina\W+(?:\w+\W+){0,3}?ki\W+(?:n\W+|mi\W+)?fi\W+(?:\w+\W+){0,2}?ranse (?:si|fun) (?:won|wan|wa|oun|ohun|un)'
+      - '(?:o|oun|ohun|un|won|wan) ?ni\W+(?:pe\W+|wipe\W+)?(?:bvn|nin)\W+(?:mi\W+)?ti dina\W+(?:\w+\W+){0,3}?ki\W+(?:n\W+|mi\W+)?fi\W+(?:\w+\W+){0,2}?ranse (?:si|fun) (?:won|wan|awon|wa|oun|ohun|un)'
     account_threat:
       - '(?:akaunti|account)\W+(?:\w+\W+){0,2}?(?:ti|maa|yoo|o) (?:di|dina|pa)'
       # H: "(they) will block the account". Future/threat markers only: "ti pa SIM mi ti" (I switched my SIM off) and

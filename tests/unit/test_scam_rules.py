@@ -446,6 +446,14 @@ def native(registry: LanguageRegistry, code: str) -> Lexicon:
         # they said my NIN is blocked, I should send it to them
         ("yo", Flag.ASKS_CREDENTIALS, "Wọ́n ní NIN mi ti dínà, kí n fi ránṣẹ́ sí wọn."),
         ("yo", Flag.ACCOUNT_THREAT, "Wọ́n ní SIM mi ti dínà."),  # they said my SIM has been blocked
+        # a person called me, he said I should give him my BVN
+        ("yo", Flag.ASKS_CREDENTIALS, "eniyan kan pe mi, o ni ki n fun oun ni BVN mi"),
+        ("yo", Flag.ASKS_CREDENTIALS, "enikan pe mi, o beere fun BVN mi"),  # someone called, asked for my BVN
+        # they called me "from the bank", said I should send my BVN to them
+        ("yo", Flag.ASKS_CREDENTIALS, "won pe mi lati banki, won ni ki n fi BVN mi ranse si won"),
+        # they said my NIN is blocked, I should send it to them
+        ("yo", Flag.ASKS_CREDENTIALS, "wọn ni NIN mi ti dina, ki n fi ranse si awon"),
+        ("yo", Flag.ASKS_CREDENTIALS, "enikan pe mi, o ni ki n mu BVN mi wa"),  # ... bring me my BVN
         ("ig", Flag.URGENCY, "Ha sị m zitere ya ozugbo ozugbo."),  # send it immediately immediately
         # he wants me to tell him the OTP
         ("ig", Flag.ASKS_CREDENTIALS, "Ọ chọrọ ka m gwa ya OTP ha zitere m."),
@@ -523,6 +531,10 @@ def test_native_parity_terms_fire(registry: LanguageRegistry, lang: str, flag: F
         ("yo", "won ni line mi ti di active"),
         ("yo", "won ni SIM mi maa dina ti nko ba so NIN mo"),
         ("yo", "won ni line mi yoo pa ti n ko ba so NIN"),
+        # verification (12 Oct 2026): "bring it to the branch / office / for registration"
+        ("yo", "enikan pe mi lati banki, o ni ki n mu BVN mi wa si branch"),
+        ("yo", "okunrin kan pe mi lati NIMC, o ni ki n mu NIN mi wa si ofiisi won"),
+        ("yo", "enikan pe mi, o ni ki n mu NIN mi wa fun registration ni ile iwe"),
         # please tell me what OTP means / I did not tell him my PIN
         ("ig", "Biko gwa m ihe OTP pụtara."),
         ("ig", "Agwaghị m ya PIN m."),
