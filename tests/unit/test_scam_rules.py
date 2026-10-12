@@ -363,6 +363,7 @@ def test_hausa_legitimate_money_sending_is_not_a_money_request(registry: Languag
         "wani ya kirani ya ce na tura mai fim ɗina.",
         "wani ya ƙira ne ya ce na tura mai akawun nan ba na.",
         "ya ce in ba mai pin dina",
+        "wani ya kira ne yake ce an tura mu wani sako masu wasu lambobi guda shida, to yace in tura masu lambobi.",
     ],
 )
 def test_hausa_live_code_requests_caught(registry: LanguageRegistry, text: str) -> None:
@@ -380,6 +381,7 @@ def test_hausa_live_code_requests_caught(registry: LanguageRegistry, text: str) 
         "na kalli fim din jiya",
         "na tura masa account number dina don ya biya ni",  # own account number to get paid: no caller
         "Mai gida ya ce na tura masa account number dina",
+        "na tura masu lambobin wayata domin su kira ni",  # no unknown caller: my phone numbers to friends
     ],
 )
 def test_hausa_mai_and_account_number_spare_ordinary_messages(registry: LanguageRegistry, text: str) -> None:

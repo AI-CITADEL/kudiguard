@@ -114,6 +114,9 @@ lexicon:
     asks_credentials:
       - 'lambar sirri'
       - '(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masa|mata|musu|mana|shi|ita|su)\W+(?:\w+\W+){0,2}?(?:lamba\w*|code|kod|otp|pin)'
+      # an unknown caller wants the digits the user was just sent ("an turo min wasu lambobi ... ya ce in tura masu
+      # lambobi", live voice notes 2026-10-12; "masu" = the speaker's "musu")
+      - '(?:wani|wata|wasu|mun)\W+(?:ya|ta|sun|suka)\W+(?:\w+\W+){0,2}?kira\w*\W+(?:\w+\W+){0,16}?(?:turo|tura|aika|aiko|ba|bayar)\W+(?:masu|musu|masa|mai|mana|mu)\W+(?:\w+\W+){0,1}?lambobi\w*'
       # "mai" = the recogniser's "masa" (live voice notes 2026-10-12: "ya ce na tura mai otp na", "... tura mai fim
       # dina" for PIN). Code words only, right after it: "mai" also means "owner" ("na ba mai shago lambar waya ta": I
       # gave the shop owner my number). "fim" (film) only in this send-to-him frame.
