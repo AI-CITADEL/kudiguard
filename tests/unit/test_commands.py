@@ -86,3 +86,18 @@ def test_a_phrase_for_delete_and_language_is_rejected(tmp_path: Path) -> None:
     reg = registry_with(tmp_path, "  delete: ['menu']\n  language: ['Menu!']")
     with pytest.raises(ValueError, match="two commands"):
         CommandMatcher(reg)
+
+
+@pytest.mark.parametrize("text", ["akúàṣálẹ̀ o", "Ẹ kú àṣálẹ́ o", "ẹ kú àṣálẹ́"])
+def test_yoruba_evening_greetings(text: str) -> None:
+    from pathlib import Path
+
+    from kudiguard.commands import CommandMatcher
+    from kudiguard.languages import LanguageRegistry
+
+    matcher = CommandMatcher(
+        LanguageRegistry.load(Path(__file__).resolve().parents[2] / "data" / "languages")
+    )
+    assert (
+        matcher.match(text).greeting_language == "yo"
+    )  # live voice note 2026-10-12 was translated "I'm in trouble"

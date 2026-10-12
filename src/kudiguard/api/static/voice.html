@@ -138,7 +138,7 @@
   "use strict";
   // UI labels per language. Hausa, Yoruba and Igbo: DRAFT, pending native-speaker review.
   const UI = {
-    en: { placeholder: "Someone called and said my BVN is blocked…", tagline: "Not sure about a message or call? Check it here in your language.", language: "Language",
+    en: { placeholder: "Paste the message you got, or describe the call. Never type your BVN, PIN or OTP here.", tagline: "Not sure about a message or call? Check it here in your language.", language: "Language",
           record: "🎤 Tap to record", stop: "⏹️ Tap to stop", describe: "Describe the call or read out the message.",
           or: "or type / paste it", check: "Check", clear: "Clear", checking: "🔎 Checking…",
           consent: "I agree that KudiGuard keeps my message (most numbers removed) for up to {days} days to improve the service; a few trusted reviewers under written confidentiality may read a de-identified sample (most numbers masked, no id) to check quality and safety, and delete their copies afterwards. Voice recordings are deleted after transcription unless I choose to donate them below. Scam examples (most numbers removed) are kept separately for up to {patternDays} days to protect others and improve KudiGuard. Guidance only, not financial advice. Messages pass through Cloudflare outside Nigeria and are stored on our server {where}. {risk} I agree to this transfer.",
@@ -150,7 +150,7 @@
           needConsent: "Please tick the box to agree first.", empty: "Record a voice note or type a message.",
           mic: "Microphone not available. Please type instead.", failed: "Sorry, something went wrong. Please try again.",
           busy: "Too many checks. Please wait a minute.", heard: "I heard", seconds: "s" },
-    ha: { placeholder: "Wani ya kira ni ya ce an toshe BVN ɗina…", tagline: "Kuna shakka game da saƙo ko kira? Ku duba shi a nan da harshenku.", language: "Harshe",
+    ha: { placeholder: "Liƙa saƙon da kuka samu, ko ku bayyana kiran. Kada ku rubuta BVN, PIN ko OTP ɗinku a nan.", tagline: "Kuna shakka game da saƙo ko kira? Ku duba shi a nan da harshenku.", language: "Harshe",
           record: "🎤 Taɓa don yin rikodi", stop: "⏹️ Taɓa don tsayawa", describe: "Ku bayyana kiran ko ku karanta saƙon.",
           or: "ko ku rubuta / liƙa shi", check: "Duba", clear: "Share", checking: "🔎 Ana dubawa…",
           consent: "Na amince KudiGuard ta adana saƙona (an cire yawancin lambobi) har kwanaki {days} don inganta aikin; wasu ƙalilan amintattun masu bita ƙarƙashin yarjejeniyar sirri a rubuce za su iya karanta wasu da aka cire bayanan gane mutum (an ɓoye yawancin lambobi, babu alamar gane ni) don duba inganci da tsaro, sannan su share kwafinsu. Ana share rikodin murya bayan an rubuta shi, sai dai idan na zaɓi ba da gudummawarsa a ƙasa. Ana adana misalan damfara (an cire yawancin lambobi) daban har kwanaki {patternDays} don kare wasu da inganta KudiGuard. Jagora ce kawai, ba shawarar kuɗi ba. Saƙonni suna wucewa ta Cloudflare a wajen Najeriya kuma ana adana su a sabarmu {where}. {risk} Na amince da wannan canja wurin.",
@@ -162,7 +162,7 @@
           needConsent: "Don Allah ku fara amincewa ta danna akwatin.", empty: "Ku yi rikodin murya ko ku rubuta saƙo.",
           mic: "Babu makirufo. Don Allah ku rubuta.", failed: "Yi haƙuri, an sami matsala. Don Allah ku sake gwadawa.",
           busy: "Dubawa sun yi yawa. Don Allah ku jira minti ɗaya.", heard: "Na ji", seconds: "s" },
-    yo: { placeholder: "Ẹnìkan pè mí pé wọ́n ti dí BVN mi…", tagline: "Ṣé ẹ ń ṣiyèméjì nípa ìfiránṣẹ́ tàbí ìpè kan? Ẹ ṣàyẹ̀wò rẹ̀ níbí ní èdè yín.", language: "Èdè",
+    yo: { placeholder: "Ẹ lẹ ọ̀rọ̀ tí ẹ gbà síbí, tàbí ẹ ṣàlàyé ìpè náà. Ẹ má kọ BVN, PIN tàbí OTP yín síbí.", tagline: "Ṣé ẹ ń ṣiyèméjì nípa ìfiránṣẹ́ tàbí ìpè kan? Ẹ ṣàyẹ̀wò rẹ̀ níbí ní èdè yín.", language: "Èdè",
           record: "🎤 Tẹ̀ láti gbohùn sílẹ̀", stop: "⏹️ Tẹ̀ láti dúró", describe: "Ẹ ṣàlàyé ìpè náà tàbí kí ẹ ka ìfiránṣẹ́ náà.",
           or: "tàbí kí ẹ tẹ̀ ẹ́ / lẹ̀ ẹ́ síbí", check: "Ṣàyẹ̀wò", clear: "Pa á rẹ́", checking: "🔎 À ń ṣàyẹ̀wò…",
           consent: "Mo gbà kí KudiGuard tọ́jú ìfiránṣẹ́ mi (a yọ ọ̀pọ̀ nọ́ńbà kúrò) fún ọjọ́ {days} láti mú iṣẹ́ náà dára sí i; àwọn olùyẹ̀wò díẹ̀ tí a gbẹ́kẹ̀lé lábẹ́ àdéhùn àṣírí tí a kọ sílẹ̀ lè ka díẹ̀ lára wọn láìsí àmì ìdánimọ̀ (a bo ọ̀pọ̀ nọ́ńbà mọ́lẹ̀) láti ṣàyẹ̀wò dídára àti ààbò, wọ́n á sì pa ẹ̀dà wọn rẹ́. A máa pa ohùn rẹ́ lẹ́yìn tí a bá kọ ọ́ sílẹ̀, àyàfi tí mo bá yàn láti fi tọrẹ nísàlẹ̀. A ń tọ́jú àpẹẹrẹ jìbìtì (a yọ ọ̀pọ̀ nọ́ńbà kúrò) lọ́tọ̀ fún ọjọ́ {patternDays} jù lọ láti dáàbò bo àwọn míì àti láti mú KudiGuard dára sí i. Ìtọ́sọ́nà nìkan ni, kì í ṣe ìmọ̀ràn owó. Àwọn ọ̀rọ̀ ń kọjá láàárín Cloudflare lẹ́yìn òde Nàìjíríà, a sì ń tọ́jú wọn sórí sáfà wa {where}. {risk} Mo gbà sí gbígbé e lọ.",
@@ -174,7 +174,7 @@
           needConsent: "Ẹ jọ̀ọ́ ẹ kọ́kọ́ fi àmì sí àpótí náà.", empty: "Ẹ gbohùn sílẹ̀ tàbí kí ẹ tẹ ìfiránṣẹ́ kan.",
           mic: "Kò sí makirofóònù. Ẹ jọ̀ọ́ ẹ tẹ̀ ẹ́.", failed: "Ẹ má bínú, nǹkan kan ṣẹlẹ̀. Ẹ jọ̀ọ́ ẹ tún gbìyànjú.",
           busy: "Àyẹ̀wò ti pọ̀ jù. Ẹ jọ̀ọ́ ẹ dúró fún ìṣẹ́jú kan.", heard: "Mo gbọ́", seconds: "s" },
-    ig: { placeholder: "Mmadụ kpọrọ m sị na e mechiela BVN m…", tagline: "Ị na-enwe obi abụọ maka ozi ma ọ bụ oku? Lelee ya ebe a n'asụsụ gị.", language: "Asụsụ",
+    ig: { placeholder: "Tinye ozi ị natara, ma ọ bụ kọwaa oku ahụ. Edela BVN, PIN ma ọ bụ OTP gị ebe a.", tagline: "Ị na-enwe obi abụọ maka ozi ma ọ bụ oku? Lelee ya ebe a n'asụsụ gị.", language: "Asụsụ",
           record: "🎤 Pịa ka ị dekọọ", stop: "⏹️ Pịa ka ị kwụsị", describe: "Kọwaa oku ahụ ma ọ bụ gụọ ozi ahụ.",
           or: "ma ọ bụ dee / mado ya", check: "Lelee", clear: "Hichapụ", checking: "🔎 Ana-elele…",
           consent: "Ekwere m ka KudiGuard chekwaa ozi m (e wepụrụ ọtụtụ nọmba) ruo ụbọchị {days} iji meziwanye ọrụ ahụ; ndị nyocha ole na ole a tụkwasịrị obi n'okpuru nkwekọrịta nzuzo e dere ede nwere ike ịgụ ụfọdụ na-enweghị ihe na-egosi onye m bụ (e zochiri ọtụtụ nọmba) iji lelee ịdị mma na nchekwa, ma hichapụ mbipụta ha mgbe e mesịrị. A na-ehichapụ ndekọ olu mgbe e dechara ya, ma ọ bụrụ na m họrọghị inye ya n'onyinye n'okpuru. A na-echekwa ihe atụ aghụghọ (e wepụrụ ọtụtụ nọmba) iche ruo ụbọchị {patternDays} iji chebe ndị ọzọ ma melite KudiGuard. Ndụmọdụ naanị, ọ bụghị ndụmọdụ ego. Ozi na-agafe na Cloudflare na mpụga Naịjirịa, a na-echekwakwa ha na sava anyị {where}. {risk} Ekwere m na mbufe a.",

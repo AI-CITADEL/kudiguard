@@ -18,7 +18,8 @@ commands:
   donate: [fi ohùn mi tọrẹ, ìtọrẹ ohùn]  # DRAFT, pending native review
   stop_donating: [dá ìtọrẹ ohùn dúró, ẹ dá ìtọrẹ ohùn dúró]  # DRAFT
   greetings: [báwo, báwo ni, ẹ n lẹ́, ẹ kú àárọ̀, ẹ kú ọ̀sán, ẹ kú ìrọ̀lẹ́, ẹ kú alẹ́, ẹ ṣé, ẹ ṣeun, o ṣé, o ṣeun,
-    ẹ ṣé gan, pẹ̀lẹ́, ó dáa]
+    ẹ ṣé gan, pẹ̀lẹ́, ó dáa,
+    ẹ kú àṣálẹ́, ẹ kú àṣálẹ́ o, a kú àṣálẹ́, a kú àṣálẹ́ o, akúàṣálẹ́, akúàṣálẹ́ o, ẹkúàṣálẹ́]  # live voice note 2026-10-12
 
 output_guard:
   safety_claims:
