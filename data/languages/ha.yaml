@@ -104,6 +104,10 @@ abuse:
 asr_terms:
   # observed in a live voice note 2026-10-12 ("an toshe bibiyen ɗina"); extend only from observed transcripts
   - {pattern: 'bibiyen', term: BVN}
+  # Hausa speakers say the English "account" (a tester: "most Hausa people don't use the Hausa word for account");
+  # heard as "akawun nan ba na" in a live voice note 2026-10-12. Longest form first.
+  - {pattern: 'akawun\s*nan\s*ba', term: account number}
+  - {pattern: 'akawun', term: account}
 
 lexicon:
   flags:

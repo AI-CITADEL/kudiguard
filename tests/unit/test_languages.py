@@ -189,7 +189,7 @@ def test_invalid_asr_terms_fail_loudly(tmp_path: Path, terms: str, message: str)
 
 def test_asr_terms_are_per_language_without_pivot_merge(tmp_path: Path, registry: LanguageRegistry) -> None:
     assert [t.term for t in registry.asr_terms("yo")] == ["BVN"]
-    assert [t.term for t in registry.asr_terms("ha")] == ["BVN"]
+    assert [t.term for t in registry.asr_terms("ha")] == ["BVN", "account number", "account"]
     assert registry.asr_terms("en") == () and registry.asr_terms("ig") == ()
     _write(tmp_path, "en.yaml", MINIMAL_EN)
     assert LanguageRegistry.load(tmp_path).asr_terms("en") == ()
@@ -232,6 +232,9 @@ def test_asr_terms_replace_whole_words_ignoring_accents(
         ),  # live voice note
         ("Bibiyen dina", "BVN dina"),
         ("bibiyena", "bibiyena"),  # a longer word: not the term
+        ("ya ce na tura mai akawun nan ba na.", "ya ce na tura mai account number na."),  # live voice note
+        ("an toshe akawun dina", "an toshe account dina"),
+        ("akawunta", "akawunta"),
     ],
 )
 def test_hausa_asr_terms(registry: LanguageRegistry, heard: str, fixed: str) -> None:
