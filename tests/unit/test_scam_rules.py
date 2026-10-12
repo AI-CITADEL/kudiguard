@@ -314,8 +314,8 @@ def test_hausa_prize_and_fee_scam_caught_by_native_rules(registry: LanguageRegis
         "mun ya kirani ya ce ma tura mai kudi",
         "mun ya kirani ya ce ma tura mai kuɗi",
         "Wani ya kira ni yana so in turo masa kuɗi yanzu",
-        "Ta ce mini in aika mata da kuɗi",
-        "Sun nemi mu tura musu kudin",
+        "Wata mace ta kira ni ta ce mini in aika mata da kuɗi",
+        "Wasu sun kira mu sun nemi mu tura musu kudin",
     ],
 )
 def test_hausa_money_request_caught_by_native_rules(registry: LanguageRegistry, text: str) -> None:
@@ -336,10 +336,30 @@ def test_hausa_money_request_caught_by_native_rules(registry: LanguageRegistry, 
         "Na ce masa ya tura min kuɗin haya.",  # the user asked
         "Ina so in tura wa yayana kuɗi ta OPay, nawa ne caji?",
         "Mahaifina ya ce in tura wa ƙanina kuɗin makaranta.",  # a named relative, not a pronoun
+        # everyday payments a known party (or nobody in particular) asks for: no unknown caller (review of e736303)
+        "an ce a tura kudin haraji ta banki",
+        "Gwamnati ta ce a tura kudin haraji ta banki",
+        "Malam ya ce a tura kudin makaranta kafin Litinin",
+        "Ana so a tura kudin zakka kafin sallah",
+        "sun ce mu tura kudi a asusun makaranta",
+        "Bankin ya ce a tura kudi ta app kawai",
+        "Mai gida ya ce na tura masa kudin haya ta banki",
+        "Matata ta ce in tura mata kudin cefane",
+        "Mamata ta ce in turo mata kudi don maganin ta",
+        "Babana yana so in tura masa kudin taki",
+        "Kanina ya roke ni na tura masa kudin mota",
+        "Uwargida ta ce na aiko mata kudi",
     ],
 )
 def test_hausa_legitimate_money_sending_is_not_a_money_request(registry: LanguageRegistry, text: str) -> None:
     assert Flag.MONEY_REQUEST not in assess([text], registry.lexicon_for("ha")).flags
+
+
+def test_hausa_someone_called_me_is_a_check(registry: LanguageRegistry) -> None:
+    ha = registry.lexicon_for("ha")
+    assert has_check_intent(["Wani ya kira ni jiya"], ha)
+    assert has_check_intent(["wata mace ta kirani"], ha)
+    assert not has_check_intent(["Na kira mamata jiya"], ha)
 
 
 def test_asking_about_secrecy_is_not_a_red_flag(en: Lexicon) -> None:

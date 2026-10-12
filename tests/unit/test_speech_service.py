@@ -40,6 +40,6 @@ async def test_voiced_limit_enforced_before_transcription() -> None:
 async def test_too_short_voiced_speech_rejected_before_transcription() -> None:
     asr = FakeASR()
     with pytest.raises(AudioError) as info:
-        await transcribe_upload(asr, FIXTURE.read_bytes(), "en", ffmpeg=find_ffmpeg(), min_seconds=20)
+        await transcribe_upload(asr, FIXTURE.read_bytes(), "en", ffmpeg=find_ffmpeg(), min_voiced_seconds=20)
     assert info.value.problem is AudioProblem.NO_SPEECH
     assert asr.durations == []

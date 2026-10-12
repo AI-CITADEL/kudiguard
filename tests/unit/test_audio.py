@@ -14,6 +14,7 @@ from kudiguard.speech.audio import (
     find_ffmpeg,
     split,
     trim_silence,
+    voiced_seconds,
 )
 from kudiguard.speech.base import SAMPLE_RATE, ASRError, Audio, AudioError, AudioProblem
 
@@ -105,14 +106,28 @@ def test_voiced_duration_limit() -> None:
     assert problem(info) is AudioProblem.TOO_LONG
 
 
-def test_too_short_voiced_speech_is_no_speech() -> None:
-    """An accidental 0.46 s tap was transcribed as garbage and answered (live, Hausa): under MIN_SECONDS of voiced
-    speech (padding included) is NO_SPEECH, the existing localised "no speech" reply."""
+@pytest.mark.parametrize("margin", [0.0, 1.0])
+def test_too_short_voiced_speech_is_no_speech(margin: float) -> None:
+    """An accidental 0.46 s tap was transcribed as garbage and answered (live, Hausa): under MIN_VOICED_SECONDS of
+    voiced frames is NO_SPEECH (the existing localised reply), whatever silence surrounds it."""
+
+    def burst(voiced: float) -> Audio:
+        total = voiced + 2 * margin
+        return tone(total, gaps=((0.0, margin), (margin + voiced, total)))
+
     with pytest.raises(AudioError) as info:
-        check_duration(trim_silence(tone(0.5)))
+        check_duration(trim_silence(burst(0.45)))
     assert problem(info) is AudioProblem.NO_SPEECH and info.value.detail == "too short"
-    assert check_duration(trim_silence(tone(1.2))).duration_s == pytest.approx(1.2, abs=0.05)
-    assert check_duration(tone(0.5), min_seconds=0.4).duration_s == pytest.approx(0.5)
+    accepted = check_duration(trim_silence(burst(0.55)))
+    assert voiced_seconds(accepted) == pytest.approx(0.55, abs=0.03)
+
+
+def test_voiced_seconds_excludes_padding_and_silence() -> None:
+    assert voiced_seconds(Audio(np.zeros(SAMPLE_RATE, dtype=np.float32))) == 0.0
+    assert voiced_seconds(trim_silence(tone(3.0, gaps=((0.0, 1.0), (2.0, 3.0))))) == pytest.approx(
+        1.0, abs=0.03
+    )
+    assert check_duration(tone(0.3), min_voiced_seconds=0.2).duration_s == pytest.approx(0.3)
 
 
 @needs_ffmpeg

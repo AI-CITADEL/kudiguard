@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from kudiguard.speech.audio import MAX_SECONDS, MIN_SECONDS, check_duration, decode, trim_silence
+from kudiguard.speech.audio import MAX_SECONDS, MIN_VOICED_SECONDS, check_duration, decode, trim_silence
 from kudiguard.speech.base import ASR, Transcript
 
 
@@ -34,7 +34,7 @@ async def transcribe_upload(
     *,
     ffmpeg: str,
     max_seconds: float = MAX_SECONDS,
-    min_seconds: float = MIN_SECONDS,
+    min_voiced_seconds: float = MIN_VOICED_SECONDS,
     temp_dir: Path | None = None,
 ) -> SpeechResult:
     """Decode, trim, enforce the voiced-speech limits (too short = NO_SPEECH), transcribe.
@@ -44,7 +44,7 @@ async def transcribe_upload(
     started = time.perf_counter()
     audio = await decode(data, ffmpeg=ffmpeg, max_seconds=max_seconds, temp_dir=temp_dir)
     decoded = time.perf_counter()
-    voiced = check_duration(trim_silence(audio), max_seconds, min_seconds=min_seconds)
+    voiced = check_duration(trim_silence(audio), max_seconds, min_voiced_seconds=min_voiced_seconds)
     transcript = await asr.transcribe(voiced, language)
     finished = time.perf_counter()
     return SpeechResult(

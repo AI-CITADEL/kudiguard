@@ -33,7 +33,10 @@ log = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 16 * 1024 * 1024  # WhatsApp's audio media limit
 MAX_SECONDS = 90.0  # voiced speech allowed after trimming silence
-MIN_SECONDS = 1.0  # shorter (an accidental tap) is "no speech": Whisper fills it with invented words
+# Shortest voiced span (before trim padding) accepted as speech. An accidental tap (live: 0.46 s even with padding)
+# made Whisper invent words that were then answered; 0.5 s rejects such taps while most one-word notes ("Sannu",
+# "Hello") still pass. Measured on the voiced frames, so surrounding silence does not change it.
+MIN_VOICED_SECONDS = 0.5
 RAW_SLACK_S = 30.0  # extra raw audio decoded so leading/trailing silence does not count against the limit
 DECODE_TIMEOUT_S = 15.0
 WHISPER_WINDOW_S = 30.0  # NCAIR1 models are Whisper-small: 30 s context per pass
@@ -155,10 +158,11 @@ def _decode_file(
 
 
 def check_duration(
-    audio: Audio, max_seconds: float = MAX_SECONDS, *, min_seconds: float = MIN_SECONDS
+    audio: Audio, max_seconds: float = MAX_SECONDS, *, min_voiced_seconds: float = MIN_VOICED_SECONDS
 ) -> Audio:
-    """Enforce the voiced-speech limits (call after ``trim_silence``): too short is NO_SPEECH, too long TOO_LONG."""
-    if audio.duration_s < min_seconds:
+    """Enforce the voiced-speech limits (call after ``trim_silence``): under ``min_voiced_seconds`` of voiced frames
+    (padding and silence excluded) is NO_SPEECH, over ``max_seconds`` is TOO_LONG."""
+    if voiced_seconds(audio) < min_voiced_seconds:
         raise AudioError(AudioProblem.NO_SPEECH, "too short")
     if audio.duration_s > max_seconds:
         raise AudioError(AudioProblem.TOO_LONG, f"{audio.duration_s:.0f} s of speech")
@@ -173,18 +177,33 @@ def _frame_rms(samples: np.ndarray, frame: int) -> np.ndarray:
     return np.sqrt(np.mean(frames.astype(np.float64) ** 2, axis=1))
 
 
-def trim_silence(audio: Audio, *, pad_s: float = PAD_S) -> Audio:
-    """Drop leading/trailing silence. The threshold is relative to the loudest frame (quiet phones still pass)."""
-    frame = int(FRAME_S * SAMPLE_RATE)
-    rms = _frame_rms(audio.samples, frame)
+def _voiced_frames(audio: Audio) -> tuple[int, int] | None:
+    """First and last voiced frame (inclusive), or None when it is all silence. The threshold is relative to the
+    loudest frame (quiet phones still pass)."""
+    rms = _frame_rms(audio.samples, int(FRAME_S * SAMPLE_RATE))
     peak = float(rms.max()) if rms.size else 0.0
     if peak <= 10 ** (SILENCE_FLOOR_DB / 20):
-        raise AudioError(AudioProblem.NO_SPEECH)
+        return None
     threshold = max(10 ** (SILENCE_FLOOR_DB / 20), peak * 10 ** (-SILENCE_BELOW_PEAK_DB / 20))
     voiced = np.flatnonzero(rms > threshold)
+    return int(voiced[0]), int(voiced[-1])
+
+
+def voiced_seconds(audio: Audio) -> float:
+    """Length of the voiced span (first to last voiced frame), without padding or surrounding silence."""
+    span = _voiced_frames(audio)
+    return 0.0 if span is None else (span[1] - span[0] + 1) * FRAME_S
+
+
+def trim_silence(audio: Audio, *, pad_s: float = PAD_S) -> Audio:
+    """Drop leading/trailing silence, keeping ``pad_s`` either side of the voiced span."""
+    span = _voiced_frames(audio)
+    if span is None:
+        raise AudioError(AudioProblem.NO_SPEECH)
+    frame = int(FRAME_S * SAMPLE_RATE)
     pad = int(pad_s * SAMPLE_RATE)
-    start = max(int(voiced[0]) * frame - pad, 0)
-    end = min((int(voiced[-1]) + 1) * frame + pad, len(audio.samples))
+    start = max(span[0] * frame - pad, 0)
+    end = min((span[1] + 1) * frame + pad, len(audio.samples))
     return Audio(audio.samples[start:end])
 
 
