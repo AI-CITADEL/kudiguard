@@ -188,7 +188,7 @@ def test_invalid_asr_terms_fail_loudly(tmp_path: Path, terms: str, message: str)
 
 
 def test_asr_terms_are_per_language_without_pivot_merge(tmp_path: Path, registry: LanguageRegistry) -> None:
-    assert [t.term for t in registry.asr_terms("yo")] == ["BVN"]
+    assert [t.term for t in registry.asr_terms("yo")] == ["BVN", "account number", "account"]
     assert [t.term for t in registry.asr_terms("ha")] == ["BVN", "account number", "account"]
     assert registry.asr_terms("en") == () and registry.asr_terms("ig") == ()
     _write(tmp_path, "en.yaml", MINIMAL_EN)
@@ -221,6 +221,23 @@ def test_asr_terms_replace_whole_words_ignoring_accents(
     assert text == fixed
     assert replaced == heard.lower().count("bifi") - fixed.count("bifi")
     assert apply_asr_terms(heard, ()) == (heard, 0)
+
+
+@pytest.mark.parametrize(
+    ("language", "heard", "fixed"),
+    [
+        ("ha", "na tura mai akawunt namba na", "na tura mai account number na"),
+        ("ha", "an toshe akaunt dina", "an toshe account dina"),
+        ("yo", "won ni akaunti mi ti dina", "won ni account mi ti dina"),
+        ("yo", "fi akant nomba mi ranse", "fi account number mi ranse"),
+        ("yo", "akanti akaounti", "account account"),
+        ("yo", "akantiwọn", "akantiwọn"),  # a longer word: not the term
+    ],
+)
+def test_account_spellings(registry: LanguageRegistry, language: str, heard: str, fixed: str) -> None:
+    from kudiguard.languages import apply_asr_terms
+
+    assert apply_asr_terms(heard, registry.asr_terms(language))[0] == fixed
 
 
 @pytest.mark.parametrize(

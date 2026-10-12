@@ -109,6 +109,9 @@ abuse:
 asr_terms:
   # observed in a live voice note 2026-10-12; extend only from observed transcripts
   - {pattern: 'bifi[\s\u200b\u2010-\u2015-]*eni', term: BVN}  # "bifi eni", "bifi ẹni", "bifi-eni", "bifieni"
+  # Yoruba speakers also say the English "account" in their accent; spellings given by the team 2026-10-12.
+  - {pattern: '(?:akaunti|akanti|akaounti|akant)\s*(?:nomba|namba|number)', term: account number}
+  - {pattern: 'akaunti|akanti|akaounti|akant', term: account}
 
 lexicon:
   # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.

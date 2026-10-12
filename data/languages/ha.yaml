@@ -106,8 +106,9 @@ asr_terms:
   - {pattern: 'bibiyen', term: BVN}
   # Hausa speakers say the English "account" (a tester: "most Hausa people don't use the Hausa word for account");
   # heard as "akawun nan ba na" in a live voice note 2026-10-12. Longest form first.
-  - {pattern: 'akawun\s*nan\s*ba', term: account number}
-  - {pattern: 'akawun', term: account}
+  # Spellings a Hausa tester gave for the same word: "akawunt" (2026-10-12).
+  - {pattern: '(?:akawunt?|akaunt)\s*(?:nan\s*ba|namba|nanba)', term: account number}
+  - {pattern: 'akawunt?|akaunt', term: account}
 
 lexicon:
   flags:
