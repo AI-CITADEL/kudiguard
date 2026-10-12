@@ -125,8 +125,13 @@ lexicon:
       - 'kiakia'
       - 'ni (?:bayii|bayi) (?:bayii|bayi)'  # H: "right now right now"
     asks_credentials:
-      - 'fi\W+(?:\w+\W+){0,2}?(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
-      - '(?:so|ka)\W+(?:koodu|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
+      # not the warning itself: "(e) ma (se) fi koodu re ranse si enikeni" (don't send your code to anyone)
+      - '(?<!ma )(?<!mase )(?<!ma se )(?<!maa se )fi\W+(?:\w+\W+){0,2}?(?:koodu|kodi|code|otp|pin)\W+(?:\w+\W+){0,3}?ranse'
+      - '(?:so|ka)\W+(?:koodu|kodi|code|otp|pin)\W+(?:\w+\W+){0,2}?fun (?:mi|wa|un|won)'
+      # V (live voice note 12 Oct 2026): English loanwords in Yoruba sound, "o ni ki n sendi kodi mi" (he said I
+      # should send my code). Only the reported "ki n/ki i ..." form: "won sendi kodi si mi" (a code was sent to me)
+      # is ordinary.
+      - 'ki (?:n|i|mi)\W+(?:sendi|send)\W+(?:\w+\W+){0,1}?(?:kodi|koodu|code|otp|pin)\b'
       # V (live voice notes, 12 Oct 2026): "someone called me, he said I should give him / bring / send / tell (him)
       # my BVN/NIN/card number" or "asked for my BVN". An unknown caller (someone, a man, a woman, a person, some
       # people) is required before the request (mirrors the Hausa money_request rule): a bank, NIMC, JAMB or family

@@ -613,3 +613,22 @@ def test_native_terms_never_fire_on_safe_advice(registry: LanguageRegistry, lang
         if compile_term(term).search(normalize(text))
     }
     assert hits == {h for h in KNOWN_SAFE_TEXT_HITS if h[0] == lang}
+
+
+@pytest.mark.parametrize(
+    ("text", "flagged"),
+    [
+        # live Yoruba voice note 2026-10-12: English loanwords in Yoruba sound ("send my code")
+        ("ó ní kí ń se̩ndì kó̩dì mi, ní pé o máa se̩ndi kó̩dù kan sími", True),
+        ("won ni ki n fi kodi naa ranse si won", True),
+        ("fi koodu naa ranse si mi", True),
+        ("won sendi kodi si mi lati bank", False),  # a code was sent to me
+        ("mo fe sendi kodi si foonu mi tuntun", False),
+        # the bank's own warning, forwarded: not a request
+        ("ma fi koodu re ranse si enikeni", False),
+        ("e ma se fi koodu yin ranse si won", False),
+        ("mase fi kodi re ranse", False),
+    ],
+)
+def test_yoruba_code_requests(registry: LanguageRegistry, text: str, flagged: bool) -> None:
+    assert (Flag.ASKS_CREDENTIALS in assess([text], registry.lexicon_for("yo")).flags) is flagged
