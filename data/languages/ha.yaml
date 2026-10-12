@@ -125,6 +125,14 @@ lexicon:
       - 'riba (?:tabbatacciya|ta tabbata|babu asara)'
     secrecy:
       - '(?:kada|kar) (?:ka|ki|ku) (?:fada|gaya|sanar)\W+(?:\w+\W+){0,1}?kowa'
+    money_request:  # DRAFT, native review pending
+      # Someone said / wants / asked that the user send money (to them): "wani ya kira ni ya ce na tura mai kudi"
+      # (live voice note; N-ATLAS translated it "they are sending money"). Needs a third party's "ya/ta/sun ce",
+      # "yana so" or "ya nemi": the user's own receipts ("na tura maka kudin"), plans ("zan tura wa mamata kudi")
+      # and "ya ce ya tura min kudi" (he says HE sent) stay clean. The recipient is a pronoun (mai/masa/... = him,
+      # her, them, me, us) or none, so "ya ce in tura wa mamata kudi" (named relative) is not matched. "ma" is the
+      # recogniser's "na" ("ya ce ma tura mai kudi").
+      - '(?:(?:ya|ta|sun|an|suka)\W+(?:ce|nemi|bukaci|roke|roki)|yace|tace|sunce|(?:yana|tana|suna|ana)\W+so)\W+(?:(?:min|mini|mana|ni)\W+)?(?:na|in|ka|ki|ku|mu|ma|a)\W+(?:tura|turo|aika|aiko)\W+(?:(?:mai|masa|mata|musu|mini|min|mana|ni)\W+(?:\w+\W+){0,2}?)?kudi\w*'
   check_intent:
     - '(?:dan )?damfara'
     - 'zamba'

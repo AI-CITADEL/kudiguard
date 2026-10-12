@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 16 * 1024 * 1024  # WhatsApp's audio media limit
 MAX_SECONDS = 90.0  # voiced speech allowed after trimming silence
+MIN_SECONDS = 1.0  # shorter (an accidental tap) is "no speech": Whisper fills it with invented words
 RAW_SLACK_S = 30.0  # extra raw audio decoded so leading/trailing silence does not count against the limit
 DECODE_TIMEOUT_S = 15.0
 WHISPER_WINDOW_S = 30.0  # NCAIR1 models are Whisper-small: 30 s context per pass
@@ -153,8 +154,12 @@ def _decode_file(
     return audio
 
 
-def check_duration(audio: Audio, max_seconds: float = MAX_SECONDS) -> Audio:
-    """Enforce the voiced-speech limit (call after ``trim_silence``)."""
+def check_duration(
+    audio: Audio, max_seconds: float = MAX_SECONDS, *, min_seconds: float = MIN_SECONDS
+) -> Audio:
+    """Enforce the voiced-speech limits (call after ``trim_silence``): too short is NO_SPEECH, too long TOO_LONG."""
+    if audio.duration_s < min_seconds:
+        raise AudioError(AudioProblem.NO_SPEECH, "too short")
     if audio.duration_s > max_seconds:
         raise AudioError(AudioProblem.TOO_LONG, f"{audio.duration_s:.0f} s of speech")
     return audio

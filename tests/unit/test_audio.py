@@ -105,6 +105,16 @@ def test_voiced_duration_limit() -> None:
     assert problem(info) is AudioProblem.TOO_LONG
 
 
+def test_too_short_voiced_speech_is_no_speech() -> None:
+    """An accidental 0.46 s tap was transcribed as garbage and answered (live, Hausa): under MIN_SECONDS of voiced
+    speech (padding included) is NO_SPEECH, the existing localised "no speech" reply."""
+    with pytest.raises(AudioError) as info:
+        check_duration(trim_silence(tone(0.5)))
+    assert problem(info) is AudioProblem.NO_SPEECH and info.value.detail == "too short"
+    assert check_duration(trim_silence(tone(1.2))).duration_s == pytest.approx(1.2, abs=0.05)
+    assert check_duration(tone(0.5), min_seconds=0.4).duration_s == pytest.approx(0.5)
+
+
 @needs_ffmpeg
 async def test_garbage_and_empty_input_rejected_with_reasons() -> None:
     with pytest.raises(AudioError) as garbage:

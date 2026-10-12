@@ -305,6 +305,43 @@ def test_hausa_prize_and_fee_scam_caught_by_native_rules(registry: LanguageRegis
     assert result.verdict is Verdict.LIKELY_SCAM
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # live Hausa voice notes (accurate transcripts); N-ATLAS translated them "they are sending money"
+        "wani ya kirani ya ce na tura mai kuɗi",
+        "wani ya kirani ya ce na tura mai kudi",
+        "mun ya kirani ya ce ma tura mai kudi",
+        "mun ya kirani ya ce ma tura mai kuɗi",
+        "Wani ya kira ni yana so in turo masa kuɗi yanzu",
+        "Ta ce mini in aika mata da kuɗi",
+        "Sun nemi mu tura musu kudin",
+    ],
+)
+def test_hausa_money_request_caught_by_native_rules(registry: LanguageRegistry, text: str) -> None:
+    result = assess([text, "Someone called me and they are sending money"], registry.lexicon_for("ha"))
+    assert result.flags == (Flag.MONEY_REQUEST,)
+    assert result.verdict is Verdict.CAUTION
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Na tura maka kuɗin, ka duba asusunka.",  # the user's own receipt
+        "Zan tura wa mamata kuɗi gobe.",
+        "Na biya kuɗin makarantar yarana ta banki.",
+        "Yaya zan tura kuɗi zuwa wani banki?",
+        "Mamata ta ce ta karɓi kuɗin da na tura mata.",
+        "Abokina ya ce ya tura min kuɗi, amma ban ga alert ba.",  # he says HE sent: not a request to the user
+        "Na ce masa ya tura min kuɗin haya.",  # the user asked
+        "Ina so in tura wa yayana kuɗi ta OPay, nawa ne caji?",
+        "Mahaifina ya ce in tura wa ƙanina kuɗin makaranta.",  # a named relative, not a pronoun
+    ],
+)
+def test_hausa_legitimate_money_sending_is_not_a_money_request(registry: LanguageRegistry, text: str) -> None:
+    assert Flag.MONEY_REQUEST not in assess([text], registry.lexicon_for("ha")).flags
+
+
 def test_asking_about_secrecy_is_not_a_red_flag(en: Lexicon) -> None:
     assert Flag.SECRECY not in assess(["Why should I keep it secret?"], en).flags
     assert Flag.SECRECY in assess(["He told me to keep it secret from my wife"], en).flags
