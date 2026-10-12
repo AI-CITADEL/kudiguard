@@ -415,7 +415,8 @@ async def _run_check(
     language: str,
     text: str | None,
     audio: bytes | None,
-) -> tuple[Answer, str | None, int]:
+) -> tuple[Answer, str | None, int, str | None]:
+    """(answer, transcript, total ms, ASR hypothesis for a donation: the recogniser's words before term fixes)."""
     if language not in {lang.code for lang in services.registry.enabled}:
         raise HTTPException(422, f"unsupported language {language!r}; see GET /v1/languages")
     slots: asyncio.Semaphore = request.app.state.check_slots
@@ -435,10 +436,11 @@ async def _run_check(
 
 async def _check_in_slot(
     services: Services, channel: str, user_key: str, language: str, text: str | None, audio: bytes | None
-) -> tuple[Answer, str | None, int]:
+) -> tuple[Answer, str | None, int, str | None]:
     started = time.perf_counter()
     deadline = time.monotonic() + API_DEADLINE_S
     transcript: str | None = None
+    recognised: str | None = None
     decode_ms = asr_ms = None
     if audio is not None:
         if not services.engine.has_speech:
@@ -451,6 +453,7 @@ async def _check_in_slot(
             log.exception("speech recognition failed")
             raise HTTPException(503, "speech recognition unavailable") from exc
         transcript = speech.transcript.text.strip()
+        recognised = speech.donated_text.strip()
         decode_ms, asr_ms = speech.decode_ms, speech.asr_ms
         text = transcript
     message_id = uuid.uuid4().hex
@@ -491,7 +494,7 @@ async def _check_in_slot(
                                  user_key=services.hasher.user_id(user_key))  # fmt: skip
     except TimeoutError:
         log.warning("scam pattern not recorded: the write took over %.0f s", PATTERN_WRITE_S)
-    return answer, transcript, total_ms
+    return answer, transcript, total_ms, recognised
 
 
 def _check_response(
@@ -575,7 +578,7 @@ def _v1_router() -> APIRouter:
         async def gated() -> CheckResponse:
             user = _partner_gates(request, client)
             async with _admitted(request, services, user):
-                answer, transcript, ms = await _run_check(
+                answer, transcript, ms, _ = await _run_check(
                     request, services, channel="api", user_key=user, language=body.language, text=body.text,
                     audio=None,
                 )  # fmt: skip
@@ -602,7 +605,7 @@ def _v1_router() -> APIRouter:
                 fields, audio = await _form(request)
                 if audio is None:
                     raise HTTPException(422, "missing 'audio' file")
-                answer, transcript, ms = await _run_check(
+                answer, transcript, ms, _ = await _run_check(
                     request, services, channel="api", user_key=user,
                     language=fields.get("language", "en"), text=None, audio=audio,
                 )  # fmt: skip
@@ -615,7 +618,7 @@ def _v1_router() -> APIRouter:
         async def gated() -> AskResponse:
             user = _partner_gates(request, client)
             async with _admitted(request, services, user):
-                answer, _, ms = await _run_check(
+                answer, _, ms, _ = await _run_check(
                     request, services, channel="api", user_key=user, language=body.language,
                     text=body.question, audio=None,
                 )  # fmt: skip
@@ -840,7 +843,7 @@ def _web_router() -> APIRouter:
                 # The per-user voice budget shared with WhatsApp. The page sends text and voice in one multipart form,
                 # so the kind is known only once the form is parsed; the costly step (transcription) has not started.
                 _voice_allowed(request, services, f"web:{session}", fields.get("language"))
-            answer, transcript, ms = await _run_check(
+            answer, transcript, ms, recognised = await _run_check(
                 request, services, channel="web", user_key=f"web:{session}", language=fields.get("language", "en"),
                 text=text if audio is None else None, audio=audio,
             )  # fmt: skip
@@ -852,7 +855,7 @@ def _web_router() -> APIRouter:
                     services.donations.donate,
                     Donation(
                         user_hash=services.hasher.user_id(f"web:{session}"), channel="web", language=answer.language,
-                        audio=audio, hypothesis=transcript or "", consent_version=donating,
+                        audio=audio, hypothesis=recognised or "", consent_version=donating,
                         consented_at=consented_at,
                     ),
                 )  # fmt: skip

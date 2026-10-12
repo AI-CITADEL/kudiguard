@@ -893,7 +893,7 @@ class Conversation:
             await self._donations.donate(
                 Donation(
                     user_hash=turn.user_hash, channel=turn.message.channel, language=turn.language, audio=data,
-                    hypothesis=speech.transcript.text, consent_version=DONATION_VERSION,
+                    hypothesis=speech.donated_text, consent_version=DONATION_VERSION,
                     duration_s=speech.transcript.duration_s, consented_at=turn.received_at,
                 )
             )  # fmt: skip

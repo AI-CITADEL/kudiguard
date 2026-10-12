@@ -17,6 +17,14 @@ class SpeechResult:
     asr_ms: int
     total_ms: int
     filtered: bool = False  # recogniser hallucinations were removed from ``transcript`` (never donated)
+    # the recogniser's own words when ``asr_terms`` corrected ``transcript`` ("bifi ẹni" -> "BVN"); None = unchanged
+    recognised: str | None = None
+
+    @property
+    def donated_text(self) -> str:
+        """The ASR hypothesis kept with a donated voice note: the recogniser's words, never the term corrections
+        (they would flatter ``kudiguard voice wer`` and anchor transcribers)."""
+        return self.transcript.text if self.recognised is None else self.recognised
 
 
 async def transcribe_upload(

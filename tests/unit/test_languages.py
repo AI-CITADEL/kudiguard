@@ -202,6 +202,8 @@ def test_asr_terms_are_per_language_without_pivot_merge(tmp_path: Path, registry
         ("Wọ́n béèrè bifi ẹ́ni", "Wọ́n béèrè BVN"),  # tone mark on the last letter is swallowed with it
         ("BIFI-ENI mi", "BVN mi"),
         ("bifieni, OTP", "BVN, OTP"),
+        ("bifi\u200beni mi", "BVN mi"),  # zero-width space
+        ("bifi\u2013eni bifi \u2014 ẹni bifi\u2010eni", "BVN BVN BVN"),  # Unicode dashes
         ("bifi  eni àti bifi ẹni", "BVN àti BVN"),
         ("bifi ẹ̣ni", "BVN"),  # decomposed (NFD) under-dot
         ("bifiẹnikan ni", "bifiẹnikan ni"),  # a longer word: not the term

@@ -306,7 +306,8 @@ class Engine:
         if not replaced:
             return speech
         log.info("asr_terms language=%s replaced=%d", language, replaced)
-        return dataclasses.replace(speech, transcript=dataclasses.replace(speech.transcript, text=text))
+        corrected = dataclasses.replace(speech.transcript, text=text)
+        return dataclasses.replace(speech, transcript=corrected, recognised=speech.transcript.text)
 
     # --- check --------------------------------------------------------------------------------------------
 

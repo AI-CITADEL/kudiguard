@@ -39,6 +39,15 @@ async def test_ticked_box_keeps_the_recording_after_answering(api: Api) -> None:
     assert await vault(api).read(kept.id) == VOICE_NOTE.read_bytes()
 
 
+async def test_donated_hypothesis_is_the_recognisers_words_not_the_term_corrections(api: Api) -> None:
+    api.asr.text = "Wọ́n ní kí n fún wọn ní bifi ẹni mi"
+    response = await api.client.post("/web/check", data={"language": "yo"}, files=FILES, headers=DONATING)
+    assert response.status_code == 200
+    assert response.json()["transcript"] == "Wọ́n ní kí n fún wọn ní BVN mi"  # shown and checked: fixed
+    [kept] = await api.store.voice_samples()
+    assert kept.hypothesis == "Wọ́n ní kí n fún wọn ní bifi ẹni mi"
+
+
 @pytest.mark.parametrize(
     ("headers", "data", "files"),
     [(WEB, {"language": "en"}, FILES),  # box not ticked

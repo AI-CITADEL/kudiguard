@@ -104,10 +104,11 @@ abuse:
 # Bank terms speech recognition spells phonetically in Yoruba speech, fixed in voice-note transcripts only (typed
 # text is never touched). `pattern` is a regex matched case-insensitively, as whole words, on an accent-folded copy
 # of the transcript (under-dots and tone marks removed), so write it WITHOUT accents: "bifi eni" also matches
-# "bifi ẹni". The matched span of the original transcript is replaced by `term`.
+# "bifi ẹni". The matched span of the original transcript is replaced by `term`. Patterns run on every voice note:
+# keep them linear (no nested quantifiers such as (a+)+). Separators allow spaces, zero-width spaces and dashes.
 asr_terms:
   # observed in a live voice note 2026-10-12; extend only from observed transcripts
-  - {pattern: 'bifi[\s-]*eni', term: BVN}  # "bifi eni", "bifi ẹni", "bifi-eni", "bifieni"
+  - {pattern: 'bifi[\s\u200b\u2010-\u2015-]*eni', term: BVN}  # "bifi eni", "bifi ẹni", "bifi-eni", "bifieni"
 
 lexicon:
   # Terms marked H were added for parity with Hausa (workstream H, 10 Oct 2026): DRAFT, pending native review.

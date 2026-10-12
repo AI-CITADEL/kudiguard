@@ -715,3 +715,17 @@ async def test_a_message_kind_without_voice_never_triggers_background_work(d: Ha
     await opt_in(d)
     await d.conversation.handle(d.msg(kind=MessageKind.UNSUPPORTED))
     assert d.conversation._tasks == set()
+
+
+async def test_donation_keeps_the_recognisers_words_not_the_term_corrections(d: Harness) -> None:
+    heard = "Wọ́n ní kí n fún wọn ní bifi ẹni mi"
+    d.asr.text = heard
+    await d.onboard("yo")
+    await voice(d)  # offered; this note is not kept
+    await d.say(button=YES)
+    d.llm.requests.clear()
+    await voice(d)
+    [kept] = await samples(d)
+    assert kept.hypothesis == heard  # `kudiguard voice wer` and transcribers see what the recogniser said
+    checked = [str(r.messages[-1]["content"]) for r in d.llm.requests]
+    assert any("BVN" in c for c in checked) and not any("bifi" in c for c in checked)  # the check: fixed
