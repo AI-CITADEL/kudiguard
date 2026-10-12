@@ -7,7 +7,7 @@ from typing import ClassVar
 import numpy as np
 import pytest
 
-from kudiguard.speech.base import SAMPLE_RATE, ASRError, Audio, AudioError
+from kudiguard.speech.base import SAMPLE_RATE, ASRError, Audio, AudioError, AudioProblem
 from kudiguard.speech.natlas_asr import NatlasASR, collapse_repeats
 
 MODELS = {"ha": "NCAIR1/Hausa-ASR", "en": "NCAIR1/NigerianAccentedEnglish", "yo": "NCAIR1/Yoruba-ASR"}
@@ -348,3 +348,42 @@ def test_transformers_loader_without_language_or_cache(fake_transformers: dict) 
 @pytest.mark.parametrize("raw", ["- - - - - - -", "… … … … … ok", "?? ?? ?? ?? ?? ??"])
 def test_punctuation_only_runs_are_not_treated_as_loops(raw: str) -> None:
     assert collapse_repeats(raw) == raw
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("bàbá ọ̀rọ̀-" + "-".join(["ìdáná"] * 12), "bàbá ọ̀rọ̀-ìdáná"),  # live Yoruba voice note 2026-10-12
+        ("kíá-kíá owó", "kíá-kíá owó"),  # reduplication with a hyphen is kept
+        (chr(0x2013).join("aaaaa") + " b", "a b"),  # en dash
+    ],
+)
+def test_collapse_hyphenated_loops(raw: str, expected: str) -> None:
+    assert collapse_repeats(raw) == expected
+
+
+class LoopLoader(FakeLoader):
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self.text = text
+
+    def __call__(self, repo: str):  # type: ignore[no-untyped-def]
+        self.loads.append(repo)
+        return lambda samples: self.text
+
+
+async def test_a_transcript_that_is_mostly_a_loop_is_no_speech() -> None:
+    asr = NatlasASR(MODELS, loader=LoopLoader("bàbá ọ̀rọ̀-" + "-".join(["ìdáná"] * 60)))
+    with pytest.raises(AudioError) as caught:
+        await asr.transcribe(speech(5), "yo")
+    assert caught.value.problem is AudioProblem.NO_SPEECH
+
+
+async def test_a_short_or_mostly_real_transcript_with_a_loop_is_kept() -> None:
+    short = "ẹ ṣé ẹ ṣé ẹ ṣé ẹ ṣé ẹ ṣé"  # under LOOP_MIN_UNITS
+    real = "won pe mi won ni ki n fi koodu ranse si won lati tun akaunti mi se ki o ma ba dina " + " ".join(
+        ["o"] * 6
+    )
+    for text in (short, real):
+        transcript = await NatlasASR(MODELS, loader=LoopLoader(text)).transcribe(speech(5), "yo")
+        assert transcript.text

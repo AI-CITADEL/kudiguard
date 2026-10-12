@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from kudiguard.speech.audio import split, trim_silence
-from kudiguard.speech.base import SAMPLE_RATE, ASRError, Audio, Samples, Transcript
+from kudiguard.speech.base import SAMPLE_RATE, ASRError, Audio, AudioError, AudioProblem, Samples, Transcript
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +38,13 @@ MAX_REPEAT_UNIT = 8  # words
 MIN_PHRASE_REPEATS = 3  # "send the code send the code send the code"
 MIN_WORD_REPEATS = 5  # single words repeat legitimately: "small small", "no no no", Yoruba reduplication
 TOKENIZER_FILES = ("tokenizer.json", "preprocessor_config.json")
+# A transcript that is mostly one loop ("ìdáná-ìdáná-ìdáná-…", live Yoruba voice note 2026-10-12) is not speech the
+# model understood: the LLM then invents a message. Rejected when at least LOOP_MIN_UNITS words/hyphen parts shrink
+# below LOOP_KEPT_SHARE once loops are collapsed.
+LOOP_MIN_UNITS = 20
+LOOP_KEPT_SHARE = 0.4
+_HYPHEN_LOOP = re.compile(rf"([^\s\-\u2013]+)(?:[\-\u2013]\1){{{MIN_WORD_REPEATS - 1},}}")
+_UNIT = re.compile(r"[^\s\-\u2013]+")
 
 
 def transformers_loader(
@@ -144,7 +151,7 @@ def collapse_repeats(text: str) -> str:
     Single words need ``MIN_WORD_REPEATS`` (legitimate: "small small", "no no no", reduplication); phrases need
     ``MIN_PHRASE_REPEATS``.
     """
-    words = text.split()
+    words = _HYPHEN_LOOP.sub(r"\1", text).split()  # "a-a-a-a-a" written as one hyphenated "word"
     keys = [re.sub(r"[^\w]", "", w.lower()) for w in words]  # compare ignoring case and punctuation
     out: list[str] = []
     i = 0
@@ -222,7 +229,11 @@ class NatlasASR:
                     texts.append(await asyncio.to_thread(model, chunk.samples))
                 except Exception as exc:
                     raise ASRError(f"speech recognition failed ({language}): {exc}") from exc
-        text = collapse_repeats(" ".join(t.strip() for t in texts if t.strip()))
+        raw = " ".join(t.strip() for t in texts if t.strip())
+        text = collapse_repeats(raw)
+        units = len(_UNIT.findall(raw))
+        if units >= LOOP_MIN_UNITS and len(_UNIT.findall(text)) < LOOP_KEPT_SHARE * units:
+            raise AudioError(AudioProblem.NO_SPEECH, "recogniser repetition loop")
         return Transcript(
             text=text,
             language=language,
